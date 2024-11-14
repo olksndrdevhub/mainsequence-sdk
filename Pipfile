@@ -1,0 +1,45 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[scripts]
+pip-install  = "pip install psycopg2-binary && pgcopy --no-deps &&  mkdocstrings['python']" #for timeseries orm
+
+[packages]
+fire = "*"
+pandas = "*"
+pyarrow = "*"
+cloudpickle = "*"
+opentelemetry-api = "*"
+opentelemetry-sdk = "*"
+pyyaml = "*"
+joblib = "*"
+tqdm = "*"
+opentelemetry-exporter-otlp = "==1.16.0"
+ray = "*"
+numexpr = "*"
+pydantic ="*"
+cryptography = "*"
+minio = "*"
+s3fs = "*"
+fastapi = "*"
+uvicorn = "*"
+python-logstash = "*"
+structlog = "*"
+mkdocs-mermaid2-plugin = "*"
+google-auth = "*"
+
+[dev-packages]
+mkdocs = "*"
+mkdocs-material = "*"
+mkdocs-gen-files = "*"
+mkdocs-literate-nav = "*"
+mkdocs-autorefs = "*"
+mkdocstrings = {extras = ["python"], version = "*"}
+mkdocs-mermaid2-plugin = "*"
+pymdown-extensions = "*"
+
+[requires]
+python_version = "3.9"
+python_full_version = "3.9.16"
