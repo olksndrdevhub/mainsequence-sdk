@@ -64,9 +64,9 @@ def create_logger_in_path(logger_name, logger_file:Union[str,None],application_n
     """
     # Ensure the directory for the log file exists
     logger = logging.getLogger(logger_name)
-    if logger.hasHandlers():
-        logger = structlog.get_logger(logger_name)
-        return logger
+    # if logger.hasHandlers():
+    #     logger = structlog.get_logger(logger_name)
+    #     return logger
 
     # Define the timestamper and pre_chain processors
     timestamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S")
