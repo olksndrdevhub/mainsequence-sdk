@@ -1,1 +1,0 @@
-::: tdag.contrib.feature_factory.tests.bars_features
