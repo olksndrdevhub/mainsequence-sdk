@@ -675,7 +675,7 @@ class TimeSerieRebuildMethods(ABC):
          Method to set state after it was loaded from pickle.
         Parameters
         ----------
-        include_mainsequence.vam_client_objects :
+        include_vam_client_objects :
         graph_depth_limit :
         metadatas : pre-requestd dictionary of metadatas to speed calculation of rebuild of state
         graph_depth :
@@ -2102,7 +2102,7 @@ class WrapperTimeSerie(TimeSerie):
         Set state with sessions for all wrapped TimeSeries.
 
         Args:
-            include_mainsequence.vam_client_objects: Whether to include asset ORM objects.
+            include_vam_client_objects: Whether to include asset ORM objects.
             graph_depth_limit: The maximum depth of the graph to traverse.
             graph_depth: The current depth in the graph.
             local_metadatas: Optional metadata dictionary.
@@ -2137,7 +2137,7 @@ class WrapperTimeSerie(TimeSerie):
             with ThreadPoolExecutor(max_workers=10) as executor:
                 for ts_key, rel_ts in self.related_time_series.items():
                     future = executor.submit(update_ts, self.related_time_series, ts_key,
-                                             include_mainsequence.vam_client_objects, graph_depth,
+                                             include_vam_client_objects, graph_depth,
                                              graph_depth_limit, errors, local_metadatas,
                                              rel_ts)
 
@@ -2152,7 +2152,7 @@ class WrapperTimeSerie(TimeSerie):
         else:
             self.logger.warning("NOT using threads for  loading state")
             t = update_ts(self.related_time_series, ts_key,
-                          include_mainsequence.vam_client_objects, graph_depth,
+                          include_vam_client_objects, graph_depth,
                           graph_depth_limit, errors, local_metadatas, rel_ts)
 
         if len(errors.keys()) > 0:
