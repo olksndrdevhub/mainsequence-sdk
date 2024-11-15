@@ -411,7 +411,9 @@ class ParquetLocalPersistManager:
         self.data_folder = data_folder
         self.logger=logger
         if logger is None:
-            self.logger = console_logger("parquet_persist_manager",application_name="tdag",sub_process=self.__class__.__name__)
+            self.logger = create_logger_in_path(logger_name="parquet_persist_manager", application_name="tdag",
+                                                    logger_file=f'{ogm.get_logging_path()}/parquet_persist_manager.log',
+                                                    )
 
         self.config_file = self.data_folder + "/config.yaml"
         self.meta_file = self.data_folder + "/meta_data.yaml"
