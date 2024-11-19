@@ -867,7 +867,7 @@ class SignalYamls(BaseYamlModel):
     def ROOT_URL(cls):
         return get_signal_yaml_url(TDAG_ENDPOINT)
 
-def register_strategies(json_payload:dict,timeout=None):
+def register_strategy(json_payload:dict,timeout=None):
     url = TDAG_ENDPOINT + "/tdag-gpt/register_strategy/"
     from requests.adapters import HTTPAdapter, Retry
     s = requests.Session()
