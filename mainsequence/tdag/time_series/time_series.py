@@ -1512,7 +1512,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
             # should be on creation
             update_details = self.local_persist_manager.update_details_exist() if local_meta_exist == True else {
-                "remote_exist": True, "local_exist": False}
+                "remote_exist": remote_meta_exist, "local_exist": local_meta_exist}
             if update_details["remote_exist"] == False or update_details["local_exist"] == False:
                 self.set_relation_tree()
                 self.local_persist_manager.build_update_details(source_class_name=self.__class__.__name__)

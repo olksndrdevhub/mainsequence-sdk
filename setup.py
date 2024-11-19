@@ -6,7 +6,7 @@ import pathlib
 import os
 import toml
 
-BASE_REQUIRED_PACKAGES = ['packages',"contrib_binance", "contrib_coinmarketcap"]
+BASE_REQUIRED_PACKAGES = ['packages']
 
 def get_install_requirements():
     """
@@ -35,6 +35,8 @@ def get_install_requirements():
     for pkg, ver in required_packages:
         if ver != "*":
             if isinstance(ver,dict):
+                if "file" in ver:
+                    continue
                 req = "{0}{1}".format(pkg, ver['extras'])
             else:
                 req="{0}{1}".format(pkg, ver)
