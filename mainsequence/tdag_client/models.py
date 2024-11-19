@@ -872,12 +872,26 @@ def register_strategy(json_payload:dict,timeout=None):
     from requests.adapters import HTTPAdapter, Retry
     s = requests.Session()
     s.headers.update(loaders.auth_headers)
-    retries = Retry(total=2, backoff_factor=2, )
+    retries = Retry(total=2, backoff_factor=2)
     s.mount('http://', HTTPAdapter(max_retries=retries))
 
-    r = make_request(s=s, r_type="POST", url=url, payload={"json":json_payload},
+    r = make_request(s=s, r_type="POST", url=url, payload={"json": json_payload},
                      loaders=loaders, time_out=timeout)
     return r
+
+def create_configuration_for_strategy(json_payload: dict, timeout=None):
+    url = TDAG_ENDPOINT + "/tdag-gpt/create_configuration_for_strategy/"
+    from requests.adapters import HTTPAdapter, Retry
+    s = requests.Session()
+    s.headers.update(loaders.auth_headers)
+    retries = Retry(total=2, backoff_factor=2)
+    s.mount('http://', HTTPAdapter(max_retries=retries))
+
+    r = make_request(s=s, r_type="POST", url=url, payload={"json": json_payload},
+                     loaders=loaders, time_out=timeout)
+    return r
+
+
 class DynamicTableHelpers:
     ROOT_URL = TDAG_ENDPOINT +"/orm/api"
     DATE_FORMAT = DATE_FORMAT

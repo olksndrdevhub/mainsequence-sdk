@@ -29,6 +29,7 @@ python-logstash = "*"
 structlog = "*"
 mkdocs-mermaid2-plugin = "*"
 google-auth = "*"
+ccxt = "*"
 
 [dev-packages]
 mkdocs = "*"
