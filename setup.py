@@ -54,10 +54,10 @@ def get_git_revision_short_hash():
 
 setup(
   name='mainsequence',
-  version='1.0.0',
-  python_requires='>=3.9.0',
-  author = 'Jose Alatorre',
-  author_email = '',
+  version=f"1.0.0-{get_git_revision_short_hash()}",
+    python_requires='>=3.9.0',
+  author='Main Sequence GmbH',
+  author_email = 'dev@main-sequence.io',
   install_requires=get_install_requirements(),
-  packages=find_packages(),
-  description='Main Sequence SDK')
+    packages=find_packages(include=['mainsequence', 'mainsequence.*']),  # Include only the `mainsequence` package
+    description='Main Sequence SDK')

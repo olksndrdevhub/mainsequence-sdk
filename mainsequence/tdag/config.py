@@ -53,7 +53,7 @@ class Configuration:
         "TDAG_ADMIN_USER", "TDAG_ADMIN_PASSWORD", "TDAG_DB_CONNECTION",
         "TDAG_RAY_CLUSTER_ADDRESS"
     ]
-    OPTIONAL_ENV_VARIABLES = ["MLFLOW_ENDPOINT"]
+    OPTIONAL_ENV_VARIABLES = []
 
     def __init__(self):
         self.set_gt_configuration()

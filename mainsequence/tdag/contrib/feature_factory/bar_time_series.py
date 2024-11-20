@@ -658,9 +658,6 @@ class CompCrossAssetFeat(TimeSerie):
         return data_df
 
 
-
-
-
 class CompAssetFeat(TimeSerie):
 
     @TimeSerie._post_init_routines()
