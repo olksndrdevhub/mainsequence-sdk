@@ -30,6 +30,7 @@ structlog = "*"
 mkdocs-mermaid2-plugin = "*"
 google-auth = "*"
 ccxt = "*"
+kombu = "*"
 
 [dev-packages]
 mkdocs = "*"
