@@ -62,14 +62,17 @@ def parse_dictionary_before_hashing(dictionary: Dict[str, Any]) -> Dict[str, Any
                     local_ts_dict_to_hash[key] = parse_dictionary_before_hashing(value)
 
             if isinstance(value, list):
-                if isinstance(value[0], dict):
-                    if "orm_class" in value[0].keys():
-                        try:
-                            new_list = [v["unique_identifier"] for v in value]
-                        except Exception as e:
-                            raise e
-                        local_ts_dict_to_hash[key] = new_list
-                        raise Exception("Use ModelList")
+                if len(value)==0:
+                    local_ts_dict_to_hash[key]=value
+                else:
+                    if isinstance(value[0], dict):
+                        if "orm_class" in value[0].keys():
+                            try:
+                                new_list = [v["unique_identifier"] for v in value]
+                            except Exception as e:
+                                raise e
+                            local_ts_dict_to_hash[key] = new_list
+                            raise Exception("Use ModelList")
 
     return local_ts_dict_to_hash
 
@@ -277,13 +280,21 @@ class ConfigSerializer:
             import_path = {"module": value.__class__.__module__,
                            "qualname": value.__class__.__qualname__}
             model_dict = value.__dict__
+
+
             serialized_model = {}
-            for key, model_tmp_value in model_dict.items():
+            for key, model_tmp_value in value.model_dump().items():#model_dict.items():
                 serialized_model[key] = self._serialize_signature_argument(model_tmp_value, pickle_ts)
+            try:
+                json.dumps(serialized_model)
+            except Exception as e:
+                raise e
             value = {"pydantic_model_import_path": import_path, "serialized_model": serialized_model}
         elif issubclass(value.__class__, BaseObjectOrm):
             value = value.to_serialized_dict()
         elif isinstance(value, list):
+            if len(value) == 0:
+                return []
             if isinstance(value, ModelList):
                 value.sort(key=lambda x: x.unique_identifier, reverse=False)
                 new_value = {"is_model_list": True}
