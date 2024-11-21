@@ -900,7 +900,7 @@ def create_configuration_for_strategy(json_payload: dict, timeout=None):
     s.mount('http://', HTTPAdapter(max_retries=retries))
 
     r = make_request(s=s, r_type="POST", url=url, payload={"json": json_payload},
-                     loaders=loaders, time_out=timeout)
+                     loaders=loaders, time_out=200)
     return r
 
 
