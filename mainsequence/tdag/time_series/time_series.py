@@ -40,6 +40,17 @@ from mainsequence.tdag.logconf import get_tdag_logger
 
 logger = get_tdag_logger()
 
+
+def serialize_model_list(value):
+    value.sort(key=lambda x: x.unique_identifier, reverse=False)
+    new_value = {"is_model_list": True}
+    new_value['model_list'] = [v.to_serialized_dict() for v in value]
+    value = new_value
+    return value
+
+from mainsequence.vam_client.models_helpers import get_model_class
+build_model = lambda model_data: get_model_class(model_data["orm_class"])(**model_data)
+
 def parse_dictionary_before_hashing(dictionary: Dict[str, Any]) -> Dict[str, Any]:
     local_ts_dict_to_hash = {}
     for key, value in dictionary.items():
@@ -143,7 +154,7 @@ class ConfigSerializer:
         Returns:
 
         """
-        rebuild_function = lambda x, state_kwargs: cls._rebuild_configuration_argument(x)
+        rebuild_function = lambda x, state_kwargs: cls._rebuild_configuration_argument(x,ignore_pydantic=False)
         if state_kwargs is not None:
             rebuild_function = lambda x, state_kwargs: cls.deserialize_pickle_value(x, **state_kwargs)
 
@@ -177,6 +188,7 @@ class ConfigSerializer:
                     raise e
             new_details[arg] = arg_value
         try:
+           
             value = PydanticClass(**new_details)
         except Exception as e:
             raise e
@@ -202,17 +214,19 @@ class ConfigSerializer:
         return config
 
     @classmethod
-    def _rebuild_configuration_argument(cls, value):
+    def _rebuild_configuration_argument(cls, value,ignore_pydantic):
         """
-        rebuilds configuration
+        To be able to mix pydantic with VAM ORM models we need to add the posibility to recusevely ignore pydantic
         Args:
-            value:
+            value: 
+            ignore_pydantic: 
 
         Returns:
 
         """
-        from mainsequence.vam_client.models_helpers import get_model_class
-        build_model = lambda model_data: get_model_class(model_data["orm_class"])(**model_data)
+      
+
+
 
         if isinstance(value, dict):
 
@@ -225,25 +239,27 @@ class ConfigSerializer:
             elif "orm_class" in value.keys():
                 value = build_model(value)
             elif "pydantic_model_import_path" in value.keys():
-
-                value = cls.rebuild_pydantic_model(value)
+                value=cls.rebuild_config(value,ignore_pydantic=True)
+                if ignore_pydantic ==False:
+                    value = cls.rebuild_pydantic_model(value)
             else:
                 value = cls.rebuild_config(config=value)
 
 
         elif isinstance(value, list):
             if isinstance(value[0], dict):
-                if "orm_class" in value[0].keys():
-                    value = [build_model(v) for v in value]
-
-                elif "pydantic_model_import_path" in value[0].keys():
-                    value = [cls.rebuild_pydantic_model(v) for v in value]
-
-            pass
+                # if "orm_class" in value[0].keys():
+                #     value = [build_model(v) for v in value]
+                # 
+                # elif "pydantic_model_import_path" in value[0].keys():
+                #     value = [cls.rebuild_pydantic_model(v) for v in value]
+                # else:
+                value = [cls.rebuild_config(v) if isinstance(v,dict) else v for v in value ]
+           
         return value
 
     @classmethod
-    def rebuild_config(cls, config):
+    def rebuild_config(cls, config,ignore_pydantic=False):
         """
 
         :param config:
@@ -251,7 +267,7 @@ class ConfigSerializer:
         """
 
         for key, value in config.items():
-            config[key] = cls._rebuild_configuration_argument(value)
+            config[key] = cls._rebuild_configuration_argument(value,ignore_pydantic)
 
         return config
 
@@ -296,10 +312,7 @@ class ConfigSerializer:
             if len(value) == 0:
                 return []
             if isinstance(value, ModelList):
-                value.sort(key=lambda x: x.unique_identifier, reverse=False)
-                new_value = {"is_model_list": True}
-                new_value['model_list'] = [v.to_serialized_dict() for v in value]
-                value = new_value
+                value=serialize_model_list(value)
             else:
                 if issubclass(value[0].__class__, BaseObjectOrm):
                     to_sort = {v.unique_identifier: v.to_serialized_dict() for v in value}
@@ -308,9 +321,10 @@ class ConfigSerializer:
                     value = [to_sort[i] for i in ids]
                     raise Exception("Use Model List")
                 elif issubclass(value[0].__class__, dict):
-
+                    a=5
                     value = [self._serialize_configuration_dict(v) for v in value]
                 elif isinstance(value[0], BaseModel):
+                    a=5
                     value = [self._serialize_signature_argument(v, pickle_ts=pickle_ts) for v in value]
                 else:
                     try:
@@ -384,10 +398,11 @@ class ConfigSerializer:
     @classmethod
     def deserialize_pickle_value(cls, value, include_vam_client_objects: bool,
                                  graph_depth_limit: int,
-                                 graph_depth: int, local_metadatas: Union[dict, None]):
+                                 graph_depth: int, local_metadatas: Union[dict, None],
+                                 ignore_pydantic=False,):
         from mainsequence.vam_client.models_helpers import get_model_class
         import cloudpickle
-        build_model = lambda model_data: get_model_class(model_data["orm_class"])(**model_data)
+
         new_value = value
         if isinstance(value, dict):
 
@@ -413,8 +428,15 @@ class ConfigSerializer:
                                     graph_depth_limit=graph_depth_limit,
                                     graph_depth=copy.deepcopy(graph_depth),
                                     include_vam_client_objects=include_vam_client_objects)
-                new_value = cls.rebuild_pydantic_model(value,
-                                                       state_kwargs=state_kwargs)
+                new_value = cls.deserialize_pickle_state(value,
+                                                         local_metadatas=local_metadatas,
+                                                         graph_depth_limit=graph_depth_limit,
+                                                         graph_depth=copy.deepcopy(graph_depth),
+                                                         ignore_pydantic=True,
+                                                         include_vam_client_objects=include_vam_client_objects)
+                if ignore_pydantic ==False:
+                    new_value = cls.rebuild_pydantic_model(new_value,
+                                                           state_kwargs=state_kwargs)
             else:
                 new_value = cls.deserialize_pickle_state(value,
                                                          local_metadatas=local_metadatas,
@@ -425,19 +447,24 @@ class ConfigSerializer:
         if isinstance(value, list):
             if len(value) == 0:
                 return new_value
-
-            if isinstance(value[0], dict):
-                if "orm_class" in value[0].keys():
-                    new_value = [build_model(v) for v in value]
-                elif "pydantic_model_import_path" in value[0].keys():
-                        new_value = [cls.rebuild_pydantic_model(v) for v in value]
+            # if isinstance(value[0], dict):
+            #     if "orm_class" in value[0].keys():
+            #         new_value = [build_model(v) for v in value]
+            #     elif "pydantic_model_import_path" in value[0].keys():
+            #             new_value = [cls.rebuild_pydantic_model(v) for v in value]
+            kk=dict(local_metadatas=local_metadatas,ignore_pydantic=ignore_pydantic,
+                                                         graph_depth_limit=graph_depth_limit,
+                                                         graph_depth=copy.deepcopy(graph_depth),
+                                                         include_vam_client_objects=include_vam_client_objects)
+            new_value=[cls.deserialize_pickle_value(v,**kk) if isinstance(v, dict) else v for v in value  ]
 
         return new_value
 
     @classmethod
     def deserialize_pickle_state(cls, state, include_vam_client_objects: bool,
                                  graph_depth_limit: int,
-                                 graph_depth: int, local_metadatas: Union[dict, None]
+                                 graph_depth: int, local_metadatas: Union[dict, None],
+                                 ignore_pydantic=False,
                                  ):
         """
         

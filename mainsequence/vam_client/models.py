@@ -379,7 +379,7 @@ class AssetMixin(BaseObjectOrm,BaseVamPydanticModel):
     name: str
     asset_type: str
     can_trade: bool
-    calendar:Optional[str]=None
+    calendar:str
     execution_venue: Union["ExecutionVenue", int]
     delisted_datetime: Optional[datetime.datetime] = None
 
