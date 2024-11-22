@@ -166,7 +166,7 @@ class ConfigSerializer:
                             new_item = cls.rebuild_pydantic_model(a,
                                                                   state_kwargs=state_kwargs)
                     if new_item is None:
-                        new_item = rebuild_function(arg_value, state_kwargs=state_kwargs)
+                        new_item = rebuild_function(a, state_kwargs=state_kwargs)
                     new_list.append(new_item)
 
                 arg_value = new_list
