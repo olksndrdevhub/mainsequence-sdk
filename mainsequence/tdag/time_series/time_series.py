@@ -180,7 +180,7 @@ class ConfigSerializer:
                         new_item = rebuild_function(a, state_kwargs=state_kwargs)
                     new_list.append(new_item)
 
-                arg_value = new_list
+                arg_value = new_list 
             else:
                 try:
                     arg_value = rebuild_function(arg_value, state_kwargs=state_kwargs)

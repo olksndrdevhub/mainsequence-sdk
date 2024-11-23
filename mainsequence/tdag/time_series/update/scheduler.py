@@ -540,7 +540,7 @@ class SchedulerUpdater:
             }
 
             self.logger.info(
-                f"Actor for local ts {head_ts} built and added to update loop")
+                f"Actor for head ts with local hash_id {head_ts} built and added to update loop")
         return actors_map, target_ts, wait_list
 
     def _get_next_update_loop(self, local_hash_id: str):
