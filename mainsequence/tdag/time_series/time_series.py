@@ -158,6 +158,8 @@ class ConfigSerializer:
         if state_kwargs is not None:
             rebuild_function = lambda x, state_kwargs: cls.deserialize_pickle_value(x, **state_kwargs)
 
+
+
         module = importlib.import_module(details["pydantic_model_import_path"]["module"])
         PydanticClass = getattr(module, details["pydantic_model_import_path"]['qualname'])
         new_details = {}
@@ -167,25 +169,26 @@ class ConfigSerializer:
                     arg_value = cls.rebuild_pydantic_model(arg_value,
                                                            state_kwargs=state_kwargs)
                 else:
-                    arg_value = rebuild_function(arg_value, state_kwargs=state_kwargs)
+                    arg_value = {k:rebuild_function(v, state_kwargs=state_kwargs) for k,v in arg_value.items()}
             elif isinstance(arg_value, list):
                 new_list = []
                 for a in arg_value:
-                    new_item = None
+
                     if isinstance(a, dict):
                         if "pydantic_model_import_path" in a.keys():
                             new_item = cls.rebuild_pydantic_model(a,
                                                                   state_kwargs=state_kwargs)
-                    if new_item is None:
+                        else:
+                            new_item = rebuild_function(a, state_kwargs=state_kwargs)
+                    else:
                         new_item = rebuild_function(a, state_kwargs=state_kwargs)
                     new_list.append(new_item)
 
-                arg_value = new_list 
+                arg_value = new_list
             else:
-                try:
-                    arg_value = rebuild_function(arg_value, state_kwargs=state_kwargs)
-                except Exception as e:
-                    raise e
+
+                arg_value = rebuild_function(arg_value, state_kwargs=state_kwargs)
+
             new_details[arg] = arg_value
         try:
            
@@ -247,14 +250,9 @@ class ConfigSerializer:
 
 
         elif isinstance(value, list):
-            if isinstance(value[0], dict):
-                # if "orm_class" in value[0].keys():
-                #     value = [build_model(v) for v in value]
-                # 
-                # elif "pydantic_model_import_path" in value[0].keys():
-                #     value = [cls.rebuild_pydantic_model(v) for v in value]
-                # else:
-                value = [cls.rebuild_config(v) if isinstance(v,dict) else v for v in value ]
+            if len(value) == 0:
+                return value
+            value = [cls._rebuild_configuration_argument(v,ignore_pydantic=ignore_pydantic)  for v in value ]
            
         return value
 
@@ -295,7 +293,6 @@ class ConfigSerializer:
 
             import_path = {"module": value.__class__.__module__,
                            "qualname": value.__class__.__qualname__}
-            model_dict = value.__dict__
 
 
             serialized_model = {}
@@ -2363,6 +2360,11 @@ class WrapperTimeSerie(TimeSerie):
             t.join()
 
         return all_dfs
+
+
+
+
+
 
     def update_series_from_source(self, latest_value, *args, **kwargs):
         """ Implemented in the wrapped nodes"""

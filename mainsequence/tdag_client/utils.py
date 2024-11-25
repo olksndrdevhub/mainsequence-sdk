@@ -427,6 +427,62 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
             # conn.commit()
 
 
+def concatenate_ts(
+    tables_to_concatenate: list,
+    start_value: Union[datetime.datetime, None],
+    end_value: Union[datetime.datetime, None],
+    great_or_equal: bool,
+    less_or_equal: bool,
+    index_to_concat: list,
+    time_series_orm_db_connection: Union[str, None] = None,
+):
+    time_series_orm_db_connection = (
+        TDAG_ORM_DB_CONNECTION if time_series_orm_db_connection is None else time_series_orm_db_connection
+    )
+
+    with psycopg2.connect(time_series_orm_db_connection) as conn:
+        params = []
+        subqueries = []
+        for i, table in enumerate(tables_to_concatenate):
+            alias = f"t{i+1}"
+            where_clauses = []
+            if start_value is not None:
+                lower_op = '>=' if great_or_equal else '>'
+                where_clauses.append(f"time_index {lower_op} %s")
+                params.append(start_value)
+            if end_value is not None:
+                upper_op = '<=' if less_or_equal else '<'
+                where_clauses.append(f"time_index {upper_op} %s")
+                params.append(end_value)
+            where_clause = ''
+            if where_clauses:
+                where_clause = 'WHERE ' + ' AND '.join(where_clauses)
+            subquery = f"""
+            (SELECT * FROM {table}
+             {where_clause}) AS {alias}
+            """
+            subqueries.append((alias, subquery.strip()))
+
+        # Build the FROM clause with full outer joins
+        from_clause = subqueries[0][1]
+        base_alias = subqueries[0][0]
+
+        for alias, subquery in subqueries[1:]:
+            join_conditions = ' AND '.join(
+                [f"{base_alias}.{col} = {alias}.{col}" for col in index_to_concat]
+            )
+            from_clause = f"""
+            ({from_clause}
+            FULL OUTER JOIN {subquery} ON ({join_conditions}))
+            """
+            # Update base_alias to represent the result of the join
+            base_alias = f"joined_{alias}"
+
+        final_query = f"SELECT * FROM {from_clause}"
+        df = pd.read_sql(final_query, conn, params=params)
+        return df
+
+
 def get_mean_bid_ask_spread(interval: str, book_table_name: str, symbol_list: list,
                             bid_ask_rank=1,
                             timeout=60 * 2):
