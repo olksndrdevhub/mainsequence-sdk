@@ -22,8 +22,8 @@ from mainsequence.tdag.config import (
 
 from mainsequence.tdag.time_series import persist_managers
 from mainsequence.tdag.time_series.persist_managers import DataLakePersistManager
+from pycares.errno import value
 from pydantic import BaseModel
-
 
 from abc import ABC
 
@@ -48,8 +48,18 @@ def serialize_model_list(value):
     value = new_value
     return value
 
+
+def rebuild_with_type(value, rebuild_function):
+    if value["__type__"] == "tuple":
+        return tuple([rebuild_function(c) for c in value["items"]])
+    else:
+        raise NotImplementedError
+
+
 from mainsequence.vam_client.models_helpers import get_model_class
+
 build_model = lambda model_data: get_model_class(model_data["orm_class"])(**model_data)
+
 
 def parse_dictionary_before_hashing(dictionary: Dict[str, Any]) -> Dict[str, Any]:
     local_ts_dict_to_hash = {}
@@ -73,8 +83,8 @@ def parse_dictionary_before_hashing(dictionary: Dict[str, Any]) -> Dict[str, Any
                     local_ts_dict_to_hash[key] = parse_dictionary_before_hashing(value)
 
             if isinstance(value, list):
-                if len(value)==0:
-                    local_ts_dict_to_hash[key]=value
+                if len(value) == 0:
+                    local_ts_dict_to_hash[key] = value
                 else:
                     if isinstance(value[0], dict):
                         if "orm_class" in value[0].keys():
@@ -154,12 +164,12 @@ class ConfigSerializer:
         Returns:
 
         """
-        rebuild_function = lambda x, state_kwargs: cls._rebuild_configuration_argument(x,ignore_pydantic=False)
+        rebuild_function = lambda x, state_kwargs: cls._rebuild_configuration_argument(x, ignore_pydantic=False)
         if state_kwargs is not None:
             rebuild_function = lambda x, state_kwargs: cls.deserialize_pickle_value(x, **state_kwargs)
-
-
-
+        
+    
+        
         module = importlib.import_module(details["pydantic_model_import_path"]["module"])
         PydanticClass = getattr(module, details["pydantic_model_import_path"]['qualname'])
         new_details = {}
@@ -168,8 +178,10 @@ class ConfigSerializer:
                 if "pydantic_model_import_path" in arg_value.keys():
                     arg_value = cls.rebuild_pydantic_model(arg_value,
                                                            state_kwargs=state_kwargs)
+                elif "__type__" in arg_value.keys():
+                    arg_value = rebuild_with_type(arg_value)
                 else:
-                    arg_value = {k:rebuild_function(v, state_kwargs=state_kwargs) for k,v in arg_value.items()}
+                    arg_value = {k: rebuild_function(v, state_kwargs=state_kwargs) for k, v in arg_value.items()}
             elif isinstance(arg_value, list):
                 new_list = []
                 for a in arg_value:
@@ -191,7 +203,7 @@ class ConfigSerializer:
 
             new_details[arg] = arg_value
         try:
-           
+
             value = PydanticClass(**new_details)
         except Exception as e:
             raise e
@@ -217,7 +229,7 @@ class ConfigSerializer:
         return config
 
     @classmethod
-    def _rebuild_configuration_argument(cls, value,ignore_pydantic):
+    def _rebuild_configuration_argument(cls, value, ignore_pydantic):
         """
         To be able to mix pydantic with VAM ORM models we need to add the posibility to recusevely ignore pydantic
         Args:
@@ -227,9 +239,6 @@ class ConfigSerializer:
         Returns:
 
         """
-      
-
-
 
         if isinstance(value, dict):
 
@@ -242,9 +251,12 @@ class ConfigSerializer:
             elif "orm_class" in value.keys():
                 value = build_model(value)
             elif "pydantic_model_import_path" in value.keys():
-                value=cls.rebuild_config(value,ignore_pydantic=True)
-                if ignore_pydantic ==False:
+                value = cls.rebuild_config(value, ignore_pydantic=True)
+                if ignore_pydantic == False:
                     value = cls.rebuild_pydantic_model(value)
+            elif "__type__" in value.keys():
+                value = rebuild_with_type(value, rebuild_function=lambda x: cls._rebuild_configuration_argument(x,
+                                                                                                                ignore_pydantic=ignore_pydantic))
             else:
                 value = cls.rebuild_config(config=value)
 
@@ -252,12 +264,12 @@ class ConfigSerializer:
         elif isinstance(value, list):
             if len(value) == 0:
                 return value
-            value = [cls._rebuild_configuration_argument(v,ignore_pydantic=ignore_pydantic)  for v in value ]
-           
+            value = [cls._rebuild_configuration_argument(v, ignore_pydantic=ignore_pydantic) for v in value]
+
         return value
 
     @classmethod
-    def rebuild_config(cls, config,ignore_pydantic=False):
+    def rebuild_config(cls, config, ignore_pydantic=False):
         """
 
         :param config:
@@ -265,7 +277,7 @@ class ConfigSerializer:
         """
 
         for key, value in config.items():
-            config[key] = cls._rebuild_configuration_argument(value,ignore_pydantic)
+            config[key] = cls._rebuild_configuration_argument(value, ignore_pydantic)
 
         return config
 
@@ -275,6 +287,8 @@ class ConfigSerializer:
         """
         from types import SimpleNamespace
         from mainsequence.vam_client import BaseObjectOrm
+
+    
         if issubclass(value.__class__, TimeSerie):
             if pickle_ts == True:
                 new_value = {"is_time_serie_pickled": True}
@@ -294,22 +308,36 @@ class ConfigSerializer:
             import_path = {"module": value.__class__.__module__,
                            "qualname": value.__class__.__qualname__}
 
-
             serialized_model = {}
-            for key, model_tmp_value in value.model_dump().items():#model_dict.items():
+            for key, model_tmp_value in value.model_dump().items():  # model_dict.items():
                 serialized_model[key] = self._serialize_signature_argument(model_tmp_value, pickle_ts)
             try:
+               
                 json.dumps(serialized_model)
             except Exception as e:
                 raise e
             value = {"pydantic_model_import_path": import_path, "serialized_model": serialized_model}
         elif issubclass(value.__class__, BaseObjectOrm):
             value = value.to_serialized_dict()
+        elif isinstance(value, tuple):
+            tuple_list = []
+            for v in value:
+                new_v = v
+                if isinstance(v, BaseModel):
+                    new_v = self._serialize_signature_argument(v, pickle_ts=pickle_ts)
+                else:
+                    try:
+                        new_v = self._serialize_signature_argument(v, pickle_ts=pickle_ts)
+                    except Exception as e:
+                        raise e
+                tuple_list.append(new_v)
+            new_value = {"__type__": "tuple", "items": tuple_list}
+            value = new_value
         elif isinstance(value, list):
             if len(value) == 0:
                 return []
             if isinstance(value, ModelList):
-                value=serialize_model_list(value)
+                value = serialize_model_list(value)
             else:
                 if issubclass(value[0].__class__, BaseObjectOrm):
                     to_sort = {v.unique_identifier: v.to_serialized_dict() for v in value}
@@ -318,16 +346,30 @@ class ConfigSerializer:
                     value = [to_sort[i] for i in ids]
                     raise Exception("Use Model List")
                 elif issubclass(value[0].__class__, dict):
-                    a=5
+                    a = 5
                     value = [self._serialize_configuration_dict(v) for v in value]
                 elif isinstance(value[0], BaseModel):
-                    a=5
+                    a = 5
                     value = [self._serialize_signature_argument(v, pickle_ts=pickle_ts) for v in value]
                 else:
-                    try:
-                        value.sort()
-                    except Exception as e:
-                        raise e
+                    new_value=[]
+                    sort=True
+                    for v in value:
+                        if  issubclass(v.__class__, dict):
+                            if "__type__" in v.keys():
+                                new_value.append(v)
+                            else:
+                                new_value.append(self._serialize_configuration_dict(v))
+                            sort = False
+                        elif isinstance(value[0], BaseModel):
+                            new_value.append(self._serialize_signature_argument(v, pickle_ts=pickle_ts))
+                            sort = False
+                        else:
+                            new_value.append(v)
+                    if sort==True:
+                        new_value.sort()
+                    value=new_value
+                    
         elif isinstance(value, dict):
             for value_key, value_value in value.items():
                 if isinstance(value_value, dict):
@@ -348,7 +390,8 @@ class ConfigSerializer:
     def _serialize_configuration_dict(self, kwargs, pickle_ts=False, ordered_dict=True):
 
         import collections
-        new_kwargs = {}
+        new_kwargs = {}        
+        
         for key, value in kwargs.items():
 
             if key in ["model_list"]:
@@ -359,7 +402,7 @@ class ConfigSerializer:
                 if "is_time_serie_pickled" in value.keys():
                     new_kwargs[key] = value
                     continue
-
+    
             value = self._serialize_signature_argument(value, pickle_ts=pickle_ts)
 
             new_kwargs[key] = value
@@ -396,15 +439,23 @@ class ConfigSerializer:
     def deserialize_pickle_value(cls, value, include_vam_client_objects: bool,
                                  graph_depth_limit: int,
                                  graph_depth: int, local_metadatas: Union[dict, None],
-                                 ignore_pydantic=False,):
+                                 ignore_pydantic=False, ):
         from mainsequence.vam_client.models_helpers import get_model_class
         import cloudpickle
 
         new_value = value
+
+        state_kwargs = dict(local_metadatas=local_metadatas,
+                            graph_depth_limit=graph_depth_limit,
+                            graph_depth=copy.deepcopy(graph_depth),
+                            include_vam_client_objects=include_vam_client_objects)
         if isinstance(value, dict):
 
             if "is_time_series_config" in value.keys():
                 new_value = TimeSerieConfigKwargs(**value["config_data"])
+            elif "__type__" in value.keys():
+                rebuild_function = lambda x: cls.deserialize_pickle_state(x, **state_kwargs)
+                new_value = rebuild_with_type(value, rebuild_function=rebuild_function)
             elif "is_model_list" in value.keys():
                 new_value = ModelList([build_model(v) for v in value['model_list']])
             elif "is_time_serie_pickled" in value.keys():
@@ -421,26 +472,23 @@ class ConfigSerializer:
             elif "orm_class" in value.keys():
                 new_value = build_model(value)
             elif "pydantic_model_import_path" in value.keys():
-                state_kwargs = dict(local_metadatas=local_metadatas,
-                                    graph_depth_limit=graph_depth_limit,
-                                    graph_depth=copy.deepcopy(graph_depth),
-                                    include_vam_client_objects=include_vam_client_objects)
+
                 new_value = cls.deserialize_pickle_state(value,
-                                                         local_metadatas=local_metadatas,
-                                                         graph_depth_limit=graph_depth_limit,
-                                                         graph_depth=copy.deepcopy(graph_depth),
-                                                         ignore_pydantic=True,
-                                                         include_vam_client_objects=include_vam_client_objects)
-                if ignore_pydantic ==False:
+
+                                                         ignore_pydantic=True, **state_kwargs
+                                                         )
+                if ignore_pydantic == False:
                     new_value = cls.rebuild_pydantic_model(new_value,
                                                            state_kwargs=state_kwargs)
             else:
                 new_value = cls.deserialize_pickle_state(value,
-                                                         local_metadatas=local_metadatas,
-                                                         graph_depth_limit=graph_depth_limit,
-                                                         graph_depth=copy.deepcopy(graph_depth),
-                                                         include_vam_client_objects=include_vam_client_objects)
-
+                                                         **state_kwargs)
+        if isinstance(value, tuple):
+            new_value = [
+                cls.deserialize_pickle_value(v, ignore_pydantic=ignore_pydantic, **state_kwargs) if isinstance(v,
+                                                                                                               dict) else v
+                for v in value]
+            new_value=tuple(new_value)
         if isinstance(value, list):
             if len(value) == 0:
                 return new_value
@@ -449,11 +497,11 @@ class ConfigSerializer:
             #         new_value = [build_model(v) for v in value]
             #     elif "pydantic_model_import_path" in value[0].keys():
             #             new_value = [cls.rebuild_pydantic_model(v) for v in value]
-            kk=dict(local_metadatas=local_metadatas,ignore_pydantic=ignore_pydantic,
-                                                         graph_depth_limit=graph_depth_limit,
-                                                         graph_depth=copy.deepcopy(graph_depth),
-                                                         include_vam_client_objects=include_vam_client_objects)
-            new_value=[cls.deserialize_pickle_value(v,**kk) if isinstance(v, dict) else v for v in value  ]
+         
+            new_value = [
+                cls.deserialize_pickle_value(v, ignore_pydantic=ignore_pydantic, **state_kwargs) if isinstance(v,
+                                                                                                               dict) else v
+                for v in value]
 
         return new_value
 
@@ -476,12 +524,21 @@ class ConfigSerializer:
         -------
 
         """
-
-        for key, value in state.items():
-            state[key] = cls.deserialize_pickle_value(value,include_vam_client_objects=include_vam_client_objects,
-                                                      graph_depth_limit=graph_depth_limit, graph_depth=graph_depth,
-                                                      local_metadatas=local_metadatas,
-                                                      )
+        if isinstance(state, dict):
+            for key, value in state.items():
+                state[key] = cls.deserialize_pickle_value(value, include_vam_client_objects=include_vam_client_objects,
+                                                          graph_depth_limit=graph_depth_limit, graph_depth=graph_depth,
+                                                          local_metadatas=local_metadatas,
+                                                          )
+        elif isinstance(state, tuple):
+            state = tuple([cls.deserialize_pickle_value(v, include_vam_client_objects=include_vam_client_objects,
+                                                        graph_depth_limit=graph_depth_limit, graph_depth=graph_depth,
+                                                        local_metadatas=local_metadatas,
+                                                        ) for v in state])
+        elif isinstance(state, str) or isinstance(state, float) or isinstance(state, int) or isinstance(state, bool):
+            pass
+        else:
+            raise NotImplementedError
 
         return state
 
@@ -693,7 +750,7 @@ class TimeSerieRebuildMethods(ABC):
         self.local_persist_manager.update_source_informmation(
             git_hash_id=self.get_time_serie_source_code_git_hash(self.__class__),
             source_code=self.get_time_serie_source_code(self.__class__),
-            )
+        )
         if os.path.isfile(path) == False or overwrite == True:
             if overwrite == True:
                 self.logger.warning("overwriting pickle")
@@ -775,7 +832,7 @@ class TimeSerieRebuildMethods(ABC):
             try:
                 cloudpickle.dumps(attr)
             except Exception as e:
-                self.logger.exception(f"Cant Pickl property {name}")
+                self.logger.exception(f"Cant Pickle property {name}")
                 raise e
 
         properties = {key: value for key, value in properties.items() if key not in names_to_remove}
@@ -1022,9 +1079,9 @@ class DataPersistanceMethods(ABC):
 
     @tracer.start_as_current_span("TS: Get Persisted Data")
     def get_df_greater_than_in_table(self, target_value: Union[None, datetime.datetime],
-                            great_or_equal=False,
-                            force_db_look=True, symbol_list: Union[None, list] = None,
-                            ):
+                                     great_or_equal=False,
+                                     force_db_look=True, symbol_list: Union[None, list] = None,
+                                     ):
         """
 
         Args:
@@ -1145,14 +1202,13 @@ class DataPersistanceMethods(ABC):
         #                                                      symbol_list=asset_symbols,)
         #     return last_observation
 
-
         latest_value, multiindex = self.get_latest_value(asset_symbols=asset_symbols,
 
                                                          )
         if latest_value is None and multiindex is None:
             return None
         if asset_symbols is not None and multiindex is not None:
-            if len(multiindex)>0:
+            if len(multiindex) > 0:
                 latest_value = np.max([np.max(list(i.values())) for i in list(multiindex.values())])
 
         last_observation = self.get_df_greater_than_in_table(latest_value, great_or_equal=True,
@@ -1160,7 +1216,7 @@ class DataPersistanceMethods(ABC):
                                                              symbol_list=asset_symbols,
                                                              )
         parquet_eval = last_observation.shape[0] != 1 if asset_symbols is None else \
-        last_observation.index.get_level_values(0).unique().shape[0] > 1
+            last_observation.index.get_level_values(0).unique().shape[0] > 1
 
         if parquet_eval == True:
             assert self.data_configuration_path is None
@@ -1174,8 +1230,8 @@ class DataPersistanceMethods(ABC):
             if asset_symbols is not None and multiindex is not None:
                 latest_value = np.max([np.max(list(ev_dict.values())) for ev_dict in multiindex.values()])
             last_observation = self.get_df_greater_than_in_table(latest_value,
-                                                        symbol_list=asset_symbols,
-                                                        great_or_equal=True)
+                                                                 symbol_list=asset_symbols,
+                                                                 great_or_equal=True)
             self.local_persist_manager._set_local_parquet_manager()
 
         return last_observation
@@ -1448,23 +1504,23 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def _set_logger(self, local_hash_id):
         if hasattr(self, "logger") == False:
             if self.data_configuration_path is None:
-                self.logger = create_logger_in_path(logger_name=local_hash_id,application_name="tdag",
+                self.logger = create_logger_in_path(logger_name=local_hash_id, application_name="tdag",
                                                     logger_file=f'{ogm.get_logging_path()}/{local_hash_id}.log',
                                                     local_hash_id=local_hash_id
                                                     )
             else:
-                logger_file=None
-                if self.data_configuration['persist_logs_to_file'] ==True:
+                logger_file = None
+                if self.data_configuration['persist_logs_to_file'] == True:
                     logging_folder = f"{ogm.get_logging_path()}/data_lakes/{self.data_configuration['datalake_name']}"
                     logger_file = f'{logging_folder}/{local_hash_id}.log'
-                self.logger = create_logger_in_path(logger_name=local_hash_id,application_name="tdag",
+                self.logger = create_logger_in_path(logger_name=local_hash_id, application_name="tdag",
                                                     logger_file=logger_file,
                                                     local_hash_id=local_hash_id
                                                     )
 
     @property
     def data_configuration(self):
-        if hasattr(self,"_data_configuration"):
+        if hasattr(self, "_data_configuration"):
             return self._data_configuration
 
         import yaml
@@ -1472,10 +1528,12 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         with open(self.data_configuration_path, "r") as f:
             data_configuration = yaml.safe_load(f)
         self._data_configuration = data_configuration
-        return  self._data_configuration
+        return self._data_configuration
+
     @property
     def running_in_data_lake(self):
         return hasattr(self, "_data_configuration")
+
     def update_data_configuration(self, data_configuration):
         """
 
@@ -1542,7 +1600,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             remote_configuration=self.remote_initial_configuration,
             time_serie_source_code_git_hash=time_serie_source_code_git_hash,
             time_serie_source_code=time_serie_source_code
-            )
+        )
         if remote_meta_exist == False or local_meta_exist == False:
 
             # should be on creation
@@ -1581,7 +1639,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                                  remote_configuration=self.remote_initial_configuration
                                                                  )
 
-    def _create_config(self, kwargs, post_init_log_messages:list):
+    def _create_config(self, kwargs, post_init_log_messages: list):
         """
         This methods executes  after serialization
         :param kwargs:
@@ -1601,10 +1659,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         remote_hashed_name = self.__class__.__name__ + "_" + remote_table_hash
         remote_hashed_name = remote_hashed_name.lower()
 
-
         self._set_logger(local_hash_id=local_hashed_name)
         for m in post_init_log_messages:
-
             self.logger.warning(m)
 
         if len(remote_hashed_name) > 60:
@@ -1621,8 +1677,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         self.remote_initial_configuration = remote_initial_configuration
         self.init_meta = init_meta
 
-
-        self.logger.debug(f"local/remote {self.hashed_name}/{self.remote_table_hashed_name}" )
+        self.logger.debug(f"local/remote {self.hashed_name}/{self.remote_table_hashed_name}")
 
     def set_update_uses_parallel(self, value):
         self.local_persist_manager.set_meta("update_uses_parallel", value)
@@ -1806,12 +1861,14 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
                             ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
                             self.update_tracker.set_start_of_execution(hash_id=ts_row[1]["local_hash_id"])
-                            error_on_last_update=ts.update(update_tree_kwargs=update_tree_kwargs, raise_exceptions=True, update_tree=False,
-                                      start_update_data=all_start_data[ts_row[1]["local_hash_id"]],
-                                      update_tracker=self.update_tracker
-                                      )
+                            error_on_last_update = ts.update(update_tree_kwargs=update_tree_kwargs,
+                                                             raise_exceptions=True, update_tree=False,
+                                                             start_update_data=all_start_data[
+                                                                 ts_row[1]["local_hash_id"]],
+                                                             update_tracker=self.update_tracker
+                                                             )
 
-                            if error_on_last_update==True:
+                            if error_on_last_update == True:
                                 raise Exception(f"Error updating dependencie {ts.local_hash_id} pipeline stopped")
                         except Exception as e:
                             self.logger.exception(f"Error updating dependencie {ts.local_hash_id}")
@@ -2004,7 +2061,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def _run_post_update_routines(self, error_on_last_update: bool):
         pass
 
-    def update_series_from_source(self, latest_value:Union[None,datetime.datetime], *args, **kwargs)->pd.DataFrame:
+    def update_series_from_source(self, latest_value: Union[None, datetime.datetime], *args, **kwargs) -> pd.DataFrame:
         """
         This method performs all the necessary logic to update our time series. The method should always return a DataFrame with the following characteristics:
 
@@ -2021,7 +2078,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         -------
 
         """
-
 
         raise NotImplementedError
 
@@ -2294,10 +2350,10 @@ class WrapperTimeSerie(TimeSerie):
 
         def add_ts(ts, key, thread, columns):
             tmp_df = ts.get_df_greater_than_in_table(target_value=target_value,
-                                            great_or_equal=great_or_equal,
-                                            symbol_list=columns,
-                                            *args, **kwargs
-                                            )
+                                                     great_or_equal=great_or_equal,
+                                                     symbol_list=columns,
+                                                     *args, **kwargs
+                                                     )
             tmp_df["key"] = key
             if thread == False:
                 return tmp_df
@@ -2360,11 +2416,6 @@ class WrapperTimeSerie(TimeSerie):
             t.join()
 
         return all_dfs
-
-
-
-
-
 
     def update_series_from_source(self, latest_value, *args, **kwargs):
         """ Implemented in the wrapped nodes"""
