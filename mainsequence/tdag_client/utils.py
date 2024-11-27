@@ -9,7 +9,7 @@ import pandas as pd
 import psycopg2
 from psycopg2 import errors
 from pgcopy import CopyManager
-from typing import Union
+from typing import Union, List
 import time
 import traceback
 from joblib import Parallel, delayed
@@ -428,12 +428,12 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
 
 
 def concatenate_ts(
-    tables_to_concatenate: list,
+    tables_to_concatenate: List[str],
     start_value: Union[datetime.datetime, None],
     end_value: Union[datetime.datetime, None],
     great_or_equal: bool,
     less_or_equal: bool,
-    index_to_concat: list,
+    index_to_concat: List[str],
     time_series_orm_db_connection: Union[str, None] = None,
 ):
     time_series_orm_db_connection = (
@@ -458,28 +458,22 @@ def concatenate_ts(
             if where_clauses:
                 where_clause = 'WHERE ' + ' AND '.join(where_clauses)
             subquery = f"""
-            (SELECT * FROM {table}
-             {where_clause}) AS {alias}
+            SELECT * FROM {table}
+            {where_clause}
             """
             subqueries.append((alias, subquery.strip()))
 
-        # Build the FROM clause with full outer joins
-        from_clause = subqueries[0][1]
-        base_alias = subqueries[0][0]
-
+        # Build the FROM clause with full outer joins using USING clause
+        join_columns = ', '.join(index_to_concat)
+        # Start with the first subquery and its alias
+        from_alias, from_subquery = subqueries[0]
+        from_clause = f"({from_subquery}) AS {from_alias}"
         for alias, subquery in subqueries[1:]:
-            join_conditions = ' AND '.join(
-                [f"{base_alias}.{col} = {alias}.{col}" for col in index_to_concat]
-            )
-            from_clause = f"""
-            ({from_clause}
-            FULL OUTER JOIN {subquery} ON ({join_conditions}))
-            """
-            # Update base_alias to represent the result of the join
-            base_alias = f"joined_{alias}"
+            from_clause = f"({from_clause} FULL OUTER JOIN ({subquery}) AS {alias} USING ({join_columns}))"
 
         final_query = f"SELECT * FROM {from_clause}"
         df = pd.read_sql(final_query, conn, params=params)
+        df = df.set_index(index_to_concat)
         return df
 
 
