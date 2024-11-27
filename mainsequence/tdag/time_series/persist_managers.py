@@ -1569,6 +1569,9 @@ class TimeScaleLocalPersistManager:
     def protect_from_deletion(self):
         self.dth.patch(metadata=self.metadata, protect_from_deletion=True)
 
+    def open_for_everyone(self):
+        self.dth.patch(metadata=self.metadata, open_for_everyone=True)
+
     def set_start_of_execution(self,**kwargs):
         return self.dth.set_start_of_execution(metadata=self.metadata,**kwargs)
     def set_end_of_execution(self,**kwargs):
