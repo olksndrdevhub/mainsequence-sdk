@@ -62,18 +62,25 @@ class DataLakeInterface:
         from mainsequence.tdag.config import TDAG_PATH
         self.base_path = f"{TDAG_PATH}/data_lakes"
         self.s3_data_lake = use_s3_if_available
-        S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", None)
-        if S3_ENDPOINT_URL is None and self.s3_data_lake:
-            raise Exception("S3_ENDPOINT_URL must be set if using S3 data lake")
-       
-        if self.s3_data_lake==True:
+
+        self.s3_endpoint_url = None
+        self.s3_secure_connection = False
+        if self.s3_data_lake:
             from minio import Minio
-            self.s3_data_lake = True
+            s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL", None)
+            if s3_endpoint_url is None:
+                raise Exception("S3_ENDPOINT_URL must be set if using S3 data lake")
+
+            if s3_endpoint_url.startswith("https://"):
+                self.s3_secure_connection = True
+
+            self.s3_endpoint_url = s3_endpoint_url.replace("http://", "").replace("https://", "").strip("/")
+
             self.minio_client = Minio(
-                S3_ENDPOINT_URL,  # The MinIO server address and port
+                self.s3_endpoint_url,  # The MinIO server address and port
                 access_key=os.environ.get("S3_ACCESS_KEY_ID"),  # Replace with your MinIO access key
                 secret_key=os.environ.get("S3_SECRET_ACCESS_KEY"),  # Replace with your MinIO secret key
-                secure=False  # Set to True if using HTTPS
+                secure=self.s3_secure_connection
             )
             self.bucket_name = "tdag"
             if not self.minio_client.bucket_exists(self.bucket_name):
@@ -107,15 +114,20 @@ class DataLakeInterface:
             file_path = os.path.join(self.base_path, data_lake_name, date_range_folder,
                                      f"{table_hash}.parquet")
         return file_path
-    def _get_storage_options(self,file_path):
+
+    def _get_storage_options(self, file_path):
+        protocol = "https" if self.s3_secure_connection else "http"
+
         s3_path = f"s3://{file_path}"
         storage_options = {
             'key': os.environ.get("S3_ACCESS_KEY_ID"),  # Replace with your MinIO access key
             'secret': os.environ.get("S3_SECRET_ACCESS_KEY"),  # Replace with your MinIO secret key
-            'client_kwargs': {'endpoint_url': "http://" + os.environ.get("S3_ENDPOINT_URL")}
-            # Your MinIO server endpoint
+            'client_kwargs': {
+                'endpoint_url': f"{protocol}://{self.s3_endpoint_url}"  # Dynamically set protocol
+            }
         }
-        return s3_path,storage_options
+        return s3_path, storage_options
+
     def read_parquet_from_lake(self, file_path: str,filters:Union[list,None]=None):
 
         extra_kwargs={} if filters is None else {'filters':filters}
