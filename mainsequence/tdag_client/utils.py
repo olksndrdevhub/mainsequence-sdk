@@ -230,12 +230,15 @@ def get_authorization_headers(time_series_orm_token_url: str,
                               time_series_orm_admin_user: str,
                               time_series_orm_admin_password: str,
                               gcp_credentials_path: Union[str, None]):
+    gcp_token_decoded = None
     headers = CaseInsensitiveDict()
     headers["Content-Type"] = "application/json"
+    if os.getenv("MAINSEQUENCE_TOKEN"):
+        headers["Authorization"] = "Token " + os.getenv("MAINSEQUENCE_TOKEN")
+        return headers, None
     try:
 
         s = build_session()
-        gcp_token_decoded = None
         if gcp_credentials_path is not None:
             if gcp_credentials_path.strip() != "":
                 logger.debug("Requesting GCP Auth")
@@ -254,7 +257,7 @@ def get_authorization_headers(time_series_orm_token_url: str,
         raise Exception(f"Connection Error is it {time_series_orm_token_url} running?")
     if response.status_code != 200:
         raise Exception(f"Request Error is it {time_series_orm_token_url} {response.text}")
-    headers["Content-Type"] = "application/json"
+
     headers["Authorization"] = "Token " + response.json()["token"]
     return headers, gcp_token_decoded
 
