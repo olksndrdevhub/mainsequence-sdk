@@ -53,9 +53,7 @@ class Configuration:
         "TDAG_ENDPOINT",
         "VAM_ADMIN_USER",
         "VAM_ADMIN_PASSWORD",
-        # "TDAG_ADMIN_USER",
-        # "TDAG_ADMIN_PASSWORD",
-        "TDAG_DB_CONNECTION",
+
         "TDAG_RAY_CLUSTER_ADDRESS"
     ]
     OPTIONAL_ENV_VARIABLES = []

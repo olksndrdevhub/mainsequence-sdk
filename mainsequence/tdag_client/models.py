@@ -16,7 +16,7 @@ import time
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from typing import Optional, List, Dict, Any
-
+_default_data_source = None  # Module-level cache
 
 
 JSON_COMPRESSED_PREFIX = ["json_compressed", "jcomp_"]
@@ -71,6 +71,7 @@ get_time_serie_local_update_url=lambda root_url:  root_url + "/ogm/api/local_tim
 get_time_serie_local_update_table_url=lambda root_url:  root_url + "/orm/api/time_serie_local_update"
 get_local_time_serie_update_details=lambda root_url: root_url + "/orm/api/local_update_details"
 get_local_time_serie_historical_update_url=lambda root_url:  root_url + "/orm/api/lts_historical_update"
+get_dynamic_table_data_source=lambda root_url: root_url + "/orm/api/dynamic_table_data_source"
 get_chat_yaml_url=lambda root_url:  root_url + "/tdag-gpt/api/chat_yaml"
 get_signal_yaml_url=lambda root_url:  root_url + "/tdag-gpt/api/signal_yaml"
 get_chat_object_url=lambda root_url: root_url + "/tdag-gpt/api/chat_object"
@@ -746,6 +747,34 @@ class ChatObject(BaseTdagPydanticModel,BaseObject):
     def ROOT_URL(cls):
         return get_chat_object_url(TDAG_ENDPOINT)
 
+class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
+    id:int
+    data_type:str
+    related_source:Optional[int]=None
+    class Config:
+        use_enum_values = True  # This ensures that enums are stored as their values (e.g., 'TEXT')
+    def __str__(self):
+        return f"{self.object_type} object created at {self.created_at}"
+
+    @classmethod
+    @property
+    def ROOT_URL(cls):
+        return get_dynamic_table_data_source(TDAG_ENDPOINT)
+    @classmethod
+    def get_default_data_source_for_token(cls):
+        global _default_data_source
+        if _default_data_source is not None:
+            return _default_data_source  # Return cached result if already set
+        url = cls.ROOT_URL+"/get_default_data_source_for_token"
+
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload={})
+        if r.status_code == 404:
+            raise SchedulerDoesNotExist
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+        _default_data_source = cls(**r.json())  # Cache the result
+        return _default_data_source
 
 class BaseYamlModel(BaseTdagPydanticModel,BaseObject):
 
@@ -878,6 +907,8 @@ def register_strategy(json_payload:dict, timeout=None):
     r = make_request(s=s, r_type="POST", url=url, payload={"json": json_payload},
                      loaders=loaders, time_out=timeout)
     return r
+
+
 
 def register_default_configuration(json_payload:dict, timeout=None):
     url = TDAG_ENDPOINT + "/tdag-gpt/register_default_configuration/"

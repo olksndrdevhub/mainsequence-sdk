@@ -1457,6 +1457,20 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
         """
         self.pre_load_routines_run = True
+    def get_data_source(self):
+        from mainsequence.tdag_client import POD_DEFAULT_DATA_SOURCE
+
+        self.logger.info("using pod default data source")
+        if POD_DEFAULT_DATA_SOURCE.related_source is None:
+            raise Exception("This Pod does not have a default data source")
+        return POD_DEFAULT_DATA_SOURCE
+    def set_data_source(self):
+        """
+
+        :return:
+        """
+        self.data_source=self.get_data_source()
+
 
     def run_after_post_init_routines(self):
         pass
@@ -1582,7 +1596,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             human_readable = self.human_readable
         except:
             human_readable = None
-
+        self.set_data_source()
         self._local_persist_manager = persist_managers.TimeScaleLocalPersistManager(local_hash_id=hashed_name,
                                                                                     remote_table_hashed_name=remote_table_hashed_name,
                                                                                     class_name=self.__class__.__name__,
