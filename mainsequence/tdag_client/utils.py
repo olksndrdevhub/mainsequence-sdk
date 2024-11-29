@@ -236,6 +236,8 @@ def get_authorization_headers(time_series_orm_token_url: str,
     if os.getenv("MAINSEQUENCE_TOKEN"):
         headers["Authorization"] = "Token " + os.getenv("MAINSEQUENCE_TOKEN")
         return headers, None
+    else:
+        raise Exception("MAINSEQUENCE_TOKEN is not set in env")
     try:
 
         s = build_session()
