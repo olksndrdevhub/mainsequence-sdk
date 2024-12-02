@@ -328,8 +328,7 @@ def read_one_value_from_table(hash_id):
     return result
 
 
-def read_sql_tmpfile(query, time_series_orm_uri_db_connection: Union[str, None]):
-    time_series_orm_uri_db_connection = time_series_orm_uri_db_connection if time_series_orm_uri_db_connection is not None else TDAG_ORM_DB_CONNECTION
+def read_sql_tmpfile(query, time_series_orm_uri_db_connection: str):
 
     with tempfile.TemporaryFile() as tmpfile:
         copy_sql = "COPY ({query}) TO STDOUT WITH CSV {head}".format(
@@ -372,7 +371,6 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
                         ):
     records = serialized_data_frame.values.tolist()
     columns = serialized_data_frame.columns.to_list()
-    time_series_orm_db_connection = TDAG_ORM_DB_CONNECTION if time_series_orm_db_connection is None else time_series_orm_db_connection
 
     if overwrite == True and table_is_empty == False:
 

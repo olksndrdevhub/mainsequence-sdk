@@ -1,4 +1,6 @@
+
 from .utils import (TDAG_ENDPOINT, read_sql_tmpfile, direct_table_update,  is_process_running,get_network_ip,
+CONSTANTS,
     DATE_FORMAT, get_authorization_headers, AuthLoaders, make_request, get_tdag_client_logger)
 import copy
 import datetime
@@ -1303,44 +1305,6 @@ class DynamicTableHelpers:
 
 
 
-        # break df into records
-        def break_df_into_records(tmp_df, time_index_name,index_names, DATE_FORMAT):
-            max_index = tmp_df[time_index_name].max()
-            min_index = tmp_df[time_index_name].min()
-            tmp_df[time_index_name] = tmp_df[time_index_name].dt.strftime(DATE_FORMAT)
-            batch = list(tmp_df.T.to_dict().values())
-            tmp_index_stats = {'max_index_value': max_index.strftime(DATE_FORMAT),
-                               'min_index_value': min_index.strftime(DATE_FORMAT)}
-            data = {"records": batch, "overwrite": overwrite}
-            if historical_update_id is not None:
-                data["historical_update_id"]=historical_update_id
-            if len(index_names)>1:
-                #statistics per asset
-                min_per_asset_symbol,max_per_asset_symbol={},{}
-                for symbol, df in tmp_df.groupby("asset_symbol"):
-                    min_per_asset_symbol[symbol]={}
-                    max_per_asset_symbol[symbol]={}
-                    for ev,ev_df in df.groupby("execution_venue_symbol"):
-                        min_per_asset_symbol[symbol][ev]=ev_df["time_index"].min()
-                        max_per_asset_symbol[symbol][ev]=ev_df["time_index"].max()
-               
-                tmp_index_stats.update({"multi_index_stats":{"min_per_asset_symbol":min_per_asset_symbol,
-                                                             "max_per_asset_symbol":max_per_asset_symbol}})
-                
-                
-
-            data.update(tmp_index_stats)
-            return data
-
-      
-        # n_records = len(serialzied_data_frame)
-        # all_records = Parallel(n_jobs=1)(delayed(break_df_into_records)(time_index_name=time_index_name,
-        #                                                                 index_names=index_names,
-        #                                                                 tmp_df=serialzied_data_frame.iloc[
-        #                                                                        i:i + batch_size, :].copy(),
-        #                                                                 DATE_FORMAT=self.DATE_FORMAT
-        #                                                                 )
-        #                                  for i in range(0, n_records, batch_size))
 
         call_end_of_execution = False
         for c in serialzied_data_frame:
@@ -1370,12 +1334,14 @@ class DynamicTableHelpers:
             r = self.TimeSerieLocalUpdate.set_last_update_index_time(metadata=local_metadata, timeout=timeout)
 
 
-        direct_table_update(serialized_data_frame=serialzied_data_frame,
-                            time_series_orm_db_connection=self.time_series_orm_db_connection,
-                            table_name=metadata["hash_id"],
-                            overwrite=overwrite,index_names=index_names,
-                            time_index_name=time_index_name,table_is_empty=table_is_empty
-                            )
+        data_source_configuration=DynamicTableDataSource.get_data_source_connection_details(metadata["data_source"]["id"])
+        if data_source_configuration["__type__"]==CONSTANTS.CONNECTION_TYPE_POSTGRES:
+            direct_table_update(serialized_data_frame=serialzied_data_frame,
+                                time_series_orm_db_connection=data_source_configuration["connection_details"],
+                                table_name=metadata["hash_id"],
+                                overwrite=overwrite,index_names=index_names,
+                                time_index_name=time_index_name,table_is_empty=table_is_empty
+                                )
 
 
         timeout=5*60 if serialzied_data_frame.shape[0]>1000000  else None
@@ -1497,7 +1463,11 @@ class DynamicTableHelpers:
             data=data[data<end_date]
         
         return data        
-    def filter_by_assets_ranges(self,table_name:str,asset_ranges_map:dict,force_db_look:bool):
+    def filter_by_assets_ranges(self,table_name:str,asset_ranges_map:dict,connection_config:dict):
+
+        if connection_config["__type__"]!=CONSTANTS.CONNECTION_TYPE_POSTGRES:
+            raise NotImplementedError
+
         query_base = f"""
                                 SELECT * FROM {table_name}
                                 WHERE
@@ -1517,7 +1487,7 @@ class DynamicTableHelpers:
 
         full_query = query_base + " OR ".join(query_parts)
 
-        df = read_sql_tmpfile(full_query, time_series_orm_uri_db_connection=None)
+        df = read_sql_tmpfile(full_query, time_series_orm_uri_db_connection=connection_config["connection_details"])
         return df
         
     def get_data_by_time_index(self, metadata: dict,

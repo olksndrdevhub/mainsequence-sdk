@@ -17,8 +17,9 @@ from mainsequence.tdag.config import (
 from mainsequence.tdag.utils import read_yaml
 from mainsequence.tdag.logconf import console_logger, create_logger_in_path
 
-from mainsequence.tdag_client import(DynamicTableHelpers, TimeSerieNode, TimeSerieLocalUpdate, LocalTimeSeriesDoesNotExist,
-                           DynamicTableDoesNotExist)
+from mainsequence.tdag_client import (DynamicTableHelpers, TimeSerieNode, TimeSerieLocalUpdate,
+                                      LocalTimeSeriesDoesNotExist,
+                                      DynamicTableDoesNotExist, DynamicTableDataSource)
 
 import structlog
 from mainsequence.tdag.logconf import get_tdag_logger
@@ -1197,8 +1198,13 @@ class TimeScaleLocalPersistManager:
     def filter_by_assets_ranges(self, asset_ranges_map: dict, force_db_look: bool):
 
         if force_db_look:
+
             assert "asset_symbol" in self.metadata["sourcetableconfiguration"]["index_names"],"Table does not contain asset_symbol column"
-            df=self.dth.filter_by_assets_ranges(table_name=self.metadata['hash_id'],asset_ranges_map=asset_ranges_map, force_db_look=force_db_look)
+            connection_config=DynamicTableDataSource.get_data_source_connection_details(self.metadata["data_source"]["id"])
+
+            df=self.dth.filter_by_assets_ranges(table_name=self.metadata['hash_id'],asset_ranges_map=asset_ranges_map,
+
+                                                connection_config=connection_config)
             df["time_index"]=pd.to_datetime(df["time_index"])
             df=df.set_index(self.metadata["sourcetableconfiguration"]["index_names"])
             
