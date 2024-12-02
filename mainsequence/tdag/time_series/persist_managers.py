@@ -966,10 +966,48 @@ class TimeScaleLocalPersistManager:
                                     target_human_readable=human_readable
                                     )
 
-    def get_all_dependencies(self):
 
-        depth_df=TimeSerieNode.get_all_dependencies(hash_id=self.remote_table_hashed_name)
-        return depth_df
+    def display_mermaid_dependency_diagram(self):
+        from IPython.core.display import display, HTML, Javascript
+
+        response=TimeSerieLocalUpdate.get_mermaid_dependency_diagram(local_hash_id=self.local_hash_id)
+        from IPython.core.display import display, HTML, Javascript
+        mermaid_chart=response.get("mermaid_chart")
+        metadata=response.get("metadata")
+        # Render Mermaid.js diagram with metadata display
+        html_template = f"""
+        <div class="mermaid">
+        {mermaid_chart}
+        </div>
+        <div id="metadata-display" style="margin-top: 20px; font-size: 16px; color: #333;"></div>
+        <script>
+            // Initialize Mermaid.js
+            if (typeof mermaid !== 'undefined') {{
+                mermaid.initialize({{ startOnLoad: true }});
+            }}
+
+            // Metadata dictionary
+            const metadata = {metadata};
+
+            // Attach click listeners to nodes
+            document.addEventListener('click', function(event) {{
+                const target = event.target.closest('div[data-graph-id]');
+                if (target) {{
+                    const nodeId = target.dataset.graphId;
+                    const metadataDisplay = document.getElementById('metadata-display');
+                    if (metadata[nodeId]) {{
+                        metadataDisplay.innerHTML = "<strong>Node Metadata:</strong> " + metadata[nodeId];
+                    }} else {{
+                        metadataDisplay.innerHTML = "<strong>No metadata available for this node.</strong>";
+                    }}
+                }}
+            }});
+        </script>
+        """
+
+        return mermaid_chart
+
+
     def get_all_local_dependencies(self):
         depth_df=TimeSerieLocalUpdate.get_all_dependencies(hash_id=self.local_hash_id)
         return depth_df
@@ -1250,7 +1288,7 @@ class TimeScaleLocalPersistManager:
 
         TimeSerieNode.patch_build_configuration(remote_table_patch=kwargs,local_table_patch=local_metadata_kwargs)
 
-    def local_persist_exist_set_config(self, local_configuration:dict, remote_configuration:dict,
+    def local_persist_exist_set_config(self, local_configuration:dict, remote_configuration:dict,data_source:dict,
                                        time_serie_source_code_git_hash:str, time_serie_source_code:str):
         """
         This method runs on initialization of the TimeSerie class. We also use it to retrieve the table if
@@ -1276,6 +1314,7 @@ class TimeScaleLocalPersistManager:
                               time_serie_source_code_git_hash=time_serie_source_code_git_hash,
                               time_serie_source_code=time_serie_source_code,
                               build_configuration=remote_configuration,
+                              data_source=data_source.model_dump(),
                               build_meta_data=remote_build_metadata)
                 if self.human_readable is not None:
                     kwargs["human_readable"] = self.human_readable
@@ -1507,9 +1546,7 @@ class TimeScaleLocalPersistManager:
         self.dth.set_policy_for_descendants(hash_id=self.remote_table_hashed_name,pol_type=comp_type,policy=policy,
                                             exclude_ids=exclude_ids,extend_to_classes=extend_to_classes)
 
-    def pre_load_dependencies_in_orm(self, hash_id_list: list):
 
-        self.dth.pre_load_dependencies_in_orm(hash_id_list=hash_id_list)
 
     def delete_after_date(self, after_date: str):
         self.dth.delete_after_date(metadata=self.metadata, after_date=after_date)

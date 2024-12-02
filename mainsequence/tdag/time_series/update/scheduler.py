@@ -184,7 +184,6 @@ class TimeSerieHeadUpdateActor:
             )
             ts.logger.info("state set with dependencies metadatas")
 
-            ts.pre_load_dependencies_in_orm()
 
         ts.set_actor_manager(actor_manager=distributed_actor_manager)
 

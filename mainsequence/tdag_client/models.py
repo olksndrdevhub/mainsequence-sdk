@@ -604,6 +604,22 @@ class TimeSerieLocalUpdate(BaseObject):
         if r.status_code != 201:
             raise Exception(f"Error in request {r.url} {r.text}")
 
+    @classmethod
+    def get_mermaid_dependency_diagram(cls, local_hash_id,desc=True,timeout=None)->dict:
+        """
+
+        :param local_hash_id:
+        :return:
+        """
+        s = cls.build_session()
+        url = cls.ROOT_URL + f"/{local_hash_id}/dependencies_graph_mermaid?desc={desc}"
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url,
+                         time_out=timeout)
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+        return r.json()
+
     #Node Updates
     @classmethod
     def get_all_dependencies(cls, hash_id,timeout=None):
@@ -681,6 +697,8 @@ class TimeSerieLocalUpdate(BaseObject):
 
         return r
 
+
+
 class TimeSerie(BaseObject):
     """
     Main Methods of a standard time serie by hash_id
@@ -750,7 +768,7 @@ class ChatObject(BaseTdagPydanticModel,BaseObject):
 class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     id:int
     data_type:str
-    related_source:Optional[int]=None
+    related_resource:Optional[dict]=None
     class Config:
         use_enum_values = True  # This ensures that enums are stored as their values (e.g., 'TEXT')
     def __str__(self):
@@ -1611,16 +1629,6 @@ class DynamicTableHelpers:
 
         r=TimeSerieNode.set_policy_for_descendants(hash_id,policy,pol_type,exclude_ids,extend_to_classes)
 
-    def pre_load_dependencies_in_orm(self, hash_id_list: list):
-        base_url = self.ROOT_URL
-
-        payload = {"json": {"hash_id_list": hash_id_list}}
-        # r = self.s.post(f"{base_url}/pre_load_models", **payload)
-        url=f"{base_url}/pre_load_models"
-        r = self.make_request(r_type="POST", url=url,payload=payload)
-
-        if r.status_code != 200:
-            raise Exception(f" {r.json()}")
 
 
 

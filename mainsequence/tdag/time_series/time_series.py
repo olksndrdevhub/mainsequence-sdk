@@ -580,6 +580,50 @@ class DependencyUpdateError(Exception):
 
 class GraphNodeMethods(ABC):
 
+    def get_mermaid_dependency_diagram(self):
+        from IPython.display import display, HTML
+
+        mermaid_diagram=self.local_persist_manager.display_mermaid_dependency_diagram()
+
+        # Mermaid.js initialization script (only run once)
+        if not hasattr(display, "_mermaid_initialized"):
+            mermaid_initialize = """
+                   <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+                   <script>
+                       function initializeMermaid() {
+                           if (typeof mermaid !== 'undefined') {
+                               console.log('Initializing Mermaid.js...');
+                               const mermaidDivs = document.querySelectorAll('.mermaid');
+                               mermaidDivs.forEach(mermaidDiv => {
+                                   mermaid.init(undefined, mermaidDiv);
+                               });
+                           } else {
+                               console.error('Mermaid.js is not loaded.');
+                           }
+                       }
+                   </script>
+                   """
+            display(HTML(mermaid_initialize))
+            display._mermaid_initialized = True
+
+        # HTML template for rendering the Mermaid diagram
+        html_template = f"""
+               <div class="mermaid">
+               {mermaid_diagram}
+               </div>
+               <script>
+                   initializeMermaid();
+               </script>
+               """
+
+        # Display the Mermaid diagram in the notebook
+        display(HTML(html_template))
+
+        # Optionally return the raw diagram code for further use
+        return mermaid_diagram
+
+
+
     def get_all_local_dependencies(self, ):
         """
         get relation tree by ids in the graph
@@ -954,18 +998,6 @@ class DataPersistanceMethods(ABC):
     def source_table_configuration(self):
         return self.local_persist_manager.source_table_configuration
 
-    def pre_load_dependencies_in_orm(self):
-        """
-        Preloads models in django ORM to avoid caching colition
-        Returns
-        -------
-
-        """
-
-        if hasattr(self, "dependencies_df"):
-            if self.dependencies_df.shape[0] > 0:
-                self.local_persist_manager.pre_load_dependencies_in_orm(
-                    hash_id_list=self.dependencies_df["remote_table_hash_id"].to_list())
 
     def set_policy(self, interval: str, comp_type: str, overwrite=False, ):
 
@@ -1461,7 +1493,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         from mainsequence.tdag_client import POD_DEFAULT_DATA_SOURCE
 
         self.logger.info("using pod default data source")
-        if POD_DEFAULT_DATA_SOURCE.related_source is None:
+        if POD_DEFAULT_DATA_SOURCE.related_resource is None:
             raise Exception("This Pod does not have a default data source")
         return POD_DEFAULT_DATA_SOURCE
     def set_data_source(self):
@@ -1613,7 +1645,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             local_configuration=self.local_initial_configuration,
             remote_configuration=self.remote_initial_configuration,
             time_serie_source_code_git_hash=time_serie_source_code_git_hash,
-            time_serie_source_code=time_serie_source_code
+            time_serie_source_code=time_serie_source_code,
+            data_source=self.data_source
         )
         if remote_meta_exist == False or local_meta_exist == False:
 
