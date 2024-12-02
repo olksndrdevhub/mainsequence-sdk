@@ -787,12 +787,23 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
 
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload={})
-        if r.status_code == 404:
-            raise SchedulerDoesNotExist
+
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
         _default_data_source = cls(**r.json())  # Cache the result
         return _default_data_source
+    @classmethod
+    def get_data_source_connection_details(cls,connection_id):
+        url = cls.ROOT_URL + f"/{connection_id}/get_data_source_connection_details"
+
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload={})
+
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+        return r.json()
+
+
 
 class BaseYamlModel(BaseTdagPydanticModel,BaseObject):
 
@@ -1547,16 +1558,11 @@ class DynamicTableHelpers:
             self.logger.debug(f"READING DATA DIRECTLY FROM DB {metadata['hash_id']}",sub_process=self.__class__.__name__)
             data = r.json()
             source_table_config = data["source_table_config"]
-            data = read_sql_tmpfile(query=data["query"],time_series_orm_uri_db_connection=self.time_series_orm_uri_db_connection)
+            data_source_conneciton_details=data["data_source_conneciton_details"]
+            if data_source_conneciton_details["__type__"]=="connection_uri__postgres":
+                data = read_sql_tmpfile(query=data["query"],time_series_orm_uri_db_connection=data_source_conneciton_details['connection_details'])
         else:
-            if r.status_code == 204:
-                return pd.DataFrame()
-            if r.status_code != 200:
-                raise Exception(f"{metadata['hash_id']} ")
-            # Build DF from records
-            data = r.json()
-            data, source_table_config = data["records"], data["source_table_config"]
-            data = pd.DataFrame(json.loads(data))
+           raise Exception ("Response should contain connection details")
 
         infered_dtypes = {k: str(c) for k, c in data.dtypes.to_dict().items()}
         config_types = {c: source_table_config["column_dtypes_map"][c] for c in infered_dtypes.keys()}
@@ -1887,7 +1893,6 @@ class DynamicTableHelpers:
 
         target_dth.set_TSLU(TSLU=TargetTimeSerieLocalUpdate)
         source_dth.set_TSLU(TSLU=SourceTimeSerieLocalUpdate)
-        source_dth.set_time_series_orm_uri_db_connection(uri=source_database_uri)
         tables, _ = source_dth.search(key_word=hash_id_contains)
         if hash_id_contains == "*":
             tables, _ = source_dth.filter()

@@ -951,6 +951,7 @@ class TimeSerieRebuildMethods(ABC):
         return error_on_last_update
 
 
+
 class DataPersistanceMethods(ABC):
 
     # sets
@@ -1056,14 +1057,8 @@ class DataPersistanceMethods(ABC):
         earliest_value = self.local_persist_manager.get_earliest_value()
         return earliest_value
 
-    # @property
-    # def local_nans(self):
-    #     if self.is_persisted:
-    #         tmp_df = self.get_persisted_ts()
-    #         tmp_df = tmp_df.isnull().sum()
-    #     else:
-    #         tmp_df = pd.DataFrame()
-    #     return tmp_df
+    def get_data_source_connection_details(self,override_id:int):
+        return self.local_persist_manager.get_data_source_connection_details(override_id)
 
     @property
     def local_parquet_file(self):
@@ -1467,6 +1462,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         if hasattr(self, "asset_symbols_filter"):
             return self.asset_symbols_filter
         return None
+
+
 
     @property
     def hash_id(self):

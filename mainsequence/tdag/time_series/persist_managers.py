@@ -1214,7 +1214,13 @@ class TimeScaleLocalPersistManager:
                                       less_or_equal=less_or_equal,direct_to_db=direct_to_db,
                                       asset_symbols=asset_symbols,
                                       columns = columns)
-        
+
+    def get_data_source_connection_details(self,override_id:Union[int,None]=None):
+        from mainsequence.tdag_client import DynamicTableDataSource
+        override_id=override_id or self.metadata['data_source']["id"]
+
+        return DynamicTableDataSource.get_data_source_connection_details(connection_id=override_id)
+
     def _get_df_between_dates_from_db(self, start_date, end_date, force_db_look=False, great_or_equal=True,
                                       less_or_equal=True,direct_to_db=False,
                                       asset_symbols: Union[list, None] = None,

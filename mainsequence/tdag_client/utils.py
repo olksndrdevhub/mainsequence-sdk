@@ -441,9 +441,7 @@ def concatenate_ts(
     index_to_concat: List[str],
     time_series_orm_db_connection: Union[str, None] = None,
 ):
-    time_series_orm_db_connection = (
-        TDAG_ORM_DB_CONNECTION if time_series_orm_db_connection is None else time_series_orm_db_connection
-    )
+
 
     with psycopg2.connect(time_series_orm_db_connection) as conn:
         params = []
