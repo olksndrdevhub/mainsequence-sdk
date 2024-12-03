@@ -79,13 +79,13 @@ get_signal_yaml_url=lambda root_url:  root_url + "/tdag-gpt/api/signal_yaml"
 get_chat_object_url=lambda root_url: root_url + "/tdag-gpt/api/chat_object"
 
 class BaseTdagPydanticModel(BaseModel):
-    orm_class: str = None  # This will be set to the class that inherits
+    tdag_orm_class: str = None  # This will be set to the class that inherits
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         # Set orm_class to the class itself
-        cls.orm_class = cls.__name__
+        cls.tdag_orm_class = cls.__name__
 
 
 
@@ -892,7 +892,7 @@ class BaseYamlModel(BaseTdagPydanticModel,BaseObject):
             new_serialized = []
 
             for q in serialized:
-                q["orm_class"] = cls.__name__
+                q["tdag_orm_class"] = cls.__name__
                 try:
                     new_serialized.append(cls(**q))
                 except Exception as e:
@@ -1328,7 +1328,7 @@ class DynamicTableHelpers:
 
 
         table_is_empty = metadata["sourcetableconfiguration"]["last_time_index_value"] is None
-        if table_is_empty== True:
+        if table_is_empty== False:
             #force an index update in  case there may be data
             timeout = 5 * 60 if serialzied_data_frame.shape[0] > 1000000 else None
             r = self.TimeSerieLocalUpdate.set_last_update_index_time(metadata=local_metadata, timeout=timeout)

@@ -1057,7 +1057,7 @@ class DataPersistanceMethods(ABC):
         earliest_value = self.local_persist_manager.get_earliest_value()
         return earliest_value
 
-    def get_data_source_connection_details(self,override_id:int):
+    def get_data_source_connection_details(self,override_id:Union[int,None]=None):
         return self.local_persist_manager.get_data_source_connection_details(override_id)
 
     @property

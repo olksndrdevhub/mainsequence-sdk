@@ -1206,8 +1206,6 @@ class SmoothSpreadChange(FeatureBase):
         return X.to_frame(self.feature_name)
 
 
-
-
 class RollingResidualAlphaBeta(FeatureBase):
 
     def __init__(self, target_column: str, beta_shift=None, alpha_size=None,
