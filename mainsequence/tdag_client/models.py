@@ -1328,7 +1328,7 @@ class DynamicTableHelpers:
 
 
         table_is_empty = metadata["sourcetableconfiguration"]["last_time_index_value"] is None
-        if table_is_empty== False:
+        if table_is_empty== True:
             #force an index update in  case there may be data
             timeout = 5 * 60 if serialzied_data_frame.shape[0] > 1000000 else None
             r = self.TimeSerieLocalUpdate.set_last_update_index_time(metadata=local_metadata, timeout=timeout)
@@ -1409,8 +1409,9 @@ class DynamicTableHelpers:
         #overwrite data origina data frame to release memory
         if not data[time_index_name].is_monotonic_increasing:
             data = data.sort_values(time_index_name)
-            
-        if metadata['sourcetableconfiguration'] is  None:
+
+        stc=metadata['sourcetableconfiguration']
+        if stc is  None:
             try:
                 source_configuration = self.create_source_table_configuration(column_dtypes_map=column_dtypes_map,
                                                                               index_names=index_names,
