@@ -84,6 +84,8 @@ class BaseVamPydanticModel(BaseModel):
         # Set orm_class to the class itself
         cls.orm_class = cls.__name__
 
+
+
     def to_serialized_dict(self):
         new_dict=json.loads(self.model_dump_json())
         if hasattr(self,'unique_identifier'):
@@ -474,8 +476,16 @@ class Asset(AssetMixin,BaseObjectOrm):
     def get_spot_reference_asset_symbol(self):
 
         return self.symbol
+    
+    @classmethod
+    def create_index_asset_from_portfolios(cls,*args,**kwargs):
+        url = f"{cls.get_object_url()}/create_index_asset_from_portfolios/"
+        payload = {"json": kwargs}
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
+        if r.status_code in [200] == False:
+            raise Exception(f" {r.text()}")
 
-
+        return cls(**r.json())
 
 
 class IndexAsset(Asset):
@@ -858,6 +868,11 @@ class TargetPortfolioExecutionConfiguration(BaseObjectOrm,BaseVamPydanticModel):
     rebalance_step_every_seconds: Optional[float] = None
     max_data_latency_seconds: Optional[float] = None
 
+
+class TargetPortfolioIndexAsset(IndexAsset):
+    live_portfolio : "TargetPortfolio"
+    backtest_portfolio : "TargetPortfolio"
+
 class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
     id: Optional[int] = None
     portfolio_name: str = Field(..., max_length=255)
@@ -866,8 +881,8 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
 
     is_asset_only: bool = False
     is_active: bool = False
-    execution_time_serie_hash_id: str = Field(..., max_length=100)
-    backtest_time_serie_hash_id:str = Field(..., max_length=100)
+    time_serie_hash_id: str = Field(..., max_length=100)
+    time_serie_signal_hash_id:str = Field(..., max_length=100)
 
     builds_from_predictions: bool = False
     builds_from_target_positions: bool = False
@@ -882,7 +897,15 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
     def __repr__(self):
         return f"{self.__class__.__name__}: {self.id} - {self.portfolio_ticker}"
 
+    @classmethod
+    def create_from_time_series(cls, *args,**kwargs) -> None:
+        url = f"{cls.get_object_url()}/create_from_time_series/"
+        payload = {"json":kwargs}
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
+        if r.status_code in [200] == False:
+            raise Exception(f" {r.text()}")
 
+        return cls(**r.json())
 
     def add_venue(self,venue_id)->None:
         url = f"{self.get_object_url()}/{self.id}/add_venue/"

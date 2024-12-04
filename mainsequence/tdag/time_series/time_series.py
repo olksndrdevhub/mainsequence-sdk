@@ -68,6 +68,7 @@ def parse_dictionary_before_hashing(dictionary: Dict[str, Any]) -> Dict[str, Any
             local_ts_dict_to_hash[key] = value
             if isinstance(value, dict):
                 if "orm_class" in value.keys():
+
                     local_ts_dict_to_hash[key] = value['unique_identifier']
 
                 elif "is_time_series_config" in value.keys():
