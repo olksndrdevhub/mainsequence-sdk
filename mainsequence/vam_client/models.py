@@ -132,6 +132,7 @@ class BaseObjectOrm:
         "ExecutionPositions": "execution_positions",
         "AccountCoolDown": "account_cooldown",
         "HistoricalWeights": "portfolio_weights",
+        "TargetPortfolioIndexAsset":"target_portfolio_index_asset"
 
     }
     ROOT_URL = VAM_API_ENDPOINT
@@ -323,7 +324,7 @@ class ExecutionPositions(BaseObjectOrm,BaseVamPydanticModel):
         return self.execution_configuration.orders_execution_configuration.broker_class
 
     @classmethod
-    def add_from_time_serie(cls, execution_time_serie_hash_id: str, positions_list: list,
+    def add_from_time_serie(cls, time_serie_signal_hash_id: str, positions_list: list,
                             positions_time: datetime.datetime,
                             comments: Union[str, None] = None, timeout=None):
         """
@@ -332,7 +333,7 @@ class ExecutionPositions(BaseObjectOrm,BaseVamPydanticModel):
         :return:
         """
         url = f"{cls.get_object_url()}/add_from_time_serie/"
-        payload = {"json": {"execution_time_serie_hash_id": execution_time_serie_hash_id,
+        payload = {"json": {"time_serie_signal_hash_id": time_serie_signal_hash_id,
                             "positions_time": positions_time.strftime(DATE_FORMAT),
                             "positions_list": positions_list,
 
@@ -478,20 +479,24 @@ class Asset(AssetMixin,BaseObjectOrm):
         return self.symbol
     
     @classmethod
-    def create_index_asset_from_portfolios(cls,*args,**kwargs):
-        url = f"{cls.get_object_url()}/create_index_asset_from_portfolios/"
+    def get_or_create_index_asset_from_portfolios(cls,*args,**kwargs):
+        url = f"{cls.get_object_url()}/get_or_create_index_asset_from_portfolios/"
         payload = {"json": kwargs}
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
 
-        return cls(**r.json())
+        return r.json()
 
 
 class IndexAsset(Asset):
     valuation_asset:Asset
     def get_settlement_asset_symbol(self):
         return self.valuation_asset.symbol
+
+class TargetPortfolioIndexAsset(IndexAsset):
+    live_portfolio : "TargetPortfolio"
+    backtest_portfolio : "TargetPortfolio"
 
 
 class FutureUSDMMixin(AssetMixin, BaseVamPydanticModel):
@@ -868,10 +873,6 @@ class TargetPortfolioExecutionConfiguration(BaseObjectOrm,BaseVamPydanticModel):
     rebalance_step_every_seconds: Optional[float] = None
     max_data_latency_seconds: Optional[float] = None
 
-
-class TargetPortfolioIndexAsset(IndexAsset):
-    live_portfolio : "TargetPortfolio"
-    backtest_portfolio : "TargetPortfolio"
 
 class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
     id: Optional[int] = None

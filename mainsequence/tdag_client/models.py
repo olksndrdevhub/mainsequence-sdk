@@ -1345,7 +1345,10 @@ class DynamicTableHelpers:
 
 
         timeout=5*60 if serialzied_data_frame.shape[0]>1000000  else None
-        r = self.TimeSerieLocalUpdate.set_last_update_index_time(metadata=local_metadata,timeout=timeout)
+        try:
+            r = self.TimeSerieLocalUpdate.set_last_update_index_time(metadata=local_metadata,timeout=timeout)
+        except Exception as e:
+            raise e
         try:
             result=r.json()
         except Exception as e:
@@ -1499,9 +1502,10 @@ class DynamicTableHelpers:
                                direct_to_db=False,asset_symbols:Union[list,None]=None,
 
                                ):
-        
+        direct_to_db=True
         if direct_to_db ==True:
             return self._direct_data_from_db(metadata,start_date,great_or_equal, less_or_equal,end_date,columns)
+
         from ast import literal_eval
         base_url = self.root_url
 

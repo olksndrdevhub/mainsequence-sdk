@@ -1830,8 +1830,9 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             tmp_meta = local_metadatas[hash_id]
             if source_table_configuration is not None:
                 if "last_time_index_value" in source_table_configuration.keys():
-                    verify_parquet_consistency(metadata=tmp_meta, logger=self.logger,
-                                               source_table_configuration=source_table_configuration)
+                    self.logger.debug("Local Parquet is not been implemented nor verified")
+                    # verify_parquet_consistency(metadata=tmp_meta, logger=self.logger,
+                    #                            source_table_configuration=source_table_configuration)
 
         self.scheduler = scheduler
         self.update_details_tree = {key: v["localtimeserieupdatedetails"] for key, v in local_metadatas.items()}

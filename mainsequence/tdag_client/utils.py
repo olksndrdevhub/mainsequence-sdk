@@ -8,6 +8,7 @@ import tempfile
 import pandas as pd
 import psycopg2
 from psycopg2 import errors
+from psycopg2.extras import execute_batch
 from pgcopy import CopyManager
 from typing import Union, List
 import time
@@ -363,9 +364,173 @@ def individual_copy(records: list, time_series_orm_db_connection: str, table_nam
             cur.rollback()
             raise e
 
+import numpy as np
+import psycopg2
+from psycopg2.extras import execute_values
+from typing import Union
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
+import itertools
+import csv
+from io import StringIO
+from tqdm import tqdm  # Import tqdm for progress bar
 
 def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwrite: bool,
-                        time_index_name: str, index_names: list,table_is_empty:bool,
+                        time_index_name: str, index_names: list, table_is_empty: bool,
+                        time_series_orm_db_connection: Union[str, None] = None,
+                        use_chunks: bool = True, num_threads: int = 4):
+    """
+    Updates the database table with the given DataFrame.
+
+    Parameters:
+    - table_name: Name of the database table.
+    - serialized_data_frame: DataFrame containing the data to insert.
+    - overwrite: If True, existing data in the date range will be deleted before insertion.
+    - time_index_name: Name of the time index column.
+    - index_names: List of index column names.
+    - table_is_empty: If True, the table is empty.
+    - time_series_orm_db_connection: Database connection string.
+    - use_chunks: If True, data will be inserted in chunks using threads.
+    - num_threads: Number of threads to use when use_chunks is True.
+    """
+
+    columns = serialized_data_frame.columns.tolist()
+
+    if overwrite and not table_is_empty:
+        min_d = serialized_data_frame[time_index_name].min()
+        max_d = serialized_data_frame[time_index_name].max()
+
+        with psycopg2.connect(time_series_orm_db_connection) as conn:
+            try:
+                with conn.cursor() as cur:
+                    GROUPED_DELETE_CONDITIONS = []
+
+                    if len(index_names) > 1:
+                        grouped_dates =serialized_data_frame.groupby(["asset_symbol","execution_venue_symbol"])["time_index"].agg(["min","max"])
+                        grouped_dates=grouped_dates.reset_index(level="execution_venue_symbol").rename(columns={"min":"start_time","max":"end_time"})
+                        grouped_dates=grouped_dates.reset_index()
+                        grouped_dates=grouped_dates.to_dict("records")
+
+                        # Build the DELETE query
+                        delete_conditions = []
+                        for item in grouped_dates:
+                            asset_symbol = item['asset_symbol']
+                            execution_venue_symbol = item['execution_venue_symbol']
+                            start_time = item['start_time']
+                            end_time = item['end_time']
+
+                            # Format timestamps as strings
+                            start_time_str = start_time.strftime('%Y-%m-%d %H:%M:%S%z')
+                            end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S%z')
+
+                            # Escape single quotes
+                            asset_symbol = asset_symbol.replace("'", "''")
+                            execution_venue_symbol = execution_venue_symbol.replace("'", "''")
+
+                            # Build the condition string
+                            condition = f"({time_index_name} >= '{start_time_str}' AND {time_index_name} <= '{end_time_str}' " \
+                                        f"AND asset_symbol = '{asset_symbol}' AND execution_venue_symbol = '{execution_venue_symbol}')"
+                            delete_conditions.append(condition)
+                            
+                        # Combine all conditions using OR
+                        where_clause = ' OR '.join(delete_conditions)
+                        delete_query = f"DELETE FROM public.{table_name} WHERE {where_clause};"
+
+                        # Execute the DELETE query
+                        cur.execute(delete_query)
+                    else:
+                        # Build a basic DELETE query using parameterized values
+                        delete_query = f"DELETE FROM public.{table_name} WHERE {time_index_name} >= %s AND {time_index_name} <= %s;"
+                        cur.execute(delete_query, (min_d, max_d))
+
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                print(f"An error occurred during deletion: {e}")
+                raise
+
+    if use_chunks:
+        total_rows = len(serialized_data_frame)
+        num_threads = min(num_threads, total_rows)
+        chunk_size = int(np.ceil(total_rows / num_threads))
+
+        # Generator to yield chunks without copying data
+        def get_dataframe_chunks(df, chunk_size):
+            for start_row in range(0, df.shape[0], chunk_size):
+                yield df.iloc[start_row:start_row + chunk_size]
+
+        # Progress bar for chunks
+        total_chunks = int(np.ceil(total_rows / chunk_size))
+
+        def insert_chunk(chunk_df):
+            try:
+                with psycopg2.connect(time_series_orm_db_connection) as conn:
+                    with conn.cursor() as cur:
+                        buffer_size = 100000  # Adjust based on memory and performance requirements
+                        data_generator = chunk_df.itertuples(index=False, name=None)
+
+                        total_records = len(chunk_df)
+                        with tqdm(total=total_records, desc="Inserting records", leave=False) as pbar:
+                            while True:
+                                batch = list(itertools.islice(data_generator, buffer_size))
+                                if not batch:
+                                    break
+
+                                # Convert batch to CSV formatted string
+                                output = StringIO()
+                                writer = csv.writer(output)
+                                writer.writerows(batch)
+                                output.seek(0)
+
+                                copy_query = f"COPY public.{table_name} ({', '.join(columns)}) FROM STDIN WITH CSV"
+                                cur.copy_expert(copy_query, output)
+
+                                # Update progress bar
+                                pbar.update(len(batch))
+
+                    conn.commit()
+            except Exception as e:
+                print(f"An error occurred during insertion: {e}")
+                raise
+
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+            list(tqdm(executor.map(insert_chunk, get_dataframe_chunks(serialized_data_frame, chunk_size)),
+                      total=total_chunks, desc="Processing chunks"))
+
+    else:
+        # Single insert using the same optimized method
+        try:
+            with psycopg2.connect(time_series_orm_db_connection) as conn:
+                with conn.cursor() as cur:
+                    buffer_size = 10000
+                    data_generator = serialized_data_frame.itertuples(index=False, name=None)
+
+                    total_records = len(serialized_data_frame)
+                    with tqdm(total=total_records, desc="Inserting records") as pbar:
+                        while True:
+                            batch = list(itertools.islice(data_generator, buffer_size))
+                            if not batch:
+                                break
+
+                            output = StringIO()
+                            writer = csv.writer(output)
+                            writer.writerows(batch)
+                            output.seek(0)
+
+                            copy_query = f"COPY public.{table_name} ({', '.join(columns)}) FROM STDIN WITH CSV"
+                            cur.copy_expert(copy_query, output)
+
+                            # Update progress bar
+                            pbar.update(len(batch))
+
+                conn.commit()
+        except Exception as e:
+            print(f"An error occurred during single insert: {e}")
+            raise
+
+
+def direct_table_update_OLD(table_name, serialized_data_frame: pd.DataFrame, overwrite: bool,
+                        time_index_name: str, index_names: list, table_is_empty: bool,
                         time_series_orm_db_connection: Union[str, None] = None,
 
                         ):
@@ -377,42 +542,48 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
         min_d = serialized_data_frame[time_index_name].min()
         max_d = serialized_data_frame[time_index_name].max()
 
-        GROUPED_DELETE_QUERIES = []
+        GROUPED_DELETE_CONDITIONS = []
 
         if len(index_names) > 1:
             grouped_dates = serialized_data_frame.groupby(["asset_symbol", "execution_venue_symbol"])[
                 time_index_name].agg(['min', 'max']).reset_index("execution_venue_symbol")
-            grouped_dates["combo"] = grouped_dates["min"].astype(str) + "-" + grouped_dates["max"].astype(str) +"_"+ \
+            grouped_dates["combo"] = grouped_dates["min"].astype(str) + "-" + grouped_dates["max"].astype(str) + "_" + \
                                      grouped_dates["execution_venue_symbol"]
             grouped_dates = grouped_dates.reset_index()
             for _, df in grouped_dates.groupby("combo"):
                 tmp_symbols = [f"'{c}'" for c in df["asset_symbol"].unique().tolist()]
                 tmp_symbols = ",".join(tmp_symbols)
-                tmp_min, tmp_max,ev_symbol = df.iloc[0]["min"], df.iloc[0]["max"], df.iloc[0]["execution_venue_symbol"]
-                DEL_Q = f""" DELETE from public.{table_name} 
-                        where {time_index_name} >= '{tmp_min}' and {time_index_name} <='{tmp_max}'
-                          AND  asset_symbol in ({tmp_symbols})  AND execution_venue_symbol ='{ev_symbol}'
-                              """
+                tmp_min, tmp_max, ev_symbol = df.iloc[0]["min"], df.iloc[0]["max"], df.iloc[0]["execution_venue_symbol"]
 
-                GROUPED_DELETE_QUERIES.append(DEL_Q)
+                DEL_Q = {
+                    'start_time': tmp_min,
+                    'end_time': tmp_max,
+                    'asset_symbol': tmp_symbols,
+                    'execution_venue_symbol': ev_symbol
+                },
+
+                GROUPED_DELETE_CONDITIONS.append(DEL_Q)
 
         else:
             GROUPED_DELETE_QUERIES = [
                 f"DELETE from public.{table_name} where {time_index_name} >= '{min_d}' and {time_index_name} <='{max_d}'"]
         multi_insert = False
         with  psycopg2.connect(time_series_orm_db_connection) as conn:
-            # if overwrite then first drop
-            cur = conn.cursor()
-            for DQ in GROUPED_DELETE_QUERIES:
-                cur.execute(DQ)
-                time.sleep(1)
-            if multi_insert == False:
-                try:
-                    mgr = CopyManager(conn, f"public.{table_name}", columns)
-                    mgr.copy(records)
-                except Exception as e:
-                    cur.rollback()
-                    raise e
+            try:
+                with conn.cursor() as cur:
+                    execute_batch(cur, ";".join(GROUPED_DELETE_QUERIES), [])
+
+                    if multi_insert == False:
+                        mgr = CopyManager(conn, f"public.{table_name}", columns)
+                        mgr.copy(records)
+                # Commit the transaction if everything succeeds
+                conn.commit()
+            except Exception as e:
+                # Rollback the transaction on any error
+                conn.rollback()
+                print(f"An error occurred: {e}")
+                raise
+
         if multi_insert == True:
             njobs = os.getenv("TDAG_TABLE_JOBS_INSERT", 1)
             Parallel(n_jobs=njobs)(
