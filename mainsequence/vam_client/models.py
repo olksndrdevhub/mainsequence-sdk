@@ -809,7 +809,7 @@ class HistoricalWeights(BaseObjectOrm,BaseVamPydanticModel):
     weights:list[WeightPosition]
 
     @classmethod
-    def add_from_time_serie(cls, backtest_time_serie_hash_id: str, positions_list: list,
+    def add_from_time_serie(cls, time_serie_hash_id: str, positions_list: list,
                             weights_date: datetime.datetime,
                             comments: Union[str, None] = None, timeout=None):
         """
@@ -818,7 +818,7 @@ class HistoricalWeights(BaseObjectOrm,BaseVamPydanticModel):
         :return:
         """
         url = f"{cls.get_object_url()}/add_from_time_serie/"
-        payload = {"json": {"backtest_time_serie_hash_id": backtest_time_serie_hash_id,
+        payload = {"json": {"time_serie_hash_id": time_serie_hash_id,
                             "weights_date": weights_date.strftime(DATE_FORMAT),
                             "positions_list": positions_list,
 

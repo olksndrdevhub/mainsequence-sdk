@@ -1270,7 +1270,7 @@ class TimeScaleLocalPersistManager:
                                                         end_date=end_date, great_or_equal=great_or_equal,
                                                         less_or_equal=less_or_equal,direct_to_db=direct_to_db,
                                                         asset_symbols=asset_symbols,
-                                                        columns=columns
+                                                        columns=columns,connection_config=self.get_data_source_connection_details()
                                                         )
         self.logger.warning(
             f"Data is not been pulled from local storage, review  storage policy to improve performace {start_date} - {end_date}")
