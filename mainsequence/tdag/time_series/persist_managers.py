@@ -1156,6 +1156,7 @@ class TimeScaleLocalPersistManager:
 
         """
 
+
         time_serie_exist = self.local_parquet_manager.time_serie_exist() if hasattr(self,
                                                                                     "local_parquet_manager") else False
         earliest_value = None
@@ -1170,7 +1171,8 @@ class TimeScaleLocalPersistManager:
                                                                                    great_or_equal=great_or_equal,
                                                                                    columns=columns,
                                                                                    asset_symbols=symbol_list,
-                                                                                   time_index_name=self.metadata['sourcetableconfiguration']['time_index_name']
+                                                                                   time_index_name=self.metadata['sourcetableconfiguration']['time_index_name'],
+                                                                                            connection_config=self.get_data_source_connection_details(),
                                                                                    )
                     return filtered_data
             except Exception as e:
@@ -1180,6 +1182,7 @@ class TimeScaleLocalPersistManager:
         # if start date is no after earlier local retetion default ot DB
 
         filtered_data = self.dth.get_data_by_time_index(start_date=target_value, metadata=self.metadata,
+                                                        connection_config=self.get_data_source_connection_details(),
                                                         columns=columns,
                                                         asset_symbols=symbol_list,
                                                         great_or_equal=great_or_equal, )

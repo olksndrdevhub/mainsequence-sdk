@@ -1438,35 +1438,75 @@ class DynamicTableHelpers:
                                                    )
 
         return local_metadata
-    
-    def _direct_data_from_db(self,metadata: dict,
-                               start_date: Union[datetime.datetime, None] = None,
-                               great_or_equal: bool = True, less_or_equal: bool = True,
-                               end_date: Union[datetime.datetime, None] = None,
-                               columns: Union[list, None] = None,):
+
+    def _direct_data_from_db(self, metadata: dict, connection_config: dict,
+                             start_date: Union[datetime.datetime, None] = None,
+                             great_or_equal: bool = True, less_or_equal: bool = True,
+                             end_date: Union[datetime.datetime, None] = None,
+                             columns: Union[list, None] = None):
         """
-        Connects Directly to DB withouth passing from the ORM to speed calculations
+        Connects directly to the DB without passing through the ORM to speed up calculations.
+
+        Parameters
+        ----------
+        metadata : dict
+            Metadata containing table and column details.
+        connection_config : dict
+            Connection configuration for the database.
+        start_date : datetime.datetime, optional
+            The start date for filtering. If None, no lower bound is applied.
+        great_or_equal : bool, optional
+            Whether the start_date filter is inclusive (>=). Defaults to True.
+        less_or_equal : bool, optional
+            Whether the end_date filter is inclusive (<=). Defaults to True.
+        end_date : datetime.datetime, optional
+            The end date for filtering. If None, no upper bound is applied.
+        columns : list, optional
+            Specific columns to select. If None, all columns are selected.
+
         Returns
         -------
-
+        pd.DataFrame
+            Data from the table as a pandas DataFrame, optionally filtered by date range.
         """
         import psycopg2
-        from .utils import TDAG_ORM_DB_CONNECTION
-        with psycopg2.connect(TDAG_ORM_DB_CONNECTION) as connection:
+        import pandas as pd
+
+        if connection_config["__type__"] != CONSTANTS.CONNECTION_TYPE_POSTGRES:
+            raise NotImplementedError("Only PostgreSQL is supported.")
+
+        # Build the SELECT clause
+        select_clause = ", ".join(columns) if columns else "*"
+
+        # Build the WHERE clause dynamically
+        where_clauses = []
+        time_index_name = metadata['sourcetableconfiguration']['time_index_name']
+        if start_date:
+            operator = ">=" if great_or_equal else ">"
+            where_clauses.append(f"{time_index_name} {operator} '{start_date}'")
+        if end_date:
+            operator = "<=" if less_or_equal else "<"
+            where_clauses.append(f"{time_index_name} {operator} '{end_date}'")
+
+        # Combine WHERE clauses
+        where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+        # Construct the query
+        query = f"SELECT {select_clause} FROM {metadata['hash_id']} {where_clause}"
+
+        with psycopg2.connect(connection_config['connection_details']) as connection:
             with connection.cursor() as cursor:
-                cursor.execute(
-                    f"""SElECT * FROM {metadata['hash_id']} WHERE  {metadata['sourcetableconfiguration']['time_index_name']} >= '{start_date}' 
-                            AND {metadata['sourcetableconfiguration']['time_index_name']} <= '{end_date}'
-                            """)
+                cursor.execute(query)
                 column_names = [desc[0] for desc in cursor.description]
                 data = cursor.fetchall()
-        data = pd.DataFrame(data=data, columns=column_names).set_index(metadata['sourcetableconfiguration']['time_index_name'])
-        if great_or_equal==False:
-            data=data[data.index>start_date]
-        if less_or_equal==False:
-            data=data[data<end_date]
-        
-        return data        
+
+        # Convert to DataFrame
+        data = pd.DataFrame(data=data, columns=column_names)
+
+        data=data.set_index(metadata['sourcetableconfiguration']["index_names"])
+
+        return data
+
     def filter_by_assets_ranges(self,table_name:str,asset_ranges_map:dict,connection_config:dict):
 
         if connection_config["__type__"]!=CONSTANTS.CONNECTION_TYPE_POSTGRES:
@@ -1494,7 +1534,7 @@ class DynamicTableHelpers:
         df = read_sql_tmpfile(full_query, time_series_orm_uri_db_connection=connection_config["connection_details"])
         return df
         
-    def get_data_by_time_index(self, metadata: dict,
+    def get_data_by_time_index(self, metadata: dict,connection_config:dict,
                                start_date: Union[datetime.datetime, None] = None,
                                great_or_equal: bool = True, less_or_equal: bool = True,
                                end_date: Union[datetime.datetime, None] = None,
@@ -1504,7 +1544,10 @@ class DynamicTableHelpers:
                                ):
         direct_to_db=True
         if direct_to_db ==True:
-            return self._direct_data_from_db(metadata,start_date,great_or_equal, less_or_equal,end_date,columns)
+            return self._direct_data_from_db(metadata=metadata,
+                                             connection_config=connection_config,
+                                             start_date=start_date,great_or_equal=great_or_equal,
+                                             less_or_equal=less_or_equal,end_date=end_date,columns=columns)
 
         from ast import literal_eval
         base_url = self.root_url
