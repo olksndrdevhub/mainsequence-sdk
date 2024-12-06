@@ -17,6 +17,7 @@ from joblib import Parallel, delayed
 import psutil
 import socket
 import logging
+import subprocess
 from mainsequence.tdag.logconf import create_logger_in_path
 
 TDAG_ENDPOINT = f"{os.environ.get('TDAG_ENDPOINT')}"
@@ -375,8 +376,27 @@ import csv
 from io import StringIO
 from tqdm import tqdm  # Import tqdm for progress bar
 
+
+def recreate_indexes(table_name, table_index_names,time_series_orm_db_connection,logger):
+    # Use a separate connection for index management
+    with psycopg2.connect(time_series_orm_db_connection) as conn:
+        # Set autocommit to True if using CREATE INDEX CONCURRENTLY
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            for index_name, index_info in table_index_names.items():
+                index_type, index_q = index_info["type"], index_info["query"]
+                logger.info(f"Creating index '{index_name}'...")
+                start_time = time.time()
+                q = f"CREATE {index_type}  {index_name} ON public.{table_name} {index_q};"
+                cur.execute(q)
+                end_time = time.time()
+                time_taken = end_time - start_time
+                logger.info(f"Index '{index_name}' created in {time_taken:.2f} seconds.")
+        # Reset autocommit if needed
+        conn.autocommit = False
+
 def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwrite: bool,
-                        time_index_name: str, index_names: list, table_is_empty: bool,
+                        time_index_name: str, index_names: list, table_is_empty: bool,table_index_names:dict,
                         time_series_orm_db_connection: Union[str, None] = None,
                         use_chunks: bool = True, num_threads: int = 4):
     """
@@ -395,6 +415,38 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
     """
 
     columns = serialized_data_frame.columns.tolist()
+    last_time_index_value=serialized_data_frame[time_index_name].max().timestamp()
+    max_per_asset_symbol=None
+    if len(index_names) > 1:
+        grouped_dates = serialized_data_frame.groupby(["asset_symbol", "execution_venue_symbol"])[time_index_name].agg(
+            ["min", "max"])
+        max_per_asset_symbol= {
+                                row["asset_symbol"]: {row["execution_venue_symbol"]: row["max"].timestamp()}
+                                for _, row in grouped_dates.reset_index().iterrows()
+                              }
+
+
+    def drop_indexes(table_name, table_index_names):
+        # Use a separate connection for index management
+        with psycopg2.connect(time_series_orm_db_connection) as conn:
+            with conn.cursor() as cur:
+                for index_name in table_index_names.keys():
+                    drop_index_query = f'DROP INDEX IF EXISTS "{index_name}";'
+                    print(f"Dropping index '{index_name}'...")
+                    cur.execute(drop_index_query)
+            # Commit changes after all indexes are processed
+            conn.commit()
+            print("All specified indexes dropped successfully.")
+
+
+
+        # Drop indexes before insertion
+
+
+    if serialized_data_frame.shape[0] > 1000000:
+        duplicates_exist = serialized_data_frame.duplicated(subset=index_names).any()
+        assert not duplicates_exist, f"Duplicates found in columns: {index_names}"
+        drop_indexes(table_name, table_index_names)
 
     if overwrite and not table_is_empty:
         min_d = serialized_data_frame[time_index_name].min()
@@ -406,7 +458,8 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
                     GROUPED_DELETE_CONDITIONS = []
 
                     if len(index_names) > 1:
-                        grouped_dates =serialized_data_frame.groupby(["asset_symbol","execution_venue_symbol"])["time_index"].agg(["min","max"])
+
+
                         grouped_dates=grouped_dates.reset_index(level="execution_venue_symbol").rename(columns={"min":"start_time","max":"end_time"})
                         grouped_dates=grouped_dates.reset_index()
                         grouped_dates=grouped_dates.to_dict("records")
@@ -466,7 +519,7 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
             try:
                 with psycopg2.connect(time_series_orm_db_connection) as conn:
                     with conn.cursor() as cur:
-                        buffer_size = 100000  # Adjust based on memory and performance requirements
+                        buffer_size = 10000  # Adjust based on memory and performance requirements
                         data_generator = chunk_df.itertuples(index=False, name=None)
 
                         total_records = len(chunk_df)
@@ -504,14 +557,13 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
                 with conn.cursor() as cur:
                     buffer_size = 10000
                     data_generator = serialized_data_frame.itertuples(index=False, name=None)
-
                     total_records = len(serialized_data_frame)
                     with tqdm(total=total_records, desc="Inserting records") as pbar:
                         while True:
                             batch = list(itertools.islice(data_generator, buffer_size))
                             if not batch:
                                 break
-
+                            #
                             output = StringIO()
                             writer = csv.writer(output)
                             writer.writerows(batch)
@@ -520,6 +572,9 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
                             copy_query = f"COPY public.{table_name} ({', '.join(columns)}) FROM STDIN WITH CSV"
                             cur.copy_expert(copy_query, output)
 
+
+
+
                             # Update progress bar
                             pbar.update(len(batch))
 
@@ -527,7 +582,21 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
         except Exception as e:
             print(f"An error occurred during single insert: {e}")
             raise
+    if serialized_data_frame.shape[0] > 500000:
+        subprocess.Popen(
+            [
+                "python", "-m", "mainsequence.tdag", "create_indices_in_table",
+                f"--table_name={table_name}",
+                f'--table_index_names={json.dumps(table_index_names)}',
+                f"--time_series_orm_db_connection={time_series_orm_db_connection}"
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            env=os.environ.copy(),  # Pass the environment variables
+        )
 
+    return last_time_index_value,max_per_asset_symbol
 
 def direct_table_update_OLD(table_name, serialized_data_frame: pd.DataFrame, overwrite: bool,
                         time_index_name: str, index_names: list, table_is_empty: bool,

@@ -584,6 +584,24 @@ class TimeSerieLocalUpdate(BaseObject):
             raise Exception(f"{metadata['local_hash_id']}{r.text}")
         return r
 
+    @classmethod
+    def set_last_update_index_time_from_update_stats(cls, metadata,
+                                                     max_per_asset_symbol:dict,
+                                                     last_time_index_value:float,
+                                                     timeout=None):
+        s = cls.build_session()
+        url = cls.LOCAL_UPDATE_URL + f"/{metadata['id']}/set_last_update_index_time_from_update_stats/"
+        payload = {"json": {"last_time_index_value": last_time_index_value,"max_per_asset_symbol":max_per_asset_symbol}}
+        r = make_request(s=s, loaders=cls.LOADERS,payload=payload, r_type="GET", url=url, time_out=timeout)
+
+        if r.status_code == 404:
+            raise SourceTableConfigurationDoesNotExist
+
+        if r.status_code != 200:
+            raise Exception(f"{metadata['local_hash_id']}{r.text}")
+        return r
+
+
     @staticmethod
     def serialize_for_json(kwargs):
         return serialize_to_json(kwargs)
@@ -1327,28 +1345,31 @@ class DynamicTableHelpers:
                     recompress==True
 
 
+
         table_is_empty = metadata["sourcetableconfiguration"]["last_time_index_value"] is None
-        if table_is_empty== True:
-            #force an index update in  case there may be data
-            timeout = 5 * 60 if serialzied_data_frame.shape[0] > 1000000 else None
-            r = self.TimeSerieLocalUpdate.set_last_update_index_time(metadata=local_metadata, timeout=timeout)
 
 
         data_source_configuration=DynamicTableDataSource.get_data_source_connection_details(metadata["data_source"]["id"])
-        if data_source_configuration["__type__"]==CONSTANTS.CONNECTION_TYPE_POSTGRES:
-            direct_table_update(serialized_data_frame=serialzied_data_frame,
-                                time_series_orm_db_connection=data_source_configuration["connection_details"],
-                                table_name=metadata["hash_id"],
-                                overwrite=overwrite,index_names=index_names,
-                                time_index_name=time_index_name,table_is_empty=table_is_empty
-                                )
+        if data_source_configuration["__type__"]!=CONSTANTS.CONNECTION_TYPE_POSTGRES:
+            raise Exception
+
+        last_time_index_value,max_per_asset_symbol=direct_table_update(serialized_data_frame=serialzied_data_frame,
+                            time_series_orm_db_connection=data_source_configuration["connection_details"],
+                            table_name=metadata["hash_id"],
+                            overwrite=overwrite,index_names=index_names,
+                            time_index_name=time_index_name,table_is_empty=table_is_empty,
+                            table_index_names=metadata["table_index_names"],
+                            )
 
 
-        timeout=5*60 if serialzied_data_frame.shape[0]>1000000  else None
-        try:
-            r = self.TimeSerieLocalUpdate.set_last_update_index_time(metadata=local_metadata,timeout=timeout)
-        except Exception as e:
-            raise e
+        r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(max_per_asset_symbol=max_per_asset_symbol,
+                                                                 last_time_index_value=last_time_index_value,
+                                                                                   metadata=local_metadata,
+
+                                                                 )
+
+
+
         try:
             result=r.json()
         except Exception as e:
