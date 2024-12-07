@@ -653,6 +653,17 @@ class TimeSerieLocalUpdate(BaseObject):
         return depth_df
 
     @classmethod
+    def get_all_dependencies_update_priority(cls, hash_id, timeout=None):
+        s = cls.build_session()
+        url = cls.ROOT_URL + f"/{hash_id}/get_all_dependencies_update_priority"
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+        depth_df = pd.DataFrame(r.json())
+        return depth_df
+
+    @classmethod
     def get_max_depth(cls, hash_id, timeout=None):
         s = cls.build_session()
         url = cls.ROOT_URL + f"/{hash_id}/get_max_depth"

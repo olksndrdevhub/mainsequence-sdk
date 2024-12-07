@@ -740,8 +740,11 @@ class TimeSerieRebuildMethods(ABC):
         except Exception as e:
             raise e
 
-        mod = importlib.import_module(time_serie_config["time_series_class_import_path"]["module"])
-        TimeSerieClass = getattr(mod, time_serie_config["time_series_class_import_path"]["qualname"])
+        try:
+            mod = importlib.import_module(time_serie_config["time_series_class_import_path"]["module"])
+            TimeSerieClass = getattr(mod, time_serie_config["time_series_class_import_path"]["qualname"])
+        except Exception as e:
+            raise e
 
         time_serie_class_name = time_serie_config["time_series_class_import_path"]["qualname"]
 
@@ -1243,24 +1246,7 @@ class DataPersistanceMethods(ABC):
 
                                                              symbol_list=asset_symbols,
                                                              )
-        parquet_eval = last_observation.shape[0] != 1 if asset_symbols is None else \
-            last_observation.index.get_level_values(0).unique().shape[0] > 1
 
-        if parquet_eval == True:
-            assert self.data_configuration_path is None
-            # db is out of sync send sync request
-            self.logger.warning("last_observation is out of sync send sync request")
-            self.local_persist_manager.delete_local_parquet()
-            self.local_persist_manager.synchronize_metadata(meta_data=None,
-                                                            local_metadata=None,
-                                                            set_last_index_value=True)
-            latest_value, multiindex = self.get_latest_value()
-            if asset_symbols is not None and multiindex is not None:
-                latest_value = np.max([np.max(list(ev_dict.values())) for ev_dict in multiindex.values()])
-            last_observation = self.get_df_greater_than_in_table(latest_value,
-                                                                 symbol_list=asset_symbols,
-                                                                 great_or_equal=True)
-            self.local_persist_manager._set_local_parquet_manager()
 
         return last_observation
 
@@ -1734,38 +1720,13 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         """
 
         self.logger.info("Initializing update priority ... ")
-        depth_df = self.local_persist_manager.get_all_local_dependencies()
+        depth_df = self.local_persist_manager.get_all_dependencies_update_priority()
         self.depth_df = depth_df
 
-        self.dependencies_df = pd.DataFrame()
-        self.depth_df["update_priority"] = -1
-        self.depth_df["number_of_upstreams"] = 0
+        self.dependencies_df = depth_df.copy()
+       
         if depth_df.shape[0] > 0:
 
-            for source_class_name, class_df in depth_df.groupby("source_class_name")["local_hash_id"]:
-
-                if source_class_name in ["CommonalityFeature", "FeatOnFeat", "DeflatedPrices", "CompAssetFeat"]:
-
-                    for h_id in class_df:
-                        tmp_depth = TimeSerieLocalUpdate.get_max_depth(hash_id=h_id)
-                        t_index = depth_df[(self.depth_df["local_hash_id"] == h_id)].index
-                        self.depth_df.loc[t_index, "update_priority"] = tmp_depth
-                else:
-                    # wrong way assumiing same depth
-                    max_depth = TimeSerieLocalUpdate.get_max_depth(hash_id=class_df.iloc[0])
-                    t_index = depth_df[(self.depth_df["source_class_name"] == source_class_name)].index
-                    self.depth_df.loc[t_index, "update_priority"] = max_depth
-
-                should_group_order = any([[t in c.lower() for t in ["comp", "equal", "coin"]] for c in class_df])
-                if should_group_order == True:
-                    for h_id in class_df:
-                        upstreams = TimeSerieLocalUpdate.get_upstream_nodes(hash_id=h_id)
-                        t_index = depth_df[(self.depth_df["local_hash_id"] == h_id)].index
-                        self.depth_df.loc[t_index, "number_of_upstreams"] = upstreams.shape[0]
-
-            # self.depth_df["update_priority"] = self.depth_df["source_class_name"].map(depth_by_class)
-            self.depth_df["update_priority"] = self.depth_df["update_priority"].max() - self.depth_df["update_priority"]
-            update_priority_dict = depth_df.set_index("local_hash_id")["update_priority"].to_dict()
             self.dependencies_df = self.depth_df[self.depth_df["local_hash_id"] != self.hashed_name].copy()
 
     def pre_update_setting_routines(self, scheduler, set_time_serie_queue_status: bool, update_tree: True,
@@ -1880,7 +1841,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             if self.dependencies_df.shape[0] > 0:
                 unique_priorities = self.dependencies_df["update_priority"].unique().tolist()
                 unique_priorities.sort()
-                unique_priorities.reverse()
+
                 all_hash = self.dependencies_df[self.dependencies_df["source_class_name"] != "WrapperTimeSerie"][
                     "local_hash_id"].to_list()
                 all_start_data = self.update_tracker.set_start_of_execution_batch(hash_id_list=all_hash)
@@ -1906,6 +1867,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                 ts.persist_to_pickle()
 
                             ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
+
                             self.update_tracker.set_start_of_execution(hash_id=ts_row[1]["local_hash_id"])
                             error_on_last_update = ts.update(update_tree_kwargs=update_tree_kwargs,
                                                              raise_exceptions=True, update_tree=False,

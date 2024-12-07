@@ -644,6 +644,7 @@ class ParquetLocalPersistManager:
         return temp_df
 
     def flush_local_persisted(self, flush_only_time_series, ):
+        raise Exception
         self.logger.warning("DELETING LOCAL PARQUET")
         if self.local_persist_exist()== True:
             flush_sub_folders = True if flush_only_time_series == False else False
@@ -1012,6 +1013,9 @@ class TimeScaleLocalPersistManager:
     def get_all_local_dependencies(self):
         depth_df=TimeSerieLocalUpdate.get_all_dependencies(hash_id=self.local_hash_id)
         return depth_df
+    def get_all_dependencies_update_priority(self):
+        depth_df=TimeSerieLocalUpdate.get_all_dependencies_update_priority(hash_id=self.local_hash_id)
+        return depth_df
 
     def set_ogm_dependencies_linked(self):
         
@@ -1201,8 +1205,8 @@ class TimeScaleLocalPersistManager:
     def filter_by_assets_ranges(self, asset_ranges_map: dict, force_db_look: bool):
 
         if force_db_look:
-
-            assert "asset_symbol" in self.metadata["sourcetableconfiguration"]["index_names"],"Table does not contain asset_symbol column"
+            if  self.metadata["sourcetableconfiguration"] is not None:
+                assert "asset_symbol" in self.metadata["sourcetableconfiguration"]["index_names"],"Table does not contain asset_symbol column"
             connection_config=DynamicTableDataSource.get_data_source_connection_details(self.metadata["data_source"]["id"])
 
             df=self.dth.filter_by_assets_ranges(table_name=self.metadata['hash_id'],asset_ranges_map=asset_ranges_map,
