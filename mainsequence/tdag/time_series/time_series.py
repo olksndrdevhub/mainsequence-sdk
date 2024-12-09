@@ -2229,7 +2229,9 @@ class WrapperTimeSerie(TimeSerie):
                     local_metadatas=local_metadatas
                 )
             except Exception as e:
-                error_list[ts_key] = e
+                tb_str = traceback.format_exc()
+                # Store the exception along with its traceback
+                error_list[ts_key] = {'error': str(e), 'traceback': tb_str}
 
         if USE_THREADS == True:
             thread_list = []
