@@ -200,6 +200,12 @@ def get_rest_token_header(token_url:str,  username:str,password:str  ):
     headers = CaseInsensitiveDict()
     headers["Content-Type"] = "application/json"
 
+    if os.getenv("MAINSEQUENCE_TOKEN"):
+        headers["Authorization"] = "Token " + os.getenv("MAINSEQUENCE_TOKEN")
+        return headers, None
+    else:
+        raise Exception("MAINSEQUENCE_TOKEN is not set in env")
+
     s = build_session()
     gcp_auth = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", None)
     gcp_token_decoded = None

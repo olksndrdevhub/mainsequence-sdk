@@ -375,7 +375,7 @@ class AccountCoolDown(BaseObjectOrm):
     
     pass
 
-class AssetMixin(BaseObjectOrm,BaseVamPydanticModel):
+class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
 
     id: Optional[int] = None
     symbol: str
@@ -393,7 +393,6 @@ class AssetMixin(BaseObjectOrm,BaseVamPydanticModel):
     @property
     def execution_venue_symbol(self):
         return self.execution_venue.symbol
-
 
     @classmethod
     def switch_cash_asset(cls,asset_id,target_currency_asset:object):
