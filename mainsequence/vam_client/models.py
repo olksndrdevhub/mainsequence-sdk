@@ -497,7 +497,8 @@ class IndexAsset(Asset):
 class TargetPortfolioIndexAsset(IndexAsset):
     live_portfolio : "TargetPortfolio"
     backtest_portfolio : "TargetPortfolio"
-
+    live_portfolio_data_source_id: int
+    backtest_portfolio_data_source_id: int
 
 class FutureUSDMMixin(AssetMixin, BaseVamPydanticModel):
     maturity_code: str = Field(..., max_length=50)

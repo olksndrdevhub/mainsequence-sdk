@@ -442,11 +442,14 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
 
         # Drop indexes before insertion
 
+    duplicates_exist = serialized_data_frame.duplicated(subset=index_names).any()
+    assert not duplicates_exist, f"Duplicates found in columns: {index_names}"
 
-    if serialized_data_frame.shape[0] > 1000000:
-        duplicates_exist = serialized_data_frame.duplicated(subset=index_names).any()
-        assert not duplicates_exist, f"Duplicates found in columns: {index_names}"
-        drop_indexes(table_name, table_index_names)
+    #do not drop indices this is only done on inception
+    # if serialized_data_frame.shape[0] > 1000000:
+    #     duplicates_exist = serialized_data_frame.duplicated(subset=index_names).any()
+    #     assert not duplicates_exist, f"Duplicates found in columns: {index_names}"
+    #     drop_indexes(table_name, table_index_names)
 
     if overwrite and not table_is_empty:
         min_d = serialized_data_frame[time_index_name].min()
@@ -582,19 +585,20 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
         except Exception as e:
             print(f"An error occurred during single insert: {e}")
             raise
-    if serialized_data_frame.shape[0] > 500000:
-        subprocess.Popen(
-            [
-                "python", "-m", "mainsequence.tdag", "create_indices_in_table",
-                f"--table_name={table_name}",
-                f'--table_index_names={json.dumps(table_index_names)}',
-                f"--time_series_orm_db_connection={time_series_orm_db_connection}"
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True,
-            env=os.environ.copy(),  # Pass the environment variables
-        )
+    # do not rebuild  indices this is only done on inception
+    # if serialized_data_frame.shape[0] > 500000:
+    #     subprocess.Popen(
+    #         [
+    #             "python", "-m", "mainsequence.tdag", "create_indices_in_table",
+    #             f"--table_name={table_name}",
+    #             f'--table_index_names={json.dumps(table_index_names)}',
+    #             f"--time_series_orm_db_connection={time_series_orm_db_connection}"
+    #         ],
+    #         stdout=subprocess.DEVNULL,
+    #         stderr=subprocess.DEVNULL,
+    #         close_fds=True,
+    #         env=os.environ.copy(),  # Pass the environment variables
+    #     )
 
     return last_time_index_value,max_per_asset_symbol
 

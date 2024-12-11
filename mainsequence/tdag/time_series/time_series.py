@@ -20,8 +20,8 @@ from mainsequence.tdag.config import (
     ogm
 )
 
-from mainsequence.tdag.time_series import persist_managers
-from mainsequence.tdag.time_series.persist_managers import DataLakePersistManager
+from mainsequence.tdag.time_series.persist_managers import PersistManager
+
 from pycares.errno import value
 from pydantic import BaseModel
 
@@ -31,7 +31,7 @@ from typing import Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-from mainsequence.tdag_client import TimeSerieLocalUpdate, LocalTimeSerieUpdateDetails
+from mainsequence.tdag_client import TimeSerieLocalUpdate, LocalTimeSerieUpdateDetails, CONSTANTS
 from enum import Enum
 from functools import wraps
 from mainsequence.tdag.config import bcolors
@@ -168,9 +168,7 @@ class ConfigSerializer:
         rebuild_function = lambda x, state_kwargs: cls._rebuild_configuration_argument(x, ignore_pydantic=False)
         if state_kwargs is not None:
             rebuild_function = lambda x, state_kwargs: cls.deserialize_pickle_value(x, **state_kwargs)
-        
-    
-        
+
         module = importlib.import_module(details["pydantic_model_import_path"]["module"])
         PydanticClass = getattr(module, details["pydantic_model_import_path"]['qualname'])
         new_details = {}
@@ -289,7 +287,6 @@ class ConfigSerializer:
         from types import SimpleNamespace
         from mainsequence.vam_client import BaseObjectOrm
 
-    
         if issubclass(value.__class__, TimeSerie):
             if pickle_ts == True:
                 new_value = {"is_time_serie_pickled": True}
@@ -313,7 +310,7 @@ class ConfigSerializer:
             for key, model_tmp_value in value.model_dump().items():  # model_dict.items():
                 serialized_model[key] = self._serialize_signature_argument(model_tmp_value, pickle_ts)
             try:
-               
+
                 json.dumps(serialized_model)
             except Exception as e:
                 raise e
@@ -353,10 +350,10 @@ class ConfigSerializer:
                     a = 5
                     value = [self._serialize_signature_argument(v, pickle_ts=pickle_ts) for v in value]
                 else:
-                    new_value=[]
-                    sort=True
+                    new_value = []
+                    sort = True
                     for v in value:
-                        if  issubclass(v.__class__, dict):
+                        if issubclass(v.__class__, dict):
                             if "__type__" in v.keys():
                                 new_value.append(v)
                             else:
@@ -367,10 +364,10 @@ class ConfigSerializer:
                             sort = False
                         else:
                             new_value.append(v)
-                    if sort==True:
+                    if sort == True:
                         new_value.sort()
-                    value=new_value
-                    
+                    value = new_value
+
         elif isinstance(value, dict):
             for value_key, value_value in value.items():
                 if isinstance(value_value, dict):
@@ -391,8 +388,8 @@ class ConfigSerializer:
     def _serialize_configuration_dict(self, kwargs, pickle_ts=False, ordered_dict=True):
 
         import collections
-        new_kwargs = {}        
-        
+        new_kwargs = {}
+
         for key, value in kwargs.items():
 
             if key in ["model_list"]:
@@ -403,7 +400,7 @@ class ConfigSerializer:
                 if "is_time_serie_pickled" in value.keys():
                     new_kwargs[key] = value
                     continue
-    
+
             value = self._serialize_signature_argument(value, pickle_ts=pickle_ts)
 
             new_kwargs[key] = value
@@ -489,7 +486,7 @@ class ConfigSerializer:
                 cls.deserialize_pickle_value(v, ignore_pydantic=ignore_pydantic, **state_kwargs) if isinstance(v,
                                                                                                                dict) else v
                 for v in value]
-            new_value=tuple(new_value)
+            new_value = tuple(new_value)
         if isinstance(value, list):
             if len(value) == 0:
                 return new_value
@@ -498,7 +495,7 @@ class ConfigSerializer:
             #         new_value = [build_model(v) for v in value]
             #     elif "pydantic_model_import_path" in value[0].keys():
             #             new_value = [cls.rebuild_pydantic_model(v) for v in value]
-         
+
             new_value = [
                 cls.deserialize_pickle_value(v, ignore_pydantic=ignore_pydantic, **state_kwargs) if isinstance(v,
                                                                                                                dict) else v
@@ -584,7 +581,7 @@ class GraphNodeMethods(ABC):
     def get_mermaid_dependency_diagram(self):
         from IPython.display import display, HTML
 
-        mermaid_diagram=self.local_persist_manager.display_mermaid_dependency_diagram()
+        mermaid_diagram = self.local_persist_manager.display_mermaid_dependency_diagram()
 
         # Mermaid.js initialization script (only run once)
         if not hasattr(display, "_mermaid_initialized"):
@@ -622,8 +619,6 @@ class GraphNodeMethods(ABC):
 
         # Optionally return the raw diagram code for further use
         return mermaid_diagram
-
-
 
     def get_all_local_dependencies(self, ):
         """
@@ -720,7 +715,11 @@ class TimeSerieRebuildMethods(ABC):
 
     @classmethod
     @tracer.start_as_current_span("TS: Rebuild From Configuration")
-    def rebuild_from_configuration(cls, local_hash_id, remote_table_hashed_name: Union[str, None]):
+    def rebuild_from_configuration(cls, local_hash_id,
+                                   data_source_id:int,
+                                   remote_table_hashed_name: Union[str, None],
+
+                                   ):
         """
 
         :param serie_data_folder:
@@ -729,11 +728,11 @@ class TimeSerieRebuildMethods(ABC):
         """
 
         import importlib
-        from mainsequence.tdag.time_series.persist_managers import get_persist_manager
+        from mainsequence.tdag.time_series.persist_managers import PersistManager
 
         tracer_instrumentator.append_attribute_to_current_span("time_serie_hash_id", local_hash_id)
 
-        persist_manager = get_persist_manager(local_hash_id=local_hash_id,
+        persist_manager = PersistManager.get_from_data_type(local_hash_id=local_hash_id,
                                               remote_table_hashed_name=remote_table_hashed_name)
         try:
             time_serie_config = persist_manager.local_build_configuration
@@ -955,7 +954,6 @@ class TimeSerieRebuildMethods(ABC):
         return error_on_last_update
 
 
-
 class DataPersistanceMethods(ABC):
 
     # sets
@@ -1002,7 +1000,6 @@ class DataPersistanceMethods(ABC):
     @property
     def source_table_configuration(self):
         return self.local_persist_manager.source_table_configuration
-
 
     def set_policy(self, interval: str, comp_type: str, overwrite=False, ):
 
@@ -1061,7 +1058,7 @@ class DataPersistanceMethods(ABC):
         earliest_value = self.local_persist_manager.get_earliest_value()
         return earliest_value
 
-    def get_data_source_connection_details(self,override_id:Union[int,None]=None):
+    def get_data_source_connection_details(self, override_id: Union[int, None] = None):
         return self.local_persist_manager.get_data_source_connection_details(override_id)
 
     @property
@@ -1111,7 +1108,7 @@ class DataPersistanceMethods(ABC):
     @tracer.start_as_current_span("TS: Get Persisted Data")
     def get_df_greater_than_in_table(self, target_value: Union[None, datetime.datetime],
                                      great_or_equal=False,
-                                     force_db_look=True, symbol_list: Union[None, list] = None,
+                                    symbol_list: Union[None, list] = None,
                                      ):
         """
 
@@ -1142,7 +1139,6 @@ class DataPersistanceMethods(ABC):
             filtered_data = self.local_persist_manager.get_df_greater_than_in_table(
                 target_value=target_value,
                 great_or_equal=great_or_equal,
-                force_db_look=force_db_look,
                 symbol_list=symbol_list,
 
             )
@@ -1163,9 +1159,9 @@ class DataPersistanceMethods(ABC):
         df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map, force_db_look)
         return df
 
-    def get_df_between_dates(self, start_date, end_date,
+    def get_df_between_dates(self, start_date:Union[datetime.datetime,None]=None, end_date:Union[datetime.datetime,None]=None,
                              asset_symbols: Union[None, list] = None,
-                             data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True, force_db_look=True
+                             data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True,
                              ):
 
         if self.data_configuration_path and data_lake_force_db_look == False:
@@ -1183,7 +1179,6 @@ class DataPersistanceMethods(ABC):
                                                                             asset_symbols=asset_symbols,
                                                                             great_or_equal=great_or_equal,
                                                                             less_or_equal=less_or_equal,
-                                                                            force_db_look=force_db_look
                                                                             )
         return filtered_data
 
@@ -1246,7 +1241,6 @@ class DataPersistanceMethods(ABC):
 
                                                              symbol_list=asset_symbols,
                                                              )
-
 
         return last_observation
 
@@ -1388,16 +1382,25 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 # create logger
                 self.run_after_post_init_routines()
 
-                # patch if neceesy build configuration
+                # patch if necesary build configuration
                 self.patch_build_configuration()
 
             return run_init
 
         return wrap
 
+    @staticmethod
+    def sanitize_default_build_metadata(build_meta_data: Union[dict, None] = None):
+        if build_meta_data is None:
+            build_meta_data = {"initialize_with_default_partitions": False}
+
+        if "initialize_with_default_partitions" not in build_meta_data.keys():
+            build_meta_data["initialize_with_default_partitions"] = False
+        return build_meta_data
+
     def __init__(self, init_meta=None,
                  build_meta_data: Union[dict, None] = None, local_kwargs_to_ignore: Union[List[str], None] = None,
-                 data_configuration_path: Union[str, None] = None,
+
                  *args, **kwargs):
         """
         Initializes the TimeSerie object with the provided metadata and configurations.
@@ -1415,8 +1418,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             Metadata related to the building process of the time series.
         local_kwargs_to_ignore : list, optional
             List of keyword arguments to ignore during configuration.
-        data_configuration_path : str, optional
-            Path to the data configuration file.
         *args : tuple
             Additional arguments.
         **kwargs : dict
@@ -1424,10 +1425,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         """
 
         self.init_meta = init_meta
-        self.build_meta_data = build_meta_data
+        self.build_meta_data = self.sanitize_default_build_metadata(build_meta_data)
         self.local_kwargs_to_ignore = local_kwargs_to_ignore
         self.pre_load_routines_run = False
-        self.data_configuration_path = data_configuration_path
+
 
         # asser that method is decorated
         if not len(self.__init__.__closure__) == 1:
@@ -1450,8 +1451,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             return self.asset_symbols_filter
         return None
 
-
-
     @property
     def hash_id(self):
         """
@@ -1473,20 +1472,32 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
         """
         self.pre_load_routines_run = True
+
     def get_data_source(self):
         from mainsequence.tdag_client import POD_DEFAULT_DATA_SOURCE
 
-        self.logger.info("using pod default data source")
-        if POD_DEFAULT_DATA_SOURCE.related_resource is None:
-            raise Exception("This Pod does not have a default data source")
-        return POD_DEFAULT_DATA_SOURCE
+        pod_source=os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
+
+        if pod_source == None:
+            self.logger.info("using pod default data source")
+            if POD_DEFAULT_DATA_SOURCE.related_resource is None:
+                raise Exception("This Pod does not have a default data source")
+            return POD_DEFAULT_DATA_SOURCE
+        #returnn to pod to override with context manager
+        from mainsequence.tdag_client import models as models
+        pod_source = json.loads(pod_source)
+        ModelClass=pod_source["tdag_orm_class"]
+        pod_source.pop("tdag_orm_class", None)
+        ModelClass=getattr(models,ModelClass)
+        pod_source=ModelClass(**pod_source)
+        return pod_source
+
     def set_data_source(self):
         """
 
         :return:
         """
-        self.data_source=self.get_data_source()
-
+        self.data_source = self.get_data_source()
 
     def run_after_post_init_routines(self):
         pass
@@ -1592,7 +1603,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         return self._local_persist_manager
 
     def _set_local_persist_manager(self, hashed_name: str, remote_table_hashed_name: str,
-                                   local_metadata: Union[None, dict] = None
+                                   local_metadata: Union[None, dict] = None,
+                                   time_serie_meta_build_configuration: Union[None, dict] = None,
                                    ) -> None:
         """
         Initializes the local persistence manager for the time series. It sets up
@@ -1613,21 +1625,23 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         except:
             human_readable = None
         self.set_data_source()
-        self._local_persist_manager = persist_managers.TimeScaleLocalPersistManager(local_hash_id=hashed_name,
-                                                                                    remote_table_hashed_name=remote_table_hashed_name,
-                                                                                    class_name=self.__class__.__name__,
-                                                                                    human_readable=human_readable,
-                                                                                    persist_parquet=True,
-                                                                                    logger=self.logger,
-                                                                                    local_metadata=local_metadata,
-                                                                                    description=self.get_html_description(),
-
+        self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=hashed_name,
+                                                                        remote_table_hashed_name=remote_table_hashed_name,
+                                                                        class_name=self.__class__.__name__,
+                                                                        human_readable=human_readable,
+                                                                        persist_parquet=True,
+                                                                        logger=self.logger,
+                                                                        local_metadata=local_metadata,
+                                                                        description=self.get_html_description(),
+                                                                        data_source=self.data_source
                                                                                     )
+
         time_serie_source_code_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
         time_serie_source_code = self.get_time_serie_source_code(self.__class__)
         remote_meta_exist, local_meta_exist = self._local_persist_manager.local_persist_exist_set_config(
             local_configuration=self.local_initial_configuration,
             remote_configuration=self.remote_initial_configuration,
+            remote_build_metadata=self.remote_build_metadata,
             time_serie_source_code_git_hash=time_serie_source_code_git_hash,
             time_serie_source_code=time_serie_source_code,
             data_source=self.data_source
@@ -1666,9 +1680,21 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         if patch_build == True:
             self.logger.warning(f"Patching build configuration for {self.hash_id}")
             self.flush_pickle()
+
+
+
             self.local_persist_manager.patch_build_configuration(local_configuration=self.local_initial_configuration,
-                                                                 remote_configuration=self.remote_initial_configuration
+                                                                 remote_configuration=self.remote_initial_configuration,
+                                                                 remote_build_metadata=self.remote_build_metadata
                                                                  )
+
+
+        if self.local_persist_manager.metadata['sourcetableconfiguration'] is not None:
+            if self.remote_build_metadata["initialize_with_default_partitions"]==False:
+                if self.data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+                    self.logger.warning("Default Partitions will be initialized ")
+
+
 
     def _create_config(self, kwargs, post_init_log_messages: list):
         """
@@ -1706,6 +1732,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 remote_initial_configuration.pop(k, None)
             remote_initial_configuration.pop("local_kwargs_to_ignore", None)
         self.remote_initial_configuration = remote_initial_configuration
+        self.remote_build_metadata=self.sanitize_default_build_metadata(kwargs.get("build_meta_data",None))
         self.init_meta = init_meta
 
         self.logger.debug(f"local/remote {self.hashed_name}/{self.remote_table_hashed_name}")
@@ -1724,9 +1751,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         self.depth_df = depth_df
 
         self.dependencies_df = depth_df.copy()
-       
-        if depth_df.shape[0] > 0:
 
+        if depth_df.shape[0] > 0:
             self.dependencies_df = self.depth_df[self.depth_df["local_hash_id"] != self.hashed_name].copy()
 
     def pre_update_setting_routines(self, scheduler, set_time_serie_queue_status: bool, update_tree: True,
@@ -1739,7 +1765,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
         """
 
-        from .persist_managers import verify_parquet_consistency
         # set scheduler
         update_details = {}
         # reset metadata
@@ -1784,16 +1809,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         state_data, local_metadatas, source_table_config_map = all_metadatas['state_data'], all_metadatas[
             "local_metadatas"], all_metadatas["source_table_config_map"]
         local_metadatas = {m["local_hash_id"]: m for m in local_metadatas}
-
-        # verify parquet file consistency
-        for hash_id in local_metadatas.keys():
-            source_table_configuration = source_table_config_map[hash_id]
-            tmp_meta = local_metadatas[hash_id]
-            if source_table_configuration is not None:
-                if "last_time_index_value" in source_table_configuration.keys():
-                    self.logger.debug("Local Parquet is not been implemented nor verified")
-                    # verify_parquet_consistency(metadata=tmp_meta, logger=self.logger,
-                    #                            source_table_configuration=source_table_configuration)
 
         self.scheduler = scheduler
         self.update_details_tree = {key: v["localtimeserieupdatedetails"] for key, v in local_metadatas.items()}

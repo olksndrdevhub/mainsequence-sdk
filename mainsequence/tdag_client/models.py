@@ -362,7 +362,9 @@ class TimeSerieNode(BaseObject):
             raise Exception(r.text)
 
     @classmethod
-    def patch_build_configuration(cls,remote_table_patch:dict,local_table_patch:dict)->"LocalTimeSerie":
+    def patch_build_configuration(cls,remote_table_patch:dict,
+                                  build_meta_data:dict,
+                                  local_table_patch:dict)->"LocalTimeSerie":
         """
         
         Args:
@@ -374,7 +376,9 @@ class TimeSerieNode(BaseObject):
         """
 
         url = cls.ROOT_URL + "/patch_build_configuration"
-        payload = {"json": {"remote_table_patch":remote_table_patch,"local_table_patch":local_table_patch}}
+        payload = {"json": {"remote_table_patch":remote_table_patch,"local_table_patch":local_table_patch,
+                                    "build_meta_data":build_meta_data,
+                            }}
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
         if r.status_code != 200:
@@ -834,6 +838,30 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
             raise Exception(f"Error in request {r.text}")
         return r.json()
 
+class LocalDiskSourceLake(DynamicTableDataSource):
+    data_type:str=CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+    id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
+    in_pod: int = Field(..., description="The ID of the related Pod Source")
+    datalake_name: str = Field(..., max_length=255, description="The name of the data lake")
+    datalake_end: Optional[datetime.datetime] = Field(None, description="The end time of the data lake")
+    datalake_start: Optional[datetime.datetime] = Field(None, description="The start time of the data lake")
+    nodes_to_get_from_db: Optional[Dict] = Field(None, description="Nodes to retrieve from the database as JSON")
+    persist_logs_to_file: bool = Field(False, description="Whether to persist logs to a file")
+    use_s3_if_available: bool = Field(False, description="Whether to use S3 if available")
+
+    @classmethod
+    def get_or_create(cls, *args,**kwargs):
+        url = cls.ROOT_URL + "/get_or_create/"
+        for field in ['datalake_start', 'datalake_end']:
+            if field in kwargs and kwargs[field] is not None:
+                kwargs[field] = int(kwargs[field].timestamp())
+        kwargs["data_type"]=CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload={"json":kwargs})
+
+        if r.status_code not in  [200,201]:
+            raise Exception(f"Error in request {r.text}")
+        return cls(**r.json())
 
 
 class BaseYamlModel(BaseTdagPydanticModel,BaseObject):
@@ -1504,8 +1532,23 @@ class DynamicTableHelpers:
         import psycopg2
         import pandas as pd
 
+
+
+
         if connection_config["__type__"] != CONSTANTS.CONNECTION_TYPE_POSTGRES:
             raise NotImplementedError("Only PostgreSQL is supported.")
+
+        def fast_table_dump(connection_config, table_name,):
+            query = f"COPY {table_name} TO STDOUT WITH CSV HEADER"
+
+            with psycopg2.connect(connection_config['connection_details']) as connection:
+                with connection.cursor() as cursor:
+                    import io
+                    buffer = io.StringIO()
+                    cursor.copy_expert(query, buffer)
+                    buffer.seek(0)
+                    df = pd.read_csv(buffer)
+                    return df
 
         # Build the SELECT clause
         select_clause = ", ".join(columns) if columns else "*"
@@ -1524,8 +1567,11 @@ class DynamicTableHelpers:
         where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
         # Construct the query
-        query = f"SELECT {select_clause} FROM {metadata['hash_id']} {where_clause}"
-
+        query = f"SELECT {select_clause} FROM {metadata['table_name']} {where_clause}"
+        # if where_clause=="":
+        #     data=fast_table_dump(connection_config, metadata['table_name'])
+        #     data[metadata["sourcetableconfiguration"]['time_index_name']]=pd.to_datetime(data[metadata["sourcetableconfiguration"]['time_index_name']])
+        # else:
         with psycopg2.connect(connection_config['connection_details']) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(query)
@@ -1571,72 +1617,16 @@ class DynamicTableHelpers:
                                great_or_equal: bool = True, less_or_equal: bool = True,
                                end_date: Union[datetime.datetime, None] = None,
                                columns: Union[list, None] = None,
-                               direct_to_db=False,asset_symbols:Union[list,None]=None,
+                               asset_symbols:Union[list,None]=None,
 
                                ):
-        direct_to_db=True
-        if direct_to_db ==True:
-            return self._direct_data_from_db(metadata=metadata,
+
+        return self._direct_data_from_db(metadata=metadata,
                                              connection_config=connection_config,
                                              start_date=start_date,great_or_equal=great_or_equal,
                                              less_or_equal=less_or_equal,end_date=end_date,columns=columns)
 
-        from ast import literal_eval
-        base_url = self.root_url
 
-        start_date = start_date.strftime(DATE_FORMAT) if start_date is not None else None
-        end_date = end_date.strftime(DATE_FORMAT) if end_date is not None else None
-
-        data = {"start_date": start_date, 'great_or_equal': great_or_equal,
-                "less_or_equal": less_or_equal, "end_date": end_date,
-                "columns": columns,
-                }
-        if asset_symbols is not None:
-            data["asset_symbols"]=asset_symbols
-        payload = {"json": data, }
-        try:
-            # r = self.s.patch(f"{base_url}/{metadata['id']}/get_data_between_dates/", **payload)
-            url=f"{base_url}/{metadata['id']}/get_data_between_dates/"
-            r = self.make_request(r_type="PATCH", url=url, payload=payload)
-        except Exception as e:
-            logger.warning(metadata)
-            raise e
-
-        if r.status_code == 305:
-            import traceback
-            # traceback.print_stack()
-            self.logger.debug(f"READING DATA DIRECTLY FROM DB {metadata['hash_id']}",sub_process=self.__class__.__name__)
-            data = r.json()
-            source_table_config = data["source_table_config"]
-            data_source_conneciton_details=data["data_source_conneciton_details"]
-            if data_source_conneciton_details["__type__"]=="connection_uri__postgres":
-                data = read_sql_tmpfile(query=data["query"],time_series_orm_uri_db_connection=data_source_conneciton_details['connection_details'])
-        else:
-           raise Exception ("Response should contain connection details")
-
-        infered_dtypes = {k: str(c) for k, c in data.dtypes.to_dict().items()}
-        config_types = {c: source_table_config["column_dtypes_map"][c] for c in infered_dtypes.keys()}
-        for c, c_type in config_types.items():
-            if c_type != infered_dtypes[c]:
-                if data.shape[0]>0:
-                    if c_type == 'datetime64[ns, UTC]':
-                        if isinstance(data[c].iloc[0], str):
-                            try:
-                                data[c] = pd.to_datetime(data[c])
-                            except Exception as e:
-                                data[c] = pd.to_datetime(data[c],format='ISO8601')
-                        else:
-                            data[c] = pd.to_datetime(data[c] * 1e6, utc=True)
-                    else:
-                        data[c] = data[c].astype(c_type)
-        data = data.set_index(source_table_config['index_names'])
-
-        if len(source_table_config['column_index_names']) > 1:
-            data.columns = pd.MultiIndex.from_tuples([literal_eval(c) for c in data.columns],
-                                                     names=source_table_config.column_index_names)
-        else:
-            data.columns.names = source_table_config['column_index_names']
-        return data
 
     def time_serie_exist_in_db(self, hash_id):
         """

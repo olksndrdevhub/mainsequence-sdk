@@ -7,12 +7,13 @@ import time
 from mainsequence.tdag_client import Scheduler, TimeSerieLocalUpdate,SourceTableConfigurationDoesNotExist
 from .update_methods import (get_or_pickle_ts_from_sessions,update_remote_from_hash_id,update_remote_from_hash_id_local)
 from mainsequence.tdag.config import bcolors
-from typing import Union
+from typing import Union, List
 import ray
 import pandas as pd
-from mainsequence.tdag.time_series.time_series import DependencyUpdateError
+from mainsequence.tdag.time_series.time_series import DependencyUpdateError,TimeSerie
 import gc
-from mainsequence.tdag.logconf import get_tdag_logger
+from mainsequence.tdag.logconf import get_tdag_logger, create_logger_in_path
+from contextlib import contextmanager
 
 logger = get_tdag_logger()
 TDAG_RAY_CLUSTER_ADDRESS = os.getenv("TDAG_RAY_CLUSTER_ADDRESS")
@@ -261,6 +262,131 @@ class TimeSerieHeadUpdateActorDist(TimeSerieHeadUpdateActor):
     ...
 
 
+
+
+@contextmanager
+def set_data_lake(pod_source,override_all: bool = False):
+    """
+
+    :param override_all:
+    :return:
+    """
+    vars=["POD_DEFAULT_DATA_SOURCE","POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE"]
+    original_values={k:os.environ.get(k,None) for k in vars}
+
+    # Override the environment variables
+    os.environ["POD_DEFAULT_DATA_SOURCE"]=pod_source.model_dump_json()
+    os.environ["POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE"] = str(override_all)
+
+    try:
+        yield pod_source
+    finally:
+        # Restore the original environment variables
+        for key, value in original_values.items():
+            if value is None:  # Variable was not originally set
+                del os.environ[key]
+            else:
+                os.environ[key] = value
+
+class LocalDataLakeScheduler:
+    @staticmethod
+    def setup_datalake(
+            datalake_end="2024-09-01 00:00:00",
+            datalake_name="Data Lake",
+            datalake_start="2022-08-01 00:00:00",
+            nodes_to_get_from_db="",
+            persist_logs_to_file=False,
+            use_s3_if_available=True,
+            specific_file_name="datalake_configuration.yaml",
+            output_dir=None
+    ):
+        """
+        Sets up the data lake configuration by creating a YAML file with the provided parameters.
+
+        Parameters:
+        - datalake_end (str): The end date of the data lake.
+        - datalake_name (str): The name of the data lake.
+        - datalake_start (str): The start date of the data lake.
+        - nodes_to_get_from_db (str): Nodes to retrieve from the database.
+        - persist_logs_to_file (bool): Whether to persist logs to a file.
+        - use_s3_if_available (bool): Whether to use S3 if available.
+        - specific_file_name (str): The name of the YAML configuration file.
+        - output_dir (str): The directory where the YAML file will be saved.
+
+        Returns:
+        - str: The path to the created YAML configuration file.
+        """
+        import tempfile
+
+        # Use the system's temporary directory if no output directory is specified
+        if output_dir is None:
+            output_dir = tempfile.gettempdir()
+
+        # Ensure the output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+
+        # YAML content for the data lake configuration
+        import textwrap
+        yaml_content = textwrap.dedent(f"""\
+               datalake_end: {datalake_end}
+               datalake_name: {datalake_name}
+               datalake_start: {datalake_start}
+               nodes_to_get_from_db: {nodes_to_get_from_db}
+               persist_logs_to_file: {str(persist_logs_to_file).lower()}
+               use_s3_if_available: {str(use_s3_if_available).lower()}
+           """)
+
+        # Full path to the YAML configuration file
+        yaml_file_path = os.path.join(output_dir, specific_file_name)
+
+        # Write the YAML content to the file
+        with open(yaml_file_path, 'w') as yaml_file:
+            yaml_file.write(yaml_content)
+
+        print(f"YAML configuration file created at: {yaml_file_path}")
+
+        return yaml_file_path
+    @staticmethod
+    def local_datalake_run(
+            head_ts:TimeSerie,
+            nodes_to_get_from_db=Union[List[str],None],
+    ) -> pd.DataFrame:
+        """
+                Execute a full data tree run to retrieve the portfolio data with specified end node hashes. Utilized the
+                local data lake, which greatly increases the speed due to not storing the node results in TSORM.
+
+                Args:
+
+                Returns:
+                    A DataFrame containing the portfolio weights calculated up to the specified end nodes.
+                """
+        self.logger = create_logger_in_path(logger_name="scheduler_data_lake" + head_ts.local_hash_id,
+                                            logger_file=f"{logging_folder}/schedulers/{head_ts.local_hash_id}.log",
+                                            scheduler_name=scheduler.name
+
+                                            )
+        if nodes_to_get_from_db is None:
+            logger.debug("Automatically inferring datalake nodes")
+            head_ts.set_dependencies_df()
+            nodes_to_get_from_db = find_ts_recursively(head_ts,
+                                                       nodes_to_get_from_db)
+            nodes_to_get_from_db = list(set([ts.local_hash_id for ts in nodes_to_get_from_db]))
+        if not nodes_to_get_from_db:  # Handle the case where no nodes are found
+            logger.warning(f" No Ts find with {nodes_to_get_from_db} data lake cant start  with empty origin node")
+            return pd.DataFrame()
+
+
+        self.logger.debug(f"TS data will be stored in data lake for: {nodes_to_get_from_db}")
+        # TODO
+        # for all nodes in ts, check if new data in remote tables is needed and update it before
+        start_time = time.time()
+        logger.debug("Start data run")
+        df = head_ts.get_df_greater_than_in_table(None)
+        minutes, seconds = divmod(elapsed_time, 60)
+        self.logger.info(f"Run finished full data run in {int(minutes)} minutes and {seconds:.2f} seconds.")
+        return df
+
+
 class SchedulerUpdater:
     ACTOR_WAIT_LIMIT = 80  # seconds to wait before sending task to get scheduled
 
@@ -313,7 +439,7 @@ class SchedulerUpdater:
     def __init__(self, scheduler: Scheduler):
 
         from mainsequence.tdag.config import logging_folder
-        from mainsequence.tdag.logconf import create_logger_in_path
+
 
 
         self.node_scheduler = scheduler
