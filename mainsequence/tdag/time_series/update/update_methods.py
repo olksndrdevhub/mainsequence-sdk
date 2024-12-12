@@ -273,7 +273,7 @@ class TimeSerieUpdateConsumer(ConsumerMixin):
 
 
 @tracer.start_as_current_span(" get_or_pickle_ts_from_sessions")
-def get_or_pickle_ts_from_sessions(local_hash_id: str,
+def get_or_pickle_ts_from_sessions(local_hash_id: str,data_source_id:int,
                                    remote_table_hashed_name: Union[str, None],
                                    set_dependencies_df=False,
                                    ts: Union[object, None] = None,
@@ -287,6 +287,7 @@ def get_or_pickle_ts_from_sessions(local_hash_id: str,
         # rebuild time serie and pickle
         if ts is None:
             ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
+                                                      data_source=data_source_id,
                                                       remote_table_hashed_name=remote_table_hashed_name)
         if set_dependencies_df == True:
             ts.set_relation_tree()

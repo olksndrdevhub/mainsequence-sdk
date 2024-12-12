@@ -37,15 +37,17 @@ logger = get_tdag_logger()
 
 
 class PersistManager:
-    def __init__(self,data_source, local_hash_id: str, remote_table_hashed_name: Union[str, None], class_name: str,
-                 persist_parquet: bool,
-                 logger, description: str, human_readable: Union[str, None] = None, metadata: Union[dict, None] = None,
+    def __init__(self,data_source, local_hash_id: str, remote_table_hashed_name: Union[str, None],
+
+                 logger:Union[str,None]=None, description: Union[str,None]=None,
+                 class_name: Union[str, None] = None,
+                 human_readable: Union[str, None] = None, metadata: Union[dict, None] = None,
                  local_metadata: Union[dict, None] = None
 
                  ):
         self.data_source=data_source
         self.local_hash_id = local_hash_id
-        self.description = description
+        self.description = description or ""
         if local_metadata is not None and metadata is None:
             # query remote hash_id
             metadata = local_metadata["remote_table"]
@@ -58,7 +60,6 @@ class PersistManager:
         self.table_model_loaded = False
         self.human_readable = human_readable if human_readable is not None else local_hash_id
 
-        self.persist_parquet = persist_parquet
         self.class_name = class_name
         if self.local_hash_id is not None:
             self.synchronize_metadata(meta_data=metadata,
@@ -66,7 +67,10 @@ class PersistManager:
                                       class_name=class_name)
 
     @classmethod
-    def get_from_data_type(self,data_source, *args, **kwargs):
+    def get_from_data_type(self,data_source:DynamicTableDataSource, *args, **kwargs):
+
+
+
         data_type=data_source.data_type
         if data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             return DataLakePersistManager(data_source=data_source,*args, **kwargs)
@@ -91,17 +95,24 @@ class PersistManager:
             human_readable=new_ts.human_readable
         self.dth.depends_on_connect(source_hash_id=self.metadata["hash_id"],
                                     target_hash_id=new_ts.remote_table_hashed_name,
+
                                     source_local_hash_id=self.local_metadata["local_hash_id"],
                                     target_local_hash_id=new_ts.local_hash_id,
 
                                     target_class_name=new_ts.__class__.__name__,
-                                    target_human_readable=human_readable
+                                    target_human_readable=human_readable,
+
+                                    source_data_source_id=self.data_source.id,
+                                    target_data_source_id=new_ts.data_source.id
+
                                     )
 
     def display_mermaid_dependency_diagram(self):
         from IPython.core.display import display, HTML, Javascript
 
-        response = TimeSerieLocalUpdate.get_mermaid_dependency_diagram(local_hash_id=self.local_hash_id)
+        response = TimeSerieLocalUpdate.get_mermaid_dependency_diagram(local_hash_id=self.local_hash_id,
+                                                                       data_source_id=self.data_source.id
+                                                                       )
         from IPython.core.display import display, HTML, Javascript
         mermaid_chart = response.get("mermaid_chart")
         metadata = response.get("metadata")
@@ -139,16 +150,22 @@ class PersistManager:
         return mermaid_chart
 
     def get_all_local_dependencies(self):
-        depth_df = TimeSerieLocalUpdate.get_all_dependencies(hash_id=self.local_hash_id)
+        depth_df = TimeSerieLocalUpdate.get_all_dependencies(hash_id=self.local_hash_id,
+                                                             data_source_id=self.data_source.id
+                                                             )
         return depth_df
 
     def get_all_dependencies_update_priority(self):
-        depth_df = TimeSerieLocalUpdate.get_all_dependencies_update_priority(hash_id=self.local_hash_id)
+        depth_df = TimeSerieLocalUpdate.get_all_dependencies_update_priority(hash_id=self.local_hash_id,
+                                                                             data_source_id=self.data_source.id
+                                                                             )
         return depth_df
 
     def set_ogm_dependencies_linked(self):
 
-        TimeSerieLocalUpdate.set_ogm_dependencies_linked(hash_id=self.local_hash_id)
+        TimeSerieLocalUpdate.set_ogm_dependencies_linked(hash_id=self.local_hash_id,
+                                                         data_source_id=self.data_source.id
+                                                         )
 
     @property
     def update_details(self):
@@ -208,13 +225,17 @@ class PersistManager:
             meta_data = {}
             try:
                 local_metadata = {}  # set to empty in case not exist
-                local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
+                local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
+                                                          data_source_id=self.data_source.id
+                                                          )
                 if len(local_metadata) == 0:
                     raise LocalTimeSeriesDoesNotExist
             except LocalTimeSeriesDoesNotExist:
                 # could be localmetadata is none but table could exist
                 try:
-                    meta_data = self.dth.get(hash_id=self.remote_table_hashed_name)
+                    meta_data = self.dth.get(hash_id=self.remote_table_hashed_name,
+                                             data_source__id=self.data_source.id
+                                             )
                 except DynamicTableDoesNotExist:
                     pass
 
@@ -283,6 +304,7 @@ class PersistManager:
 
 
         TimeSerieNode.patch_build_configuration(remote_table_patch=kwargs,
+                                                data_source_id=self.data_source.id,
                                                 build_meta_data=remote_build_metadata,
                                                 local_table_patch=local_metadata_kwargs)
 
@@ -359,7 +381,8 @@ class PersistManager:
             local_build_configuration, local_build_metadata = self.local_build_configuration, self.local_build_metadata
         if local_build_configuration is None:
             local_table_exist=False
-            local_update = TimeSerieLocalUpdate.filter(local_hash_id=self.local_hash_id)
+            local_update = TimeSerieLocalUpdate.filter(local_hash_id=self.local_hash_id,
+                                                       remote_table__data_source__id=self.data_source.id)
             if len(local_update) == 0:
                 local_build_metadata = local_configuration[
                     "build_meta_data"] if "build_meta_data" in local_configuration.keys() else {}
@@ -367,7 +390,8 @@ class PersistManager:
                 metadata_kwargs=dict(local_hash_id=self.local_hash_id,
                               build_configuration=local_configuration,
                               remote_table__hash_id=self.metadata['hash_id'],
-                                     description=self.description
+                                     description=self.description,
+                                     data_source_id=self.data_source.id
                                      )
                 if self.human_readable is not None:
                     metadata_kwargs["human_readable"] = self.human_readable
@@ -375,11 +399,12 @@ class PersistManager:
                 node_kwargs = {"hash_id": self.local_hash_id,
                                "source_class_name": self.class_name,
                                "human_readable": self.human_readable,
-
+                               "data_source_id" : self.data_source.id
                                }
 
                 local_metadata = TimeSerieLocalUpdate.create(metadata_kwargs=metadata_kwargs,
-                                                             node_kwargs=node_kwargs
+                                                             node_kwargs=node_kwargs,
+
                                               )
                 self.local_build_configuration = local_metadata["build_configuration"]
                 self.local_build_metadata = local_metadata["build_meta_data"]
@@ -486,6 +511,30 @@ class PersistManager:
         request_kwargs=dict(table_id_list=table_id_list,   filter_by_update_time=filter_by_update_time)
         data=self.dth.get_pending_nodes(metadata=self.metadata,**request_kwargs)
         return data["dependecies_updated"],data['pending_nodes'],data["next_rebalances"],data["error_on_dependencies"]
+
+
+    #table dependes
+
+    def get_latest_value(self, asset_symbols:list) -> [datetime.datetime,Dict[str, datetime.datetime]]:
+
+        metadata= self.dth.get(hash_id=self.remote_table_hashed_name,data_source__id=self.data_source.id)
+
+        last_index_value,last_multiindex=None,None
+        if "sourcetableconfiguration" in metadata.keys():
+            if metadata['sourcetableconfiguration'] is not None:
+                last_index_value=metadata['sourcetableconfiguration']['last_time_index_value']
+                if last_index_value is None:
+                    return last_index_value,last_multiindex
+                last_index_value=self.dth.request_to_datetime(last_index_value)
+                if metadata['sourcetableconfiguration']['multi_index_stats'] is not None:
+                    last_multiindex=metadata['sourcetableconfiguration']['multi_index_stats']['max_per_asset_symbol']
+                    if last_multiindex is not None:
+                        last_multiindex={symbol:{ev:self.dth.request_to_datetime(v) for ev,v in ev_dict.items()} for symbol,ev_dict in last_multiindex.items()}
+
+        if asset_symbols is not None and last_multiindex is not None:
+            last_multiindex = {asset: value for asset, value in last_multiindex.items() if asset in asset_symbols}
+
+        return last_index_value,last_multiindex
 
 
 class TimeScaleLocalPersistManager(PersistManager):
@@ -661,26 +710,6 @@ class TimeScaleLocalPersistManager(PersistManager):
 
         self.add_data_to_timescale(temp_df=data_df, overwrite=True)
 
-    def get_latest_value(self, asset_symbols:list) -> [datetime.datetime,Dict[str, datetime.datetime]]:
-
-        metadata= self.dth.get(hash_id=self.remote_table_hashed_name)
-
-        last_index_value,last_multiindex=None,None
-        if "sourcetableconfiguration" in metadata.keys():
-            if metadata['sourcetableconfiguration'] is not None:
-                last_index_value=metadata['sourcetableconfiguration']['last_time_index_value']
-                if last_index_value is None:
-                    return last_index_value,last_multiindex
-                last_index_value=self.dth.request_to_datetime(last_index_value)
-                if metadata['sourcetableconfiguration']['multi_index_stats'] is not None:
-                    last_multiindex=metadata['sourcetableconfiguration']['multi_index_stats']['max_per_asset_symbol']
-                    if last_multiindex is not None:
-                        last_multiindex={symbol:{ev:self.dth.request_to_datetime(v) for ev,v in ev_dict.items()} for symbol,ev_dict in last_multiindex.items()}
-
-        if asset_symbols is not None and last_multiindex is not None:
-            last_multiindex = {asset: value for asset, value in last_multiindex.items() if asset in asset_symbols}
-
-        return last_index_value,last_multiindex
 
     def get_earliest_value(self) -> datetime.datetime:
         earliest_value = self.dth.get_earliest_value(hash_id=self.remote_table_hashed_name)
@@ -873,7 +902,7 @@ class DataLakePersistManager(PersistManager):
 
 
         super().__init__(*args,**kwargs)
-        self.data_lake_interface = DataLakeInterface(use_s3_if_available=self.data_source.use_s3_if_available)
+        self.data_lake_interface = DataLakeInterface(use_s3_if_available=self.data_source.related_resource.use_s3_if_available)
         self.already_introspected = self.set_introspection(introspection=False)
 
     @staticmethod
@@ -926,7 +955,7 @@ class DataLakePersistManager(PersistManager):
 
         return file_path
 
-    def get_latest_value(self, ts, asset_symbols: list, *args, **kwargs) -> [datetime.datetime,
+    def get_latest_value_in_table(self, ts, asset_symbols: list, *args, **kwargs) -> [datetime.datetime,
                                                                              Dict[str, datetime.datetime]]:
         """
         Returns: [datetime.datetime,Dict[str, datetime]]

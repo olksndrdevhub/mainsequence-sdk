@@ -14,6 +14,8 @@ import logging
 import copy
 import hashlib
 import importlib
+import cloudpickle
+from pathlib import Path
 from mainsequence.tdag.instrumentation import tracer, tracer_instrumentator
 from mainsequence.tdag.logconf import create_logger_in_path
 from mainsequence.tdag.config import (
@@ -21,6 +23,7 @@ from mainsequence.tdag.config import (
 )
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager
+from numpy.f2py.auxfuncs import isint1
 
 from pycares.errno import value
 from pydantic import BaseModel
@@ -31,7 +34,8 @@ from typing import Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-from mainsequence.tdag_client import TimeSerieLocalUpdate, LocalTimeSerieUpdateDetails, CONSTANTS
+from mainsequence.tdag_client import TimeSerieLocalUpdate, LocalTimeSerieUpdateDetails, CONSTANTS, \
+    DynamicTableDataSource
 from enum import Enum
 from functools import wraps
 from mainsequence.tdag.config import bcolors
@@ -437,7 +441,7 @@ class ConfigSerializer:
     def deserialize_pickle_value(cls, value, include_vam_client_objects: bool,
                                  graph_depth_limit: int,
                                  graph_depth: int, local_metadatas: Union[dict, None],
-                                 ignore_pydantic=False, ):
+                                 ignore_pydantic=False,data_source_id:Union[DynamicTableDataSource,None]=None, ):
         from mainsequence.vam_client.models_helpers import get_model_class
         import cloudpickle
 
@@ -445,6 +449,7 @@ class ConfigSerializer:
 
         state_kwargs = dict(local_metadatas=local_metadatas,
                             graph_depth_limit=graph_depth_limit,
+                            data_source_id=data_source_id,
                             graph_depth=copy.deepcopy(graph_depth),
                             include_vam_client_objects=include_vam_client_objects)
         if isinstance(value, dict):
@@ -457,9 +462,15 @@ class ConfigSerializer:
             elif "is_model_list" in value.keys():
                 new_value = ModelList([build_model(v) for v in value['model_list']])
             elif "is_time_serie_pickled" in value.keys():
-                full_path = TimeSerie.get_pickle_path(local_hash_id=value['hashed_name'])
+                try:
+                    full_path = TimeSerie.get_pickle_path(local_hash_id=value['hashed_name'],
+                                                      data_source_id=data_source_id
+                                                      )
+                except Exception as e:
+                    raise e
                 with open(full_path, 'rb') as handle:
                     ts = cloudpickle.load(handle)
+                    ts.set_data_source_from_pickle_path(full_path)
                     if graph_depth - 1 <= graph_depth_limit:
                         ts.set_state_with_sessions(
                             graph_depth_limit=graph_depth_limit,
@@ -504,7 +515,7 @@ class ConfigSerializer:
         return new_value
 
     @classmethod
-    def deserialize_pickle_state(cls, state, include_vam_client_objects: bool,
+    def deserialize_pickle_state(cls, state, include_vam_client_objects: bool,data_source_id:int,
                                  graph_depth_limit: int,
                                  graph_depth: int, local_metadatas: Union[dict, None],
                                  ignore_pydantic=False,
@@ -526,12 +537,12 @@ class ConfigSerializer:
             for key, value in state.items():
                 state[key] = cls.deserialize_pickle_value(value, include_vam_client_objects=include_vam_client_objects,
                                                           graph_depth_limit=graph_depth_limit, graph_depth=graph_depth,
-                                                          local_metadatas=local_metadatas,
+                                                          local_metadatas=local_metadatas,data_source_id=data_source_id,
                                                           )
         elif isinstance(state, tuple):
             state = tuple([cls.deserialize_pickle_value(v, include_vam_client_objects=include_vam_client_objects,
                                                         graph_depth_limit=graph_depth_limit, graph_depth=graph_depth,
-                                                        local_metadatas=local_metadatas,
+                                                        local_metadatas=local_metadatas,data_source_id=data_source_id,
                                                         ) for v in state])
         elif isinstance(state, str) or isinstance(state, float) or isinstance(state, int) or isinstance(state, bool):
             pass
@@ -683,9 +694,12 @@ class TimeSerieRebuildMethods(ABC):
     @tracer.start_as_current_span("TS: load_from_pickle")
     def load_from_pickle(cls, pickle_path):
         import cloudpickle
+        from pathlib import Path
         with open(pickle_path, 'rb') as handle:
             time_serie = cloudpickle.load(handle)
 
+        data_source=time_serie.load_data_source_from_pickle(pickle_path=pickle_path)
+        time_serie.data_source = data_source
         # verify pickle
         if time_serie.local_persist_manager.metadata is not None:
             load_git_hash = time_serie.get_time_serie_source_code_git_hash(time_serie.__class__)
@@ -694,8 +708,10 @@ class TimeSerieRebuildMethods(ABC):
                 time_serie.logger.warning(
                     f"{bcolors.WARNING}Source code does not match with pickle rebuilding{bcolors.ENDC}")
                 time_serie.flush_pickle()
+
                 time_serie = time_serie.rebuild_from_configuration(local_hash_id=time_serie.local_hash_id,
                                                                    remote_table_hashed_name=time_serie.remote_table_hashed_name,
+                                                                   data_source=data_source
                                                                    )
                 time_serie.persist_to_pickle()
             else:
@@ -703,6 +719,17 @@ class TimeSerieRebuildMethods(ABC):
                 time_serie.local_persist_manager.synchronize_metadata(meta_data=None, local_metadata=None)
 
         return time_serie
+
+    @classmethod
+    def load_data_source_from_pickle(self,pickle_path):
+        data_path = Path(pickle_path).parent / "data_source.pickle"
+        with open(data_path, 'rb') as handle:
+            data_source = cloudpickle.load(handle)
+        return data_source
+
+    def set_data_source_from_pickle_path(self,pikle_path):
+        data_source=self.load_data_source_from_pickle(pikle_path)
+        self.data_source=data_source
 
     @classmethod
     def load_and_set_from_pickle(cls, pickle_path, graph_depth_limit=1, ):
@@ -716,7 +743,7 @@ class TimeSerieRebuildMethods(ABC):
     @classmethod
     @tracer.start_as_current_span("TS: Rebuild From Configuration")
     def rebuild_from_configuration(cls, local_hash_id,
-                                   data_source_id:int,
+                                   data_source:Union[int,object],
                                    remote_table_hashed_name: Union[str, None],
 
                                    ):
@@ -732,7 +759,14 @@ class TimeSerieRebuildMethods(ABC):
 
         tracer_instrumentator.append_attribute_to_current_span("time_serie_hash_id", local_hash_id)
 
+        if isinstance(data_source, int):
+            pickle_path = cls.get_pickle_path(local_hash_id,
+                                               data_source_id=data_source)
+            data_source = cls.load_data_source_from_pickle(pickle_path=pickle_path)
+
+
         persist_manager = PersistManager.get_from_data_type(local_hash_id=local_hash_id,
+                                                            data_source=data_source,
                                               remote_table_hashed_name=remote_table_hashed_name)
         try:
             time_serie_config = persist_manager.local_build_configuration
@@ -770,18 +804,26 @@ class TimeSerieRebuildMethods(ABC):
         return state
 
     @classmethod
-    def get_pickle_path(cls, local_hash_id):
-        return f"{ogm.pickle_storage_path}/{local_hash_id}.pickle"
+    def get_pickle_path(cls, local_hash_id,data_source_id:int):
+        return f"{ogm.pickle_storage_path}/{data_source_id}/{local_hash_id}.pickle"
 
     @classmethod
-    def load_and_set_from_hash_id(cls, local_hash_id):
-        path = cls.get_pickle_path(local_hash_id=local_hash_id)
+    def load_and_set_from_hash_id(cls, local_hash_id,data_source_id:int):
+        path = cls.get_pickle_path(local_hash_id=local_hash_id,data_source_id=data_source_id)
         ts = cls.load_and_set_from_pickle(pickle_path=path)
         return ts
 
     @property
+    def data_source_dir_path(self):
+        return   f"{ogm.pickle_storage_path}/{self.data_source.id}"
+
+    @property
+    def data_source_pickle_path(self):
+        return f"{ogm.pickle_storage_path}/{self.data_source.id}/data_source.pickle"
+
+    @property
     def pickle_path(self):
-        path = f"{ogm.pickle_storage_path}/{self.local_hash_id}.pickle"
+        path = f"{self.data_source_dir_path}/{self.local_hash_id}.pickle"
         return path
 
     def persist_to_pickle(self, overwrite=False):
@@ -798,9 +840,16 @@ class TimeSerieRebuildMethods(ABC):
             git_hash_id=self.get_time_serie_source_code_git_hash(self.__class__),
             source_code=self.get_time_serie_source_code(self.__class__),
         )
+
+        if os.path.isfile(self.data_source_pickle_path) == False or overwrite == True:
+            os.makedirs(os.path.dirname(self.data_source_pickle_path), exist_ok=True)
+            with open(self.data_source_pickle_path, 'wb') as handle:
+                cloudpickle.dump(self.data_source, handle)
+
         if os.path.isfile(path) == False or overwrite == True:
             if overwrite == True:
                 self.logger.warning("overwriting pickle")
+
             with open(path, 'wb') as handle:
                 cloudpickle.dump(self, handle)
 
@@ -843,7 +892,7 @@ class TimeSerieRebuildMethods(ABC):
                                             )
 
         serializer = ConfigSerializer()
-        state = serializer.deserialize_pickle_state(state=state,
+        state = serializer.deserialize_pickle_state(state=state,data_source_id=self.data_source.id,
                                                     include_vam_client_objects=include_vam_client_objects,
                                                     graph_depth_limit=graph_depth_limit,
                                                     local_metadatas=local_metadatas,
@@ -1044,13 +1093,8 @@ class DataPersistanceMethods(ABC):
 
         """
 
-        if self.data_configuration_path is not None:
 
-            latest_value, last_multiindex = self.env_data_lake.get_latest_value(asset_symbols=asset_symbols,
-                                                                                ts=self,
-                                                                                )
-        else:
-            latest_value, last_multiindex = self.local_persist_manager.get_latest_value(asset_symbols=asset_symbols)
+        latest_value, last_multiindex = self.local_persist_manager.get_latest_value(asset_symbols=asset_symbols)
 
         return latest_value, last_multiindex
 
@@ -1547,16 +1591,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             if self.data_configuration_path is None:
                 self.logger = create_logger_in_path(logger_name=local_hash_id, application_name="tdag",
                                                     logger_file=f'{ogm.get_logging_path()}/{local_hash_id}.log',
-                                                    local_hash_id=local_hash_id
-                                                    )
-            else:
-                logger_file = None
-                if self.data_configuration['persist_logs_to_file'] == True:
-                    logging_folder = f"{ogm.get_logging_path()}/data_lakes/{self.data_configuration['datalake_name']}"
-                    logger_file = f'{logging_folder}/{local_hash_id}.log'
-                self.logger = create_logger_in_path(logger_name=local_hash_id, application_name="tdag",
-                                                    logger_file=logger_file,
-                                                    local_hash_id=local_hash_id
+                                                    local_hash_id=local_hash_id,data_source_id=self.data_source.id
                                                     )
 
     @property
@@ -1624,12 +1659,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             human_readable = self.human_readable
         except:
             human_readable = None
-        self.set_data_source()
+
         self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=hashed_name,
                                                                         remote_table_hashed_name=remote_table_hashed_name,
                                                                         class_name=self.__class__.__name__,
                                                                         human_readable=human_readable,
-                                                                        persist_parquet=True,
                                                                         logger=self.logger,
                                                                         local_metadata=local_metadata,
                                                                         description=self.get_html_description(),
@@ -1678,6 +1712,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         """
         patch_build = os.environ.get("PATCH_BUILD_CONFIGURATION", False) in ["true", "True", 1]
         if patch_build == True:
+            self.local_persist_manager # just call it before to initilaize dts
             self.logger.warning(f"Patching build configuration for {self.hash_id}")
             self.flush_pickle()
 
@@ -1715,7 +1750,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
         remote_hashed_name = self.__class__.__name__ + "_" + remote_table_hash
         remote_hashed_name = remote_hashed_name.lower()
-
+        self.set_data_source()
         self._set_logger(local_hash_id=local_hashed_name)
         for m in post_init_log_messages:
             self.logger.warning(m)
@@ -1873,11 +1908,14 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
                     for ts_row in tmp_ts.iterrows():
                         try:
-                            pickle_path = self.get_pickle_path(ts_row[1]["local_hash_id"])
+                            pickle_path = self.get_pickle_path(ts_row[1]["local_hash_id"],
+                                                               data_source_id=ts_row[1]["data_source_id"])
+                            data_source = self.load_data_source_from_pickle(pickle_path=pickle_path)
                             if os.path.isfile(pickle_path) == False:
                                 ts = TimeSerie.rebuild_from_configuration(local_hash_id=ts_row[1]["local_hash_id"],
                                                                           remote_table_hashed_name=ts_row[1][
-                                                                              "remote_table_hash_id"]
+                                                                              "remote_table_hash_id"],
+                                                                          data_source=data_source
                                                                           )
                                 ts.persist_to_pickle()
 
@@ -2128,6 +2166,7 @@ class WrapperTimeSerie(TimeSerie):
 
         # todo set minimum update date.
 
+
     @property
     def wrapped_latest_index_value(self) -> Dict[str, Any]:
         """
@@ -2159,7 +2198,13 @@ class WrapperTimeSerie(TimeSerie):
         for key, value in state["related_time_series"].items():
             if isinstance(value, dict) == True:
                 local_hash_id = value["local_hash_id"]
-                pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id)
+
+                module = importlib.import_module(state["data_source"]["pydantic_model_import_path"]["module"])
+                PydanticClass = getattr(module, state["data_source"]["pydantic_model_import_path"]['qualname'])
+                data_source=PydanticClass(**state["data_source"]['serialized_model'])
+                pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
+                                                        data_source_id=data_source.id
+                                                        )
                 state["related_time_series"][key] = TimeSerie.load_from_pickle(pickle_path=pickle_path)
 
         self.__dict__.update(state)
@@ -2183,7 +2228,9 @@ class WrapperTimeSerie(TimeSerie):
 
         # Remove the unpicklable entries.
         return state
-
+    def set_data_source_from_pickle_path(self,pikle_path):
+        data_source=self.load_data_source_from_pickle(pikle_path)
+        self.data_source=data_source
     def set_local_persist_manager_if_not_set(self) -> None:
         """
         Set local persist manager for all wrapped TimeSeries.

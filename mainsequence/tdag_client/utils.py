@@ -199,11 +199,11 @@ def make_request(s, r_type: str, url: str, loaders: Union[AuthLoaders, None], pa
                 keep_request = False
                 break
         except requests.exceptions.ConnectionError as errc:
-            logger.warning(f"ERROR req time {time.time() - request_start} Connection {url} ", errc)
+            logger.warning(f"ERROR req time {time.time() - request_start} Connection {url}  {errc}")
 
 
         except Exception as e:
-            logger.warning(f"ERROR req time {time.time() - request_start} Connection {url} ", e)
+            logger.warning(f"ERROR req time {time.time() - request_start} Connection {url} {e}")
 
         counter = counter + 1
         if counter >= TRIES:

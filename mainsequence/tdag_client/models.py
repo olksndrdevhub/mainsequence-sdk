@@ -88,8 +88,6 @@ class BaseTdagPydanticModel(BaseModel):
         cls.tdag_orm_class = cls.__name__
 
 
-
-
 class BaseObject:
     LOADERS = loaders
     @classmethod
@@ -145,13 +143,181 @@ class DynamicTableDoesNotExist(Exception):
 class SourceTableConfigurationDoesNotExist(Exception):
     pass
 
-class Scheduler(BaseObject):
-    ROOT_URL = get_scheduler_node_url(TDAG_ENDPOINT)
 
-    def __init__(self,*args,**kwargs):
+class TimeSerieNode(BaseTdagPydanticModel,BaseObject):
+    uid: str
+    hash_id: str
+    data_source_id: int
+    source_class_name: str
+    human_readable: str
+    creation_date: datetime.datetime
+    relation_tree_frozen: bool
 
-        for key,value in kwargs.items():
-            setattr(self,key,value)
+
+
+    @classmethod
+    @property
+    def ROOT_URL(cls):
+        return get_ts_node_url(TDAG_ENDPOINT)
+
+    @classmethod
+    def get_all_dependencies(cls, hash_id):
+        s = cls.build_session()
+        url = cls.ROOT_URL + f"/{hash_id}/get_all_dependencies"
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, )
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+        depth_df = pd.DataFrame(r.json())
+        return depth_df
+
+    @classmethod
+    def delete_with_relationships(cls, *args, **kwargs):
+        s = cls.build_session()
+        url = cls.ROOT_URL + f"/delete_with_relationships/"
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": kwargs})
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+        return r.json()
+
+    @classmethod
+    def get_max_depth(cls, hash_id, timeout=None):
+        s = cls.build_session()
+        url = cls.ROOT_URL + f"/{hash_id}/get_max_depth"
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+        return r.json()["max_depth"]
+
+    @classmethod
+    def get_upstream_nodes(cls, hash_id):
+        s = cls.build_session()
+        url = cls.ROOT_URL + f"/{hash_id}/get_upstream_nodes"
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, )
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+        depth_df = pd.DataFrame(r.json())
+        return depth_df
+
+    @classmethod
+    def depends_on_connect(cls, source_hash_id: str, target_hash_id: str, target_class_name: str,
+                           source_local_hash_id: str,
+                           target_local_hash_id: str,
+                           source_data_source_id: id,
+                           target_data_source_id: id,
+                           target_human_readable: str):
+        """
+        Connects and build relationship
+        Parameters
+        ----------
+        source_hash_id :
+        target_hash_id :
+        target_class_name :
+        target_human_readable :
+
+        Returns
+        -------
+
+        """
+        s = cls.build_session()
+        url = cls.ROOT_URL + "/depends_on_connect/"
+        payload = dict(json={"source_hash_id": source_hash_id,
+                             "target_hash_id": target_hash_id, "target_class_name": target_class_name,
+                             "source_local_hash_id": source_local_hash_id, "target_local_hash_id": target_local_hash_id,
+                             "target_human_readable": target_human_readable,
+                             "source_data_source_id": source_data_source_id,
+                             "target_data_source_id": target_data_source_id,
+                             })
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
+        if r.status_code != 201:
+            raise Exception(f"Error in request {r.text}")
+
+    @classmethod
+    def set_policy_for_descendants(cls, hash_id, policy, pol_type, exclude_ids, extend_to_classes):
+        s = cls.build_session()
+        url = cls.ROOT_URL + f"/{hash_id}/set_policy_for_descendants/"
+        payload = dict(json={"policy": policy,
+                             "pol_type": pol_type,
+                             "exclude_ids": exclude_ids,
+                             "extend_to_classes": extend_to_classes,
+                             })
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="PATCH", url=url, payload=payload)
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+    @classmethod
+    def create(cls, *args, **kwargs):
+        url = cls.ROOT_URL + "/"
+        payload = {"json": kwargs}
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
+        if r.status_code != 201:
+            if r.status_code == 409:
+                raise AlreadyExist(r.text)
+            else:
+                raise Exception(r.text)
+        data = r.json()
+        instance, metadata = cls(**data["node"]), data["metadata"]
+        return instance, metadata
+
+    @classmethod
+    def remove_head_from_all_schedulers(cls, hash_id):
+        url = cls.ROOT_URL + f"/{hash_id}/remove_head_from_all_schedulers/"
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="PATCH", url=url, )
+        if r.status_code != 200:
+            raise Exception(r.text)
+
+    @classmethod
+    def patch_build_configuration(cls, remote_table_patch: dict,
+                                  build_meta_data: dict, data_source_id: int,
+                                  local_table_patch: dict) -> "TimeSerieLocalUpdate":
+        """
+
+        Args:
+            remote_table_patch:
+            local_table_patch:
+
+        Returns:
+
+        """
+
+        url = cls.ROOT_URL + "/patch_build_configuration"
+        payload = {"json": {"remote_table_patch": remote_table_patch, "local_table_patch": local_table_patch,
+                            "build_meta_data": build_meta_data, "data_source_id": data_source_id,
+                            }}
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
+        if r.status_code != 200:
+            raise Exception(r.text)
+        return TimeSerieLocalUpdate(**r.json())
+class LocalTimeSerieNode(BaseTdagPydanticModel,BaseObject):
+    hash_id: str
+    uid: str
+    data_source_id: int
+    updates_to: TimeSerieNode
+
+
+class Scheduler(BaseTdagPydanticModel,BaseObject):
+    uid: str
+    name: str
+    is_running: bool
+    running_process_pid: Optional[int]
+    running_in_debug_mode: bool
+    host: Optional[str]
+    api_address: Optional[str]
+    api_port: Optional[int]
+    pre_loads_in_tree: List[str]  # Assuming this is a list of strings
+    in_active_tree: List[LocalTimeSerieNode]    # Assuming this is a list of strings
+    schedules_to: List[LocalTimeSerieNode]
+
+
+    @classmethod
+    @property
+    def ROOT_URL(cls):
+        return  get_scheduler_node_url(TDAG_ENDPOINT)
 
     @classmethod
     def get(cls, *args,**kwargs):
@@ -196,10 +362,14 @@ class Scheduler(BaseObject):
         scheduler=cls(**r.json())
         return scheduler
     @classmethod
-    def initialize_debug_for_ts(cls,local_hash_id:str,name_suffix:Union[str,None]=None):
+    def initialize_debug_for_ts(cls,local_hash_id:str,
+                                data_source_id:int,
+                                name_suffix:Union[str,None]=None):
         s = cls.build_session()
         url = cls.ROOT_URL + "/initialize_debug_for_ts/"
-        payload = dict(json={"local_hash_id":local_hash_id,"name_suffix":name_suffix})
+        payload = dict(json={"local_hash_id":local_hash_id,"name_suffix":name_suffix,
+                             "data_source_id":data_source_id
+                             })
         r = make_request(s=s, loaders=cls.LOADERS,r_type="POST", url=url, payload=payload)
         if r.status_code != 201:
             raise Exception(f"Error in request {r.text}")
@@ -248,142 +418,7 @@ class Scheduler(BaseObject):
                 return True
         return False
 
-class TimeSerieNode(BaseObject):
-    ROOT_URL =  get_ts_node_url(TDAG_ENDPOINT)
 
-    def __init__(self, *args, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-    @classmethod
-    def get_all_dependencies(cls,hash_id):
-        s = cls.build_session()
-        url = cls.ROOT_URL + f"/{hash_id}/get_all_dependencies"
-        r = make_request(s=s,loaders=cls.LOADERS, r_type="GET", url=url,)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-        depth_df=pd.DataFrame(r.json())
-        return depth_df
-
-    @classmethod
-    def delete_with_relationships(cls,*args,**kwargs):
-        s = cls.build_session()
-        url = cls.ROOT_URL + f"/delete_with_relationships/"
-        r = make_request(s=s,loaders=cls.LOADERS, r_type="POST", url=url, payload={"json":kwargs})
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-        return r.json()
-    @classmethod
-    def get_max_depth(cls,hash_id,timeout=None):
-        s = cls.build_session()
-        url = cls.ROOT_URL + f"/{hash_id}/get_max_depth"
-        r = make_request(s=s,loaders=cls.LOADERS, r_type="GET", url=url,time_out=timeout )
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-
-        return r.json()["max_depth"]
-
-    @classmethod
-    def get_upstream_nodes(cls, hash_id):
-        s = cls.build_session()
-        url = cls.ROOT_URL + f"/{hash_id}/get_upstream_nodes"
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, )
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-        depth_df = pd.DataFrame(r.json())
-        return depth_df
-
-    @classmethod
-    def depends_on_connect(cls,source_hash_id:str, target_hash_id:str,target_class_name:str,
-                           source_local_hash_id: str,
-                           target_local_hash_id: str,
-                           target_human_readable:str):
-        """
-        Connects and build relationship
-        Parameters
-        ----------
-        source_hash_id :
-        target_hash_id :
-        target_class_name :
-        target_human_readable :
-
-        Returns
-        -------
-
-        """
-        s = cls.build_session()
-        url = cls.ROOT_URL + "/depends_on_connect/"
-        payload = dict(json={"source_hash_id": source_hash_id,
-                             "target_hash_id":target_hash_id,"target_class_name":target_class_name,
-                             "source_local_hash_id":source_local_hash_id,"target_local_hash_id":target_local_hash_id,
-                             "target_human_readable":target_human_readable,
-                             })
-        r = make_request(s=s,loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
-            raise Exception(f"Error in request {r.text}")
-
-    @classmethod
-    def set_policy_for_descendants(cls,hash_id, policy,pol_type, exclude_ids, extend_to_classes):
-        s = cls.build_session()
-        url = cls.ROOT_URL + f"/{hash_id}/set_policy_for_descendants/"
-        payload = dict(json={"policy": policy,
-                             "pol_type":pol_type,
-                             "exclude_ids": exclude_ids,
-                             "extend_to_classes": extend_to_classes,
-                             })
-        r = make_request(s=s,loaders=cls.LOADERS, r_type="PATCH", url=url, payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-    @classmethod
-    def create(cls, *args, **kwargs):
-        url = cls.ROOT_URL + "/"
-        payload = {"json": kwargs}
-        s = cls.build_session()
-        r = make_request(s=s,loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
-            if r.status_code == 409:
-                raise AlreadyExist(r.text)
-            else:
-                raise Exception(r.text)
-        data=r.json()
-        instance,metadata = cls(**data["node"]),data["metadata"]
-        return instance,metadata
-
-    @classmethod
-    def remove_head_from_all_schedulers(cls,hash_id):
-        url = cls.ROOT_URL + f"/{hash_id}/remove_head_from_all_schedulers/"
-        s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS,r_type="PATCH", url=url, )
-        if r.status_code != 200:
-            raise Exception(r.text)
-
-    @classmethod
-    def patch_build_configuration(cls,remote_table_patch:dict,
-                                  build_meta_data:dict,
-                                  local_table_patch:dict)->"LocalTimeSerie":
-        """
-        
-        Args:
-            remote_table_patch:
-            local_table_patch:
-
-        Returns:
-
-        """
-
-        url = cls.ROOT_URL + "/patch_build_configuration"
-        payload = {"json": {"remote_table_patch":remote_table_patch,"local_table_patch":local_table_patch,
-                                    "build_meta_data":build_meta_data,
-                            }}
-        s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 200:
-           raise Exception(r.text)
-        return cls(**r.json())
 
 class ContinuousAggregateMultiIndex(BaseObject):
     ROOT_URL = get_continuous_agg_multi_index(TDAG_ENDPOINT)
@@ -629,14 +664,14 @@ class TimeSerieLocalUpdate(BaseObject):
             raise Exception(f"Error in request {r.url} {r.text}")
 
     @classmethod
-    def get_mermaid_dependency_diagram(cls, local_hash_id,desc=True,timeout=None)->dict:
+    def get_mermaid_dependency_diagram(cls, local_hash_id,data_source_id,desc=True,timeout=None)->dict:
         """
 
         :param local_hash_id:
         :return:
         """
         s = cls.build_session()
-        url = cls.ROOT_URL + f"/{local_hash_id}/dependencies_graph_mermaid?desc={desc}"
+        url = cls.ROOT_URL + f"/{local_hash_id}/dependencies_graph_mermaid?desc={desc}&data_source_id={data_source_id}"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url,
                          time_out=timeout)
         if r.status_code != 200:
@@ -646,9 +681,9 @@ class TimeSerieLocalUpdate(BaseObject):
 
     #Node Updates
     @classmethod
-    def get_all_dependencies(cls, hash_id,timeout=None):
+    def get_all_dependencies(cls, hash_id,data_source_id,timeout=None):
         s = cls.build_session()
-        url = cls.ROOT_URL + f"/{hash_id}/get_all_dependencies"
+        url = cls.ROOT_URL + f"/{hash_id}/get_all_dependencies?data_source_id={data_source_id}"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -657,9 +692,9 @@ class TimeSerieLocalUpdate(BaseObject):
         return depth_df
 
     @classmethod
-    def get_all_dependencies_update_priority(cls, hash_id, timeout=None):
+    def get_all_dependencies_update_priority(cls, hash_id,data_source_id, timeout=None):
         s = cls.build_session()
-        url = cls.ROOT_URL + f"/{hash_id}/get_all_dependencies_update_priority"
+        url = cls.ROOT_URL + f"/{hash_id}/get_all_dependencies_update_priority?data_source_id={data_source_id}"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -668,9 +703,9 @@ class TimeSerieLocalUpdate(BaseObject):
         return depth_df
 
     @classmethod
-    def get_max_depth(cls, hash_id, timeout=None):
+    def get_max_depth(cls, hash_id, data_source_id,timeout=None):
         s = cls.build_session()
-        url = cls.ROOT_URL + f"/{hash_id}/get_max_depth"
+        url = cls.ROOT_URL + f"/{hash_id}/get_max_depth?data_source_id={data_source_id}"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -678,9 +713,9 @@ class TimeSerieLocalUpdate(BaseObject):
         return r.json()["max_depth"]
 
     @classmethod
-    def get_upstream_nodes(cls, hash_id,timeout=None):
+    def get_upstream_nodes(cls, hash_id,data_source_id,timeout=None):
         s = cls.build_session()
-        url = cls.ROOT_URL + f"/{hash_id}/get_upstream_nodes"
+        url = cls.ROOT_URL + f"/{hash_id}/get_upstream_nodes?data_source_id={data_source_id}"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -700,9 +735,11 @@ class TimeSerieLocalUpdate(BaseObject):
         return r.json()
 
     @classmethod
-    def get(cls, local_hash_id):
+    def get(cls, local_hash_id,data_source_id:int):
 
-        result = cls.filter(**{"local_hash_id": local_hash_id, "detail": True})
+        result = cls.filter(**{"local_hash_id": local_hash_id,
+                               "remote_table__data_source__id":data_source_id,
+                               "detail": True})
         if len(result) > 1:
             raise Exception("More than 1 return")
         if len(result)==0:
@@ -723,9 +760,9 @@ class TimeSerieLocalUpdate(BaseObject):
             raise Exception(f"Error in request {r.text}")
         return r.json()
     @classmethod
-    def set_ogm_dependencies_linked(cls,hash_id):
+    def set_ogm_dependencies_linked(cls,hash_id,data_source_id):
         s = cls.build_session()
-        url = cls.ROOT_URL + f"/{hash_id}/set_ogm_dependencies_linked"
+        url = cls.ROOT_URL + f"/{hash_id}/set_ogm_dependencies_linked?data_source_id={data_source_id}"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, )
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -800,10 +837,17 @@ class ChatObject(BaseTdagPydanticModel,BaseObject):
     def ROOT_URL(cls):
         return get_chat_object_url(TDAG_ENDPOINT)
 
+
+
+class DataSource(BaseTdagPydanticModel,BaseObject):
+    id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
+    organization: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
+    class_type:str
+
 class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     id:int
     data_type:str
-    related_resource:Optional[dict]=None
+    related_resource:Optional[DataSource]=None
     class Config:
         use_enum_values = True  # This ensures that enums are stored as their values (e.g., 'TEXT')
     def __str__(self):
@@ -836,10 +880,30 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
 
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
-        return r.json()
+        data = r.json()
+        return cls.get_class(data["data_type"])(**data)
+    @classmethod
+    def get(cls,id):
+        url = cls.ROOT_URL + f"/{id}/"
 
-class LocalDiskSourceLake(DynamicTableDataSource):
-    data_type:str=CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload={})
+
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+
+        data=r.json()
+        return cls.get_class(data["data_type"])(**data)
+    @staticmethod
+    def get_class(data_type):
+        CLASS_FACTORY = {CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE: LocalDiskSourceLake,
+                         CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB: TimeScaleDBDataSource
+                         }
+        return CLASS_FACTORY[data_type]
+
+
+class PodLocalLake(DataSource):
     id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
     in_pod: int = Field(..., description="The ID of the related Pod Source")
     datalake_name: str = Field(..., max_length=255, description="The name of the data lake")
@@ -848,6 +912,11 @@ class LocalDiskSourceLake(DynamicTableDataSource):
     nodes_to_get_from_db: Optional[Dict] = Field(None, description="Nodes to retrieve from the database as JSON")
     persist_logs_to_file: bool = Field(False, description="Whether to persist logs to a file")
     use_s3_if_available: bool = Field(False, description="Whether to use S3 if available")
+
+
+class LocalDiskSourceLake(DynamicTableDataSource):
+    related_resource:PodLocalLake
+    data_type:str=CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
 
     @classmethod
     def get_or_create(cls, *args,**kwargs):
@@ -862,6 +931,10 @@ class LocalDiskSourceLake(DynamicTableDataSource):
         if r.status_code not in  [200,201]:
             raise Exception(f"Error in request {r.text}")
         return cls(**r.json())
+
+class TimeScaleDBDataSource(DynamicTableDataSource):
+    related_resource: PodLocalLake
+    data_type: str = CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB
 
 
 class BaseYamlModel(BaseTdagPydanticModel,BaseObject):
@@ -1683,7 +1756,7 @@ class DynamicTableHelpers:
         base_url = self.root_url
         payload = { "json": kwargs}
         # r = self.s.patch(, **payload)
-        url=f"{base_url}/{metadata['id']}/build_or_update_update_details/"
+        url=f"{base_url}/{metadata['id']}/build_or_update_update_details/?data_source_id={metadata['data_source']['id']}"
         r=self.make_request(r_type="PATCH",url=url,payload=payload)
         if r.status_code != 202:
             raise Exception(f"Error in request {r.text}")
@@ -1795,12 +1868,16 @@ class DynamicTableHelpers:
     def depends_on_connect(self,source_hash_id:str, target_hash_id:str,target_class_name:str,
                            source_local_hash_id:str,
                            target_local_hash_id:str,
+                           source_data_source_id:id,
+                            target_data_source_id:id,
                            target_human_readable:str):
 
 
         TimeSerieNode.depends_on_connect(source_hash_id=source_hash_id, target_hash_id=target_hash_id,
                                          source_local_hash_id=source_local_hash_id,target_local_hash_id=target_local_hash_id,
                                          target_class_name=target_class_name,
+                                         source_data_source_id=source_data_source_id,
+                                         target_data_source_id=target_data_source_id,
                            target_human_readable=target_human_readable)
 
 

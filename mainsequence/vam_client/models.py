@@ -478,14 +478,14 @@ class Asset(AssetMixin,BaseObjectOrm):
         return self.symbol
     
     @classmethod
-    def get_or_create_index_asset_from_portfolios(cls,*args,**kwargs):
+    def get_or_create_index_asset_from_portfolios(cls,*args,**kwargs)->"TargetPortfolioIndexAsset":
         url = f"{cls.get_object_url()}/get_or_create_index_asset_from_portfolios/"
         payload = {"json": kwargs}
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
 
-        return r.json()
+        return TargetPortfolioIndexAsset(**r.json())
 
 
 class IndexAsset(Asset):
