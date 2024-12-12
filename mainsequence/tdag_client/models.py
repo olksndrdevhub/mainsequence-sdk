@@ -857,6 +857,7 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     @property
     def ROOT_URL(cls):
         return get_dynamic_table_data_source(TDAG_ENDPOINT)
+
     @classmethod
     def get_default_data_source_for_token(cls):
         global _default_data_source

@@ -24,10 +24,6 @@ TDAG_ENDPOINT = f"{os.environ.get('TDAG_ENDPOINT')}"
 
 TDAG_TOKEN_URL = f"{os.environ.get('TDAG_ENDPOINT')}/auth/rest-token-auth/"
 
-TDAG_ADMIN_USER = os.environ.get('TDAG_ADMIN_USER')
-TDAG_ADMIN_PASSWORD = os.environ.get('TDAG_ADMIN_PASSWORD')
-TDAG_ORM_DB_CONNECTION = os.environ.get('TDAG_DB_CONNECTION')
-
 COMPRESSED_KEYS = ["json_compressed_", "jcomp_"]
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
@@ -97,8 +93,8 @@ def inflate_json_compresed_column(compressed_series: pd.Series):
 class AuthLoaders:
 
     def __init__(self, time_series_orm_token_url=TDAG_TOKEN_URL,
-                 time_series_orm_admin_user=TDAG_ADMIN_USER,
-                 time_series_orm_admin_password=TDAG_ADMIN_PASSWORD,
+                 time_series_orm_admin_user=None,
+                 time_series_orm_admin_password=None,
                  gcp_credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS", None)):
 
         self.time_series_orm_token_url = time_series_orm_token_url
