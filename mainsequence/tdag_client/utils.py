@@ -196,8 +196,6 @@ def make_request(s, r_type: str, url: str, loaders: Union[AuthLoaders, None], pa
                 break
         except requests.exceptions.ConnectionError as errc:
             logger.warning(f"ERROR req time {time.time() - request_start} Connection {url} ", errc)
-
-
         except Exception as e:
             logger.warning(f"ERROR req time {time.time() - request_start} Connection {url} ", e)
 
