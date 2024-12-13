@@ -1,3 +1,4 @@
+from graphene import Dynamic
 
 from .utils import (TDAG_ENDPOINT, read_sql_tmpfile, direct_table_update,  is_process_running,get_network_ip,
 CONSTANTS,
@@ -12,7 +13,7 @@ import json
 from typing import Union
 import structlog
 import time
-
+import os
 
 
 from pydantic import BaseModel, Field
@@ -941,6 +942,20 @@ class LocalDiskSourceLake(DynamicTableDataSource):
             raise Exception(f"Error in request {r.text}")
         return cls(**r.json())
 
+
+    def data_source_dir_path(self,path):
+        return f"{path}/{self.id}"
+
+
+    def data_source_pickle_path(self,path):
+        return f"{self.data_source_dir_path(path)}/data_source.pickle"
+    def persist_to_pickle(self, path):
+        import cloudpickle
+        path=self.data_source_pickle_path(path)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as handle:
+            cloudpickle.dump(self, handle)
+
 class TimeScaleDBDataSource(DynamicTableDataSource):
     related_resource: TimeScaleDB
     data_type: str = CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB
@@ -1418,8 +1433,8 @@ class DynamicTableHelpers:
 
     def _insert_data_into_hash_id(self, serialzied_data_frame: pd.DataFrame, metadata,local_metadata:dict,
                                   overwrite: bool, time_index_name:str,index_names:list,
-                                  historical_update_id:Union[None,int],
-                                  batch_size_limit=10,batch_size=1000
+                                  historical_update_id:Union[None,int],data_source:DynamicTableDataSource
+
                                   ) -> dict:#LocalMetaData
         """
 
@@ -1433,82 +1448,84 @@ class DynamicTableHelpers:
         -------
 
         """
-        from joblib import Parallel, delayed
-       
-        
-        if "asset_symbol" in serialzied_data_frame.columns:
-            serialzied_data_frame['asset_symbol']=serialzied_data_frame['asset_symbol'].astype(str)
 
-        base_url = self.root_url
-        serialzied_data_frame = serialzied_data_frame.replace({np.nan: None})
-        for c in serialzied_data_frame.columns:
-            if any([t in c for t in JSON_COMPRESSED_PREFIX]) == True:
-                assert isinstance(serialzied_data_frame[c].iloc[0], dict)
+        if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+            from .data_lake import DataLakeInterface
+            data_lake_interface=DataLakeInterface(data_lake_source=data_source)
+            data_lake_interface.persist_datalake(serialzied_data_frame,overwrite=True)
+        elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
 
 
-
-
-        call_end_of_execution = False
-        for c in serialzied_data_frame:
-            if any([t in c for t in JSON_COMPRESSED_PREFIX]) == True:
-                serialzied_data_frame[c] = serialzied_data_frame[c].apply(lambda x: json.dumps(x).encode())
-
-        #if overwrite then decompress the chunks
-        recompress=False
-        if overwrite==True:
-            url = f"{base_url}/{metadata['id']}/decompress_chunks/"
-            r = self.make_request(r_type="POST", url=url,
-            payload={"json":{"start_date":serialzied_data_frame[time_index_name].min().strftime(DATE_FORMAT),
-                             "end_date":serialzied_data_frame[time_index_name].max().strftime(DATE_FORMAT),
-                                                                           }},timeout=60*5)
-            if r.status_code not in [200,204]:
-                logger.error(r.text)
-                raise Exception("Error trying to decompress table")
-            else:
-                if r.status_code == 200:
-                    recompress==True
-
-
-
-        table_is_empty = metadata["sourcetableconfiguration"]["last_time_index_value"] is None
-
-
-        data_source_configuration=DynamicTableDataSource.get_data_source_connection_details(metadata["data_source"]["id"])
-        if data_source_configuration["__type__"]!=CONSTANTS.CONNECTION_TYPE_POSTGRES:
-            raise Exception
-
-        last_time_index_value,max_per_asset_symbol=direct_table_update(serialized_data_frame=serialzied_data_frame,
-                            time_series_orm_db_connection=data_source_configuration["connection_details"],
-                            table_name=metadata["hash_id"],
-                            overwrite=overwrite,index_names=index_names,
-                            time_index_name=time_index_name,table_is_empty=table_is_empty,
-                            table_index_names=metadata["table_index_names"],
-                            )
-
+           
+            
+            if "asset_symbol" in serialzied_data_frame.columns:
+                serialzied_data_frame['asset_symbol']=serialzied_data_frame['asset_symbol'].astype(str)
+    
+            base_url = self.root_url
+            serialzied_data_frame = serialzied_data_frame.replace({np.nan: None})
+            for c in serialzied_data_frame.columns:
+                if any([t in c for t in JSON_COMPRESSED_PREFIX]) == True:
+                    assert isinstance(serialzied_data_frame[c].iloc[0], dict)
+    
+    
+    
+    
+            call_end_of_execution = False
+            for c in serialzied_data_frame:
+                if any([t in c for t in JSON_COMPRESSED_PREFIX]) == True:
+                    serialzied_data_frame[c] = serialzied_data_frame[c].apply(lambda x: json.dumps(x).encode())
+    
+            #if overwrite then decompress the chunks
+            recompress=False
+            if overwrite==True:
+                url = f"{base_url}/{metadata['id']}/decompress_chunks/"
+                r = self.make_request(r_type="POST", url=url,
+                payload={"json":{"start_date":serialzied_data_frame[time_index_name].min().strftime(DATE_FORMAT),
+                                 "end_date":serialzied_data_frame[time_index_name].max().strftime(DATE_FORMAT),
+                                                                               }},timeout=60*5)
+                if r.status_code not in [200,204]:
+                    logger.error(r.text)
+                    raise Exception("Error trying to decompress table")
+                else:
+                    if r.status_code == 200:
+                        recompress==True
+    
+    
+    
+            table_is_empty = metadata["sourcetableconfiguration"]["last_time_index_value"] is None
+    
+    
+    
+    
+            last_time_index_value,max_per_asset_symbol=direct_table_update(serialized_data_frame=serialzied_data_frame,
+                                time_series_orm_db_connection=data_source_configuration["connection_details"],
+                                table_name=metadata["hash_id"],
+                                overwrite=overwrite,index_names=index_names,
+                                time_index_name=time_index_name,table_is_empty=table_is_empty,
+                                table_index_names=metadata["table_index_names"],
+                                )
+            if recompress == True:
+                pass
 
         r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(max_per_asset_symbol=max_per_asset_symbol,
                                                                  last_time_index_value=last_time_index_value,
                                                                                    metadata=local_metadata,
 
                                                                  )
-
-
-
         try:
             result=r.json()
         except Exception as e:
             logger.warning(insert_direct)
             logger.warning(all_records)
             raise e
-        if recompress== True:
-            pass
+       
 
         if call_end_of_execution == True:
             #todo: fix the historical update_id
             self.TimeSerieLocalUpdate.set_end_of_execution(metadata=local_metadata,error_on_update=False,
                                       historical_update_id=historical_update_id)
 
-        
+    
         return result
 
 
@@ -1535,7 +1552,7 @@ class DynamicTableHelpers:
     def upsert_data_into_table(self, metadata:dict,local_metadata:dict,
                             historical_update_id:Union[int,None],
                                data: pd.DataFrame, overwrite: bool,
-                               batch_size_limit=10, batch_size=1000
+                               data_source:DynamicTableDataSource
                                ):
         """
         1) Build or get metadata
@@ -1579,7 +1596,7 @@ class DynamicTableHelpers:
                                                    overwrite=overwrite, time_index_name=time_index_name,
                                                    index_names=index_names,
                                                    historical_update_id=historical_update_id,
-                                                   batch_size_limit=batch_size_limit, batch_size=batch_size,
+                                                    data_source=data_source
                                                    )
 
         return local_metadata

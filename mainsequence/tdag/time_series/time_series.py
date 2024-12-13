@@ -813,17 +813,12 @@ class TimeSerieRebuildMethods(ABC):
         ts = cls.load_and_set_from_pickle(pickle_path=path)
         return ts
 
-    @property
-    def data_source_dir_path(self):
-        return   f"{ogm.pickle_storage_path}/{self.data_source.id}"
 
-    @property
-    def data_source_pickle_path(self):
-        return f"{ogm.pickle_storage_path}/{self.data_source.id}/data_source.pickle"
 
     @property
     def pickle_path(self):
-        path = f"{self.data_source_dir_path}/{self.local_hash_id}.pickle"
+        pp=self.data_source.data_source_dir_path(ogm.pickle_storage_path)
+        path = f"{pp}/{self.local_hash_id}.pickle"
         return path
 
     def persist_to_pickle(self, overwrite=False):
@@ -840,11 +835,9 @@ class TimeSerieRebuildMethods(ABC):
             git_hash_id=self.get_time_serie_source_code_git_hash(self.__class__),
             source_code=self.get_time_serie_source_code(self.__class__),
         )
-
-        if os.path.isfile(self.data_source_pickle_path) == False or overwrite == True:
-            os.makedirs(os.path.dirname(self.data_source_pickle_path), exist_ok=True)
-            with open(self.data_source_pickle_path, 'wb') as handle:
-                cloudpickle.dump(self.data_source, handle)
+        pp = self.data_source.data_source_pickle_path(ogm.pickle_storage_path)
+        if os.path.isfile(pp) == False or overwrite == True:
+            self.data_source.persist_to_pickle(pp)
 
         if os.path.isfile(path) == False or overwrite == True:
             if overwrite == True:
@@ -1315,6 +1308,7 @@ class DataPersistanceMethods(ABC):
                 self.logger.warning(f"Values will be overwritten assuming latest value of  {latest_value}")
             self.local_persist_manager.persist_updated_data(temp_df=temp_df,
                                                             update_tracker=update_tracker,
+                                                            historical_update_id=None,
                                                             overwrite=overwrite)
             persisted = True
         return persisted
@@ -1523,7 +1517,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         pod_source=os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
 
         if pod_source == None:
-            self.logger.info("using pod default data source")
+            print("using pod default data source")
             if POD_DEFAULT_DATA_SOURCE.related_resource is None:
                 raise Exception("This Pod does not have a default data source")
             return POD_DEFAULT_DATA_SOURCE
@@ -1750,8 +1744,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
         remote_hashed_name = self.__class__.__name__ + "_" + remote_table_hash
         remote_hashed_name = remote_hashed_name.lower()
+
         self.set_data_source()
         self._set_logger(local_hash_id=local_hashed_name)
+
         for m in post_init_log_messages:
             self.logger.warning(m)
 
