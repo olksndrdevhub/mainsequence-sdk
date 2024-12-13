@@ -935,9 +935,9 @@ class TimeSerieRebuildMethods(ABC):
         return properties
 
     @tracer.start_as_current_span("TS: Update")
-    def update(self, update_tree_kwargs, update_tracker: object,
+    def update(self, update_tracker: object,debug_mode:bool,
                raise_exceptions=True, update_tree=False, start_update_data: Union[StartUpdateDataInfo, None] = None,
-               metadatas: Union[dict, None] = None, update_only_tree=False,
+               metadatas: Union[dict, None] = None, update_only_tree=False,force_update=False
                ):
         """
         Main update method for time series that interacts with Graph node. Time series should be updated through this
@@ -956,9 +956,9 @@ class TimeSerieRebuildMethods(ABC):
         latest_value, must_update = start_update_data.last_time_index_value, start_update_data.must_update
 
         error_on_last_update = False
-        if "force_update" in update_tree_kwargs.keys():
-            if update_tree_kwargs["force_update"] == True:
-                must_update = True
+
+        if force_update == True:
+            must_update = True
 
         if must_update == True:
             try:
@@ -969,7 +969,7 @@ class TimeSerieRebuildMethods(ABC):
                     max_update_time_days = datetime.timedelta(days=update_on_batches)
                     update_on_batches = True
 
-                self.update_local(update_tree_kwargs=update_tree_kwargs, update_tree=update_tree,
+                self.update_local( update_tree=update_tree,debug_mode=debug_mode,
                                   overwrite_latest_value=latest_value, metadatas=metadatas,
                                   update_tracker=update_tracker, update_only_tree=update_only_tree,
                                   )
@@ -1850,7 +1850,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         return local_metadatas, state_data
 
     @tracer.start_as_current_span("Verify time series tree update")
-    def _verify_tree_is_updated(self, update_tree_kwargs, metadatas):
+    def _verify_tree_is_updated(self,metadatas,debug_mode):
         """
         \
         Args:
@@ -1872,16 +1872,15 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         else:
             self.logger.info("Tree is not updated as is_local_relation_tree_set== True")
 
-        if update_tree_kwargs["DEBUG"] == False:
+        if debug_mode == False:
             tmp_ts = self.dependencies_df.copy()
             if tmp_ts.shape[0] == 0:
                 return None
             tmp_ts = tmp_ts[tmp_ts["source_class_name"] != "WrapperTimeSerie"]
-            if update_tree_kwargs["force_local_run"] == True:
-                raise NotImplementedError("Do not force paralle non distributed")
+
 
             if tmp_ts.shape[0] > 0:
-                self._execute_parallel_distributed_update(tmp_ts=tmp_ts, update_tree_kwargs=update_tree_kwargs,
+                self._execute_parallel_distributed_update(tmp_ts=tmp_ts,
                                                           metadatas=metadatas,
                                                           scheduler=self.scheduler)
 
@@ -1922,7 +1921,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                             ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
 
                             self.update_tracker.set_start_of_execution(hash_id=ts_row[1]["local_hash_id"])
-                            error_on_last_update = ts.update(update_tree_kwargs=update_tree_kwargs,
+                            error_on_last_update = ts.update(debug_mode=debug_mode,
                                                              raise_exceptions=True, update_tree=False,
                                                              start_update_data=all_start_data[
                                                                  ts_row[1]["local_hash_id"]],
@@ -1941,9 +1940,9 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         self.update_actor_manager = actor_manager
 
     @tracer.start_as_current_span("Execute distributed parallel update")
-    def _execute_parallel_distributed_update(self, tmp_ts: pd.DataFrame, update_tree_kwargs: dict,
+    def _execute_parallel_distributed_update(self, tmp_ts: pd.DataFrame,
                                              metadatas: Union[dict, None],
-                                             scheduler: object):
+                                            ):
 
         telemetry_carrier = tracer_instrumentator.get_telemetry_carrier()
 
@@ -1966,7 +1965,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             if start_update_data.must_update == False:
                 continue
             kwargs_update = dict(local_hash_id=local_hash_id,
-                                 update_tree_kwargs=update_tree_kwargs,
+
                                  execution_start=start_update_date,
                                  telemetry_carrier=telemetry_carrier,
                                  local_metadatas=metadatas,
@@ -2019,35 +2018,18 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             raise DependencyUpdateError(f"Update Stop from error in children \n {ts_with_errors}")
 
     @tracer.start_as_current_span("TimeSerie.update_local")
-    def update_local(self, update_tree, update_tracker: object, update_tree_kwargs=None,
+    def update_local(self, update_tree, update_tracker: object, debug_mode:bool,
                      metadatas: Union[None, dict] = None,
                      overwrite_latest_value: Union[datetime.datetime, None] = None, update_only_tree: bool = False,
 
                      *args, **kwargs) -> bool:
-        """
 
-        Parameters
-        ----------
-        update_tree :
-        update_tree_kwargs :
-        assets_db :
-        metadatas :
-        overwrite_latest_value :
-        update_only_tree :
-        args :
-        kwargs :
-
-        Returns (bool) True if data was inserted
-        -------
-
-        """
 
         from mainsequence.tdag.instrumentation.utils import Status, StatusCode
         persisted = False
         if update_tree == True:
-            update_tree_kwargs = {} if update_tree_kwargs is None else update_tree_kwargs
-            update_tree_kwargs["DEBUG"] = False if "DEBUG" not in update_tree_kwargs else update_tree_kwargs["DEBUG"]
-            self._verify_tree_is_updated(update_tree_kwargs=update_tree_kwargs,
+
+            self._verify_tree_is_updated(debug_mode=debug_mode,
                                          metadatas=metadatas,
                                          )
             update_only_tree == True
@@ -2071,7 +2053,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
                 self.logger.info(f'Updating Local Time Series for  {self}  since {latest_value}')
                 temp_df = self.update_series_from_source(latest_value=latest_value,
-                                                         update_tree_kwargs=update_tree_kwargs,
+
                                                          **kwargs)
 
                 if temp_df.shape[0] == 0:
@@ -2096,7 +2078,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
 
                 temp_df = self.update_series_from_source(latest_value=latest_value,
-                                                         update_tree_kwargs=update_tree_kwargs, **kwargs)
+                                                       **kwargs)
                 for col, ddtype in temp_df.dtypes.items():
                     if "datetime64" in str(ddtype):
                         self.logger.info(f"WARNING DATETIME TYPE IN {self}")
@@ -2509,15 +2491,7 @@ class WrapperTimeSerie(TimeSerie):
         """ Get values of wrapped TimeSeries. """
         return self.related_time_series.values()
 
-    def update_local(self, update_tree_kwargs: dict, *args, **kwargs):
-        """ Update local data for all wrapped TimeSeries. """
-        # if "update_wrapper_dependencies" in update_tree_kwargs:
-        #     if update_tree_kwargs["update_wrapper_dependencies"] == True:
-        #         kwargs['update_only_tree'] = True
-        #         self._verify_tree_is_updated(update_tree_kwargs=update_tree_kwargs,
-        #                                      metadatas=kwargs['metadatas'],
-        #                                     )
-        raise NotImplementedError
+
 
     def get_ts_as_pandas(self) -> List[pd.DataFrame]:
         """

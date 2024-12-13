@@ -663,23 +663,7 @@ class TimeScaleLocalPersistManager(PersistManager):
         -------
 
         """
-         #Todo Remove local parquet verification
-        # #1 Operations with local parquet file
-        # self._verify_insertion_format(temp_df)
-        # try:
-        #     self.local_parquet_manager.persist_updated_data(temp_df=temp_df,
-        #                                                     overwrite=True)
-        # except Exception as e:
-        #     self.local_parquet_manager.flush_local_persisted(flush_only_time_series=False)
-        #     raise e
-        #
-        # min_value=self.local_parquet_manager.get_earliest_value()
-        #
-        # idx=temp_df.index.get_level_values(0)
-        # if idx.min()>min_value and update_tracker is not None:
-        #     #set update complete before peristence on timescale. This will help speed the update process
-        #     update_tracker.set_end_of_execution(hash_id=self.local_hash_id,error_on_update=False)
-        #2 insert into time scale
+
         self.add_data_to_timescale(temp_df=temp_df,overwrite=overwrite)
         update_tracker.set_end_of_execution(hash_id=self.local_hash_id, error_on_update=False)
        

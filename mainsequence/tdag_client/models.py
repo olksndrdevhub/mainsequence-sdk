@@ -790,9 +790,11 @@ class TimeSerie(BaseObject):
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
     @classmethod
-    def get(cls, hash_id):
+    def get(cls, hash_id,data_source__id:int):
 
-        result = cls.filter(payload={"hash_id": hash_id, "detail": True})
+        result = cls.filter(payload={"hash_id": hash_id,
+                                     "data_source__id":data_source__id,
+                                     "detail": True})
         if len(result)!=1:
             raise Exception("More than 1 return")
         return cls(**result[0])
@@ -914,6 +916,12 @@ class PodLocalLake(DataSource):
     persist_logs_to_file: bool = Field(False, description="Whether to persist logs to a file")
     use_s3_if_available: bool = Field(False, description="Whether to use S3 if available")
 
+class TimeScaleDB(DataSource):
+    user : str
+    password :str
+    host : str
+    database_name :str
+    port :int
 
 class LocalDiskSourceLake(DynamicTableDataSource):
     related_resource:PodLocalLake
@@ -934,9 +942,12 @@ class LocalDiskSourceLake(DynamicTableDataSource):
         return cls(**r.json())
 
 class TimeScaleDBDataSource(DynamicTableDataSource):
-    related_resource: PodLocalLake
+    related_resource: TimeScaleDB
     data_type: str = CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB
 
+    def get_connection_uri(self):
+        password = self.related_resource.password  # Decrypt password if necessary
+        return f"postgresql://{self.related_resource.user}:{password}@{self.related_resource.host}:{self.related_resource.port}/{self.related_resource.database_name}"
 
 class BaseYamlModel(BaseTdagPydanticModel,BaseObject):
 

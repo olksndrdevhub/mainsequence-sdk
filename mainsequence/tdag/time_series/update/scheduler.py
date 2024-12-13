@@ -233,12 +233,9 @@ class TimeSerieHeadUpdateActor:
                                                           logger=self.ts.logger,
                                                           force_next_start_of_minute=force_next_start_of_minute)
 
-                update_tree_kwargs = {"DEBUG": self.debug,
 
-                                      "force_local_run": False, "force_update": force_update}
-                update_tree_kwargs.update(self.update_extra_kwargs)
 
-                error_on_update = self.ts.update(update_tree_kwargs=update_tree_kwargs, raise_exceptions=True,
+                error_on_update = self.ts.update(debug_mode=self.debug, raise_exceptions=True,force_update=force_update,
                                                  update_tree=self.update_tree, update_only_tree=update_only_tree,
                                                  metadatas=all_metadatas, update_tracker=self.ts.update_tracker,
                                                  )

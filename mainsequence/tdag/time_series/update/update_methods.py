@@ -23,7 +23,7 @@ EXECUTION_HEAD_WEIGHT = float(os.environ.get('EXECUTION_HEAD_WEIGHT', 60 * 60 * 
 
 
 
-def update_remote_from_hash_id_local(update_tree_kwargs: dict,
+def update_remote_from_hash_id_local(
                                execution_start: datetime.datetime, telemetry_carrier: str,
                                start_update_data: dict,
                                local_hash_id: str,
@@ -63,7 +63,6 @@ def update_remote_from_hash_id_local(update_tree_kwargs: dict,
             local_hash_id=local_hash_id,
             update_tree=False,
             execution_start=execution_start,
-            update_tree_kwargs=update_tree_kwargs,
             update=True,
 
             start_update_data=start_update_data,
@@ -86,11 +85,11 @@ def update_remote_from_hash_id(*args,**kwargs  ):
 
 
 @tracer.start_as_current_span("Update with session")
-def update_with_session(session, time_serie, update_tree, update_tree_kwargs,
+def update_with_session(session, time_serie, update_tree,
                         ):
     logger.info(f'{time_serie} loaded and ready to update')
 
-    time_serie.update(update_tree_kwargs=update_tree_kwargs, raise_exceptions=True, update_tree=update_tree,
+    time_serie.update( raise_exceptions=True, update_tree=update_tree,
                       assets_db=session.tdag_orm_db_name)
 
 
@@ -114,14 +113,14 @@ class TimeSerieUpdateConsumer(ConsumerMixin):
 
 
     def __init__(self, connection, time_serie: TimeSerie,    start_update_data: StartUpdateDataInfo, update_tree: bool,
-                 update_tree_kwargs: dict,           execution_start: datetime.datetime,              ):
+                           execution_start: datetime.datetime,              ):
         self.connection = connection
         self.time_serie=time_serie
         self.start_update_data=start_update_data
         self.update_tree=update_tree
         self.execution_start=execution_start
         self.dependencies_status={}
-        self.update_tree_kwargs=update_tree_kwargs
+
         self._set_dependencies_status()
         self.update_finished=TimeSerieUpdateConsumer.executor.submit(self._do_step_update)
 
@@ -160,20 +159,7 @@ class TimeSerieUpdateConsumer(ConsumerMixin):
             updates.append(details["active_update_status"]==CONSTANTS.UPDATE_SUCCESS_STATE)
         return all(updates),error_on_update
     def _do_step_update(self)->bool:
-        """
 
-        Parameters
-        ----------
-        update_tree
-        update_tree_kwargs
-        execution_start
-        start_update_data
-        time_serie
-
-        Returns
-        -------
-
-        """
 
 
         from mainsequence.tdag import configuration
@@ -226,7 +212,7 @@ class TimeSerieUpdateConsumer(ConsumerMixin):
 
                 are_dependencies_updates, error_on_dependencies = self._check_if_dependencies_are_updated()
 
-        self.time_serie.update(update_tree_kwargs=self.update_tree_kwargs, raise_exceptions=True, update_tree=self.update_tree,
+        self.time_serie.update( raise_exceptions=True, update_tree=self.update_tree,
                           start_update_data=self.start_update_data, update_tracker=update_tracker,
 
                           )
@@ -306,13 +292,13 @@ def get_or_pickle_ts_from_sessions(local_hash_id: str,data_source_id:int,
 
 @tracer.start_as_current_span(" get_pickled_ts_path")
 def get_or_pickle_ts(hash_id: str, update_priority: int, scheduler_uid: str,
-                     in_update_tree_node_uid: int, update_tree_kwargs: dict,
+                     in_update_tree_node_uid: int,
                      ):
     from mainsequence.tdag import ogm
     pickle_path = ogm.get_ts_pickle_path(hash_id=hash_id)
     if os.path.isfile(pickle_path) == False:
         ts, pickle_path = rebuild_with_session(local_hash_id=hash_id,
-                                               update_tree=False, update_tree_kwargs=update_tree_kwargs, update=False,
+                                               update_tree=False,  update=False,
                                                scheduler_uid=scheduler_uid, execution_start=None,
                                                update_priority=update_priority,
                                                in_update_tree_node_uid=in_update_tree_node_uid)
@@ -324,7 +310,7 @@ def get_or_pickle_ts(hash_id: str, update_priority: int, scheduler_uid: str,
 
 @tracer.start_as_current_span("Rebuild with session")
 def rebuild_with_session(local_hash_id, update_tree, execution_start: Union[datetime.datetime, None],
-                         update_tree_kwargs,
+
                          update=True,
                          local_metadatas: Union[dict, None] = None,
                          start_update_data: Union[dict, None] = None,
@@ -334,7 +320,6 @@ def rebuild_with_session(local_hash_id, update_tree, execution_start: Union[date
 
     :param hash_id:
     :param update_tree:
-    :param update_tree_kwargs:
     :param update:
     :param scheduler_uid:
     :return:
@@ -375,7 +360,7 @@ def rebuild_with_session(local_hash_id, update_tree, execution_start: Union[date
         try:
             assert execution_start is not None
             ts = TimeSerieUpdateConsumer.start_consumer(time_serie=ts, update_tree=update_tree,
-                                update_tree_kwargs=update_tree_kwargs,
+
                                 execution_start=execution_start,
                                 start_update_data=start_update_data
                                 )
@@ -388,7 +373,7 @@ def rebuild_with_session(local_hash_id, update_tree, execution_start: Union[date
 @tracer.start_as_current_span("Rebuild and update from source")
 def rebuild_and_update_from_source(local_hash_id,
                                    execution_start: datetime.datetime,
-                                   update_tree=False, update_tree_kwargs=None,
+                                   update_tree=False,
                                    in_update_tree_node_uid=None,
 
                                    ):
@@ -396,7 +381,6 @@ def rebuild_and_update_from_source(local_hash_id,
     rebuilds a time series from configuration and updates it
     :param hash_id:
     :param update_tree:
-    :param update_tree_kwargs:
     :return:
     """
 
@@ -404,7 +388,7 @@ def rebuild_and_update_from_source(local_hash_id,
                               in_update_tree_node_uid=in_update_tree_node_uid,
 
                               execution_start=execution_start,
-                              update_tree=update_tree, update_tree_kwargs=update_tree_kwargs)
+                              update_tree=update_tree, )
 
     return ts
 
