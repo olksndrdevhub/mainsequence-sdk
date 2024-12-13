@@ -873,7 +873,10 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
 
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
-        _default_data_source = cls(**r.json())  # Cache the result
+        data=r.json()
+        DataClass=cls.get_class(data["data_type"])
+
+        _default_data_source = DataClass(**r.json())
         return _default_data_source
     @classmethod
     def get_data_source_connection_details(cls,connection_id):
@@ -905,7 +908,23 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
                          CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB: TimeScaleDBDataSource
                          }
         return CLASS_FACTORY[data_type]
+    @classmethod
+    def pickle_from_remote(self,id):
+        data_source=self.get(id=id)
+        data_source.persist_to_pickle()
 
+    def data_source_dir_path(self, path):
+        return f"{path}/{self.id}"
+
+    def data_source_pickle_path(self, path):
+        return f"{self.data_source_dir_path(path)}/data_source.pickle"
+
+    def persist_to_pickle(self, path):
+        import cloudpickle
+        path = self.data_source_pickle_path(path)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as handle:
+            cloudpickle.dump(self, handle)
 
 class PodLocalLake(DataSource):
     id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
@@ -943,18 +962,7 @@ class LocalDiskSourceLake(DynamicTableDataSource):
         return cls(**r.json())
 
 
-    def data_source_dir_path(self,path):
-        return f"{path}/{self.id}"
 
-
-    def data_source_pickle_path(self,path):
-        return f"{self.data_source_dir_path(path)}/data_source.pickle"
-    def persist_to_pickle(self, path):
-        import cloudpickle
-        path=self.data_source_pickle_path(path)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'wb') as handle:
-            cloudpickle.dump(self, handle)
 
 class TimeScaleDBDataSource(DynamicTableDataSource):
     related_resource: TimeScaleDB

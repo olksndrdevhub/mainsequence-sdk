@@ -762,6 +762,8 @@ class TimeSerieRebuildMethods(ABC):
         if isinstance(data_source, int):
             pickle_path = cls.get_pickle_path(local_hash_id,
                                                data_source_id=data_source)
+            if os.path.isfile(pickle_path) ==False:
+                DynamicTableDataSource.pickle_from_remote(id=data_source)
             data_source = cls.load_data_source_from_pickle(pickle_path=pickle_path)
 
 
