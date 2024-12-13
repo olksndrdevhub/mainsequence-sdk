@@ -392,6 +392,7 @@ def recreate_indexes(table_name, table_index_names,time_series_orm_db_connection
         conn.autocommit = False
 
 def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwrite: bool,
+grouped_dates,
                         time_index_name: str, index_names: list, table_is_empty: bool,table_index_names:dict,
                         time_series_orm_db_connection: Union[str, None] = None,
                         use_chunks: bool = True, num_threads: int = 4):
@@ -411,15 +412,7 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
     """
 
     columns = serialized_data_frame.columns.tolist()
-    last_time_index_value=serialized_data_frame[time_index_name].max().timestamp()
-    max_per_asset_symbol=None
-    if len(index_names) > 1:
-        grouped_dates = serialized_data_frame.groupby(["asset_symbol", "execution_venue_symbol"])[time_index_name].agg(
-            ["min", "max"])
-        max_per_asset_symbol= {
-                                row["asset_symbol"]: {row["execution_venue_symbol"]: row["max"].timestamp()}
-                                for _, row in grouped_dates.reset_index().iterrows()
-                              }
+
 
 
     def drop_indexes(table_name, table_index_names):
@@ -596,7 +589,7 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
     #         env=os.environ.copy(),  # Pass the environment variables
     #     )
 
-    return last_time_index_value,max_per_asset_symbol
+
 
 def direct_table_update_OLD(table_name, serialized_data_frame: pd.DataFrame, overwrite: bool,
                         time_index_name: str, index_names: list, table_is_empty: bool,

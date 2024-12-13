@@ -1431,10 +1431,10 @@ class DynamicTableHelpers:
 
         return data_frame, column_index_names, index_names, column_dtypes_map, time_index_name
 
-    def _insert_data_into_hash_id(self, serialzied_data_frame: pd.DataFrame, metadata,local_metadata:dict,
+    def _insert_data_into_hash_id(self, serialized_data_frame: pd.DataFrame, metadata,local_metadata:dict,
                                   overwrite: bool, time_index_name:str,index_names:list,
-                                  historical_update_id:Union[None,int],data_source:DynamicTableDataSource
-
+                                  historical_update_id:Union[None,int],data_source:DynamicTableDataSource,
+                                logger:object,
                                   ) -> dict:#LocalMetaData
         """
 
@@ -1448,40 +1448,51 @@ class DynamicTableHelpers:
         -------
 
         """
+        last_time_index_value = serialized_data_frame[time_index_name].max().timestamp()
+        max_per_asset_symbol = None
+        if len(index_names) > 1:
+            grouped_dates = serialized_data_frame.groupby(["asset_symbol", "execution_venue_symbol"])[
+                time_index_name].agg(
+                ["min", "max"])
+            max_per_asset_symbol = {
+                row["asset_symbol"]: {row["execution_venue_symbol"]: row["max"].timestamp()}
+                for _, row in grouped_dates.reset_index().iterrows()
+            }
 
+        call_end_of_execution = False
         if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             from .data_lake import DataLakeInterface
-            data_lake_interface=DataLakeInterface(data_lake_source=data_source)
-            data_lake_interface.persist_datalake(serialzied_data_frame,overwrite=True)
+            data_lake_interface=DataLakeInterface(data_lake_source=data_source,logger=logger,)
+            data_lake_interface.persist_datalake(serialized_data_frame,overwrite=True,
+                                                 time_index_name=time_index_name,index_names=index_names,
+                                                 table_name=metadata["table_name"])
         elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
 
 
-           
-            
-            if "asset_symbol" in serialzied_data_frame.columns:
-                serialzied_data_frame['asset_symbol']=serialzied_data_frame['asset_symbol'].astype(str)
+            if "asset_symbol" in serialized_data_frame.columns:
+                serialized_data_frame['asset_symbol']=serialized_data_frame['asset_symbol'].astype(str)
     
             base_url = self.root_url
-            serialzied_data_frame = serialzied_data_frame.replace({np.nan: None})
-            for c in serialzied_data_frame.columns:
+            serialized_data_frame = serialized_data_frame.replace({np.nan: None})
+            for c in serialized_data_frame.columns:
                 if any([t in c for t in JSON_COMPRESSED_PREFIX]) == True:
-                    assert isinstance(serialzied_data_frame[c].iloc[0], dict)
+                    assert isinstance(serialized_data_frame[c].iloc[0], dict)
     
     
     
     
-            call_end_of_execution = False
-            for c in serialzied_data_frame:
+
+            for c in serialized_data_frame:
                 if any([t in c for t in JSON_COMPRESSED_PREFIX]) == True:
-                    serialzied_data_frame[c] = serialzied_data_frame[c].apply(lambda x: json.dumps(x).encode())
+                    serialized_data_frame[c] = serialized_data_frame[c].apply(lambda x: json.dumps(x).encode())
     
             #if overwrite then decompress the chunks
             recompress=False
             if overwrite==True:
                 url = f"{base_url}/{metadata['id']}/decompress_chunks/"
                 r = self.make_request(r_type="POST", url=url,
-                payload={"json":{"start_date":serialzied_data_frame[time_index_name].min().strftime(DATE_FORMAT),
-                                 "end_date":serialzied_data_frame[time_index_name].max().strftime(DATE_FORMAT),
+                payload={"json":{"start_date":serialized_data_frame[time_index_name].min().strftime(DATE_FORMAT),
+                                 "end_date":serialized_data_frame[time_index_name].max().strftime(DATE_FORMAT),
                                                                                }},timeout=60*5)
                 if r.status_code not in [200,204]:
                     logger.error(r.text)
@@ -1497,8 +1508,8 @@ class DynamicTableHelpers:
     
     
     
-            last_time_index_value,max_per_asset_symbol=direct_table_update(serialized_data_frame=serialzied_data_frame,
-                                time_series_orm_db_connection=data_source_configuration["connection_details"],
+            direct_table_update(serialized_data_frame=serialized_data_frame,
+                                time_series_orm_db_connection=data_source.get_connection_uri(),
                                 table_name=metadata["hash_id"],
                                 overwrite=overwrite,index_names=index_names,
                                 time_index_name=time_index_name,table_is_empty=table_is_empty,
@@ -1515,8 +1526,7 @@ class DynamicTableHelpers:
         try:
             result=r.json()
         except Exception as e:
-            logger.warning(insert_direct)
-            logger.warning(all_records)
+
             raise e
        
 
@@ -1552,7 +1562,8 @@ class DynamicTableHelpers:
     def upsert_data_into_table(self, metadata:dict,local_metadata:dict,
                             historical_update_id:Union[int,None],
                                data: pd.DataFrame, overwrite: bool,
-                               data_source:DynamicTableDataSource
+                               data_source:DynamicTableDataSource,
+                               logger=logger
                                ):
         """
         1) Build or get metadata
@@ -1591,12 +1602,12 @@ class DynamicTableHelpers:
                     # assert data_frame
                     data = data[
                         data[time_index_name] > self.request_to_datetime(source_configuration['last_time_index_value'])]
-        local_metadata = self._insert_data_into_hash_id(serialzied_data_frame=data, metadata=metadata,
+        local_metadata = self._insert_data_into_hash_id(serialized_data_frame=data, metadata=metadata,
                                                    local_metadata=local_metadata,
                                                    overwrite=overwrite, time_index_name=time_index_name,
                                                    index_names=index_names,
                                                    historical_update_id=historical_update_id,
-                                                    data_source=data_source
+                                                    data_source=data_source,logger=logger,
                                                    )
 
         return local_metadata

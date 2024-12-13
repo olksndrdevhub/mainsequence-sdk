@@ -4,8 +4,6 @@ from typing import Union, List,Dict
 
 import os
 
-from functools import lru_cache
-import psutil
 
 
 from mainsequence.tdag.logconf import console_logger, create_logger_in_path
@@ -552,7 +550,8 @@ class PersistManager:
             local_metadata=self.local_metadata,
             data=temp_df,
             historical_update_id=historical_update_id,
-            overwrite=overwrite,data_source=self.data_source
+            overwrite=overwrite,data_source=self.data_source,
+        logger=self.logger
         )
 
         if update_tracker is not None:

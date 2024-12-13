@@ -1,12 +1,14 @@
 
 import os
 import pandas as pd
-from typing import Union
+from typing import Union, List
 import s3fs
 import yaml
 import pyarrow.parquet as pq
 import json
-
+from functools import lru_cache
+import psutil
+import datetime
 import pyarrow.dataset as ds
 import pytz
 
@@ -35,7 +37,7 @@ class DataLakeInterface:
 
 
 
-    def __init__(self,data_lake_source:"PodLocalLake",):
+    def __init__(self,data_lake_source:"PodLocalLake",logger):
         from mainsequence.tdag.config import TDAG_PATH
         self.base_path = f"{TDAG_PATH}/data_lakes"
         self.data_source = data_lake_source
@@ -44,7 +46,7 @@ class DataLakeInterface:
             f"{int(self.data_source.related_resource.datalake_end.timestamp() * 1_000_000) if self.data_source.related_resource.datalake_end is not None else 'None'}"
         )
 
-
+        self.logger=logger
         self.s3_endpoint_url = None
         self.s3_secure_connection = False
         self.s3_data_lake=None
@@ -78,7 +80,7 @@ class DataLakeInterface:
         memory_info = psutil.virtual_memory()
         used_memory_percentage = memory_info.percent
         return used_memory_percentage > max_usage_percentage
-    def get_file_path(self,table_name):
+    def get_file_path_for_table(self,table_name):
 
 
 
@@ -88,8 +90,8 @@ class DataLakeInterface:
 
         return file_path
 
-    def lake_exists(self):
-        file_path = self.get_file_path()
+    def lake_exists(self,table_name):
+        file_path = self.get_file_path_for_table(table_name)
         return self.lake_exists(file_path)
     def _query_datalake(
             self,
@@ -159,7 +161,8 @@ class DataLakeInterface:
                 data = data[filter_index < end_value]
 
         return data
-    def _persist_datalake(self, data: pd.DataFrame,overwrite:bool):
+    def persist_datalake(self, data: pd.DataFrame,overwrite:bool,table_name,time_index_name:str,
+                         index_names:list):
         """
         Partition per week , do not partition per asset_symbol as system only allows 1024 partittions
         Args:
@@ -171,17 +174,21 @@ class DataLakeInterface:
         if overwrite==False:
             raise NotImplementedError
         self.logger.debug(f"Persisting  datalake {self.data_source.related_resource.datalake_name}")
-        file_path = self.get_file_path()
-        if len(data.index.names) > 1:
-            iso_calendar = data.index.get_level_values("time_index").isocalendar().astype(str)
-        else:
-            iso_calendar = data.index.isocalendar()
+        file_path = self.get_file_path_for_table(table_name=table_name)
+
+
+
+        iso_calendar = data[time_index_name].dt.isocalendar()
         data[TIME_PARTITION] = iso_calendar['year'].values.astype(str) + '-W' + iso_calendar[
             'week'].values.astype(str)
         partition_cols = [TIME_PARTITION]
-        data = data.sort_index(level="time_index")
+        data = data.sort_values(by=time_index_name)
 
         self.write_to_parquet(data=data, partition_cols=partition_cols, file_path=file_path)
+
+
+
+
 
 
     def lake_exists(self, file_path: str):
