@@ -505,10 +505,10 @@ class SchedulerUpdater:
         self.node_scheduler.last_heart_beat = datetime.datetime.now(pytz.utc)
         self.node_scheduler.save()
 
-    def _run_update_task(self, running_distributed_heads: bool, local_hash_id: str, actors_map: dict,
-                         task_hex_to_hash_id: dict, force_update: bool, force_next_start_of_minute: bool,
+    def _run_update_task(self, running_distributed_heads: bool, uid_to_wait: str, actors_map: dict,
+                         task_hex_to_uid: dict, force_update: bool, force_next_start_of_minute: bool,
                          update_only_tree: bool) -> dict:
-        actor_handle = actors_map[local_hash_id]['actor_handle']
+        actor_handle = actors_map[uid_to_wait]['actor_handle']
         if running_distributed_heads == True:
             task_handle = actor_handle.run_one_step_update.remote(force_next_start_of_minute=force_next_start_of_minute,
                                                                   update_only_tree=update_only_tree)
@@ -518,10 +518,10 @@ class SchedulerUpdater:
                                                                  update_only_tree=update_only_tree,
                                                                  force_next_start_of_minute=force_next_start_of_minute)
             task_handle = None
-            actors_map[local_hash_id]["force_next_update"] = force_next_update
-        actors_map[local_hash_id]["task_handle"] = task_handle
+            actors_map[uid_to_wait]["force_next_update"] = force_next_update
+        actors_map[uid_to_wait]["task_handle"] = task_handle
         if running_distributed_heads == True:
-            task_hex_to_hash_id[task_handle.task_id().hex()] = local_hash_id
+            task_hex_to_uid[task_handle.task_id().hex()] = uid_to_wait
 
         return actors_map
 
@@ -544,16 +544,16 @@ class SchedulerUpdater:
 
     def _actor_launcher_manager(self, wait_list, sequential_update: bool,
                                 running_distributed_heads, actors_map,
-                                task_hex_to_hash_id, force_update=False, update_only_tree=False,
+                                task_hex_to_uid, force_update=False, update_only_tree=False,
                                 launch_backoff_wait: Union[None, float] = None):
         new_wait_list = {}
 
         time_to_wait, actor_launched = [], False
-        for hash_id_to_wait, wait_details in wait_list.items():
+        for uid_to_wait, wait_details in wait_list.items():
             force_next_start_of_minute = False
-            if actors_map[hash_id_to_wait]['force_next_update'] == True:
-                wait_list[hash_id_to_wait]['next_update'] = datetime.datetime.now(pytz.utc)
-                wait_details['next_update'] = wait_list[hash_id_to_wait]['next_update']
+            if actors_map[uid_to_wait]['force_next_update'] == True:
+                wait_list[uid_to_wait]['next_update'] = datetime.datetime.now(pytz.utc)
+                wait_details['next_update'] = wait_list[uid_to_wait]['next_update']
                 force_next_start_of_minute = True
             tmp_wait = (wait_details['next_update'] - datetime.datetime.now(pytz.utc)).total_seconds()
             remote_table_hashed_name = wait_details['remote_table_hashed_name']
@@ -561,38 +561,39 @@ class SchedulerUpdater:
             if tmp_wait < self.ACTOR_WAIT_LIMIT or force_update == True:
                 # in debug and in run head in main process this is blocked
                 actors_map = self._run_update_task(running_distributed_heads=running_distributed_heads,
-                                                   local_hash_id=hash_id_to_wait,
-                                                   task_hex_to_hash_id=task_hex_to_hash_id,
+                                                   uid_to_wait=uid_to_wait,
+                                                   task_hex_to_uid=task_hex_to_uid,
                                                    actors_map=actors_map,
                                                    force_update=force_update,
                                                    force_next_start_of_minute=force_next_start_of_minute,
                                                    update_only_tree=update_only_tree
                                                    )
                 if running_distributed_heads == False:
-                    next_update = self._get_next_update_loop(local_hash_id=hash_id_to_wait)
-                    new_wait_list[hash_id_to_wait] = dict(next_update=next_update,
+                    next_update = self._get_next_update_loop(local_hash_id=wait_details["local_hash_id"],
+                                                             data_source_id=wait_details["data_source_id"])
+                    new_wait_list[uid_to_wait] = dict(next_update=next_update,
                                                           remote_table_hashed_name=remote_table_hashed_name)
-                    actors_map[hash_id_to_wait]["task_handle"] = None
+                    actors_map[uid_to_wait]["task_handle"] = None
                     sequential_update = False  # do not wait for other heads as it is been runn in main process
                 if launch_backoff_wait is not None:
                     self.logger.info(f"Waiting {launch_backoff_wait} to start next update")
                     time.sleep(launch_backoff_wait)
                 if sequential_update == True:
                     # wait until task is done
-                    self.logger.info(f"{bcolors.BOLD} Sequential update waiting for {hash_id_to_wait} {bcolors.ENDC}")
-                    ready, unready = ray.wait([actors_map[hash_id_to_wait]["task_handle"]], num_returns=1,
+                    self.logger.info(f"{bcolors.BOLD} Sequential update waiting for {uid_to_wait} {bcolors.ENDC}")
+                    ready, unready = ray.wait([actors_map[uid_to_wait]["task_handle"]], num_returns=1,
                                               timeout=60 * 15)
                     if len(ready) > 0:
-                        task_hex_to_hash_id, tmp_wait_list = self._evaluate_read_task(ready=ready,
-                                                                                      task_hex_to_hash_id=task_hex_to_hash_id,
+                        task_hex_to_uid, tmp_wait_list = self._evaluate_read_task(ready=ready,
+                                                                                      task_hex_to_uid=task_hex_to_uid,
                                                                                       wait_list=wait_list)
 
-                        new_wait_list[hash_id_to_wait] = tmp_wait_list[hash_id_to_wait]
-                        actors_map[hash_id_to_wait]["task_handle"] = None
+                        new_wait_list[uid_to_wait] = tmp_wait_list[uid_to_wait]
+                        actors_map[uid_to_wait]["task_handle"] = None
             else:
-                new_wait_list[hash_id_to_wait] = dict(next_update=wait_details['next_update'],
+                new_wait_list[uid_to_wait] = dict(next_update=wait_details['next_update'],
                                                       remote_table_hashed_name=remote_table_hashed_name)
-                actors_map[hash_id_to_wait]["task_handle"] = None
+                actors_map[uid_to_wait]["task_handle"] = None
 
         return new_wait_list, actors_map
 
@@ -610,7 +611,7 @@ class SchedulerUpdater:
         from mainsequence.tdag_client import DynamicTableHelpers
         dth = DynamicTableHelpers()
         self.refresh_node_scheduler()
-        local_to_remote = {t.uid: t.updates_to for t in self.node_scheduler.schedules_to}
+        local_to_remote = {t.uid: {"updates_to":t.updates_to,"local_hash_id":t.hash_id} for t in self.node_scheduler.schedules_to}
         target_ts = self.node_scheduler.schedules_to
 
         # verify target_ts_in actors
@@ -640,8 +641,8 @@ class SchedulerUpdater:
 
             if uid in actors_map.keys():
                 continue
-            metadata = dth.get(hash_id=local_to_remote[uid].hash_id,
-                               data_source__id=local_to_remote[uid].data_source_id,
+            metadata = dth.get(hash_id=local_to_remote[uid]["updates_to"].hash_id,
+                               data_source__id=local_to_remote[uid]["updates_to"].data_source_id,
                                )
             update_details = {"distributed_num_cpus": 1}
             if "dynamictableupdatedetails" in metadata.keys():
@@ -649,8 +650,8 @@ class SchedulerUpdater:
                 update_details = metadata["dynamictableupdatedetails"]
 
             update_init_kwargs = dict(local_hash_id=head_ts.hash_id,
-                                      remote_table_hashed_name=local_to_remote[uid],
-                                      data_source_id=local_to_remote[uid].data_source_id,
+                                      remote_table_hashed_name=local_to_remote[uid]["updates_to"].hash_id,
+                                      data_source_id=local_to_remote[uid]["updates_to"].data_source_id,
                                       scheduler=self.node_scheduler,
 
                                       wait_for_update=wait_for_update, debug=debug, update_tree=update_tree,
@@ -670,15 +671,16 @@ class SchedulerUpdater:
                 time.sleep(30)
             _, nu = SchedulerUpdater.get_time_to_wait_from_hash_id(local_time_serie_node=head_ts)
             wait_list[uid] = {"next_update": nu,
-                                  "remote_table_hashed_name": local_to_remote[uid].hash_id,
-                                  "data_source_id":local_to_remote[uid].data_source_id
+                                  "remote_table_hashed_name": local_to_remote[uid]["updates_to"].hash_id,
+                                  "data_source_id": local_to_remote[uid]["updates_to"].data_source_id,
+                              "local_hash_id": local_to_remote[uid]["local_hash_id"]
                                   }
 
             self.logger.info(
                 f"Actor for head ts with local hash_id {head_ts} built and added to update loop")
         return actors_map, target_ts, wait_list
 
-    def _get_next_update_loop(self, local_hash_id: str):
+    def _get_next_update_loop(self, local_hash_id: str,data_source_id:int):
         """
         loop until query succesfull to avoid breaking the  udpates
         Parameters
@@ -693,7 +695,7 @@ class SchedulerUpdater:
         while error_in_request == True:
             try:
                 _, next_update = SchedulerUpdater.get_time_to_wait_from_hash_id(
-                    local_hash_id=local_hash_id)
+                    local_time_serie_node=local_hash_id,data_source_id=data_source_id)
                 error_in_request = False
             except Exception as e:
                 self.logger.exception("Error getting wait time")
@@ -714,7 +716,7 @@ class SchedulerUpdater:
                 self.logger.exception("Error getting refreshing scheduler")
                 time.sleep(60)
 
-    def _evaluate_read_task(self, ready: list, task_hex_to_hash_id: dict, wait_list: dict):
+    def _evaluate_read_task(self, ready: list, task_hex_to_uid: dict, wait_list: dict):
         """
         makes evaluation of task if its ready
         Returns
@@ -723,7 +725,7 @@ class SchedulerUpdater:
         """
         for ready_task in ready:
             task_hex = ready_task.task_id().hex()
-            local_hash_id = task_hex_to_hash_id[task_hex]
+            local_hash_id = task_hex_to_uid[task_hex]
             try:
                 task_answer = ray.get(ready_task)
             except ray.exceptions.RayTaskError as e:
@@ -739,12 +741,12 @@ class SchedulerUpdater:
                 )
 
             # rerun ready task
-            task_hex_to_hash_id.pop(task_hex, None)
+            task_hex_to_uid.pop(task_hex, None)
             remote_table_hashed_name = wait_list[local_hash_id]['remote_table_hashed_name']
             next_update = self._get_next_update_loop(local_hash_id=local_hash_id)
             wait_list[local_hash_id] = dict(next_update=next_update, remote_table_hashed_name=remote_table_hashed_name)
 
-        return task_hex_to_hash_id, wait_list
+        return task_hex_to_uid, wait_list
 
     def _print_failed_updates(self):
         """
@@ -812,7 +814,7 @@ class SchedulerUpdater:
 
         first_launch = True
         try:
-            task_hex_to_hash_id = {}
+            task_hex_to_uid = {}
 
             ready, unready = ray.wait([actor_details["task_handle"] for actor_details in actors_map.values()
                                        if actor_details["task_handle"] is not None
@@ -821,8 +823,8 @@ class SchedulerUpdater:
             unready = True if len(unready) == 0 else unready
 
             while unready:
-                task_hex_to_hash_id, wait_list = self._evaluate_read_task(ready=ready,
-                                                                          task_hex_to_hash_id=task_hex_to_hash_id,
+                task_hex_to_uid, wait_list = self._evaluate_read_task(ready=ready,
+                                                                          task_hex_to_uid=task_hex_to_uid,
                                                                           wait_list=wait_list)
 
                 # requery DB looking for new TS added to scheduler
@@ -839,7 +841,7 @@ class SchedulerUpdater:
                 # wait in this process to avoid  calling extra actors on long waiting task
                 wait_list, actors_map = self._actor_launcher_manager(
                     running_distributed_heads=running_distributed_heads,
-                    wait_list=wait_list, task_hex_to_hash_id=task_hex_to_hash_id,
+                    wait_list=wait_list, task_hex_to_uid=task_hex_to_uid,
                     sequential_update=sequential_update, force_update=force_update,
                     update_only_tree=update_only_tree,
                     actors_map=actors_map)

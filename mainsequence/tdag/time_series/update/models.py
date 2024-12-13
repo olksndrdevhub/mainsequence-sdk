@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import datetime
 
 class StartUpdateDataInfo(BaseModel):
@@ -11,4 +11,4 @@ class StartUpdateDataInfo(BaseModel):
     error_on_update:bool
     last_time_index_value:Optional[datetime.datetime]=None
     must_update:bool
-    direct_dependencies_hash_id:List[str]
+    direct_dependencies_hash_id: List[Tuple[str, int]]  # List of (hash_id, data_source_id) pairs

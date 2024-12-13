@@ -441,7 +441,7 @@ class ConfigSerializer:
     def deserialize_pickle_value(cls, value, include_vam_client_objects: bool,
                                  graph_depth_limit: int,
                                  graph_depth: int, local_metadatas: Union[dict, None],
-                                 ignore_pydantic=False,data_source_id:Union[DynamicTableDataSource,None]=None, ):
+                                 ignore_pydantic=False, data_source_id: Union[DynamicTableDataSource, None] = None, ):
         from mainsequence.vam_client.models_helpers import get_model_class
         import cloudpickle
 
@@ -464,8 +464,8 @@ class ConfigSerializer:
             elif "is_time_serie_pickled" in value.keys():
                 try:
                     full_path = TimeSerie.get_pickle_path(local_hash_id=value['hashed_name'],
-                                                      data_source_id=data_source_id
-                                                      )
+                                                          data_source_id=data_source_id
+                                                          )
                 except Exception as e:
                     raise e
                 with open(full_path, 'rb') as handle:
@@ -515,7 +515,7 @@ class ConfigSerializer:
         return new_value
 
     @classmethod
-    def deserialize_pickle_state(cls, state, include_vam_client_objects: bool,data_source_id:int,
+    def deserialize_pickle_state(cls, state, include_vam_client_objects: bool, data_source_id: int,
                                  graph_depth_limit: int,
                                  graph_depth: int, local_metadatas: Union[dict, None],
                                  ignore_pydantic=False,
@@ -537,12 +537,13 @@ class ConfigSerializer:
             for key, value in state.items():
                 state[key] = cls.deserialize_pickle_value(value, include_vam_client_objects=include_vam_client_objects,
                                                           graph_depth_limit=graph_depth_limit, graph_depth=graph_depth,
-                                                          local_metadatas=local_metadatas,data_source_id=data_source_id,
+                                                          local_metadatas=local_metadatas,
+                                                          data_source_id=data_source_id,
                                                           )
         elif isinstance(state, tuple):
             state = tuple([cls.deserialize_pickle_value(v, include_vam_client_objects=include_vam_client_objects,
                                                         graph_depth_limit=graph_depth_limit, graph_depth=graph_depth,
-                                                        local_metadatas=local_metadatas,data_source_id=data_source_id,
+                                                        local_metadatas=local_metadatas, data_source_id=data_source_id,
                                                         ) for v in state])
         elif isinstance(state, str) or isinstance(state, float) or isinstance(state, int) or isinstance(state, bool):
             pass
@@ -698,7 +699,7 @@ class TimeSerieRebuildMethods(ABC):
         with open(pickle_path, 'rb') as handle:
             time_serie = cloudpickle.load(handle)
 
-        data_source=time_serie.load_data_source_from_pickle(pickle_path=pickle_path)
+        data_source = time_serie.load_data_source_from_pickle(pickle_path=pickle_path)
         time_serie.data_source = data_source
         # verify pickle
         if time_serie.local_persist_manager.metadata is not None:
@@ -721,15 +722,15 @@ class TimeSerieRebuildMethods(ABC):
         return time_serie
 
     @classmethod
-    def load_data_source_from_pickle(self,pickle_path):
+    def load_data_source_from_pickle(self, pickle_path):
         data_path = Path(pickle_path).parent / "data_source.pickle"
         with open(data_path, 'rb') as handle:
             data_source = cloudpickle.load(handle)
         return data_source
 
-    def set_data_source_from_pickle_path(self,pikle_path):
-        data_source=self.load_data_source_from_pickle(pikle_path)
-        self.data_source=data_source
+    def set_data_source_from_pickle_path(self, pikle_path):
+        data_source = self.load_data_source_from_pickle(pikle_path)
+        self.data_source = data_source
 
     @classmethod
     def load_and_set_from_pickle(cls, pickle_path, graph_depth_limit=1, ):
@@ -743,7 +744,7 @@ class TimeSerieRebuildMethods(ABC):
     @classmethod
     @tracer.start_as_current_span("TS: Rebuild From Configuration")
     def rebuild_from_configuration(cls, local_hash_id,
-                                   data_source:Union[int,object],
+                                   data_source: Union[int, object],
                                    remote_table_hashed_name: Union[str, None],
 
                                    ):
@@ -761,15 +762,14 @@ class TimeSerieRebuildMethods(ABC):
 
         if isinstance(data_source, int):
             pickle_path = cls.get_pickle_path(local_hash_id,
-                                               data_source_id=data_source)
-            if os.path.isfile(pickle_path) ==False:
-                DynamicTableDataSource.pickle_from_remote(id=data_source)
+                                              data_source_id=data_source)
+            if os.path.isfile(pickle_path) == False:
+                DynamicTableDataSource.pickle_from_remote(id=data_source, path=ogm.pickle_storage_path)
             data_source = cls.load_data_source_from_pickle(pickle_path=pickle_path)
-
 
         persist_manager = PersistManager.get_from_data_type(local_hash_id=local_hash_id,
                                                             data_source=data_source,
-                                              remote_table_hashed_name=remote_table_hashed_name)
+                                                            remote_table_hashed_name=remote_table_hashed_name)
         try:
             time_serie_config = persist_manager.local_build_configuration
         except Exception as e:
@@ -806,20 +806,18 @@ class TimeSerieRebuildMethods(ABC):
         return state
 
     @classmethod
-    def get_pickle_path(cls, local_hash_id,data_source_id:int):
+    def get_pickle_path(cls, local_hash_id, data_source_id: int):
         return f"{ogm.pickle_storage_path}/{data_source_id}/{local_hash_id}.pickle"
 
     @classmethod
-    def load_and_set_from_hash_id(cls, local_hash_id,data_source_id:int):
-        path = cls.get_pickle_path(local_hash_id=local_hash_id,data_source_id=data_source_id)
+    def load_and_set_from_hash_id(cls, local_hash_id, data_source_id: int):
+        path = cls.get_pickle_path(local_hash_id=local_hash_id, data_source_id=data_source_id)
         ts = cls.load_and_set_from_pickle(pickle_path=path)
         return ts
 
-
-
     @property
     def pickle_path(self):
-        pp=self.data_source.data_source_dir_path(ogm.pickle_storage_path)
+        pp = self.data_source.data_source_dir_path(ogm.pickle_storage_path)
         path = f"{pp}/{self.local_hash_id}.pickle"
         return path
 
@@ -880,14 +878,14 @@ class TimeSerieRebuildMethods(ABC):
             graph_depth_limit = minimum_required_depth_for_update
             self.logger.warning(f"Graph depht limit overrided to {minimum_required_depth_for_update}")
         if graph_depth <= graph_depth_limit:
-            local_metadata = local_metadatas[self.local_hash_id] if local_metadatas is not None else None
+            local_metadata = local_metadatas[(self.local_hash_id,self.data_source.id)] if local_metadatas is not None else None
             self._set_local_persist_manager(hashed_name=self.hashed_name,
                                             remote_table_hashed_name=self.remote_table_hashed_name,
                                             local_metadata=local_metadata
                                             )
 
         serializer = ConfigSerializer()
-        state = serializer.deserialize_pickle_state(state=state,data_source_id=self.data_source.id,
+        state = serializer.deserialize_pickle_state(state=state, data_source_id=self.data_source.id,
                                                     include_vam_client_objects=include_vam_client_objects,
                                                     graph_depth_limit=graph_depth_limit,
                                                     local_metadatas=local_metadatas,
@@ -930,9 +928,9 @@ class TimeSerieRebuildMethods(ABC):
         return properties
 
     @tracer.start_as_current_span("TS: Update")
-    def update(self, update_tracker: object,debug_mode:bool,
+    def update(self, update_tracker: object, debug_mode: bool,
                raise_exceptions=True, update_tree=False, start_update_data: Union[StartUpdateDataInfo, None] = None,
-               metadatas: Union[dict, None] = None, update_only_tree=False,force_update=False
+               metadatas: Union[dict, None] = None, update_only_tree=False, force_update=False
                ):
         """
         Main update method for time series that interacts with Graph node. Time series should be updated through this
@@ -946,7 +944,8 @@ class TimeSerieRebuildMethods(ABC):
         """
 
         if start_update_data is None:
-            start_update_data = update_tracker.set_start_of_execution(hash_id=self.local_hash_id)
+            start_update_data = update_tracker.set_start_of_execution(local_hash_id=self.local_hash_id,
+                                                                      data_source_id=self.data_source.id)
 
         latest_value, must_update = start_update_data.last_time_index_value, start_update_data.must_update
 
@@ -964,7 +963,7 @@ class TimeSerieRebuildMethods(ABC):
                     max_update_time_days = datetime.timedelta(days=update_on_batches)
                     update_on_batches = True
 
-                self.update_local( update_tree=update_tree,debug_mode=debug_mode,
+                self.update_local(update_tree=update_tree, debug_mode=debug_mode,
                                   overwrite_latest_value=latest_value, metadatas=metadatas,
                                   update_tracker=update_tracker, update_only_tree=update_only_tree,
                                   )
@@ -979,7 +978,7 @@ class TimeSerieRebuildMethods(ABC):
 
                 logging.shutdown()
                 if raise_exceptions is True:
-                    update_tracker.set_end_of_execution(hash_id=self.local_hash_id,
+                    update_tracker.set_end_of_execution(local_hash_id=self.local_hash_id,data_source_id=self.data_source.id,
                                                         error_on_update=error_on_last_update)
 
 
@@ -1088,7 +1087,6 @@ class DataPersistanceMethods(ABC):
 
         """
 
-
         latest_value, last_multiindex = self.local_persist_manager.get_latest_value(asset_symbols=asset_symbols)
 
         return latest_value, last_multiindex
@@ -1147,7 +1145,7 @@ class DataPersistanceMethods(ABC):
     @tracer.start_as_current_span("TS: Get Persisted Data")
     def get_df_greater_than_in_table(self, target_value: Union[None, datetime.datetime],
                                      great_or_equal=False,
-                                    symbol_list: Union[None, list] = None,
+                                     symbol_list: Union[None, list] = None,
                                      ):
         """
 
@@ -1198,7 +1196,8 @@ class DataPersistanceMethods(ABC):
         df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map, force_db_look)
         return df
 
-    def get_df_between_dates(self, start_date:Union[datetime.datetime,None]=None, end_date:Union[datetime.datetime,None]=None,
+    def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
+                             end_date: Union[datetime.datetime, None] = None,
                              asset_symbols: Union[None, list] = None,
                              data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True,
                              ):
@@ -1469,7 +1468,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         self.local_kwargs_to_ignore = local_kwargs_to_ignore
         self.pre_load_routines_run = False
 
-
         # asser that method is decorated
         if not len(self.__init__.__closure__) == 1:
             logger.error("init method is not decorated with @TimeSerie._post_init_routines()")
@@ -1516,20 +1514,20 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def get_data_source(self):
         from mainsequence.tdag_client import POD_DEFAULT_DATA_SOURCE
 
-        pod_source=os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
+        pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
 
         if pod_source == None:
             print("using pod default data source")
             if POD_DEFAULT_DATA_SOURCE.related_resource is None:
                 raise Exception("This Pod does not have a default data source")
             return POD_DEFAULT_DATA_SOURCE
-        #returnn to pod to override with context manager
+        # returnn to pod to override with context manager
         from mainsequence.tdag_client import models as models
         pod_source = json.loads(pod_source)
-        ModelClass=pod_source["tdag_orm_class"]
+        ModelClass = pod_source["tdag_orm_class"]
         pod_source.pop("tdag_orm_class", None)
-        ModelClass=getattr(models,ModelClass)
-        pod_source=ModelClass(**pod_source)
+        ModelClass = getattr(models, ModelClass)
+        pod_source = ModelClass(**pod_source)
         return pod_source
 
     def set_data_source(self):
@@ -1587,7 +1585,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             if self.data_configuration_path is None:
                 self.logger = create_logger_in_path(logger_name=local_hash_id, application_name="tdag",
                                                     logger_file=f'{ogm.get_logging_path()}/{local_hash_id}.log',
-                                                    local_hash_id=local_hash_id,data_source_id=self.data_source.id
+                                                    local_hash_id=local_hash_id, data_source_id=self.data_source.id
                                                     )
 
     @property
@@ -1664,7 +1662,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                                         local_metadata=local_metadata,
                                                                         description=self.get_html_description(),
                                                                         data_source=self.data_source
-                                                                                    )
+                                                                        )
 
         time_serie_source_code_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
         time_serie_source_code = self.get_time_serie_source_code(self.__class__)
@@ -1708,24 +1706,19 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         """
         patch_build = os.environ.get("PATCH_BUILD_CONFIGURATION", False) in ["true", "True", 1]
         if patch_build == True:
-            self.local_persist_manager # just call it before to initilaize dts
+            self.local_persist_manager  # just call it before to initilaize dts
             self.logger.warning(f"Patching build configuration for {self.hash_id}")
             self.flush_pickle()
-
-
 
             self.local_persist_manager.patch_build_configuration(local_configuration=self.local_initial_configuration,
                                                                  remote_configuration=self.remote_initial_configuration,
                                                                  remote_build_metadata=self.remote_build_metadata
                                                                  )
 
-
         if self.local_persist_manager.metadata['sourcetableconfiguration'] is not None:
-            if self.remote_build_metadata["initialize_with_default_partitions"]==False:
-                if self.data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+            if self.remote_build_metadata["initialize_with_default_partitions"] == False:
+                if self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
                     self.logger.warning("Default Partitions will be initialized ")
-
-
 
     def _create_config(self, kwargs, post_init_log_messages: list):
         """
@@ -1765,7 +1758,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 remote_initial_configuration.pop(k, None)
             remote_initial_configuration.pop("local_kwargs_to_ignore", None)
         self.remote_initial_configuration = remote_initial_configuration
-        self.remote_build_metadata=self.sanitize_default_build_metadata(kwargs.get("build_meta_data",None))
+        self.remote_build_metadata = self.sanitize_default_build_metadata(kwargs.get("build_meta_data", None))
         self.init_meta = init_meta
 
         self.logger.debug(f"local/remote {self.hashed_name}/{self.remote_table_hashed_name}")
@@ -1826,9 +1819,9 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         all_hash_id_in_tree = []
 
         if self.depth_df.shape[0] > 0:
-            all_hash_id_in_tree = depth_df["local_hash_id"].to_list()
+            all_hash_id_in_tree = depth_df[["local_hash_id","data_source_id"]].to_dict("records")
             assert depth_df.groupby("local_hash_id").count().max().max() < 2
-        all_hash_id_in_tree.append(self.local_hash_id)
+        all_hash_id_in_tree.append({"local_hash_id":self.local_hash_id,"data_source_id":self.data_source.id})
 
         update_details_batch = dict(error_on_last_update=False,
                                     active_update_scheduler_uid=scheduler.uid)
@@ -1841,14 +1834,14 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                            )
         state_data, local_metadatas, source_table_config_map = all_metadatas['state_data'], all_metadatas[
             "local_metadatas"], all_metadatas["source_table_config_map"]
-        local_metadatas = {m["local_hash_id"]: m for m in local_metadatas}
+        local_metadatas = {(m["local_hash_id"],m["remote_table"]["data_source"]["id"]): m for m in local_metadatas}
 
         self.scheduler = scheduler
         self.update_details_tree = {key: v["localtimeserieupdatedetails"] for key, v in local_metadatas.items()}
         return local_metadatas, state_data
 
     @tracer.start_as_current_span("Verify time series tree update")
-    def _verify_tree_is_updated(self,metadatas,debug_mode):
+    def _verify_tree_is_updated(self, metadatas, debug_mode):
         """
         \
         Args:
@@ -1876,7 +1869,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 return None
             tmp_ts = tmp_ts[tmp_ts["source_class_name"] != "WrapperTimeSerie"]
 
-
             if tmp_ts.shape[0] > 0:
                 self._execute_parallel_distributed_update(tmp_ts=tmp_ts,
                                                           metadatas=metadatas,
@@ -1889,9 +1881,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 unique_priorities = self.dependencies_df["update_priority"].unique().tolist()
                 unique_priorities.sort()
 
-                all_hash = self.dependencies_df[self.dependencies_df["source_class_name"] != "WrapperTimeSerie"][
-                    "local_hash_id"].to_list()
-                all_start_data = self.update_tracker.set_start_of_execution_batch(hash_id_list=all_hash)
+                local_time_series_list = self.dependencies_df[
+                    self.dependencies_df["source_class_name"] != "WrapperTimeSerie"
+                    ][["local_hash_id", "data_source_id"]].values.tolist()
+                all_start_data = self.update_tracker.set_start_of_execution_batch(local_time_series_list=local_time_series_list)
                 for prioriity in unique_priorities:
                     # get hierarchies ids
 
@@ -1918,11 +1911,13 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
                             ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
 
-                            self.update_tracker.set_start_of_execution(hash_id=ts_row[1]["local_hash_id"])
+                            self.update_tracker.set_start_of_execution(local_hash_id=ts_row[1]["local_hash_id"],
+                                                                       data_source_id=ts_row[1]["data_source_id"]
+                                                                       )
                             error_on_last_update = ts.update(debug_mode=debug_mode,
                                                              raise_exceptions=True, update_tree=False,
                                                              start_update_data=all_start_data[
-                                                                 ts_row[1]["local_hash_id"]],
+                                                                 (ts_row[1]["local_hash_id"],ts_row[1]["data_source_id"])],
                                                              update_tracker=self.update_tracker
                                                              )
 
@@ -1940,7 +1935,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     @tracer.start_as_current_span("Execute distributed parallel update")
     def _execute_parallel_distributed_update(self, tmp_ts: pd.DataFrame,
                                              metadatas: Union[dict, None],
-                                            ):
+                                             ):
 
         telemetry_carrier = tracer_instrumentator.get_telemetry_carrier()
 
@@ -2016,12 +2011,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             raise DependencyUpdateError(f"Update Stop from error in children \n {ts_with_errors}")
 
     @tracer.start_as_current_span("TimeSerie.update_local")
-    def update_local(self, update_tree, update_tracker: object, debug_mode:bool,
+    def update_local(self, update_tree, update_tracker: object, debug_mode: bool,
                      metadatas: Union[None, dict] = None,
                      overwrite_latest_value: Union[datetime.datetime, None] = None, update_only_tree: bool = False,
 
                      *args, **kwargs) -> bool:
-
 
         from mainsequence.tdag.instrumentation.utils import Status, StatusCode
         persisted = False
@@ -2076,7 +2070,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
 
                 temp_df = self.update_series_from_source(latest_value=latest_value,
-                                                       **kwargs)
+                                                         **kwargs)
                 for col, ddtype in temp_df.dtypes.items():
                     if "datetime64" in str(ddtype):
                         self.logger.info(f"WARNING DATETIME TYPE IN {self}")
@@ -2146,7 +2140,6 @@ class WrapperTimeSerie(TimeSerie):
 
         # todo set minimum update date.
 
-
     @property
     def wrapped_latest_index_value(self) -> Dict[str, Any]:
         """
@@ -2181,7 +2174,7 @@ class WrapperTimeSerie(TimeSerie):
 
                 module = importlib.import_module(state["data_source"]["pydantic_model_import_path"]["module"])
                 PydanticClass = getattr(module, state["data_source"]["pydantic_model_import_path"]['qualname'])
-                data_source=PydanticClass(**state["data_source"]['serialized_model'])
+                data_source = PydanticClass(**state["data_source"]['serialized_model'])
                 pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
                                                         data_source_id=data_source.id
                                                         )
@@ -2208,9 +2201,11 @@ class WrapperTimeSerie(TimeSerie):
 
         # Remove the unpicklable entries.
         return state
-    def set_data_source_from_pickle_path(self,pikle_path):
-        data_source=self.load_data_source_from_pickle(pikle_path)
-        self.data_source=data_source
+
+    def set_data_source_from_pickle_path(self, pikle_path):
+        data_source = self.load_data_source_from_pickle(pikle_path)
+        self.data_source = data_source
+
     def set_local_persist_manager_if_not_set(self) -> None:
         """
         Set local persist manager for all wrapped TimeSeries.
@@ -2488,8 +2483,6 @@ class WrapperTimeSerie(TimeSerie):
     def values(self):
         """ Get values of wrapped TimeSeries. """
         return self.related_time_series.values()
-
-
 
     def get_ts_as_pandas(self) -> List[pd.DataFrame]:
         """

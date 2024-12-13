@@ -909,9 +909,9 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
                          }
         return CLASS_FACTORY[data_type]
     @classmethod
-    def pickle_from_remote(self,id):
+    def pickle_from_remote(self,id,path):
         data_source=self.get(id=id)
-        data_source.persist_to_pickle()
+        data_source.persist_to_pickle(path)
 
     def data_source_dir_path(self, path):
         return f"{path}/{self.id}"
@@ -1861,6 +1861,7 @@ class DynamicTableHelpers:
         r=r.json()
         return r["must_update"],r["metadata"]
     def get_metadatas_and_set_updates(self,*args,**kwargs):
+        import ast
 
         base_url = self.root_url
 
@@ -1871,6 +1872,10 @@ class DynamicTableHelpers:
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
         r = r.json()
+        r["source_table_config_map"] = {ast.literal_eval(k): v for k, v in r["source_table_config_map"].items()}
+        r["state_data"] = {ast.literal_eval(k): v for k, v in r["state_data"].items()}
+
+
         return r
     def _build_table_response(self,data:pd.DataFrame,source_table_config:dict):
         infered_dtypes = {k: str(c) for k, c in data.dtypes.to_dict().items()}
