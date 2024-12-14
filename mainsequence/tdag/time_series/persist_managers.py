@@ -265,11 +265,6 @@ class PersistManager:
         return self.dth.get(hash_id=self.remote_table_hashed_name)
 
 
-    def get_data_source_connection_details(self,override_id:Union[int,None]=None):
-        from mainsequence.tdag_client import DynamicTableDataSource
-        override_id=override_id or self.metadata['data_source']["id"]
-
-        return DynamicTableDataSource.get_data_source_connection_details(connection_id=override_id)
     def patch_build_configuration(self,local_configuration:dict,remote_configuration:dict,
                                   remote_build_metadata:dict,):
         """
@@ -598,7 +593,6 @@ class TimeScaleLocalPersistManager(PersistManager):
 
 
         filtered_data = self.dth.get_data_by_time_index(start_date=target_value, metadata=self.metadata,
-                                                        connection_config=self.get_data_source_connection_details(),
                                                         columns=columns,
                                                         asset_symbols=symbol_list,
                                                         great_or_equal=great_or_equal, )
@@ -608,20 +602,19 @@ class TimeScaleLocalPersistManager(PersistManager):
 
     def filter_by_assets_ranges(self, asset_ranges_map: dict):
 
-        if force_db_look:
-            if  self.metadata["sourcetableconfiguration"] is not None:
-                assert "asset_symbol" in self.metadata["sourcetableconfiguration"]["index_names"],"Table does not contain asset_symbol column"
+
+        if  self.metadata["sourcetableconfiguration"] is not None:
+            assert "asset_symbol" in self.metadata["sourcetableconfiguration"]["index_names"],"Table does not contain asset_symbol column"
 
 
-            df=self.dth.filter_by_assets_ranges(table_name=self.metadata['hash_id'],asset_ranges_map=asset_ranges_map,
+        df=self.dth.filter_by_assets_ranges(table_name=self.metadata['hash_id'],asset_ranges_map=asset_ranges_map,
 
-                                                data_source=self.data_source)
-            df["time_index"]=pd.to_datetime(df["time_index"])
-            df=df.set_index(self.metadata["sourcetableconfiguration"]["index_names"])
+                                            data_source=self.data_source)
+        df["time_index"]=pd.to_datetime(df["time_index"])
+        df=df.set_index(self.metadata["sourcetableconfiguration"]["index_names"])
+
             
-            
-        else:
-            raise NotImplementedError
+
         return df
     def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
                                       less_or_equal=True,

@@ -878,17 +878,7 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
 
         _default_data_source = DataClass(**r.json())
         return _default_data_source
-    @classmethod
-    def get_data_source_connection_details(cls,connection_id):
-        url = cls.ROOT_URL + f"/{connection_id}/get_data_source_connection_details"
 
-        s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload={})
-
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-        data = r.json()
-        return cls.get_class(data["data_type"])(**data)
     @classmethod
     def get(cls,id):
         url = cls.ROOT_URL + f"/{id}/"
@@ -1620,7 +1610,7 @@ class DynamicTableHelpers:
 
         return local_metadata
 
-    def _direct_data_from_db(self, metadata: dict, connection_config: dict,
+    def _direct_data_from_db(self, metadata: dict, connection_uri: str,
                              start_date: Union[datetime.datetime, None] = None,
                              great_or_equal: bool = True, less_or_equal: bool = True,
                              end_date: Union[datetime.datetime, None] = None,
@@ -1656,8 +1646,6 @@ class DynamicTableHelpers:
 
 
 
-        if connection_config["__type__"] != CONSTANTS.CONNECTION_TYPE_POSTGRES:
-            raise NotImplementedError("Only PostgreSQL is supported.")
 
         def fast_table_dump(connection_config, table_name,):
             query = f"COPY {table_name} TO STDOUT WITH CSV HEADER"
@@ -1693,7 +1681,7 @@ class DynamicTableHelpers:
         #     data=fast_table_dump(connection_config, metadata['table_name'])
         #     data[metadata["sourcetableconfiguration"]['time_index_name']]=pd.to_datetime(data[metadata["sourcetableconfiguration"]['time_index_name']])
         # else:
-        with psycopg2.connect(connection_config['connection_details']) as connection:
+        with psycopg2.connect(connection_uri) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(query)
                 column_names = [desc[0] for desc in cursor.description]
@@ -1706,9 +1694,9 @@ class DynamicTableHelpers:
 
         return data
 
-    def filter_by_assets_ranges(self,table_name:str,asset_ranges_map:dict,data_source:dict):
+    def filter_by_assets_ranges(self,table_name:str,asset_ranges_map:dict,data_source:object):
 
-        if self.data_source.data_type!=CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+        if data_source.data_type!=CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             raise NotImplementedError
 
         query_base = f"""
@@ -1733,7 +1721,7 @@ class DynamicTableHelpers:
         df = read_sql_tmpfile(full_query, time_series_orm_uri_db_connection=data_source.get_connection_uri())
         return df
         
-    def get_data_by_time_index(self, metadata: dict,connection_config:dict,
+    def get_data_by_time_index(self, metadata: dict,     data_source:object,
                                start_date: Union[datetime.datetime, None] = None,
                                great_or_equal: bool = True, less_or_equal: bool = True,
                                end_date: Union[datetime.datetime, None] = None,
@@ -1742,10 +1730,13 @@ class DynamicTableHelpers:
 
                                ):
 
-        return self._direct_data_from_db(metadata=metadata,
-                                             connection_config=connection_config,
-                                             start_date=start_date,great_or_equal=great_or_equal,
-                                             less_or_equal=less_or_equal,end_date=end_date,columns=columns)
+        if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+            return self._direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
+            start_date = start_date, great_or_equal = great_or_equal,
+            less_or_equal = less_or_equal, end_date = end_date, columns = columns)
+        else:
+            raise NotImplementedError("Only PostgreSQL is supported.")
+
 
 
 
