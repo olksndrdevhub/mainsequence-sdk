@@ -195,7 +195,8 @@ class TimeSerieUpdateConsumer(ConsumerMixin):
                     error_message = f"{bcolors.OKCYAN}Head time Serie timeout exceeded {execution_timeout_seconds} pending: {next_rebalances}{bcolors.ENDC}"
                     self.time_serie.logger.error(error_message)
 
-                    update_tracker.set_end_of_execution(hash_id= self.time_serie.hashed_name, error_on_update=True,
+                    update_tracker.set_end_of_execution(local_hash_id= self.time_serie.hashed_name, error_on_update=True,
+                                                        data_source_id=self.time_serie.data_source.id,
                                                         error_message=error_message
                                                         )
                     logging.shutdown()
@@ -204,7 +205,8 @@ class TimeSerieUpdateConsumer(ConsumerMixin):
                 if error_on_dependencies == True:  # or active_updates==0:
                     error_message = f"{bcolors.OKCYAN}Error on Dependencies Update not started{bcolors.ENDC}"
                     self.time_serie.logger.error(error_message)
-                    update_tracker.set_end_of_execution(hash_id= self.time_serie.hashed_name, error_on_update=True,
+                    update_tracker.set_end_of_execution(local_hash_id= self.time_serie.hashed_name, error_on_update=True,
+                                                        data_source_id=self.time_serie.data_source.id,
                                                         error_message=error_message
                                                         )
                     logging.shutdown()

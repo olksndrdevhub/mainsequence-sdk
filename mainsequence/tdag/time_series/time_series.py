@@ -968,7 +968,7 @@ class TimeSerieRebuildMethods(ABC):
                                   update_tracker=update_tracker, update_only_tree=update_only_tree,
                                   )
 
-                update_tracker.set_end_of_execution(hash_id=self.local_hash_id,
+                update_tracker.set_end_of_execution(local_hash_id=self.local_hash_id,data_source_id=self.data_source.id,
                                                     error_on_update=error_on_last_update)
 
             except Exception as e:
@@ -989,7 +989,7 @@ class TimeSerieRebuildMethods(ABC):
         else:
 
             self.logger.info("Already updated, waiting until next update time")
-            update_tracker.set_end_of_execution(hash_id=self.local_hash_id,
+            update_tracker.set_end_of_execution(local_hash_id=self.local_hash_id,data_source_id=self.data_source.id,
                                                 error_on_update=error_on_last_update)
         self._run_post_update_routines(error_on_last_update=error_on_last_update)
         # close all logging handlers
@@ -1182,7 +1182,7 @@ class DataPersistanceMethods(ABC):
 
         return filtered_data
 
-    def filter_by_assets_ranges(self, asset_ranges_map: dict, force_db_look=True):
+    def filter_by_assets_ranges(self, asset_ranges_map: dict):
         """
 
         Parameters
@@ -1193,7 +1193,7 @@ class DataPersistanceMethods(ABC):
         -------
 
         """
-        df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map, force_db_look)
+        df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map)
         return df
 
     def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,

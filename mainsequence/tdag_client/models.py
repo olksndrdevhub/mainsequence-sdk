@@ -1516,7 +1516,7 @@ class DynamicTableHelpers:
     
     
     
-            direct_table_update(serialized_data_frame=serialized_data_frame,
+            direct_table_update(serialized_data_frame=serialized_data_frame,grouped_dates=grouped_dates,
                                 time_series_orm_db_connection=data_source.get_connection_uri(),
                                 table_name=metadata["hash_id"],
                                 overwrite=overwrite,index_names=index_names,
@@ -1706,9 +1706,9 @@ class DynamicTableHelpers:
 
         return data
 
-    def filter_by_assets_ranges(self,table_name:str,asset_ranges_map:dict,connection_config:dict):
+    def filter_by_assets_ranges(self,table_name:str,asset_ranges_map:dict,data_source:dict):
 
-        if connection_config["__type__"]!=CONSTANTS.CONNECTION_TYPE_POSTGRES:
+        if self.data_source.data_type!=CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             raise NotImplementedError
 
         query_base = f"""
@@ -1730,7 +1730,7 @@ class DynamicTableHelpers:
 
         full_query = query_base + " OR ".join(query_parts)
 
-        df = read_sql_tmpfile(full_query, time_series_orm_uri_db_connection=connection_config["connection_details"])
+        df = read_sql_tmpfile(full_query, time_series_orm_uri_db_connection=data_source.get_connection_uri())
         return df
         
     def get_data_by_time_index(self, metadata: dict,connection_config:dict,

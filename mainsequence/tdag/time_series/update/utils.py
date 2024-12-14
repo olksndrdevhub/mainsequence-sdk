@@ -114,7 +114,7 @@ class UpdateInterface:
 
             if must_update == False:
                 start_data['update_completed'] = True
-                self.set_end_of_execution(hash_id=lts[0],data_source_id=lts[1], error_on_update=False)
+                self.set_end_of_execution(local_hash_id=lts[0],data_source_id=lts[1], error_on_update=False)
             else:
                 to_place_in_queue.append(lts)
 

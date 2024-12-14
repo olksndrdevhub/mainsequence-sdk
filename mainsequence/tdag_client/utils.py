@@ -392,7 +392,7 @@ def recreate_indexes(table_name, table_index_names,time_series_orm_db_connection
         conn.autocommit = False
 
 def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwrite: bool,
-grouped_dates,
+                        grouped_dates,
                         time_index_name: str, index_names: list, table_is_empty: bool,table_index_names:dict,
                         time_series_orm_db_connection: Union[str, None] = None,
                         use_chunks: bool = True, num_threads: int = 4):

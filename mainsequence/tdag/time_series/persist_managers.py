@@ -555,7 +555,9 @@ class PersistManager:
         )
 
         if update_tracker is not None:
-            update_tracker.set_end_of_execution(hash_id=self.local_hash_id, error_on_update=False)
+            update_tracker.set_end_of_execution(local_hash_id=self.local_hash_id,
+            data_source_id=self.data_source.id,
+            error_on_update=False)
 
 class TimeScaleLocalPersistManager(PersistManager):
     """
@@ -604,16 +606,16 @@ class TimeScaleLocalPersistManager(PersistManager):
 
         return filtered_data
 
-    def filter_by_assets_ranges(self, asset_ranges_map: dict, force_db_look: bool):
+    def filter_by_assets_ranges(self, asset_ranges_map: dict):
 
         if force_db_look:
             if  self.metadata["sourcetableconfiguration"] is not None:
                 assert "asset_symbol" in self.metadata["sourcetableconfiguration"]["index_names"],"Table does not contain asset_symbol column"
-            connection_config=DynamicTableDataSource.get_data_source_connection_details(self.metadata["data_source"]["id"])
+
 
             df=self.dth.filter_by_assets_ranges(table_name=self.metadata['hash_id'],asset_ranges_map=asset_ranges_map,
 
-                                                connection_config=connection_config)
+                                                data_source=self.data_source)
             df["time_index"]=pd.to_datetime(df["time_index"])
             df=df.set_index(self.metadata["sourcetableconfiguration"]["index_names"])
             

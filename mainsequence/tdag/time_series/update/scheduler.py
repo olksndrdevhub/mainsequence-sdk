@@ -452,11 +452,11 @@ class SchedulerUpdater:
                                             )
 
     @staticmethod
-    def get_time_to_wait_from_hash_id(local_time_serie_node: LocalTimeSerieNode):
+    def get_time_to_wait_from_hash_id(local_hash_id: str,data_source_id:int):
         from mainsequence.tdag_client import DynamicTableHelpers
         dth = DynamicTableHelpers()
-        local_metadata = TimeSerieLocalUpdate.get(local_hash_id=local_time_serie_node.hash_id,
-                                                  data_source_id=local_time_serie_node.data_source_id
+        local_metadata = TimeSerieLocalUpdate.get(local_hash_id=local_hash_id,
+                                                  data_source_id=data_source_id
                                                   )
         time_to_wait, next_update = SchedulerUpdater._get_node_time_to_wait(local_metadata=local_metadata)
 
@@ -669,7 +669,7 @@ class SchedulerUpdater:
                                                   )
             if first_launch == True and running_distributed_heads == True:
                 time.sleep(30)
-            _, nu = SchedulerUpdater.get_time_to_wait_from_hash_id(local_time_serie_node=head_ts)
+            _, nu = SchedulerUpdater.get_time_to_wait_from_hash_id(local_hash_id=head_ts.hash_id,data_source_id=head_ts.data_source_id)
             wait_list[uid] = {"next_update": nu,
                                   "remote_table_hashed_name": local_to_remote[uid]["updates_to"].hash_id,
                                   "data_source_id": local_to_remote[uid]["updates_to"].data_source_id,
@@ -695,7 +695,7 @@ class SchedulerUpdater:
         while error_in_request == True:
             try:
                 _, next_update = SchedulerUpdater.get_time_to_wait_from_hash_id(
-                    local_time_serie_node=local_hash_id,data_source_id=data_source_id)
+                    local_hash_id=local_hash_id,data_source_id=data_source_id)
                 error_in_request = False
             except Exception as e:
                 self.logger.exception("Error getting wait time")
