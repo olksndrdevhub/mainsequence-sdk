@@ -14,21 +14,40 @@ import pytz
 
 TIME_PARTITION = "TIME_PARTITION"
 
-@staticmethod
+
+
+def memory_usage_exceeds_limit(max_usage_percentage):
+    """
+    Checks if the current memory usage exceeds the given percentage of total memory.
+    """
+    memory_info = psutil.virtual_memory()
+    used_memory_percentage = memory_info.percent
+    return used_memory_percentage > max_usage_percentage
+
 @lru_cache(maxsize=50)
-def _read_full_data(file_path, use_s3_if_available, max_memory_usage=80):
+def read_full_data(file_path,index_names,filters=None, use_s3_if_available=False, max_memory_usage=80):
     " Cached access to static datalake file "
     # logger.debug("in data lake read")
-    if DataLakePersistManager._memory_usage_exceeds_limit(max_memory_usage):
+    if memory_usage_exceeds_limit(max_memory_usage):
         # Clear cache if memory exceeds the limit
-        DataLakePersistManager._read_full_data.cache_clear()
+        read_full_data.cache_clear()
         # logger.info("Cache cleared due to high memory usage.")
 
-    data_lake_interface = DataLakeInterface(use_s3_if_available=use_s3_if_available)
-    data = data_lake_interface.read_parquet_from_lake(file_path)
-    data = data.drop(columns=[TIME_PARTITION]).sort_index()
+    data = read_parquet_from_lake(file_path=file_path,filters=filters,use_s3_if_available=use_s3_if_available)
+    data = data.drop(columns=[TIME_PARTITION]).set_index([c for c in index_names]).sort_index(level=index_names[0])
     return data
 
+def read_parquet_from_lake(file_path: str,use_s3_if_available:bool,filters:Union[list,None]=None,
+                           s3_storage_options:Union[dict,None]=None,
+                           ):
+
+    extra_kwargs={} if filters is None else {'filters':filters}
+    if use_s3_if_available:
+        s3_path,storage_options=self._get_storage_options(file_path)
+        data = pd.read_parquet(s3_path, engine='pyarrow', storage_options=storage_options,**extra_kwargs)
+    else:
+        data = pd.read_parquet(file_path,**extra_kwargs)
+    return data
 
 
 
@@ -72,14 +91,39 @@ class DataLakeInterface:
                 self.minio_client.make_bucket(self.bucket_name)
         self._create_base_path()
 
-    @staticmethod
-    def _memory_usage_exceeds_limit(max_usage_percentage):
+
+
+    def filter_by_assets_ranges(self,table_name:str,
+                                index_names:list,
+                                asset_ranges_map:dict):
         """
-        Checks if the current memory usage exceeds the given percentage of total memory.
+
+        :param table_name:
+        :param asset_ranges_map:
+        :return:
         """
-        memory_info = psutil.virtual_memory()
-        used_memory_percentage = memory_info.percent
-        return used_memory_percentage > max_usage_percentage
+        filters = tuple(
+            tuple(
+                (
+                    ('asset_symbol', '=', key),
+                    ('time_index', conditions['start_date_operand'], conditions['start_date'])
+                    if 'start_date' in conditions and conditions['start_date'] is not None else None,
+                    ('time_index', '<=', conditions['end_date'])
+                    if 'end_date' in conditions and conditions['end_date'] is not None else None,
+                )
+            )
+            for key, conditions in asset_ranges_map.items()
+        )
+
+        # Remove None values from each filter group
+        filters = tuple(
+            tuple(condition for condition in group if condition is not None)
+            for group in filters
+        )
+
+        df=self._query_datalake(table_name,filters=filters,index_names=index_names)
+        return df
+
     def get_file_path_for_table(self,table_name):
 
 
@@ -95,12 +139,12 @@ class DataLakeInterface:
         return self.lake_exists(file_path)
     def _query_datalake(
             self,
-            ts: object,
-            start_date: pd.Timestamp,
-            symbol_list: List[str],
-            great_or_equal: bool, less_or_equal: bool = True, end_value: Union[datetime.datetime, None] = None,
-            *args,
-            **kwargs
+            table_name:str, index_names=list,
+            start_date: Union[datetime.datetime, None] = None,
+            symbol_list: Union[List[str], None] = None,
+            great_or_equal: bool=False, less_or_equal: bool = True, end_value: Union[datetime.datetime, None] = None,
+            filters: Union[list,None] = None,
+
     ) -> pd.DataFrame:
         """
         Queries the data lake for time series data.
@@ -118,31 +162,13 @@ class DataLakeInterface:
         Returns:
             pd.DataFrame: The queried data.
         """
-        if self.table_hash in self.nodes_to_get_from_db and not self.lake_exists():
-            # Nodes should be queried directly from the DB
-            self.logger.debug(f"Persisting {self.table_hash} directly from DB in to datalake {self.datalake_name}")
-            data = ts.get_df_between_dates(
-                start_date=self.start_latest_value,
-                end_date=self.end_latest_value,
-                data_lake_force_db_look=True,
-                asset_symbols=symbol_list
-            )
-            if len(data) == 0:
-                raise ValueError(f"Data for {self.table_hash} empty")
-            self._persist_datalake(data=data)
 
-        elif not self.lake_exists():
-            self.logger.debug(f"Persisting {self.table_hash} locally generated to datalake {self.datalake_name}")
-            self.set_introspection(True)
-            data = ts.update_series_from_source(latest_value=self.start_latest_value, *args, **kwargs)
-            if len(data) == 0:
-                raise ValueError(f"Results data after update_series_from_source for {self.table_hash} empty")
-            self._persist_datalake(data=data)
 
-        else:
-            self.logger.debug(f"Read {self.table_hash} from datalake {self.datalake_name}")
-            data = DataLakePersistManager._read_full_data(file_path=self.get_file_path(),
-                                                          use_s3_if_available=self.use_s3_if_available)
+
+        self.logger.debug(f"Read {table_name} ")
+        data = read_full_data(file_path=self.get_file_path_for_table(table_name=table_name),
+                              filters=filters,index_names=tuple(index_names),
+                              )
 
         # Todo pass this filter to parquet read
         if symbol_list is not None:
@@ -267,15 +293,6 @@ class DataLakeInterface:
         }
         return s3_path, storage_options
 
-    def read_parquet_from_lake(self, file_path: str,filters:Union[list,None]=None):
-
-        extra_kwargs={} if filters is None else {'filters':filters}
-        if self.s3_data_lake:
-            s3_path,storage_options=self._get_storage_options(file_path)
-            data = pd.read_parquet(s3_path, engine='pyarrow', storage_options=storage_options,**extra_kwargs)
-        else:
-            data = pd.read_parquet(file_path,**extra_kwargs)
-        return data
 
     def get_parquet_data_set(self,file_path):
         if self.s3_data_lake:

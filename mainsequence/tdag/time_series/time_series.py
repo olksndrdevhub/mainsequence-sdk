@@ -1110,37 +1110,7 @@ class DataPersistanceMethods(ABC):
         ip = self.local_persist_manager.time_serie_exist()
         return ip
 
-    @property
-    def env_data_lake(self):
-        """
-        Sets a datalake from environment
-        Returns:
-        """
-        if self.data_configuration_path and not hasattr(self, "_env_data_lake"):
 
-            data_configuration = self.data_configuration
-
-            start_latest_value = data_configuration["datalake_start"]
-            start_latest_value = pd.Timestamp(start_latest_value, tz="utc") if start_latest_value is not None else None
-            end_latest_value = data_configuration["datalake_end"]
-            end_latest_value = pd.Timestamp(end_latest_value, tz="utc") if end_latest_value is not None else None
-            nodes_to_get_from_db = data_configuration.get("nodes_to_get_from_db", None)
-            if nodes_to_get_from_db is not None:
-                nodes_to_get_from_db = nodes_to_get_from_db.split(",")
-            else:
-                nodes_to_get_from_db = []
-
-            data_lake = DataLakePersistManager(
-                use_s3_if_available=data_configuration["use_s3_if_available"],
-                data_lake_name=data_configuration["datalake_name"],
-                start_latest_value=start_latest_value,
-                end_latest_value=end_latest_value,
-                nodes_to_get_from_db=nodes_to_get_from_db,
-                table_hash=self.local_hash_id,
-            )
-            self._env_data_lake = data_lake
-
-        return self._env_data_lake
 
     @tracer.start_as_current_span("TS: Get Persisted Data")
     def get_df_greater_than_in_table(self, target_value: Union[None, datetime.datetime],
@@ -1161,24 +1131,14 @@ class DataPersistanceMethods(ABC):
 
         """
 
-        if self.data_configuration_path is not None:
-            self.logger.info(f"Query datalake for node {self.remote_table_hashed_name}")
 
-            return self.env_data_lake.get_df_greater_than_in_table(
-                ts=self,
-                latest_value=target_value,
-                great_or_equal=great_or_equal,
-                symbol_list=symbol_list,
-            )
 
-        else:
-            # No full tree traversal - use the default TSORM API functions
-            filtered_data = self.local_persist_manager.get_df_greater_than_in_table(
-                target_value=target_value,
-                great_or_equal=great_or_equal,
-                symbol_list=symbol_list,
+        filtered_data = self.local_persist_manager.get_df_greater_than_in_table(
+            target_value=target_value,
+            great_or_equal=great_or_equal,
+            symbol_list=symbol_list,
 
-            )
+        )
 
         return filtered_data
 
@@ -1202,22 +1162,14 @@ class DataPersistanceMethods(ABC):
                              data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True,
                              ):
 
-        if self.data_configuration_path and data_lake_force_db_look == False:
-            filtered_data = self.env_data_lake.get_df_between_dates(start_date=start_date,
-                                                                    ts=self,
-                                                                    end_date=end_date,
-                                                                    symbol_list=asset_symbols,
-                                                                    great_or_equal=great_or_equal,
-                                                                    less_or_equal=less_or_equal,
 
-                                                                    )
-        else:
-            filtered_data = self.local_persist_manager.get_df_between_dates(start_date=start_date,
-                                                                            end_date=end_date,
-                                                                            asset_symbols=asset_symbols,
-                                                                            great_or_equal=great_or_equal,
-                                                                            less_or_equal=less_or_equal,
-                                                                            )
+
+        filtered_data = self.local_persist_manager.get_df_between_dates(start_date=start_date,
+                                                                        end_date=end_date,
+                                                                        asset_symbols=asset_symbols,
+                                                                        great_or_equal=great_or_equal,
+                                                                        less_or_equal=less_or_equal,
+                                                                        )
         return filtered_data
 
     def get_persisted_ts(self):
@@ -1255,16 +1207,6 @@ class DataPersistanceMethods(ABC):
         -------
 
         """
-
-        # if  self.data_configuration_path is not None:
-        #
-        #     latest_value, multiindex = self.get_latest_value(asset_symbols=asset_symbols,
-        #
-        #                                                      )
-        #     last_observation=self.get_df_greater_than_in_table(latest_value,great_or_equal=True,
-        #
-        #                                                      symbol_list=asset_symbols,)
-        #     return last_observation
 
         latest_value, multiindex = self.get_latest_value(asset_symbols=asset_symbols,
 
@@ -1406,16 +1348,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 kwargs["time_series_class_import_path"] = {"module": self.__class__.__module__,
                                                            "qualname": self.__class__.__qualname__}
 
-                self.data_configuration_path = None
-                if os.environ.get("DATA_CONFIGURATION_PATH", None):
-                    self.data_configuration_path = os.environ["DATA_CONFIGURATION_PATH"]
-                    kwargs["data_configuration_path"] = self.data_configuration_path
 
-                    if "local_kwargs_to_ignore" in kwargs:
-                        if "data_configuration_path" not in kwargs["local_kwargs_to_ignore"]:
-                            kwargs["local_kwargs_to_ignore"].append("data_configuration_path")
-                    else:
-                        kwargs["local_kwargs_to_ignore"] = ["data_configuration_path"]
 
                 self._create_config(kwargs=kwargs, post_init_log_messages=post_init_log_messages)
                 # create logger
@@ -1582,43 +1515,16 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
     def _set_logger(self, local_hash_id):
         if hasattr(self, "logger") == False:
-            if self.data_configuration_path is None:
-                self.logger = create_logger_in_path(logger_name=local_hash_id, application_name="tdag",
-                                                    logger_file=f'{ogm.get_logging_path()}/{local_hash_id}.log',
-                                                    local_hash_id=local_hash_id, data_source_id=self.data_source.id
-                                                    )
 
-    @property
-    def data_configuration(self):
-        if hasattr(self, "_data_configuration"):
-            return self._data_configuration
+            self.logger = create_logger_in_path(logger_name=local_hash_id, application_name="tdag",
+                                                logger_file=f'{ogm.get_logging_path()}/{local_hash_id}.log',
+                                                local_hash_id=local_hash_id, data_source_id=self.data_source.id
+                                                )
 
-        import yaml
-        assert self.data_configuration_path, "No data configuration path found"
-        with open(self.data_configuration_path, "r") as f:
-            data_configuration = yaml.safe_load(f)
-        self._data_configuration = data_configuration
-        return self._data_configuration
 
-    @property
-    def running_in_data_lake(self):
-        return hasattr(self, "_data_configuration")
 
-    def update_data_configuration(self, data_configuration):
-        """
 
-        Parameters
-        ----------
-        data_configuration
 
-        Returns
-        -------
-
-        """
-        import yaml
-        assert self.data_configuration_path, "No data configuration path found"
-        with open(self.data_configuration_path, "w") as f:
-            yaml.dump(data_configuration, f)
 
     @property
     def local_persist_manager(self):

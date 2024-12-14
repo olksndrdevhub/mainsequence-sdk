@@ -554,14 +554,30 @@ class PersistManager:
             data_source_id=self.data_source.id,
             error_on_update=False)
 
-class TimeScaleLocalPersistManager(PersistManager):
-    """
-    Main Controler to interacti with TimeSerie ORM
-    """
-
-
-
-
+    # def get_df_greater_than_in_table(self, target_value: datetime.datetime, great_or_equal: bool,
+    #
+    #                                  symbol_list: Union[list, None] = None,
+    #                                  columns: Union[list, None] = None
+    #                                  ):
+    #     """
+    #
+    #     Parameters
+    #     ----------
+    #     target_value
+    #     great_or_equal
+    #
+    #     Returns
+    #     -------
+    #
+    #     """
+    #
+    #     filtered_data = self.dth.get_data_by_time_index(start_date=target_value, metadata=self.metadata,
+    #                                                     data_source=self.data_source,
+    #                                                     columns=columns,
+    #                                                     asset_symbols=symbol_list,
+    #                                                     great_or_equal=great_or_equal, )
+    #
+    #     return filtered_data
 
     def get_persisted_ts(self):
         """
@@ -573,109 +589,58 @@ class TimeScaleLocalPersistManager(PersistManager):
 
         return persisted_df
 
-    def get_df_greater_than_in_table(self, target_value: datetime.datetime, great_or_equal: bool,
-
-                            symbol_list:Union[list,None]=None,
-                            columns: Union[list, None] = None
-                            ):
-        """
-
-        Parameters
-        ----------
-        target_value
-        great_or_equal
-
-        Returns
-        -------
-
-        """
-
-
-
-        filtered_data = self.dth.get_data_by_time_index(start_date=target_value, metadata=self.metadata,
-                                                        columns=columns,
-                                                        asset_symbols=symbol_list,
-                                                        great_or_equal=great_or_equal, )
-
-
-        return filtered_data
-
     def filter_by_assets_ranges(self, asset_ranges_map: dict):
 
+        if self.metadata["sourcetableconfiguration"] is not None:
+            assert "asset_symbol" in self.metadata["sourcetableconfiguration"][
+                "index_names"], "Table does not contain asset_symbol column"
 
-        if  self.metadata["sourcetableconfiguration"] is not None:
-            assert "asset_symbol" in self.metadata["sourcetableconfiguration"]["index_names"],"Table does not contain asset_symbol column"
+        df = self.dth.filter_by_assets_ranges(metadata=self.metadata, asset_ranges_map=asset_ranges_map,
 
+                                              data_source=self.data_source)
 
-        df=self.dth.filter_by_assets_ranges(table_name=self.metadata['hash_id'],asset_ranges_map=asset_ranges_map,
-
-                                            data_source=self.data_source)
-        df["time_index"]=pd.to_datetime(df["time_index"])
-        df=df.set_index(self.metadata["sourcetableconfiguration"]["index_names"])
-
-            
 
         return df
-    def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
-                                      less_or_equal=True,
-                                      asset_symbols: Union[list, None] = None,
-                                      columns: Union[list, None] = None):
-        return self._get_df_between_dates_from_db(start_date, end_date, great_or_equal=great_or_equal,
-                                      less_or_equal=less_or_equal,
-                                      asset_symbols=asset_symbols,
-                                      columns = columns)
-
-
-
-    def _get_df_between_dates_from_db(self, start_date, end_date,  great_or_equal=True,
-                                      less_or_equal=True,
-                                      asset_symbols: Union[list, None] = None,
-                                      columns: Union[list, None] = None
-                                      ):
-        """
-
-        Parameters
-        ----------
-        start_date
-        end_date
-
-        Returns
-        -------
-
-        """
-
-
-
-        # if start date is no after earlier local retetion default ot DB
-        if "id" not in self.metadata.keys():
-            raise Exception(f"No id in f{self.metadata}")
-        filtered_data = self.dth.get_data_by_time_index(metadata=self.metadata, start_date=start_date,
-                                                        end_date=end_date, great_or_equal=great_or_equal,
-                                                        less_or_equal=less_or_equal,
-                                                        asset_symbols=asset_symbols,
-                                                        columns=columns,connection_config=self.get_data_source_connection_details()
-                                                        )
-        self.logger.warning(
-            f"Data is not been pulled from local storage, review  storage policy to improve performace {start_date} - {end_date}")
-        return filtered_data
-
-
-
-
-
-
-
-       
-
-
-    def upsert_data(self, data_df: pd.DataFrame):
-
-        self.add_data_to_timescale(temp_df=data_df, overwrite=True)
-
 
     def get_earliest_value(self) -> datetime.datetime:
         earliest_value = self.dth.get_earliest_value(hash_id=self.remote_table_hashed_name)
         return earliest_value
+
+class TimeScaleLocalPersistManager(PersistManager):
+    """
+    Main Controler to interacti with TimeSerie ORM
+    """
+
+
+
+
+
+
+
+
+
+
+    def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
+                                      less_or_equal=True,
+                                      asset_symbols: Union[list, None] = None,
+                                      columns: Union[list, None] = None):
+
+        filtered_data = self.dth.get_data_by_time_index(metadata=self.metadata, start_date=start_date,
+                                                        end_date=end_date, great_or_equal=great_or_equal,
+                                                        less_or_equal=less_or_equal,
+                                                        asset_symbols=asset_symbols,
+                                                        columns=columns,
+                                                        data_source=self.data_source
+                                                        )
+
+
+        return filtered_data
+
+
+
+
+
+
 
     def get_full_source_data(self, engine="pandas"):
         """

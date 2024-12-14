@@ -453,35 +453,7 @@ class ContinuousAggregateMultiIndex(BaseObject):
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
     
-class MultiIndexTableMetaData(BaseObject):
-    ROOT_URL=get_multi_index_node_url(TDAG_ENDPOINT)
 
-    def __init__(self, *args, **kwargs):
-
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-    @classmethod
-    def get_or_create(cls,time_out:Union[None,int]=None,*args,**kwargs,):
-        s = cls.build_session()
-        url = cls.ROOT_URL + "/get_or_create/"
-        payload = dict(json=kwargs)
-        r = make_request(s=s,loaders=cls.LOADERS, r_type="POST", url=url, payload=payload,time_out=time_out)
-        created=False
-        if r.status_code not in [200,201]:
-            raise Exception(f"{r.text()}")
-        mi_metadata = cls(**r.json())
-        if r.status_code ==201:
-            created=True
-        
-        return mi_metadata,created
-
-    def patch(self,time_out:Union[None,int]=None, *args, **kwargs,):
-        url = self.ROOT_URL + f"/{self.id}/"
-        payload = {"json": serialize_to_json(kwargs)}
-        s = self.build_session()
-        r = make_request(s=s,loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload,time_out=time_out)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
 
 
 class RunConfiguration(BaseTdagPydanticModel,BaseObject):
@@ -1694,31 +1666,48 @@ class DynamicTableHelpers:
 
         return data
 
-    def filter_by_assets_ranges(self,table_name:str,asset_ranges_map:dict,data_source:object):
+    def set_types_in_table(self,df,column_types):
+        for c in column_types:
+            df[c] = df[c].astype(str)
+        return df
+    def filter_by_assets_ranges(self,metadata: dict,
 
-        if data_source.data_type!=CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-            raise NotImplementedError
+                                asset_ranges_map:dict,data_source:object):
 
-        query_base = f"""
-                                SELECT * FROM {table_name}
-                                WHERE
-                            """
-        # Initialize a list to store the query parts and another for parameters
-        query_parts = []
+        table_name=metadata["table_name"]
+        index_names=metadata["sourcetableconfiguration"]["index_names"]
+        column_types=metadata["sourcetableconfiguration"]["column_dtypes_map"]
+        if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+            from .data_lake import DataLakeInterface
+            data_lake_interface = DataLakeInterface(data_lake_source=data_source, logger=logger, )
+            df=data_lake_interface.filter_by_assets_ranges(table_name=table_name,index_names=index_names,
+                                                 asset_ranges_map=asset_ranges_map,
+                                                 )
 
-        # Build query dynamically based on the dictionary
-        for symbol, range_dict in asset_ranges_map.items():
+        elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+            query_base = f"""
+                                    SELECT * FROM {table_name}
+                                    WHERE
+                                """
+            # Initialize a list to store the query parts and another for parameters
+            query_parts = []
 
-            if range_dict['end_date'] is not None:
-                tmp_query = f" (asset_symbol ='{symbol}'  AND time_index BETWEEN '{range_dict['start_date']}' AND '{range_dict['end_date']}') "
+            # Build query dynamically based on the dictionary
+            for symbol, range_dict in asset_ranges_map.items():
 
-            else:
-                tmp_query = f" (asset_symbol ='{symbol}'  AND time_index {range_dict['start_date_operand']} '{range_dict['start_date']}') "
-            query_parts.append(tmp_query)
+                if range_dict['end_date'] is not None:
+                    tmp_query = f" (asset_symbol ='{symbol}'  AND time_index BETWEEN '{range_dict['start_date']}' AND '{range_dict['end_date']}') "
 
-        full_query = query_base + " OR ".join(query_parts)
+                else:
+                    tmp_query = f" (asset_symbol ='{symbol}'  AND time_index {range_dict['start_date_operand']} '{range_dict['start_date']}') "
+                query_parts.append(tmp_query)
 
-        df = read_sql_tmpfile(full_query, time_series_orm_uri_db_connection=data_source.get_connection_uri())
+            full_query = query_base + " OR ".join(query_parts)
+
+            df = read_sql_tmpfile(full_query, time_series_orm_uri_db_connection=data_source.get_connection_uri())
+            df=df.set_index(index_names)
+
+        df=self.set_types_in_table(df,column_types)
         return df
         
     def get_data_by_time_index(self, metadata: dict,     data_source:object,
