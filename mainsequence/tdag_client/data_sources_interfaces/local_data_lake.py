@@ -16,6 +16,8 @@ TIME_PARTITION = "TIME_PARTITION"
 
 
 
+
+
 def memory_usage_exceeds_limit(max_usage_percentage):
     """
     Checks if the current memory usage exceeds the given percentage of total memory.
@@ -54,7 +56,49 @@ def read_parquet_from_lake(file_path: str,use_s3_if_available:bool,filters:Union
 
 class DataLakeInterface:
 
+    @staticmethod
+    def build_time_and_symbol_filter(
+                              start_date: Union[datetime.datetime, None] = None,
+                              great_or_equal: bool = True,
+                              less_or_equal: bool = True,
+                              end_date: Union[datetime.datetime, None] = None,
+                              asset_symbols: Union[list, None] = None):
+        """
+        Build hashable parquet filters based on the parameters.
 
+        Args:
+            metadata (dict): Metadata dictionary, not used for filtering here but included for extensibility.
+            start_date (datetime.datetime, optional): Start date for filtering.
+            great_or_equal (bool): Whether the start date condition is `>=` or `>`.
+            less_or_equal (bool): Whether the end date condition is `<=` or `<`.
+            end_date (datetime.datetime, optional): End date for filtering.
+            asset_symbols (list, optional): List of asset symbols to filter on.
+
+        Returns:
+            tuple: Hashable parquet filters for use with pandas or pyarrow.
+        """
+        # Define the filters
+        filters = []
+
+        # Add asset_symbols filter (OR condition across symbols)
+        if asset_symbols:
+            asset_symbol_filter = ('asset_symbol', 'in', tuple(asset_symbols))
+            filters.append(asset_symbol_filter)
+
+        # Add time_index filter for start_date
+        if start_date:
+            start_date_op = '>=' if great_or_equal else '>'
+            start_date_filter = ('time_index', start_date_op, start_date)
+            filters.append(start_date_filter)
+
+        # Add time_index filter for end_date
+        if end_date:
+            end_date_op = '<=' if less_or_equal else '<'
+            end_date_filter = ('time_index', end_date_op, end_date)
+            filters.append(end_date_filter)
+
+        # Return filters as a hashable tuple of tuples
+        return tuple(filters)
 
     def __init__(self,data_lake_source:"PodLocalLake",logger):
         from mainsequence.tdag.config import TDAG_PATH
@@ -121,7 +165,7 @@ class DataLakeInterface:
             for group in filters
         )
 
-        df=self._query_datalake(table_name,filters=filters,index_names=index_names)
+        df=self.query_datalake(table_name,filters=filters,index_names=index_names)
         return df
 
     def get_file_path_for_table(self,table_name):
@@ -137,12 +181,9 @@ class DataLakeInterface:
     def lake_exists(self,table_name):
         file_path = self.get_file_path_for_table(table_name)
         return self.lake_exists(file_path)
-    def _query_datalake(
+    def query_datalake(
             self,
             table_name:str, index_names=list,
-            start_date: Union[datetime.datetime, None] = None,
-            symbol_list: Union[List[str], None] = None,
-            great_or_equal: bool=False, less_or_equal: bool = True, end_value: Union[datetime.datetime, None] = None,
             filters: Union[list,None] = None,
 
     ) -> pd.DataFrame:
@@ -170,21 +211,9 @@ class DataLakeInterface:
                               filters=filters,index_names=tuple(index_names),
                               )
 
-        # Todo pass this filter to parquet read
-        if symbol_list is not None:
-            data = data[data.index.get_level_values("asset_symbol").isin(symbol_list)]
-        filter_index = data.index.get_level_values("time_index") if len(data.index.names) > 1 else data.index
-        if start_date is not None:
-            if great_or_equal:
-                data = data[filter_index >= start_date]
-            else:
-                data = data[filter_index > start_date]
 
-        if end_value is not None:
-            if less_or_equal:
-                data = data[filter_index <= end_value]
-            else:
-                data = data[filter_index < end_value]
+
+
 
         return data
     def persist_datalake(self, data: pd.DataFrame,overwrite:bool,table_name,time_index_name:str,

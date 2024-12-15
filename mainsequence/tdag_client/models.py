@@ -1,6 +1,6 @@
 from graphene import Dynamic
 
-from .utils import (TDAG_ENDPOINT, read_sql_tmpfile, direct_table_update,  is_process_running,get_network_ip,
+from .utils import (TDAG_ENDPOINT,   is_process_running,get_network_ip,
 CONSTANTS,
     DATE_FORMAT, get_authorization_headers, AuthLoaders, make_request, get_tdag_client_logger)
 import copy
@@ -19,6 +19,10 @@ import os
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from typing import Optional, List, Dict, Any
+from .data_sources_interfaces.local_data_lake import DataLakeInterface
+from .data_sources_interfaces import timescale as TimeScaleInterface
+
+
 _default_data_source = None  # Module-level cache
 
 
@@ -1431,62 +1435,25 @@ class DynamicTableHelpers:
 
         call_end_of_execution = False
         if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            from .data_lake import DataLakeInterface
             data_lake_interface=DataLakeInterface(data_lake_source=data_source,logger=logger,)
             data_lake_interface.persist_datalake(serialized_data_frame,overwrite=True,
                                                  time_index_name=time_index_name,index_names=index_names,
                                                  table_name=metadata["table_name"])
         elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
 
+            TimeScaleInterface.process_and_update_table(
+                serialized_data_frame=serialized_data_frame,
+                metadata=metadata,
+                grouped_dates=grouped_dates,
+                data_source=data_source,
+                index_names=index_names,
+                time_index_name=time_index_name,
+                overwrite=overwrite,
+                JSON_COMPRESSED_PREFIX=JSON_COMPRESSED_PREFIX,
+                DATE_FORMAT="%Y-%m-%d",
+                logger=self.logger
+            )
 
-            if "asset_symbol" in serialized_data_frame.columns:
-                serialized_data_frame['asset_symbol']=serialized_data_frame['asset_symbol'].astype(str)
-    
-            base_url = self.root_url
-            serialized_data_frame = serialized_data_frame.replace({np.nan: None})
-            for c in serialized_data_frame.columns:
-                if any([t in c for t in JSON_COMPRESSED_PREFIX]) == True:
-                    assert isinstance(serialized_data_frame[c].iloc[0], dict)
-    
-    
-    
-    
-
-            for c in serialized_data_frame:
-                if any([t in c for t in JSON_COMPRESSED_PREFIX]) == True:
-                    serialized_data_frame[c] = serialized_data_frame[c].apply(lambda x: json.dumps(x).encode())
-    
-            #if overwrite then decompress the chunks
-            recompress=False
-            if overwrite==True:
-                url = f"{base_url}/{metadata['id']}/decompress_chunks/"
-                r = self.make_request(r_type="POST", url=url,
-                payload={"json":{"start_date":serialized_data_frame[time_index_name].min().strftime(DATE_FORMAT),
-                                 "end_date":serialized_data_frame[time_index_name].max().strftime(DATE_FORMAT),
-                                                                               }},timeout=60*5)
-                if r.status_code not in [200,204]:
-                    logger.error(r.text)
-                    raise Exception("Error trying to decompress table")
-                else:
-                    if r.status_code == 200:
-                        recompress==True
-    
-    
-    
-            table_is_empty = metadata["sourcetableconfiguration"]["last_time_index_value"] is None
-    
-    
-    
-    
-            direct_table_update(serialized_data_frame=serialized_data_frame,grouped_dates=grouped_dates,
-                                time_series_orm_db_connection=data_source.get_connection_uri(),
-                                table_name=metadata["hash_id"],
-                                overwrite=overwrite,index_names=index_names,
-                                time_index_name=time_index_name,table_is_empty=table_is_empty,
-                                table_index_names=metadata["table_index_names"],
-                                )
-            if recompress == True:
-                pass
 
         r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(max_per_asset_symbol=max_per_asset_symbol,
                                                                  last_time_index_value=last_time_index_value,
@@ -1582,93 +1549,15 @@ class DynamicTableHelpers:
 
         return local_metadata
 
-    def _direct_data_from_db(self, metadata: dict, connection_uri: str,
-                             start_date: Union[datetime.datetime, None] = None,
-                             great_or_equal: bool = True, less_or_equal: bool = True,
-                             end_date: Union[datetime.datetime, None] = None,
-                             columns: Union[list, None] = None):
-        """
-        Connects directly to the DB without passing through the ORM to speed up calculations.
 
-        Parameters
-        ----------
-        metadata : dict
-            Metadata containing table and column details.
-        connection_config : dict
-            Connection configuration for the database.
-        start_date : datetime.datetime, optional
-            The start date for filtering. If None, no lower bound is applied.
-        great_or_equal : bool, optional
-            Whether the start_date filter is inclusive (>=). Defaults to True.
-        less_or_equal : bool, optional
-            Whether the end_date filter is inclusive (<=). Defaults to True.
-        end_date : datetime.datetime, optional
-            The end date for filtering. If None, no upper bound is applied.
-        columns : list, optional
-            Specific columns to select. If None, all columns are selected.
-
-        Returns
-        -------
-        pd.DataFrame
-            Data from the table as a pandas DataFrame, optionally filtered by date range.
-        """
-        import psycopg2
-        import pandas as pd
-
-
-
-
-
-        def fast_table_dump(connection_config, table_name,):
-            query = f"COPY {table_name} TO STDOUT WITH CSV HEADER"
-
-            with psycopg2.connect(connection_config['connection_details']) as connection:
-                with connection.cursor() as cursor:
-                    import io
-                    buffer = io.StringIO()
-                    cursor.copy_expert(query, buffer)
-                    buffer.seek(0)
-                    df = pd.read_csv(buffer)
-                    return df
-
-        # Build the SELECT clause
-        select_clause = ", ".join(columns) if columns else "*"
-
-        # Build the WHERE clause dynamically
-        where_clauses = []
-        time_index_name = metadata['sourcetableconfiguration']['time_index_name']
-        if start_date:
-            operator = ">=" if great_or_equal else ">"
-            where_clauses.append(f"{time_index_name} {operator} '{start_date}'")
-        if end_date:
-            operator = "<=" if less_or_equal else "<"
-            where_clauses.append(f"{time_index_name} {operator} '{end_date}'")
-
-        # Combine WHERE clauses
-        where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-
-        # Construct the query
-        query = f"SELECT {select_clause} FROM {metadata['table_name']} {where_clause}"
-        # if where_clause=="":
-        #     data=fast_table_dump(connection_config, metadata['table_name'])
-        #     data[metadata["sourcetableconfiguration"]['time_index_name']]=pd.to_datetime(data[metadata["sourcetableconfiguration"]['time_index_name']])
-        # else:
-        with psycopg2.connect(connection_uri) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(query)
-                column_names = [desc[0] for desc in cursor.description]
-                data = cursor.fetchall()
-
-        # Convert to DataFrame
-        data = pd.DataFrame(data=data, columns=column_names)
-
-        data=data.set_index(metadata['sourcetableconfiguration']["index_names"])
-
-        return data
 
     def set_types_in_table(self,df,column_types):
-        for c in column_types:
-            df[c] = df[c].astype(str)
+        for c,col_type in column_types.items():
+            if c in df.columns:
+                if col_type =="object":
+                    df[c] = df[c].astype(str)
+                else:
+                    df[c]=df[c].astype(col_type)
         return df
     def filter_by_assets_ranges(self,metadata: dict,
 
@@ -1678,35 +1567,18 @@ class DynamicTableHelpers:
         index_names=metadata["sourcetableconfiguration"]["index_names"]
         column_types=metadata["sourcetableconfiguration"]["column_dtypes_map"]
         if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            from .data_lake import DataLakeInterface
+
             data_lake_interface = DataLakeInterface(data_lake_source=data_source, logger=logger, )
             df=data_lake_interface.filter_by_assets_ranges(table_name=table_name,index_names=index_names,
                                                  asset_ranges_map=asset_ranges_map,
                                                  )
 
         elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-            query_base = f"""
-                                    SELECT * FROM {table_name}
-                                    WHERE
-                                """
-            # Initialize a list to store the query parts and another for parameters
-            query_parts = []
-
-            # Build query dynamically based on the dictionary
-            for symbol, range_dict in asset_ranges_map.items():
-
-                if range_dict['end_date'] is not None:
-                    tmp_query = f" (asset_symbol ='{symbol}'  AND time_index BETWEEN '{range_dict['start_date']}' AND '{range_dict['end_date']}') "
-
-                else:
-                    tmp_query = f" (asset_symbol ='{symbol}'  AND time_index {range_dict['start_date_operand']} '{range_dict['start_date']}') "
-                query_parts.append(tmp_query)
-
-            full_query = query_base + " OR ".join(query_parts)
-
-            df = read_sql_tmpfile(full_query, time_series_orm_uri_db_connection=data_source.get_connection_uri())
-            df=df.set_index(index_names)
-
+            TimeScaleInterface.filter_by_assets_ranges(table_name=table_name,asset_ranges_map=asset_ranges_map,index_names=index_names,
+                                    data_source=data_source
+                                    )
+        else:
+            raise NotImplementedError
         df=self.set_types_in_table(df,column_types)
         return df
         
@@ -1720,13 +1592,24 @@ class DynamicTableHelpers:
                                ):
 
         if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-            return self._direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
+            df= TimeScaleInterface.direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
             start_date = start_date, great_or_equal = great_or_equal,
             less_or_equal = less_or_equal, end_date = end_date, columns = columns)
+        elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+            data_lake_interface = DataLakeInterface(data_lake_source=data_source,logger=self.logger)
+            filters = data_lake_interface.build_time_and_symbol_filter(start_date=start_date,
+                                                                       great_or_equal=great_or_equal,
+                                                                       less_or_equal=less_or_equal,
+                                                                       end_date=end_date,
+                                                                       asset_symbols=asset_symbols)
+            df=data_lake_interface.query_datalake(filters=filters,
+                                                  index_names=metadata["sourcetableconfiguration"]["index_names"],
+                                                  table_name=metadata["table_name"],)
         else:
-            raise NotImplementedError("Only PostgreSQL is supported.")
+            raise NotImplementedError
+        df = self.set_types_in_table(df, metadata["sourcetableconfiguration"]["column_dtypes_map"])
 
-
+        return df
 
 
     def time_serie_exist_in_db(self, hash_id):

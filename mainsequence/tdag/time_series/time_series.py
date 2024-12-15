@@ -1095,9 +1095,6 @@ class DataPersistanceMethods(ABC):
         earliest_value = self.local_persist_manager.get_earliest_value()
         return earliest_value
 
-    def get_data_source_connection_details(self, override_id: Union[int, None] = None):
-        return self.local_persist_manager.get_data_source_connection_details(override_id)
-
     @property
     def local_parquet_file(self):
         try:
@@ -1112,35 +1109,7 @@ class DataPersistanceMethods(ABC):
 
 
 
-    @tracer.start_as_current_span("TS: Get Persisted Data")
-    def get_df_greater_than_in_table(self, target_value: Union[None, datetime.datetime],
-                                     great_or_equal=False,
-                                     symbol_list: Union[None, list] = None,
-                                     ):
-        """
 
-        Args:
-            target_value:
-            great_or_equal:
-            force_db_look:
-            symbol_list:
-            *args:
-            **kwargs:
-
-        Returns:
-
-        """
-
-
-
-        filtered_data = self.local_persist_manager.get_df_greater_than_in_table(
-            target_value=target_value,
-            great_or_equal=great_or_equal,
-            symbol_list=symbol_list,
-
-        )
-
-        return filtered_data
 
     def filter_by_assets_ranges(self, asset_ranges_map: dict):
         """
@@ -1217,10 +1186,11 @@ class DataPersistanceMethods(ABC):
             if len(multiindex) > 0:
                 latest_value = np.max([np.max(list(i.values())) for i in list(multiindex.values())])
 
-        last_observation = self.get_df_greater_than_in_table(latest_value, great_or_equal=True,
 
-                                                             symbol_list=asset_symbols,
-                                                             )
+        last_observation = self.get_df_between_dates(
+            start_date=latest_value, great_or_equal=True,
+            asset_symbols=asset_symbols
+        )
 
         return last_observation
 
@@ -1516,8 +1486,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def _set_logger(self, local_hash_id):
         if hasattr(self, "logger") == False:
 
-            self.logger = create_logger_in_path(logger_name=local_hash_id, application_name="tdag",
-                                                logger_file=f'{ogm.get_logging_path()}/{local_hash_id}.log',
+            self.logger = create_logger_in_path(logger_name=f"{self.data_source.id}_{local_hash_id}", application_name="tdag",
+                                                logger_file=f'{ogm.get_logging_path()}/{self.data_source.id}/{local_hash_id}.log',
                                                 local_hash_id=local_hash_id, data_source_id=self.data_source.id
                                                 )
 

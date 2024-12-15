@@ -554,30 +554,7 @@ class PersistManager:
             data_source_id=self.data_source.id,
             error_on_update=False)
 
-    # def get_df_greater_than_in_table(self, target_value: datetime.datetime, great_or_equal: bool,
-    #
-    #                                  symbol_list: Union[list, None] = None,
-    #                                  columns: Union[list, None] = None
-    #                                  ):
-    #     """
-    #
-    #     Parameters
-    #     ----------
-    #     target_value
-    #     great_or_equal
-    #
-    #     Returns
-    #     -------
-    #
-    #     """
-    #
-    #     filtered_data = self.dth.get_data_by_time_index(start_date=target_value, metadata=self.metadata,
-    #                                                     data_source=self.data_source,
-    #                                                     columns=columns,
-    #                                                     asset_symbols=symbol_list,
-    #                                                     great_or_equal=great_or_equal, )
-    #
-    #     return filtered_data
+
 
     def get_persisted_ts(self):
         """
@@ -606,24 +583,10 @@ class PersistManager:
         earliest_value = self.dth.get_earliest_value(hash_id=self.remote_table_hashed_name)
         return earliest_value
 
-class TimeScaleLocalPersistManager(PersistManager):
-    """
-    Main Controler to interacti with TimeSerie ORM
-    """
-
-
-
-
-
-
-
-
-
-
     def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
-                                      less_or_equal=True,
-                                      asset_symbols: Union[list, None] = None,
-                                      columns: Union[list, None] = None):
+                             less_or_equal=True,
+                             asset_symbols: Union[list, None] = None,
+                             columns: Union[list, None] = None):
 
         filtered_data = self.dth.get_data_by_time_index(metadata=self.metadata, start_date=start_date,
                                                         end_date=end_date, great_or_equal=great_or_equal,
@@ -633,8 +596,13 @@ class TimeScaleLocalPersistManager(PersistManager):
                                                         data_source=self.data_source
                                                         )
 
-
         return filtered_data
+
+
+class TimeScaleLocalPersistManager(PersistManager):
+    """
+    Main Controler to interacti with TimeSerie ORM
+    """
 
 
 
@@ -711,7 +679,6 @@ class DataLakePersistManager(PersistManager):
     This class handles the storage and retrieval of time series data in a local file system,
     organized by date ranges and table hashes.
     """
-    TIME_PARTITION = "TIME_PARTITION"
 
     def __init__(self, *args,**kwargs):
         """
@@ -738,62 +705,4 @@ class DataLakePersistManager(PersistManager):
         """
         self.logger.debug(f"Setting introspection for {self.local_hash_id}")
         self.introspection = introspection
-
-
-
-
-    def get_latest_value_in_table(self, ts, asset_symbols: list, *args, **kwargs) -> [datetime.datetime,
-                                                                             Dict[str, datetime.datetime]]:
-        """
-        Returns: [datetime.datetime,Dict[str, datetime]]
-        """
-        if self.introspection:
-            return None, None
-
-        file_path = self.get_file_path()
-        last_index_value, last_multiindex = None, None
-        if not os.path.exists(file_path):
-            # create the object
-            _ = self._query_datalake(
-                ts=ts,
-                symbol_list=asset_symbols,
-                great_or_equal=True,
-                start_date=None,
-                *args, **kwargs
-            )
-
-        last_index_value, last_multiindex = self._get_parquet_latest_value()
-        return last_index_value, last_multiindex
-
-    def get_df_greater_than_in_table(self, ts: object,
-                                     latest_value: pd.Timestamp,
-                                     symbol_list: List[str],
-                                     great_or_equal: bool,
-                                     *args,
-                                     **kwargs):
-        data = self._query_datalake(
-            ts=ts,
-            start_date=latest_value,
-            symbol_list=symbol_list,
-            great_or_equal=great_or_equal,
-            *args,
-            **kwargs
-        )
-        return data
-
-    def get_df_between_dates(self, ts, symbol_list: List[str],
-                             great_or_equal: bool, less_or_equal: bool,
-                             end_date: datetime.datetime, start_date: datetime.datetime,
-                             ):
-        return self._query_datalake(ts=ts, symbol_list=symbol_list, great_or_equal=great_or_equal,
-                                    less_or_equal=less_or_equal, start_date=start_date, end_date=end_date)
-
-
-
-
-
-
-
-
-
 
