@@ -582,3 +582,22 @@ def get_mean_bid_ask_spread(interval: str, book_table_name: str, symbol_list: li
             column_names = [desc[0] for desc in cursor.description]
     average_bid_offer = pd.DataFrame(data=result, columns=column_names)
     return average_bid_offer
+
+
+
+
+def set_types_in_table(df, column_types):
+    index_cols = [name for name in df.index.names if name is not None]
+    if index_cols:
+        df = df.reset_index()
+
+    for c,col_type in column_types.items():
+        if c in df.columns:
+            if col_type == "object":
+                df[c] = df[c].astype(str)
+            else:
+                df[c] = df[c].astype(col_type)
+
+    if index_cols:
+        df = df.set_index(index_cols)
+    return df

@@ -1,8 +1,8 @@
 from graphene import Dynamic
 
-from .utils import (TDAG_ENDPOINT,   is_process_running,get_network_ip,
-CONSTANTS,
-    DATE_FORMAT, get_authorization_headers, AuthLoaders, make_request, get_tdag_client_logger)
+from .utils import (TDAG_ENDPOINT, is_process_running, get_network_ip,
+                    CONSTANTS,
+                    DATE_FORMAT, get_authorization_headers, AuthLoaders, make_request, get_tdag_client_logger, set_types_in_table)
 import copy
 import datetime
 import pytz
@@ -460,7 +460,7 @@ class ContinuousAggregateMultiIndex(BaseObject):
 
 
 
-class RunConfiguration(BaseTdagPydanticModel,BaseObject):
+class RunConfiguration(BaseTdagPydanticModel, BaseObject):
 
     local_time_serie_update_details_id:Optional[int]=None
     retry_on_error: int = 0
@@ -1424,6 +1424,7 @@ class DynamicTableHelpers:
         """
         last_time_index_value = serialized_data_frame[time_index_name].max().timestamp()
         max_per_asset_symbol = None
+        grouped_dates = None
         if len(index_names) > 1:
             grouped_dates = serialized_data_frame.groupby(["asset_symbol", "execution_venue_symbol"])[
                 time_index_name].agg(
@@ -1434,12 +1435,12 @@ class DynamicTableHelpers:
             }
 
         call_end_of_execution = False
-        if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+        if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             data_lake_interface=DataLakeInterface(data_lake_source=data_source,logger=logger,)
             data_lake_interface.persist_datalake(serialized_data_frame,overwrite=True,
                                                  time_index_name=time_index_name,index_names=index_names,
                                                  table_name=metadata["table_name"])
-        elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+        elif data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
 
             TimeScaleInterface.process_and_update_table(
                 serialized_data_frame=serialized_data_frame,
@@ -1450,7 +1451,6 @@ class DynamicTableHelpers:
                 time_index_name=time_index_name,
                 overwrite=overwrite,
                 JSON_COMPRESSED_PREFIX=JSON_COMPRESSED_PREFIX,
-                DATE_FORMAT="%Y-%m-%d",
                 logger=self.logger
             )
 
@@ -1549,16 +1549,6 @@ class DynamicTableHelpers:
 
         return local_metadata
 
-
-
-    def set_types_in_table(self,df,column_types):
-        for c,col_type in column_types.items():
-            if c in df.columns:
-                if col_type =="object":
-                    df[c] = df[c].astype(str)
-                else:
-                    df[c]=df[c].astype(col_type)
-        return df
     def filter_by_assets_ranges(self,metadata: dict,
 
                                 asset_ranges_map:dict,data_source:object):
@@ -1570,16 +1560,16 @@ class DynamicTableHelpers:
 
             data_lake_interface = DataLakeInterface(data_lake_source=data_source, logger=logger, )
             df=data_lake_interface.filter_by_assets_ranges(table_name=table_name,index_names=index_names,
-                                                 asset_ranges_map=asset_ranges_map,
+                                                 asset_ranges_map=asset_ranges_map, column_types=column_types
                                                  )
 
         elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-            TimeScaleInterface.filter_by_assets_ranges(table_name=table_name,asset_ranges_map=asset_ranges_map,index_names=index_names,
-                                    data_source=data_source
+            df = TimeScaleInterface.filter_by_assets_ranges(table_name=table_name,asset_ranges_map=asset_ranges_map,index_names=index_names,
+                                    data_source=data_source, column_types=column_types
                                     )
         else:
             raise NotImplementedError
-        df=self.set_types_in_table(df,column_types)
+
         return df
         
     def get_data_by_time_index(self, metadata: dict,     data_source:object,
@@ -1591,11 +1581,11 @@ class DynamicTableHelpers:
 
                                ):
 
-        if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+        if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             df= TimeScaleInterface.direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
             start_date = start_date, great_or_equal = great_or_equal,
-            less_or_equal = less_or_equal, end_date = end_date, columns = columns)
-        elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+            less_or_equal = less_or_equal, end_date = end_date, columns = columns, asset_symbols=asset_symbols)
+        elif data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             data_lake_interface = DataLakeInterface(data_lake_source=data_source,logger=self.logger)
             filters = data_lake_interface.build_time_and_symbol_filter(start_date=start_date,
                                                                        great_or_equal=great_or_equal,
@@ -1607,7 +1597,7 @@ class DynamicTableHelpers:
                                                   table_name=metadata["table_name"],)
         else:
             raise NotImplementedError
-        df = self.set_types_in_table(df, metadata["sourcetableconfiguration"]["column_dtypes_map"])
+        df = set_types_in_table(df, metadata["sourcetableconfiguration"]["column_dtypes_map"])
 
         return df
 

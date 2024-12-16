@@ -12,6 +12,8 @@ import datetime
 import pyarrow.dataset as ds
 import pytz
 
+from mainsequence.tdag_client.utils import set_types_in_table
+
 TIME_PARTITION = "TIME_PARTITION"
 
 
@@ -139,7 +141,9 @@ class DataLakeInterface:
 
     def filter_by_assets_ranges(self,table_name:str,
                                 index_names:list,
-                                asset_ranges_map:dict):
+                                asset_ranges_map:dict,
+                                column_types:dict
+    ):
         """
 
         :param table_name:
@@ -165,7 +169,8 @@ class DataLakeInterface:
             for group in filters
         )
 
-        df=self.query_datalake(table_name,filters=filters,index_names=index_names)
+        df = self.query_datalake(table_name,filters=filters,index_names=index_names)
+        df = set_types_in_table(df, column_types)
         return df
 
     def get_file_path_for_table(self,table_name):

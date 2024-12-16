@@ -180,7 +180,7 @@ def build_features_from_upsampled_df(upsampled_ts:Union[TimeSerie,pd.DataFrame],
             upsampled_df=upsampled_ts
             upsampled_df=upsampled_df[upsampled_df.index>=start_required_date]
         else:
-            upsampled_df =upsampled_ts.get_df_greater_than_in_table(target_value=start_required_date,great_or_equal=True)
+            upsampled_df =upsampled_ts.get_df_between_dates(start_date=start_required_date, great_or_equal=True)
         if (upsampled_df.shape[0] / string_frequency_to_minutes(upsample_frequency_id)) <=1.0:
 
             raise Exception (f"Error in data been pulled  start required date{start_required_date} and latest value {latest_value}")
@@ -351,7 +351,7 @@ class CommonalityFeature(TimeSerie):
         if latest_value is not None:
             start_date = start_date - min_time_delta * self.rolling_window*3
 
-        data_df = self.feature_source_ts.get_df_greater_than_in_table(target_value=start_date ,great_or_equal=True ,
+        data_df = self.feature_source_ts.get_df_between_dates(start_date=start_date, great_or_equal=True,
                                                              asset_symbols=self.asset_symbols_filter,
                                                              force_db_look=False)
 
@@ -580,7 +580,7 @@ class CompCrossAssetFeat(TimeSerie):
             min_time_delta = min_time_delta + datetime.timedelta(
                 minutes=string_frequency_to_minutes(self.bars_ts_y.upsample_frequency_id))
             start_required_date = latest_value - min_time_delta
-            last_observation=self.get_df_greater_than_in_table(target_value=latest_value,great_or_equal=True)
+            last_observation=self.get_df_between_dates(start_date=latest_value, great_or_equal=True)
         else:
             latest_value = INIT_LATEST
             start_required_date=latest_value
@@ -772,8 +772,8 @@ class CompAssetFeat(TimeSerie):
             if required_columns is None:
                 self.logger.warning(f"************No required columns for {self.human_readable}*************")
 
-            upsampled_df=self.bars_ts.get_df_greater_than_in_table(target_value=start_date,
-                                                          symbol_list=assets_in_group["asset_symbol"].to_list(),
+            upsampled_df=self.bars_ts.get_df_between_dates(start_value=start_date,
+                                                          asset_list=assets_in_group["asset_symbol"].to_list(),
                                                           columns=required_columns)
         
             upsampled_df=upsampled_df.reset_index().pivot(index="time_index",columns="asset_symbol",
@@ -863,9 +863,7 @@ class FeatOnFeat(TimeSerie):
         if latest_value is not None:
             start_date = start_date - min_time_delta
        
-        upsampled_df = self.feature_source_ts.get_df_greater_than_in_table(target_value=start_date, great_or_equal=True,
-
-                                                        )
+        upsampled_df = self.feature_source_ts.get_df_between_dates(start_date=start_date, great_or_equal=True)
         upsampled_df = inflate_json_compresed_column(upsampled_df[f"json_compressed_{required_columns[0]}"])
         upsampled_df.columns=pd.MultiIndex.from_tuples([(required_columns[0], a) for a in upsampled_df.columns])
 
