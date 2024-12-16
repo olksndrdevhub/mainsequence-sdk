@@ -15,7 +15,8 @@ import json
 from typing import Dict, List, Union
 import datetime
 
-from ..utils import DATE_FORMAT
+from ..utils import DATE_FORMAT, make_request, set_types_in_table
+import os
 
 def read_sql_tmpfile(query, time_series_orm_uri_db_connection: str):
     with tempfile.TemporaryFile() as tmpfile:
@@ -35,7 +36,7 @@ def read_sql_tmpfile(query, time_series_orm_uri_db_connection: str):
         return df
 
 
-def filter_by_assets_ranges(table_name, asset_ranges_map, index_names, data_source):
+def filter_by_assets_ranges(table_name, asset_ranges_map, index_names, data_source, column_types):
     """
     Query time series data dynamically based on asset ranges.
 
@@ -77,17 +78,22 @@ def filter_by_assets_ranges(table_name, asset_ranges_map, index_names, data_sour
     # Execute the query and load results into a Pandas DataFrame
     df = read_sql_tmpfile(full_query, time_series_orm_uri_db_connection=data_source.get_connection_uri())
 
+    # set correct types for values
+    df = set_types_in_table(df, column_types)
+
     # Set the specified columns as the DataFrame index
     df = df.set_index(index_names)
 
     return df
 
 
-def direct_data_from_db(self, metadata: dict, connection_uri: str,
+def direct_data_from_db(metadata: dict, connection_uri: str,
                         start_date: Union[datetime.datetime, None] = None,
                         great_or_equal: bool = True, less_or_equal: bool = True,
                         end_date: Union[datetime.datetime, None] = None,
-                        columns: Union[list, None] = None):
+                        columns: Union[list, None] = None,
+                        asset_symbols: Union[list, None] = None
+                        ):
     """
     Connects directly to the DB without passing through the ORM to speed up calculations.
 
@@ -138,6 +144,10 @@ def direct_data_from_db(self, metadata: dict, connection_uri: str,
     if end_date:
         operator = "<=" if less_or_equal else "<"
         where_clauses.append(f"{time_index_name} {operator} '{end_date}'")
+
+    if asset_symbols:
+        helper_symbol = "','"
+        where_clauses.append(f"asset_symbol IN ('{helper_symbol.join(asset_symbols)}')")
 
     # Combine WHERE clauses
     where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
@@ -386,7 +396,8 @@ def process_and_update_table(
     if "asset_symbol" in serialized_data_frame.columns:
         serialized_data_frame['asset_symbol'] = serialized_data_frame['asset_symbol'].astype(str)
 
-    base_url = metadata.get("root_url")
+    TDAG_ENDPOINT = f"{os.environ.get('TDAG_ENDPOINT')}"
+    base_url = TDAG_ENDPOINT + "/orm/api/dynamic_table" #metadata.get("root_url")
     serialized_data_frame = serialized_data_frame.replace({np.nan: None})
 
     # Validate JSON-compressed columns
@@ -403,7 +414,11 @@ def process_and_update_table(
     recompress = False
     if overwrite:
         url = f"{base_url}/{metadata['id']}/decompress_chunks/"
-        r = metadata["make_request"](
+        from ..models import BaseObject
+        s = BaseObject.build_session()
+
+        r = make_request(
+            s=s, loaders=BaseObject.LOADERS,
             r_type="POST",
             url=url,
             payload={
@@ -412,7 +427,7 @@ def process_and_update_table(
                     "end_date": serialized_data_frame[time_index_name].max().strftime(DATE_FORMAT),
                 }
             },
-            timeout=60 * 5,
+            time_out=60 * 5,
         )
 
         if r.status_code not in [200, 204]:

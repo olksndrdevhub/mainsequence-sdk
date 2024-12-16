@@ -1024,7 +1024,7 @@ class DataPersistanceMethods(ABC):
             self.set_relation_tree()
         dependants_df = self.get_all_local_dependencies()
 
-        all_metadatas = self.get_metadatas_and_set_updates(local_hash_id__in=dependants_df["local_hash_id"].to_list(),
+        all_metadatas = self.get_metadatas_and_set_updates(local_hash_id__in=dependants_df[["local_hash_id", "data_source_id"]].to_dict("records"),
                                                            multi_index_asset_symbols_filter=self.multi_index_asset_symbols_filter,
                                                            update_priority_dict=None,
                                                            update_details_kwargs=kwargs)
@@ -1108,9 +1108,6 @@ class DataPersistanceMethods(ABC):
 
         ip = self.local_persist_manager.time_serie_exist()
         return ip
-
-
-
 
 
     def filter_by_assets_ranges(self, asset_ranges_map: dict):
@@ -2278,9 +2275,9 @@ class WrapperTimeSerie(TimeSerie):
         all_dfs_thread = {}
 
         def add_ts(ts, key, thread, columns):
-            tmp_df = ts.get_df_greater_than_in_table(target_value=target_value,
+            tmp_df = ts.get_df_between_dates(start_date=target_value,
                                                      great_or_equal=great_or_equal,
-                                                     symbol_list=columns,
+                                                     columns=columns,
                                                      *args, **kwargs
                                                      )
             tmp_df["key"] = key
@@ -2326,7 +2323,7 @@ class WrapperTimeSerie(TimeSerie):
 
         def get_df(all_dfs, key, ts, target_value, great_or_equal):
             try:
-                tmp_df = ts.get_df_greater_than_in_table(target_value=target_value, great_or_equal=great_or_equal)
+                tmp_df = ts.get_df_between_dates(start_date=target_value, great_or_equal=great_or_equal)
                 all_dfs[key] = tmp_df
             except Exception as e:
                 all_dfs[key] = "Error"

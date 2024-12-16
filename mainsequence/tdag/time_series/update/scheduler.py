@@ -386,7 +386,7 @@ class LocalDataLakeScheduler:
         # for all nodes in ts, check if new data in remote tables is needed and update it before
         start_time = time.time()
         logger.debug("Start data run")
-        df = head_ts.get_df_greater_than_in_table(None)
+        df = head_ts.get_df_between_dates(start_date=None)
         minutes, seconds = divmod(elapsed_time, 60)
         self.logger.info(f"Run finished full data run in {int(minutes)} minutes and {seconds:.2f} seconds.")
         return df
@@ -855,7 +855,7 @@ class SchedulerUpdater:
                     actors_map=actors_map)
                 if break_after_one_update == True:
                     break
-                ts_updating = [c for c in target_ts if c not in wait_list.keys()]
+                ts_updating = [c.hash_id for c in target_ts if c.uid not in wait_list.keys()]
 
                 self.logger.info(f"""{bcolors.OKBLUE}Waiting for tasks to finish in scheduler {self.node_scheduler.uid}"
                                      timeseries updating {ts_updating}
