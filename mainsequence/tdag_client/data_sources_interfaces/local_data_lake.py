@@ -56,49 +56,7 @@ def read_parquet_from_lake(file_path: str,use_s3_if_available:bool,filters:Union
 
 class DataLakeInterface:
 
-    @staticmethod
-    def build_time_and_symbol_filter(
-                              start_date: Union[datetime.datetime, None] = None,
-                              great_or_equal: bool = True,
-                              less_or_equal: bool = True,
-                              end_date: Union[datetime.datetime, None] = None,
-                              asset_symbols: Union[list, None] = None):
-        """
-        Build hashable parquet filters based on the parameters.
 
-        Args:
-            metadata (dict): Metadata dictionary, not used for filtering here but included for extensibility.
-            start_date (datetime.datetime, optional): Start date for filtering.
-            great_or_equal (bool): Whether the start date condition is `>=` or `>`.
-            less_or_equal (bool): Whether the end date condition is `<=` or `<`.
-            end_date (datetime.datetime, optional): End date for filtering.
-            asset_symbols (list, optional): List of asset symbols to filter on.
-
-        Returns:
-            tuple: Hashable parquet filters for use with pandas or pyarrow.
-        """
-        # Define the filters
-        filters = []
-
-        # Add asset_symbols filter (OR condition across symbols)
-        if asset_symbols:
-            asset_symbol_filter = ('asset_symbol', 'in', tuple(asset_symbols))
-            filters.append(asset_symbol_filter)
-
-        # Add time_index filter for start_date
-        if start_date:
-            start_date_op = '>=' if great_or_equal else '>'
-            start_date_filter = ('time_index', start_date_op, start_date)
-            filters.append(start_date_filter)
-
-        # Add time_index filter for end_date
-        if end_date:
-            end_date_op = '<=' if less_or_equal else '<'
-            end_date_filter = ('time_index', end_date_op, end_date)
-            filters.append(end_date_filter)
-
-        # Return filters as a hashable tuple of tuples
-        return tuple(filters)
 
     def __init__(self,data_lake_source:"PodLocalLake",logger):
         from mainsequence.tdag.config import TDAG_PATH
@@ -135,7 +93,49 @@ class DataLakeInterface:
                 self.minio_client.make_bucket(self.bucket_name)
         self._create_base_path()
 
+    @staticmethod
+    def build_time_and_symbol_filter(
+            start_date: Union[datetime.datetime, None] = None,
+            great_or_equal: bool = True,
+            less_or_equal: bool = True,
+            end_date: Union[datetime.datetime, None] = None,
+            asset_symbols: Union[list, None] = None):
+        """
+        Build hashable parquet filters based on the parameters.
 
+        Args:
+            metadata (dict): Metadata dictionary, not used for filtering here but included for extensibility.
+            start_date (datetime.datetime, optional): Start date for filtering.
+            great_or_equal (bool): Whether the start date condition is `>=` or `>`.
+            less_or_equal (bool): Whether the end date condition is `<=` or `<`.
+            end_date (datetime.datetime, optional): End date for filtering.
+            asset_symbols (list, optional): List of asset symbols to filter on.
+
+        Returns:
+            tuple: Hashable parquet filters for use with pandas or pyarrow.
+        """
+        # Define the filters
+        filters = []
+
+        # Add asset_symbols filter (OR condition across symbols)
+        if asset_symbols:
+            asset_symbol_filter = ('asset_symbol', 'in', tuple(asset_symbols))
+            filters.append(asset_symbol_filter)
+
+        # Add time_index filter for start_date
+        if start_date:
+            start_date_op = '>=' if great_or_equal else '>'
+            start_date_filter = ('time_index', start_date_op, start_date)
+            filters.append(start_date_filter)
+
+        # Add time_index filter for end_date
+        if end_date:
+            end_date_op = '<=' if less_or_equal else '<'
+            end_date_filter = ('time_index', end_date_op, end_date)
+            filters.append(end_date_filter)
+
+        # Return filters as a hashable tuple of tuples
+        return tuple(filters)
 
     def filter_by_assets_ranges(self,table_name:str,
                                 index_names:list,
@@ -246,8 +246,10 @@ class DataLakeInterface:
 
 
 
-    def lake_exists(self, file_path: str):
-        if self.s3_data_lake:
+    def table_exist(self, table_name: str):
+        file_path = self.get_file_path_for_table(table_name=table_name)
+        s3_data_lake=False
+        if s3_data_lake:
             bucket_name, object_key = file_path.split("/", 1)
 
             objects = self.minio_client.list_objects(bucket_name, prefix=object_key, recursive=True)
@@ -259,10 +261,13 @@ class DataLakeInterface:
         else:
             return os.path.exists(file_path)
 
-    def _get_parquet_latest_value(self):
-        file_path = self.get_file_path()
+    def get_parquet_latest_value(self,table_name):
+        self.logger.warning("IMPROVE SPEED READ FROM STATS")
+        file_path = self.get_file_path_for_table(table_name)
+        if os.path.isfile(file_path)==False:
+            return None, None
         data_set = self.get_parquet_data_set(file_path)
-        time_index_column_name = data_set.schema.pandas_metadata["index_columns"][0]
+        time_index_column_name = data_set.schema.pandas_metadata["columns"][0]["name"]
 
         partitions = data_set.partitioning
         time_partition = partitions.dictionaries[0]
@@ -273,23 +278,26 @@ class DataLakeInterface:
             key=lambda x: (int(x.split('-W')[0]), int(x.split('-W')[1]))
         )
 
-        filtered_dataset = self.read_parquet_from_lake(file_path=file_path,
-                                                                           filters=[(TIME_PARTITION, "=",
+        filtered_dataset=read_parquet_from_lake(file_path=file_path,
+                                                use_s3_if_available=False,
+                                                filters=[(TIME_PARTITION, "=",
                                                                                      time_partition[-1])])
-        multiindex_df = filtered_dataset.reset_index()
+        last_multiindex={}
 
-        # Get the latest index value for each asset and execution venue
-        last_multiindex = multiindex_df.groupby(["asset_symbol", "execution_venue_symbol"], observed=True)[
-            time_index_column_name].max()
-        last_multiindex = {
-            asset: {ev: timestamp}
-            for (asset, ev), timestamp in last_multiindex.items()
-        }
+        if "asset_symbol" in filtered_dataset.columns:
+            # Get the latest index value for each asset and execution venue
+            last_multiindex = filtered_dataset.groupby(["asset_symbol", "execution_venue_symbol"], observed=True)[
+                time_index_column_name].max()
+            last_multiindex = {
+                asset: {ev: timestamp}
+                for (asset, ev), timestamp in last_multiindex.items()
+            }
 
-        # Get the latest time index value across all assets and execution venues
-        last_index_value = multiindex_df.set_index(
-            ["time_index", "asset_symbol", "execution_venue_symbol"]).index.get_level_values('time_index').max()
-
+            # Get the latest time index value across all assets and execution venues
+            last_index_value = filtered_dataset.set_index(
+                ["time_index", "asset_symbol", "execution_venue_symbol"]).index.get_level_values('time_index').max()
+        else:
+            last_index_value=filtered_dataset[time_index_column_name].max()
         if len(last_multiindex) == 0:
             last_multiindex = None
 

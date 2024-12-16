@@ -689,6 +689,8 @@ class GraphNodeMethods(ABC):
             self.local_persist_manager.set_ogm_dependencies_linked()
 
 
+
+
 class TimeSerieRebuildMethods(ABC):
 
     @classmethod
@@ -1125,11 +1127,16 @@ class DataPersistanceMethods(ABC):
         df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map)
         return df
 
+
+
     def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
                              end_date: Union[datetime.datetime, None] = None,
                              asset_symbols: Union[None, list] = None,
                              data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True,
                              ):
+
+
+
 
 
 
@@ -1491,11 +1498,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                 local_hash_id=local_hash_id, data_source_id=self.data_source.id
                                                 )
 
-
-
-
-
-
     @property
     def local_persist_manager(self):
         if hasattr(self, "logger") == False:
@@ -1524,7 +1526,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
            local_metadata : Union[None, dict], optional
                Local metadata for the time series, if available.
         """
-
+        from .persist_managers import DataLakePersistManager
         try:
             human_readable = self.human_readable
         except:
@@ -1539,6 +1541,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                                         description=self.get_html_description(),
                                                                         data_source=self.data_source
                                                                         )
+        if isinstance(self._local_persist_manager, DataLakePersistManager):
+            self._local_persist_manager.verify_introspection(self)
 
         time_serie_source_code_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
         time_serie_source_code = self.get_time_serie_source_code(self.__class__)
@@ -1885,6 +1889,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         # Verify there are no errors after finishing hierarchy
         if len(ts_with_errors) > 0:
             raise DependencyUpdateError(f"Update Stop from error in children \n {ts_with_errors}")
+
+
 
     @tracer.start_as_current_span("TimeSerie.update_local")
     def update_local(self, update_tree, update_tracker: object, debug_mode: bool,

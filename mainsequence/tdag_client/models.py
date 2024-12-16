@@ -24,7 +24,7 @@ from .data_sources_interfaces import timescale as TimeScaleInterface
 
 
 _default_data_source = None  # Module-level cache
-
+TDAG_DETACHED=lambda : os.environ.get('TDAG_DETACHED',"false").lower()=="true"
 
 JSON_COMPRESSED_PREFIX = ["json_compressed", "jcomp_"]
 
@@ -113,6 +113,8 @@ class BaseObject:
 
     @classmethod
     def create(cls, *args, **kwargs):
+        if TDAG_DETACHED() == True:
+            return None
         url = cls.ROOT_URL + "/"
         payload = {"json": serialize_to_json(kwargs)}
         s=cls.build_session()
@@ -123,6 +125,8 @@ class BaseObject:
         return instance
 
     def delete(self):
+        if TDAG_DETACHED() == True:
+            return None
         url = self.ROOT_URL + "/destroy/"
         payload = {"json":{"uid":self.uid}}
         s = self.build_session()
@@ -131,6 +135,9 @@ class BaseObject:
             raise Exception(f"Error in request {r.text}")
 
     def patch(self,*args,**kwargs):
+        if TDAG_DETACHED() == True:
+            return None
+
         url = self.ROOT_URL + "/update/"
         payload = {"json": {"uid": self.uid,"patch_data":serialize_to_json(kwargs)}}
         s = self.build_session()
@@ -167,6 +174,8 @@ class TimeSerieNode(BaseTdagPydanticModel,BaseObject):
 
     @classmethod
     def get_all_dependencies(cls, hash_id):
+        if TDAG_DETACHED() == True:
+            return None
         s = cls.build_session()
         url = cls.ROOT_URL + f"/{hash_id}/get_all_dependencies"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, )
@@ -314,9 +323,9 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
     host: Optional[str]
     api_address: Optional[str]
     api_port: Optional[int]
-    pre_loads_in_tree: List[str]  # Assuming this is a list of strings
-    in_active_tree: List[LocalTimeSerieNode]    # Assuming this is a list of strings
-    schedules_to: List[LocalTimeSerieNode]
+    pre_loads_in_tree: Optional[List[str]]=None  # Assuming this is a list of strings
+    in_active_tree: Optional[List[LocalTimeSerieNode]  ]=None  # Assuming this is a list of strings
+    schedules_to: Optional[List[LocalTimeSerieNode]]=None
 
 
     @classmethod
@@ -326,7 +335,8 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
 
     @classmethod
     def get(cls, *args,**kwargs):
-
+        if TDAG_DETACHED() == True:
+            raise Exception("TDAG is running detached")
         url = cls.ROOT_URL
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload={"params": kwargs})
@@ -343,6 +353,8 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
 
     @classmethod
     def filter(cls,payload:Union[dict,None]):
+        if TDAG_DETACHED() == True:
+            raise Exception("TDAG is running detached")
         url = cls.ROOT_URL
         payload={} if payload is None else {"params":payload}
 
@@ -356,6 +368,8 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
         return instance
     @classmethod
     def get_scheduler_for_ts(cls,hash_id:str):
+        if TDAG_DETACHED() == True:
+            raise Exception("TDAG is running detached")
         s=cls.build_session()
         url=cls.ROOT_URL + "/get_scheduler_for_ts"
         payload = dict(params={"hash_id":hash_id})
@@ -369,7 +383,14 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
     @classmethod
     def initialize_debug_for_ts(cls,local_hash_id:str,
                                 data_source_id:int,
-                                name_suffix:Union[str,None]=None):
+                                name_suffix:Union[str,None]=None,):
+
+        if TDAG_DETACHED() == True:
+            return cls(name=f"Detached scheduler for {local_hash_id}",
+                       uid="DETACHED",running_process_pid=0,host="SDf",api_address="Sdf",
+                       api_port=0,
+                       running_in_debug_mode=True,updates_to=local_hash_id,
+                       is_running=True)
         s = cls.build_session()
         url = cls.ROOT_URL + "/initialize_debug_for_ts/"
         payload = dict(json={"local_hash_id":local_hash_id,"name_suffix":name_suffix,
@@ -384,7 +405,12 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
     @classmethod
     def build_and_assign_to_ts(cls, scheduler_name: str, local_hash_id_list: list, delink_all_ts=False,
                                remove_from_other_schedulers=True):
-        s = cls.build_session()
+
+        if TDAG_DETACHED() == True:
+            raise
+            return None
+        s = cls.build_session( )
+
         url = cls.ROOT_URL + "/build_and_assign_to_ts/"
         payload = dict(json={
             "scheduler_name": scheduler_name,
@@ -399,6 +425,9 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
         return scheduler
 
     def in_active_tree_connect(self,hash_id_list:list):
+        if TDAG_DETACHED() == True:
+            self.in_active_tree=hash_id_list
+            return None
         s = self.build_session()
         url = self.ROOT_URL + f"/{self.uid}/in_active_tree_connect/"
         payload = dict(json={"hash_id_list": hash_id_list})
@@ -407,6 +436,9 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
             raise Exception(f"Error in request {r.text}")
 
     def assign_to_scheduler(self,hash_id_list:list):
+        if TDAG_DETACHED() == True:
+            self.schedules_to=hash_id_list
+            return self
         s = self.build_session()
         url = self.ROOT_URL + f"/{self.uid}/assign_to_scheduler/"
         payload = dict(json={"hash_id_list": hash_id_list})
@@ -1305,6 +1337,8 @@ class DynamicTableHelpers:
             return metadata, r
 
     def get(self,class_name=None, *args, **kwargs):
+        if TDAG_DETACHED() == True:
+            return {}
         instance, r = self.get_rest(*args, **kwargs)
         # try:
         #     instance, r = self.dts_ws.get(*args, **kwargs)

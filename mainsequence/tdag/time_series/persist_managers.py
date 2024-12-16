@@ -13,6 +13,7 @@ from mainsequence.tdag_client import (DynamicTableHelpers, TimeSerieNode, TimeSe
                                       DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS)
 
 from mainsequence.tdag.logconf import get_tdag_logger
+from mainsequence.tdag_client.models import TDAG_DETACHED
 
 logger = get_tdag_logger()
 
@@ -501,6 +502,8 @@ class PersistManager:
     #table dependes
 
     def get_latest_value(self, asset_symbols:list) -> [datetime.datetime,Dict[str, datetime.datetime]]:
+        if TDAG_DETACHED():#todo this can be optimized by running stats per data lake
+            return self._get_lastest_value()
 
         metadata= self.dth.get(hash_id=self.remote_table_hashed_name,data_source__id=self.data_source.id)
 
@@ -673,6 +676,7 @@ class TimeScaleLocalPersistManager(PersistManager):
 
 
 class DataLakePersistManager(PersistManager):
+
     """
     A class to manage data persistence in a local data lake.
 
@@ -690,6 +694,19 @@ class DataLakePersistManager(PersistManager):
         self.already_introspected = self.set_introspection(introspection=False)
 
 
+    def verify_introspection(self,ts):
+        from mainsequence.tdag_client.models import TDAG_DETACHED
+        if self.already_introspected== True:
+            return None
+        if TDAG_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+
+            # verify if its calculated
+            if not self.table_exist():
+                self.logger.debug(f"Building local data lake for the first time for  {self.local_hash_id}")
+                df=ts.update_series_from_source(latest_value=None)
+                self.set_introspection(True)
+                a=5
+
 
     def set_introspection(self, introspection: bool):
         """
@@ -703,6 +720,21 @@ class DataLakePersistManager(PersistManager):
         Returns:
 
         """
-        self.logger.debug(f"Setting introspection for {self.local_hash_id}")
+
         self.introspection = introspection
 
+    def _get_lastest_value(self):
+        from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
+        assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+        last_index_value, last_multiindex = DataLakeInterface(data_lake_source=self.data_source,
+                                                              logger=self.logger).get_parquet_latest_value(
+            table_name=self.remote_table_hashed_name)
+
+        return last_index_value, last_multiindex
+
+    def table_exist(self):
+        from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
+        assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+        return DataLakeInterface(data_lake_source=self.data_source,
+                                                              logger=self.logger).table_exist(
+            table_name=self.remote_table_hashed_name)

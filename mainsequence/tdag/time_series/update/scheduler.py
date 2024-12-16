@@ -267,7 +267,7 @@ class TimeSerieHeadUpdateActorDist(TimeSerieHeadUpdateActor):
 
 
 @contextmanager
-def set_data_lake(pod_source, override_all: bool = False):
+def set_data_lake(pod_source,tdag_detached=False, override_all: bool = False):
     """
 
     :param override_all:
@@ -279,6 +279,8 @@ def set_data_lake(pod_source, override_all: bool = False):
     # Override the environment variables
     os.environ["POD_DEFAULT_DATA_SOURCE"] = pod_source.model_dump_json()
     os.environ["POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE"] = str(override_all)
+    os.environ["TDAG_DETACHED"]=str(tdag_detached)
+
 
     try:
         yield pod_source
@@ -399,7 +401,7 @@ class SchedulerUpdater:
                           debug: bool, update_tree: bool, wait_for_update=True,
                           raise_exception_on_error: bool = True,
                           break_after_one_update=True, force_update=False, run_head_in_main_process=False,
-                          update_extra_kwargs=None, update_only_tree=False, name_suffix=None
+                          update_extra_kwargs=None, update_only_tree=False, name_suffix=None,
 
                           ):
 
@@ -407,7 +409,8 @@ class SchedulerUpdater:
 
         new_scheduler = Scheduler.initialize_debug_for_ts(local_hash_id=time_serie_hash_id,
                                                           data_source_id=data_source_id,
-                                                          name_suffix=name_suffix
+                                                          name_suffix=name_suffix,
+
                                                           )
 
         logger.info(f"Scheduler ID {new_scheduler.name}")
@@ -703,9 +706,13 @@ class SchedulerUpdater:
         return next_update
 
     def refresh_node_scheduler(self):
+        from mainsequence.tdag_client.models import TDAG_DETACHED
+        if TDAG_DETACHED()==True:
+            return None
         error_in_request = True
         while error_in_request == True:
             try:
+
                 scheduler = Scheduler.get(name=self.node_scheduler.name)
                 self.node_scheduler = scheduler
                 error_in_request = False
@@ -779,7 +786,8 @@ class SchedulerUpdater:
               wait_for_update=True,
               raise_exception_on_error=False,
               update_extra_kwargs: Union[None, dict] = None, run_head_in_main_process=False, force_update=False,
-              sequential_update=False, update_only_tree=False, api_port: Union[int, None] = None
+              sequential_update=False, update_only_tree=False, api_port: Union[int, None] = None,
+
               ):
         """
 
