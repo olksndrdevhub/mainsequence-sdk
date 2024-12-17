@@ -14,6 +14,9 @@ import json
 import time
 
 from enum import IntEnum, Enum
+
+
+
 from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, CONSTANTS,VAM_API_ENDPOINT
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field, validator,root_validator
@@ -193,6 +196,7 @@ class BaseObjectOrm:
                 assert isinstance(value,list)
                 parameters[key] = ",".join(value)
         return parameters
+
 
     @classmethod
     def filter(cls,timeout=None,*args,**kwargs):
@@ -489,21 +493,28 @@ class Asset(AssetMixin,BaseObjectOrm):
 
 
 class IndexAsset(Asset):
-    valuation_asset:Asset
+    valuation_asset:AssetMixin
     def get_settlement_asset_symbol(self):
         return self.valuation_asset.symbol
 
 class TargetPortfolioIndexAsset(IndexAsset):
+    asset_type: str = CONSTANTS.ASSET_TYPE_INDEX
+    can_trade:bool=False
     live_portfolio : "TargetPortfolio"
     backtest_portfolio : "TargetPortfolio"
     live_portfolio_data_source_id: int
     backtest_portfolio_data_source_id: int
+    execution_venue: "ExecutionVenue"= Field(
+        default_factory=lambda: ExecutionVenue(**CONSTANTS.VENUE_MAIN_SEQUENCE_PORTFOLIOS)
+    )
+
+
 
 class FutureUSDMMixin(AssetMixin, BaseVamPydanticModel):
     maturity_code: str = Field(..., max_length=50)
     last_trade_time: Optional[datetime.datetime] = None
-    base_asset: Asset
-    quote_asset: Asset
+    base_asset: AssetMixin
+    quote_asset: AssetMixin
 
     def get_spot_reference_asset_symbol(self):
         FUTURE_TO_SPOT_MAP = {
@@ -861,7 +872,7 @@ class OrdersExecutionConfiguration(BaseModel):
     broker_configuration: dict
 
 class TargetPortfolioExecutionConfiguration(BaseObjectOrm,BaseVamPydanticModel):
-    related_portfolio: int
+    related_portfolio: Optional[int]=None
     portfolio_build_configuration: Optional[Dict[str, Any]] = None
     orders_execution_configuration: Optional[OrdersExecutionConfiguration] = None
 
@@ -875,7 +886,7 @@ class TargetPortfolioExecutionConfiguration(BaseObjectOrm,BaseVamPydanticModel):
 
 
 class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
-    id: Optional[int] = None
+    id: Optional[Union[int,str]] = None
     portfolio_name: str = Field(..., max_length=255)
     portfolio_ticker: str = Field(..., max_length=150)
     latest_rebalance: Optional[datetime.datetime] = None

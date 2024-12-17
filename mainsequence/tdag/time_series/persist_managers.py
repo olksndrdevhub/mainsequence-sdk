@@ -13,7 +13,7 @@ from mainsequence.tdag_client import (DynamicTableHelpers, TimeSerieNode, TimeSe
                                       DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS)
 
 from mainsequence.tdag.logconf import get_tdag_logger
-from mainsequence.tdag_client.models import BACKEND_DETACHED
+from mainsequence.tdag_client.models import BACKEND_DETACHED, none_if_backend_detached
 
 logger = get_tdag_logger()
 
@@ -168,6 +168,7 @@ class PersistManager:
         if "sourcetableconfiguration" in self.metadata.keys():
             return self.metadata['sourcetableconfiguration']
         return None
+    @none_if_backend_detached
     def update_source_informmation(self, git_hash_id:str, source_code:str):
         """
 
@@ -503,7 +504,7 @@ class PersistManager:
 
     def get_latest_value(self, asset_symbols:list) -> [datetime.datetime,Dict[str, datetime.datetime]]:
         if BACKEND_DETACHED():#todo this can be optimized by running stats per data lake
-            return self._get_lastest_value()
+            return self._get_local_lake_lastest_value()
 
         metadata= self.dth.get(hash_id=self.remote_table_hashed_name,data_source__id=self.data_source.id)
 
@@ -695,15 +696,25 @@ class DataLakePersistManager(PersistManager):
 
 
     def verify_introspection(self,ts):
+        """
+        This method handles all the configuration and setup necessary when running a detached local data lake
+        :param ts:
+        :return:
+        """
         from mainsequence.tdag_client.models import BACKEND_DETACHED
         if self.already_introspected== True:
             return None
         if BACKEND_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-
+            self.metadata= {"sourcetableconfiguration":None,"hash_id":self.remote_table_hashed_name,
+                            "table_name":self.remote_table_hashed_name
+                            }
+            self.local_metadata= {"local_hash_id":self.local_hash_id}
             # verify if its calculated
             if not self.table_exist():
                 self.logger.debug(f"Building local data lake for the first time for  {self.local_hash_id}")
-                df=ts.update_series_from_source(latest_value=None)
+
+
+                df = ts.update_series_from_source(latest_value=None)
                 self.set_introspection(True)
                 if df is None:
                     return None
@@ -733,7 +744,7 @@ class DataLakePersistManager(PersistManager):
 
         self.introspection = introspection
 
-    def _get_lastest_value(self):
+    def _get_local_lake_lastest_value(self):
         from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
         last_index_value, last_multiindex = DataLakeInterface(data_lake_source=self.data_source,

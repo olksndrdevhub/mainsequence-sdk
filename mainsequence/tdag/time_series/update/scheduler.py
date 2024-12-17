@@ -279,7 +279,7 @@ def set_data_lake(pod_source,tdag_detached=False, override_all: bool = False):
     # Override the environment variables
     os.environ["POD_DEFAULT_DATA_SOURCE"] = pod_source.model_dump_json()
     os.environ["POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE"] = str(override_all)
-    os.environ["TDAG_DETACHED"]=str(tdag_detached)
+    os.environ["BACKEND_DETACHED"]=str(tdag_detached)
 
 
     try:
@@ -706,8 +706,8 @@ class SchedulerUpdater:
         return next_update
 
     def refresh_node_scheduler(self):
-        from mainsequence.tdag_client.models import TDAG_DETACHED
-        if TDAG_DETACHED()==True:
+        from mainsequence.tdag_client.models import BACKEND_DETACHED
+        if BACKEND_DETACHED()==True:
             return None
         error_in_request = True
         while error_in_request == True:

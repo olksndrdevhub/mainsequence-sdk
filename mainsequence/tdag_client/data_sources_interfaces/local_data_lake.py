@@ -29,7 +29,7 @@ def memory_usage_exceeds_limit(max_usage_percentage):
     return used_memory_percentage > max_usage_percentage
 
 @lru_cache(maxsize=50)
-def read_full_data(file_path,index_names,filters=None, use_s3_if_available=False, max_memory_usage=80):
+def read_full_data(file_path,filters=None, use_s3_if_available=False, max_memory_usage=80):
     " Cached access to static datalake file "
     # logger.debug("in data lake read")
     if memory_usage_exceeds_limit(max_memory_usage):
@@ -38,7 +38,7 @@ def read_full_data(file_path,index_names,filters=None, use_s3_if_available=False
         # logger.info("Cache cleared due to high memory usage.")
 
     data = read_parquet_from_lake(file_path=file_path,filters=filters,use_s3_if_available=use_s3_if_available)
-    data = data.drop(columns=[TIME_PARTITION]).set_index([c for c in index_names]).sort_index(level=index_names[0])
+    data = data.drop(columns=[TIME_PARTITION])
     return data
 
 def read_parquet_from_lake(file_path: str,use_s3_if_available:bool,filters:Union[list,None]=None,
@@ -140,9 +140,9 @@ class DataLakeInterface:
         return tuple(filters)
 
     def filter_by_assets_ranges(self,table_name:str,
-                                index_names:list,
+
                                 asset_ranges_map:dict,
-                                column_types:dict
+
     ):
         """
 
@@ -169,8 +169,8 @@ class DataLakeInterface:
             for group in filters
         )
 
-        df = self.query_datalake(table_name,filters=filters,index_names=index_names)
-        df = set_types_in_table(df, column_types)
+        df = self.query_datalake(table_name,filters=filters)
+
         return df
 
     def get_file_path_for_table(self,table_name):
@@ -213,7 +213,7 @@ class DataLakeInterface:
 
         self.logger.debug(f"Read {table_name} ")
         data = read_full_data(file_path=self.get_file_path_for_table(table_name=table_name),
-                              filters=filters,index_names=tuple(index_names),
+                              filters=filters,
                               )
 
 
@@ -243,7 +243,7 @@ class DataLakeInterface:
             'week'].values.astype(str)
         partition_cols = [TIME_PARTITION]
         data = data.sort_values(by=time_index_name)
-
+        data.set_index(index_names, inplace=True)
         self.write_to_parquet(data=data, partition_cols=partition_cols, file_path=file_path)
 
 
@@ -267,12 +267,13 @@ class DataLakeInterface:
             return os.path.exists(file_path)
 
     def get_parquet_latest_value(self,table_name):
-        self.logger.warning("IMPROVE SPEED READ FROM STATS")
+
         file_path = self.get_file_path_for_table(table_name)
-        if os.path.isfile(file_path)==False:
-            return None, None
+        if self.table_exist(table_name)==False:
+            return None,None
+        self.logger.warning("IMPROVE SPEED READ FROM STATS")
         data_set = self.get_parquet_data_set(file_path)
-        time_index_column_name = data_set.schema.pandas_metadata["columns"][0]["name"]
+        time_index_column_name = data_set.schema.pandas_metadata['index_columns'][0]
 
         partitions = data_set.partitioning
         time_partition = partitions.dictionaries[0]
@@ -289,20 +290,24 @@ class DataLakeInterface:
                                                                                      time_partition[-1])])
         last_multiindex={}
 
-        if "asset_symbol" in filtered_dataset.columns:
+        if "asset_symbol" in filtered_dataset.index.names:
             # Get the latest index value for each asset and execution venue
-            last_multiindex = filtered_dataset.groupby(["asset_symbol", "execution_venue_symbol"], observed=True)[
-                time_index_column_name].max()
+            last_multiindex = (
+                filtered_dataset.index
+                .to_frame(index=False)  # Convert index to DataFrame without resetting
+                .groupby(["asset_symbol", "execution_venue_symbol"], observed=True)
+                [time_index_column_name]
+                .max()
+            )
             last_multiindex = {
                 asset: {ev: timestamp}
                 for (asset, ev), timestamp in last_multiindex.items()
             }
 
             # Get the latest time index value across all assets and execution venues
-            last_index_value = filtered_dataset.set_index(
-                ["time_index", "asset_symbol", "execution_venue_symbol"]).index.get_level_values('time_index').max()
+            last_index_value = filtered_dataset.index.get_level_values('time_index').max()
         else:
-            last_index_value=filtered_dataset[time_index_column_name].max()
+            last_index_value=filtered_dataset.index.max()
         if len(last_multiindex) == 0:
             last_multiindex = None
 

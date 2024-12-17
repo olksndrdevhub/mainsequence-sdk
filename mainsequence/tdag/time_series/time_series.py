@@ -694,6 +694,26 @@ class GraphNodeMethods(ABC):
 
 class TimeSerieRebuildMethods(ABC):
 
+    @none_if_backend_detached
+    def verify_backend_git_hash_with_pickle(self):
+        if self.local_persist_manager.metadata is not None:
+            load_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
+
+            persisted_pickle_hash = self.local_persist_manager.metadata["time_serie_source_code_git_hash"]
+            if load_git_hash != persisted_pickle_hash:
+                time_serie.logger.warning(
+                    f"{bcolors.WARNING}Source code does not match with pickle rebuilding{bcolors.ENDC}")
+                self.flush_pickle()
+
+                self = TimeSerie.rebuild_from_configuration(local_hash_id=time_serie.local_hash_id,
+                                                                   remote_table_hashed_name=time_serie.remote_table_hashed_name,
+                                                                   data_source=data_source
+                                                                   )
+                self.persist_to_pickle()
+            else:
+                # if no need to rebuild, just sync the metadata
+                self.local_persist_manager.synchronize_metadata(meta_data=None, local_metadata=None)
+
     @classmethod
     @tracer.start_as_current_span("TS: load_from_pickle")
     def load_from_pickle(cls, pickle_path):
@@ -705,22 +725,7 @@ class TimeSerieRebuildMethods(ABC):
         data_source = time_serie.load_data_source_from_pickle(pickle_path=pickle_path)
         time_serie.data_source = data_source
         # verify pickle
-        if time_serie.local_persist_manager.metadata is not None:
-            load_git_hash = time_serie.get_time_serie_source_code_git_hash(time_serie.__class__)
-            persisted_pickle_hash = time_serie.local_persist_manager.metadata["time_serie_source_code_git_hash"]
-            if load_git_hash != persisted_pickle_hash:
-                time_serie.logger.warning(
-                    f"{bcolors.WARNING}Source code does not match with pickle rebuilding{bcolors.ENDC}")
-                time_serie.flush_pickle()
-
-                time_serie = time_serie.rebuild_from_configuration(local_hash_id=time_serie.local_hash_id,
-                                                                   remote_table_hashed_name=time_serie.remote_table_hashed_name,
-                                                                   data_source=data_source
-                                                                   )
-                time_serie.persist_to_pickle()
-            else:
-                # if no need to rebuild, just sync the metadata
-                time_serie.local_persist_manager.synchronize_metadata(meta_data=None, local_metadata=None)
+        time_serie.verify_backend_git_hash_with_pickle()
 
         return time_serie
 
@@ -848,6 +853,13 @@ class TimeSerieRebuildMethods(ABC):
         path = f"{pp}/{self.local_hash_id}.pickle"
         return path
 
+    @none_if_backend_detached
+    def _update_git_and_code_in_backend(self):
+        self.local_persist_manager.update_source_informmation(
+            git_hash_id=self.get_time_serie_source_code_git_hash(self.__class__),
+            source_code=self.get_time_serie_source_code(self.__class__),
+        )
+
     def persist_to_pickle(self, overwrite=False):
         """
 
@@ -858,10 +870,8 @@ class TimeSerieRebuildMethods(ABC):
         path = self.pickle_path
         # after persisting pickle , build_hash and source code need to be patched
         self.logger.info(f"Persisting pickle and patching source code and git hash for {self.hash_id}")
-        self.local_persist_manager.update_source_informmation(
-            git_hash_id=self.get_time_serie_source_code_git_hash(self.__class__),
-            source_code=self.get_time_serie_source_code(self.__class__),
-        )
+        self._update_git_and_code_in_backend()
+
         pp = self.data_source.data_source_pickle_path(ogm.pickle_storage_path)
         if os.path.isfile(pp) == False or overwrite == True:
             self.data_source.persist_to_pickle(pp)
@@ -1059,10 +1069,12 @@ class DataPersistanceMethods(ABC):
     def update_details(self):
         return self.local_persist_manager.update_details
 
+    @none_if_backend_detached
     @property
     def metadata(self):
         return self.local_persist_manager.metadata
 
+    @none_if_backend_detached
     @property
     def local_metadata(self):
         return self.local_persist_manager.local_metadata

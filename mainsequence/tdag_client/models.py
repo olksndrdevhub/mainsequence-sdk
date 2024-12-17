@@ -27,18 +27,36 @@ from functools import wraps
 _default_data_source = None  # Module-level cache
 BACKEND_DETACHED=lambda : os.environ.get('BACKEND_DETACHED',"false").lower()=="true"
 
+
 def none_if_backend_detached(func):
     """
     Decorator that evaluates BACKEND_DETACHED before executing the function.
     If BACKEND_DETACHED() returns True, the function is skipped, and None is returned.
     Otherwise, the function is executed as normal.
+
+    It supports both regular functions and property methods.
     """
+    # Handle property getter methods
+    if isinstance(func, property):
+        # Wrap the getter method
+        getter = func.fget
+
+        @wraps(getter)
+        def wrapper_getter(*args, **kwargs):
+            if BACKEND_DETACHED():
+                return None
+            return getter(*args, **kwargs)
+
+        # Return a new property with the wrapped getter
+        return property(wrapper_getter, func.fset, func.fdel, func.__doc__)
+
+    # Regular function handling
     @wraps(func)
     def wrapper(*args, **kwargs):
-        # Evaluate BACKEND_DETACHED before executing the function
         if BACKEND_DETACHED():
             return None
         return func(*args, **kwargs)
+
     return wrapper
 
 
@@ -952,7 +970,7 @@ class PodLocalLake(DataSource):
     use_s3_if_available: bool = Field(False, description="Whether to use S3 if available")
 
 class TimeScaleDB(DataSource):
-    user : str
+    user : str="postgres"
     password :str
     host : str
     database_name :str
@@ -1660,16 +1678,17 @@ class DynamicTableHelpers:
                                 asset_ranges_map:dict,data_source:object):
 
         table_name=metadata["table_name"]
-        index_names=metadata["sourcetableconfiguration"]["index_names"]
-        column_types=metadata["sourcetableconfiguration"]["column_dtypes_map"]
+
         if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
 
             data_lake_interface = DataLakeInterface(data_lake_source=data_source, logger=logger, )
-            df=data_lake_interface.filter_by_assets_ranges(table_name=table_name,index_names=index_names,
-                                                 asset_ranges_map=asset_ranges_map, column_types=column_types
+            df=data_lake_interface.filter_by_assets_ranges(table_name=table_name,
+                                                 asset_ranges_map=asset_ranges_map,
                                                  )
 
         elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+            index_names = metadata["sourcetableconfiguration"]["index_names"]
+            column_types = metadata["sourcetableconfiguration"]["column_dtypes_map"]
             df = TimeScaleInterface.filter_by_assets_ranges(table_name=table_name,asset_ranges_map=asset_ranges_map,index_names=index_names,
                                     data_source=data_source, column_types=column_types
                                     )
@@ -1691,6 +1710,7 @@ class DynamicTableHelpers:
             df= TimeScaleInterface.direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
             start_date = start_date, great_or_equal = great_or_equal,
             less_or_equal = less_or_equal, end_date = end_date, columns = columns, asset_symbols=asset_symbols)
+            df = set_types_in_table(df, metadata["sourcetableconfiguration"]["column_dtypes_map"])
         elif data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             data_lake_interface = DataLakeInterface(data_lake_source=data_source,logger=self.logger)
             filters = data_lake_interface.build_time_and_symbol_filter(start_date=start_date,
@@ -1699,11 +1719,11 @@ class DynamicTableHelpers:
                                                                        end_date=end_date,
                                                                        asset_symbols=asset_symbols)
             df=data_lake_interface.query_datalake(filters=filters,
-                                                  index_names=metadata["sourcetableconfiguration"]["index_names"],
+
                                                   table_name=metadata["table_name"],)
         else:
             raise NotImplementedError
-        df = set_types_in_table(df, metadata["sourcetableconfiguration"]["column_dtypes_map"])
+
 
         return df
 
@@ -1768,6 +1788,8 @@ class DynamicTableHelpers:
         if r.status_code != 202:
             raise Exception(f"Error in request {r.text}")
         return r.json()
+
+    @none_if_backend_detached
     def patch(self,metadata,timeout=None,*args,**kwargs):
         """
         Main patch method
