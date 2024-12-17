@@ -970,11 +970,8 @@ class PodLocalLake(DataSource):
     use_s3_if_available: bool = Field(False, description="Whether to use S3 if available")
 
 class TimeScaleDB(DataSource):
-<<<<<<< HEAD
-    user : str="postgres"
-=======
+
     database_user : str
->>>>>>> main
     password :str
     host : str
     database_name :str
