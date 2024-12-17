@@ -952,7 +952,7 @@ class PodLocalLake(DataSource):
     use_s3_if_available: bool = Field(False, description="Whether to use S3 if available")
 
 class TimeScaleDB(DataSource):
-    user : str
+    database_user : str
     password :str
     host : str
     database_name :str
@@ -985,7 +985,7 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
 
     def get_connection_uri(self):
         password = self.related_resource.password  # Decrypt password if necessary
-        return f"postgresql://{self.related_resource.user}:{password}@{self.related_resource.host}:{self.related_resource.port}/{self.related_resource.database_name}"
+        return f"postgresql://{self.related_resource.database_user}:{password}@{self.related_resource.host}:{self.related_resource.port}/{self.related_resource.database_name}"
 
 class BaseYamlModel(BaseTdagPydanticModel,BaseObject):
 
