@@ -13,7 +13,7 @@ from mainsequence.tdag_client import (DynamicTableHelpers, TimeSerieNode, TimeSe
                                       DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS)
 
 from mainsequence.tdag.logconf import get_tdag_logger
-from mainsequence.tdag_client.models import TDAG_DETACHED
+from mainsequence.tdag_client.models import BACKEND_DETACHED
 
 logger = get_tdag_logger()
 
@@ -502,7 +502,7 @@ class PersistManager:
     #table dependes
 
     def get_latest_value(self, asset_symbols:list) -> [datetime.datetime,Dict[str, datetime.datetime]]:
-        if TDAG_DETACHED():#todo this can be optimized by running stats per data lake
+        if BACKEND_DETACHED():#todo this can be optimized by running stats per data lake
             return self._get_lastest_value()
 
         metadata= self.dth.get(hash_id=self.remote_table_hashed_name,data_source__id=self.data_source.id)
@@ -695,17 +695,27 @@ class DataLakePersistManager(PersistManager):
 
 
     def verify_introspection(self,ts):
-        from mainsequence.tdag_client.models import TDAG_DETACHED
+        from mainsequence.tdag_client.models import BACKEND_DETACHED
         if self.already_introspected== True:
             return None
-        if TDAG_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+        if BACKEND_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
 
             # verify if its calculated
             if not self.table_exist():
                 self.logger.debug(f"Building local data lake for the first time for  {self.local_hash_id}")
                 df=ts.update_series_from_source(latest_value=None)
                 self.set_introspection(True)
-                a=5
+                if df is None:
+                    return None
+                if df.shape[0] == 0:
+                    return None
+                self.dth.upsert_data_into_table(metadata={"table_name":self.remote_table_hashed_name},local_metadata=None,data=df,
+                                                logger=self.logger,overwrite=True,historical_update_id=None,
+                                                data_source=self.data_source)
+            #verify pickle exist
+            ts.persist_to_pickle()
+
+
 
 
     def set_introspection(self, introspection: bool):

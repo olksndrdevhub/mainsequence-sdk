@@ -23,6 +23,7 @@ from mainsequence.tdag.config import (
 )
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager
+from mainsequence.tdag_client.models import none_if_backend_detached
 from numpy.f2py.auxfuncs import isint1
 
 from pycares.errno import value
@@ -743,6 +744,30 @@ class TimeSerieRebuildMethods(ABC):
             include_vam_client_objects=False)
         return ts
 
+
+    @classmethod
+    def rebuild_from_pickle_or_configuration(self,local_hash_id,data_source_id,
+                                             remote_table_hashed_name
+                                             ):
+        """
+        :param local_hash_id:
+        :param data_source_id:
+        :param remote_table_hashed_name:
+        :return:
+        """
+        pickle_path = self.get_pickle_path(local_hash_id,
+                                           data_source_id=data_source_id)
+        data_source = self.load_data_source_from_pickle(pickle_path=pickle_path)
+        if os.path.isfile(pickle_path) == False:
+            ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
+                                                      remote_table_hashed_name=remote_table_hashed_name,
+                                                      data_source=data_source
+                                                      )
+            ts.persist_to_pickle()
+
+        ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
+        return ts
+
     @classmethod
     @tracer.start_as_current_span("TS: Rebuild From Configuration")
     def rebuild_from_configuration(cls, local_hash_id,
@@ -1230,21 +1255,7 @@ class DataPersistanceMethods(ABC):
             persisted = True
         return persisted
 
-    def dump_to_parquet(self, file_path: str, overwrite=False, engine="pandas"):
-        """
-        Dumps entire time series  to parquet  file
-        :return:
-        """
-        from pathlib import Path
-        data_exist = os.path.isfile(file_path) == True or os.path.isdir(file_path) == True
-        if overwrite == True or data_exist == False:
-            os.makedirs(Path(file_path).parent.absolute(), exist_ok=True)
-            tmp_df = self.local_persist_manager.get_full_source_data()
-            if engine == "dask":
-                import dask.dataframe as dd
-                tmp_df = dd.from_pandas(tmp_df.reset_index(), chunksize=5000000)
-            tmp_df.to_parquet(file_path)
-        return file_path
+
 
 
 class TimeSerieConfigKwargs(dict):
@@ -1540,6 +1551,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                                         )
         if isinstance(self._local_persist_manager, DataLakePersistManager):
             self._local_persist_manager.verify_introspection(self)
+        self._verify_and_build_remote_objects()
+
+    @none_if_backend_detached
+    def _verify_and_build_remote_objects(self):
 
         time_serie_source_code_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
         time_serie_source_code = self.get_time_serie_source_code(self.__class__)
@@ -1572,7 +1587,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def flush_pickle(self):
         if os.path.isfile(self.pickle_path):
             os.remove(self.pickle_path)
-
+    @none_if_backend_detached
     def patch_build_configuration(self):
         """
         This method comes in handy when there is a change in VAM models extra configuration. This method will properly
@@ -1581,6 +1596,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         -------
 
         """
+
+
         patch_build = os.environ.get("PATCH_BUILD_CONFIGURATION", False) in ["true", "True", 1]
         if patch_build == True:
             self.local_persist_manager  # just call it before to initilaize dts

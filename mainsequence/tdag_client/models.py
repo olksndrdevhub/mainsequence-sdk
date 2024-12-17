@@ -21,10 +21,26 @@ from typing import Optional, Dict, Any
 from typing import Optional, List, Dict, Any
 from .data_sources_interfaces.local_data_lake import DataLakeInterface
 from .data_sources_interfaces import timescale as TimeScaleInterface
+from functools import wraps
 
 
 _default_data_source = None  # Module-level cache
-TDAG_DETACHED=lambda : os.environ.get('TDAG_DETACHED',"false").lower()=="true"
+BACKEND_DETACHED=lambda : os.environ.get('BACKEND_DETACHED',"false").lower()=="true"
+
+def none_if_backend_detached(func):
+    """
+    Decorator that evaluates BACKEND_DETACHED before executing the function.
+    If BACKEND_DETACHED() returns True, the function is skipped, and None is returned.
+    Otherwise, the function is executed as normal.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Evaluate BACKEND_DETACHED before executing the function
+        if BACKEND_DETACHED():
+            return None
+        return func(*args, **kwargs)
+    return wrapper
+
 
 JSON_COMPRESSED_PREFIX = ["json_compressed", "jcomp_"]
 
@@ -110,11 +126,10 @@ class BaseObject:
         return s
 
 
-
+    @none_if_backend_detached
     @classmethod
     def create(cls, *args, **kwargs):
-        if TDAG_DETACHED() == True:
-            return None
+
         url = cls.ROOT_URL + "/"
         payload = {"json": serialize_to_json(kwargs)}
         s=cls.build_session()
@@ -124,9 +139,9 @@ class BaseObject:
         instance=cls(**r.json())
         return instance
 
+    @none_if_backend_detached
     def delete(self):
-        if TDAG_DETACHED() == True:
-            return None
+
         url = self.ROOT_URL + "/destroy/"
         payload = {"json":{"uid":self.uid}}
         s = self.build_session()
@@ -134,9 +149,9 @@ class BaseObject:
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
 
+    @none_if_backend_detached
     def patch(self,*args,**kwargs):
-        if TDAG_DETACHED() == True:
-            return None
+
 
         url = self.ROOT_URL + "/update/"
         payload = {"json": {"uid": self.uid,"patch_data":serialize_to_json(kwargs)}}
@@ -172,10 +187,10 @@ class TimeSerieNode(BaseTdagPydanticModel,BaseObject):
     def ROOT_URL(cls):
         return get_ts_node_url(TDAG_ENDPOINT)
 
+    @none_if_backend_detached
     @classmethod
     def get_all_dependencies(cls, hash_id):
-        if TDAG_DETACHED() == True:
-            return None
+
         s = cls.build_session()
         url = cls.ROOT_URL + f"/{hash_id}/get_all_dependencies"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, )
@@ -284,6 +299,7 @@ class TimeSerieNode(BaseTdagPydanticModel,BaseObject):
         if r.status_code != 200:
             raise Exception(r.text)
 
+    @none_if_backend_detached
     @classmethod
     def patch_build_configuration(cls, remote_table_patch: dict,
                                   build_meta_data: dict, data_source_id: int,
@@ -333,10 +349,10 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
     def ROOT_URL(cls):
         return  get_scheduler_node_url(TDAG_ENDPOINT)
 
+    @none_if_backend_detached
     @classmethod
     def get(cls, *args,**kwargs):
-        if TDAG_DETACHED() == True:
-            raise Exception("TDAG is running detached")
+
         url = cls.ROOT_URL
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload={"params": kwargs})
@@ -351,10 +367,10 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
         instance = cls(**results[0])
         return instance
 
+    @none_if_backend_detached
     @classmethod
     def filter(cls,payload:Union[dict,None]):
-        if TDAG_DETACHED() == True:
-            raise Exception("TDAG is running detached")
+
         url = cls.ROOT_URL
         payload={} if payload is None else {"params":payload}
 
@@ -366,10 +382,11 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
             raise Exception(f"Error in request {r.text}")
         instance = [cls(**i.json()) for i in r.json()]
         return instance
+
+    @none_if_backend_detached
     @classmethod
     def get_scheduler_for_ts(cls,hash_id:str):
-        if TDAG_DETACHED() == True:
-            raise Exception("TDAG is running detached")
+
         s=cls.build_session()
         url=cls.ROOT_URL + "/get_scheduler_for_ts"
         payload = dict(params={"hash_id":hash_id})
@@ -385,7 +402,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
                                 data_source_id:int,
                                 name_suffix:Union[str,None]=None,):
 
-        if TDAG_DETACHED() == True:
+        if BACKEND_DETACHED() == True:
             return cls(name=f"Detached scheduler for {local_hash_id}",
                        uid="DETACHED",running_process_pid=0,host="SDf",api_address="Sdf",
                        api_port=0,
@@ -406,9 +423,9 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
     def build_and_assign_to_ts(cls, scheduler_name: str, local_hash_id_list: list, delink_all_ts=False,
                                remove_from_other_schedulers=True):
 
-        if TDAG_DETACHED() == True:
-            raise
-            return None
+        if BACKEND_DETACHED() == True:
+            raise Exception("TDAG is detached")
+
         s = cls.build_session( )
 
         url = cls.ROOT_URL + "/build_and_assign_to_ts/"
@@ -425,7 +442,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
         return scheduler
 
     def in_active_tree_connect(self,hash_id_list:list):
-        if TDAG_DETACHED() == True:
+        if BACKEND_DETACHED() == True:
             self.in_active_tree=hash_id_list
             return None
         s = self.build_session()
@@ -436,7 +453,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
             raise Exception(f"Error in request {r.text}")
 
     def assign_to_scheduler(self,hash_id_list:list):
-        if TDAG_DETACHED() == True:
+        if BACKEND_DETACHED() == True:
             self.schedules_to=hash_id_list
             return self
         s = self.build_session()
@@ -1337,7 +1354,7 @@ class DynamicTableHelpers:
             return metadata, r
 
     def get(self,class_name=None, *args, **kwargs):
-        if TDAG_DETACHED() == True:
+        if BACKEND_DETACHED() == True:
             return {}
         instance, r = self.get_rest(*args, **kwargs)
         # try:
@@ -1488,6 +1505,8 @@ class DynamicTableHelpers:
                 logger=self.logger
             )
 
+        if BACKEND_DETACHED() == True:
+            return None
 
         r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(max_per_asset_symbol=max_per_asset_symbol,
                                                                  last_time_index_value=last_time_index_value,
@@ -1530,6 +1549,64 @@ class DynamicTableHelpers:
             raise Exception(f"{r.text}")
         all_metadatas = {m["hash_id"]: m for m in r.json()}
         return all_metadatas
+
+    @none_if_backend_detached
+    def _handle_source_table_configuration(self,
+            metadata,
+            column_dtypes_map,
+            index_names,
+            time_index_name,
+            column_index_names,
+            data,
+            overwrite=False
+    ):
+        """
+        Handles the creation or retrieval of the source table configuration.
+
+        Parameters:
+        ----------
+        metadata : dict
+            Metadata dictionary containing "sourcetableconfiguration" and "id".
+        column_dtypes_map : dict
+            Mapping of column names to their data types.
+        index_names : list
+            List of index names.
+        time_index_name : str
+            Name of the time index column.
+        column_index_names : list
+            List of column index names.
+        data : DataFrame
+            The input DataFrame.
+        overwrite : bool, optional
+            Whether to overwrite existing configurations (default is False).
+
+        Returns:
+        -------
+        dict or None
+            Updated metadata with the source table configuration, and potentially filtered data.
+        """
+
+        stc = metadata.get('sourcetableconfiguration')
+
+        if stc is None:
+            try:
+                source_configuration = self.create_source_table_configuration(
+                    column_dtypes_map=column_dtypes_map,
+                    index_names=index_names,
+                    time_index_name=time_index_name,
+                    column_index_names=column_index_names,
+                    metadata_id=metadata["id"]
+                )
+                metadata["sourcetableconfiguration"] = source_configuration
+            except AlreadyExist:
+                source_configuration = metadata["sourcetableconfiguration"]
+                if not overwrite:
+                    # Filter the data based on time_index_name and last_time_index_value
+                    data = data[
+                        data[time_index_name] > self.request_to_datetime(source_configuration['last_time_index_value'])
+                        ]
+        return metadata, data
+
     def upsert_data_into_table(self, metadata:dict,local_metadata:dict,
                             historical_update_id:Union[int,None],
                                data: pd.DataFrame, overwrite: bool,
@@ -1557,22 +1634,17 @@ class DynamicTableHelpers:
         if not data[time_index_name].is_monotonic_increasing:
             data = data.sort_values(time_index_name)
 
-        stc=metadata['sourcetableconfiguration']
-        if stc is  None:
-            try:
-                source_configuration = self.create_source_table_configuration(column_dtypes_map=column_dtypes_map,
-                                                                              index_names=index_names,
-                                                                              time_index_name=time_index_name,
-                                                                              column_index_names=column_index_names,
-                                                                              metadata_id=metadata["id"]
-                                                                              )
-                metadata["sourcetableconfiguration"]=source_configuration
-            except AlreadyExist:
-                source_configuration = metadata["sourcetableconfiguration"]
-                if overwrite ==False:
-                    # assert data_frame
-                    data = data[
-                        data[time_index_name] > self.request_to_datetime(source_configuration['last_time_index_value'])]
+
+        metadata, data = (result if (result:=self._handle_source_table_configuration(metadata=metadata, column_dtypes_map=column_dtypes_map,
+                                                          index_names=index_names,
+                                                          time_index_name=time_index_name,
+                                                          column_index_names=column_index_names, data=data,
+                                                          overwrite=overwrite
+                                                          )
+
+                          )  is not None else (metadata, data))
+
+
         local_metadata = self._insert_data_into_hash_id(serialized_data_frame=data, metadata=metadata,
                                                    local_metadata=local_metadata,
                                                    overwrite=overwrite, time_index_name=time_index_name,
