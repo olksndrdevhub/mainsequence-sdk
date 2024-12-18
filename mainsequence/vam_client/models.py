@@ -381,7 +381,7 @@ class AccountCoolDown(BaseObjectOrm):
 class Calendar(BaseObjectOrm,BaseVamPydanticModel):
     id: Optional[int] = None
     name: str
-    calendar_dates:dict
+    calendar_dates:Optional[dict]=None
 
 class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
 
