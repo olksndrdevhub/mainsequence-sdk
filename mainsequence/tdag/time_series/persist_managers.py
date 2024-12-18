@@ -503,27 +503,27 @@ class PersistManager:
     #table dependes
 
     def get_latest_value(self, asset_symbols:list) -> [datetime.datetime,Dict[str, datetime.datetime]]:
-        if BACKEND_DETACHED():#todo this can be optimized by running stats per data lake
+        if BACKEND_DETACHED(): #todo this can be optimized by running stats per data lake
             return self._get_local_lake_lastest_value()
 
-        metadata= self.dth.get(hash_id=self.remote_table_hashed_name,data_source__id=self.data_source.id)
+        metadata = self.dth.get(hash_id=self.remote_table_hashed_name,data_source__id=self.data_source.id)
 
-        last_index_value,last_multiindex=None,None
+        last_index_value, last_multiindex = None, None
         if "sourcetableconfiguration" in metadata.keys():
             if metadata['sourcetableconfiguration'] is not None:
-                last_index_value=metadata['sourcetableconfiguration']['last_time_index_value']
+                last_index_value = metadata['sourcetableconfiguration']['last_time_index_value']
                 if last_index_value is None:
-                    return last_index_value,last_multiindex
-                last_index_value=self.dth.request_to_datetime(last_index_value)
+                    return last_index_value, last_multiindex
+                last_index_value = self.dth.request_to_datetime(last_index_value)
                 if metadata['sourcetableconfiguration']['multi_index_stats'] is not None:
-                    last_multiindex=metadata['sourcetableconfiguration']['multi_index_stats']['max_per_asset_symbol']
+                    last_multiindex = metadata['sourcetableconfiguration']['multi_index_stats']['max_per_asset_symbol']
                     if last_multiindex is not None:
-                        last_multiindex={symbol:{ev:self.dth.request_to_datetime(v) for ev,v in ev_dict.items()} for symbol,ev_dict in last_multiindex.items()}
+                        last_multiindex = {symbol:{ev:self.dth.request_to_datetime(v) for ev,v in ev_dict.items()} for symbol,ev_dict in last_multiindex.items()}
 
         if asset_symbols is not None and last_multiindex is not None:
             last_multiindex = {asset: value for asset, value in last_multiindex.items() if asset in asset_symbols}
 
-        return last_index_value,last_multiindex
+        return last_index_value, last_multiindex
 
     def _add_to_data_source(self,data_df,overwrite:bool):
         raise NotImplementedError
@@ -695,7 +695,7 @@ class DataLakePersistManager(PersistManager):
         self.already_introspected = self.set_introspection(introspection=False)
 
 
-    def verify_introspection(self,ts):
+    def verify_introspection(self, ts):
         """
         This method handles all the configuration and setup necessary when running a detached local data lake
         :param ts:
@@ -705,24 +705,34 @@ class DataLakePersistManager(PersistManager):
         if self.already_introspected== True:
             return None
         if BACKEND_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            self.metadata= {"sourcetableconfiguration":None,"hash_id":self.remote_table_hashed_name,
-                            "table_name":self.remote_table_hashed_name
+            self.metadata = {"sourcetableconfiguration":None, "hash_id": self.remote_table_hashed_name,
+                            "table_name": self.remote_table_hashed_name
                             }
             self.local_metadata= {"local_hash_id":self.local_hash_id}
-            # verify if its calculated
-            if not self.table_exist():
+
+            if self.table_exist():
+                # check if table is complete and continue with earlist latest value to avoid data gaps
+                latest_value, latest_values_per_asset = ts.get_latest_value()
+
+                if latest_value is None:
+                    return None
+                else:
+                    # get earlist latest value of the assets to avoid gaps
+                    latest_value = min([t for a in latest_values_per_asset.values() for t in a.values()])
+                    self.logger.debug(f"Building local data lake from latest value  {latest_value}")
+            else:
                 self.logger.debug(f"Building local data lake for the first time for  {self.local_hash_id}")
+                latest_value = None
 
-
-                df = ts.update_series_from_source(latest_value=None)
-                self.set_introspection(True)
-                if df is None:
-                    return None
-                if df.shape[0] == 0:
-                    return None
-                self.dth.upsert_data_into_table(metadata={"table_name":self.remote_table_hashed_name},local_metadata=None,data=df,
-                                                logger=self.logger,overwrite=True,historical_update_id=None,
-                                                data_source=self.data_source)
+            self.set_introspection(True)
+            df = ts.update_series_from_source(latest_value=latest_value)
+            if df is None:
+                return None
+            if df.shape[0] == 0:
+                return None
+            self.dth.upsert_data_into_table(metadata={"table_name": self.remote_table_hashed_name}, local_metadata=None, data=df,
+                                            logger=self.logger, overwrite=True, historical_update_id=None,
+                                            data_source=self.data_source)
             #verify pickle exist
             ts.persist_to_pickle()
 

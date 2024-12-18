@@ -945,13 +945,11 @@ class TargetPortfolioFrontEndDetails(BaseObjectOrm, BaseVamPydanticModel):
         return  VAM_API_ENDPOINT.replace("orm/api","api/")
     
     @classmethod
-    def filter(cls,timeout=None,*args,**kwargs):
+    def filter(cls, timeout=None, *args, **kwargs):
         url = cls.get_base_endpoint()+"target-portfolio-details"
         params = cls._parse_parameters_filter(parameters=kwargs)
 
-
         request_kwargs = {"params": params, }
-
         if "pk" in kwargs:
             url = f"{url}/{kwargs['pk']}/"
             request_kwargs = {}

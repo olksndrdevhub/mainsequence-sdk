@@ -1169,11 +1169,6 @@ class DataPersistanceMethods(ABC):
                              data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True,
                              ):
 
-
-
-
-
-
         filtered_data = self.local_persist_manager.get_df_between_dates(start_date=start_date,
                                                                         end_date=end_date,
                                                                         asset_symbols=asset_symbols,

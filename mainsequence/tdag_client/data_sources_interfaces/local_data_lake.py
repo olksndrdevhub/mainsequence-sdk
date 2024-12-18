@@ -11,6 +11,7 @@ import psutil
 import datetime
 import pyarrow.dataset as ds
 import pytz
+from tqdm import tqdm
 
 from mainsequence.tdag_client.utils import set_types_in_table
 
@@ -41,24 +42,29 @@ def read_full_data(file_path,filters=None, use_s3_if_available=False, max_memory
     data = data.drop(columns=[TIME_PARTITION])
     return data
 
-def read_parquet_from_lake(file_path: str,use_s3_if_available:bool,filters:Union[list,None]=None,
-                           s3_storage_options:Union[dict,None]=None,
-                           ):
+def read_parquet_from_lake(
+        file_path: str,
+        use_s3_if_available: bool,
+        filters: Union[list,None]=None,
+        s3_storage_options: Union[dict,None]=None,
+):
+    data_buffer = []
+    for filter in tqdm(filters):
+        extra_kwargs = {} if filters is None else {'filters': (filter,)}
 
-    extra_kwargs={} if filters is None else {'filters':filters}
-    if use_s3_if_available:
-        s3_path,storage_options=self._get_storage_options(file_path)
-        data = pd.read_parquet(s3_path, engine='pyarrow', storage_options=storage_options,**extra_kwargs)
-    else:
-        data = pd.read_parquet(file_path,**extra_kwargs)
-    return data
+        if use_s3_if_available:
+            s3_path, storage_options = self._get_storage_options(file_path)
+            data = pd.read_parquet(s3_path, engine='pyarrow', storage_options=storage_options, **extra_kwargs)
+        else:
+            data = pd.read_parquet(file_path, **extra_kwargs)
+
+        data_buffer.append(data)
+    return pd.concat(data_buffer)
 
 
 
 
 class DataLakeInterface:
-
-
 
     def __init__(self,data_lake_source:"PodLocalLake",logger):
         from mainsequence.tdag.config import TDAG_PATH
@@ -231,12 +237,10 @@ class DataLakeInterface:
         Returns:
 
         """
-        if overwrite==False:
+        if overwrite == False:
             raise NotImplementedError
         self.logger.debug(f"Persisting  datalake {self.data_source.related_resource.datalake_name}")
         file_path = self.get_file_path_for_table(table_name=table_name)
-
-
 
         iso_calendar = data[time_index_name].dt.isocalendar()
         data[TIME_PARTITION] = iso_calendar['year'].values.astype(str) + '-W' + iso_calendar[
@@ -245,11 +249,6 @@ class DataLakeInterface:
         data = data.sort_values(by=time_index_name)
         data.set_index(index_names, inplace=True)
         self.write_to_parquet(data=data, partition_cols=partition_cols, file_path=file_path)
-
-
-
-
-
 
     def table_exist(self, table_name: str):
         file_path = self.get_file_path_for_table(table_name=table_name)

@@ -1530,8 +1530,8 @@ class DynamicTableHelpers:
         call_end_of_execution = False
         if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             data_lake_interface=DataLakeInterface(data_lake_source=data_source,logger=logger,)
-            data_lake_interface.persist_datalake(serialized_data_frame,overwrite=True,
-                                                 time_index_name=time_index_name,index_names=index_names,
+            data_lake_interface.persist_datalake(serialized_data_frame, overwrite=True,
+                                                 time_index_name=time_index_name, index_names=index_names,
                                                  table_name=metadata["table_name"])
         elif data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
 
@@ -1668,7 +1668,7 @@ class DynamicTableHelpers:
         -------
 
         """
-        overwrite=True #ALWAYS OVERWRITE
+        overwrite = True #ALWAYS OVERWRITE
 
         data, column_index_names, index_names, column_dtypes_map, time_index_name = self._break_pandas_dataframe(
             data)
@@ -1742,9 +1742,7 @@ class DynamicTableHelpers:
                                                                        less_or_equal=less_or_equal,
                                                                        end_date=end_date,
                                                                        asset_symbols=asset_symbols)
-            df=data_lake_interface.query_datalake(filters=filters,
-
-                                                  table_name=metadata["table_name"],)
+            df = data_lake_interface.query_datalake(filters=filters, table_name=metadata["table_name"])
         else:
             raise NotImplementedError
 

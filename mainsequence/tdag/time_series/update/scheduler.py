@@ -273,14 +273,13 @@ def set_data_lake(pod_source,tdag_detached=False, override_all: bool = False):
     :param override_all:
     :return:
     """
-    vars = ["POD_DEFAULT_DATA_SOURCE", "POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE"]
+    vars = ["POD_DEFAULT_DATA_SOURCE", "POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE", "BACKEND_DETACHED"]
     original_values = {k: os.environ.get(k, None) for k in vars}
 
     # Override the environment variables
     os.environ["POD_DEFAULT_DATA_SOURCE"] = pod_source.model_dump_json()
     os.environ["POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE"] = str(override_all)
-    os.environ["BACKEND_DETACHED"]=str(tdag_detached)
-
+    os.environ["BACKEND_DETACHED"] = str(tdag_detached)
 
     try:
         yield pod_source
