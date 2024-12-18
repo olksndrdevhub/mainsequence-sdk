@@ -49,15 +49,38 @@ def none_if_backend_detached(func):
 
         # Return a new property with the wrapped getter
         return property(wrapper_getter, func.fset, func.fdel, func.__doc__)
+        # Handle classmethods
+    elif isinstance(func, classmethod):
+        original_func = func.__func__
 
-    # Regular function handling
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if BACKEND_DETACHED():
-            return None
-        return func(*args, **kwargs)
+        @wraps(original_func)
+        def wrapper(*args, **kwargs):
+            if BACKEND_DETACHED():
+                return None
+            return original_func(*args, **kwargs)
 
-    return wrapper
+        return classmethod(wrapper)
+
+        # Handle staticmethods
+    elif isinstance(func, staticmethod):
+        original_func = func.__func__
+
+        @wraps(original_func)
+        def wrapper(*args, **kwargs):
+            if BACKEND_DETACHED():
+                return None
+            return original_func(*args, **kwargs)
+
+        return staticmethod(wrapper)
+    else:
+        # Regular function handling
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if BACKEND_DETACHED():
+                return None
+            return func(*args, **kwargs)
+
+
 
 
 JSON_COMPRESSED_PREFIX = ["json_compressed", "jcomp_"]
