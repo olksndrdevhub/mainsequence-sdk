@@ -34,11 +34,10 @@ def none_if_backend_detached(func):
     If BACKEND_DETACHED() returns True, the function is skipped, and None is returned.
     Otherwise, the function is executed as normal.
 
-    It supports both regular functions and property methods.
+    It supports regular functions, property methods, classmethods, and staticmethods.
     """
-    # Handle property getter methods
+    # Handle property methods
     if isinstance(func, property):
-        # Wrap the getter method
         getter = func.fget
 
         @wraps(getter)
@@ -47,9 +46,9 @@ def none_if_backend_detached(func):
                 return None
             return getter(*args, **kwargs)
 
-        # Return a new property with the wrapped getter
         return property(wrapper_getter, func.fset, func.fdel, func.__doc__)
-        # Handle classmethods
+
+    # Handle classmethods
     elif isinstance(func, classmethod):
         original_func = func.__func__
 
@@ -61,7 +60,7 @@ def none_if_backend_detached(func):
 
         return classmethod(wrapper)
 
-        # Handle staticmethods
+    # Handle staticmethods
     elif isinstance(func, staticmethod):
         original_func = func.__func__
 
@@ -72,15 +71,16 @@ def none_if_backend_detached(func):
             return original_func(*args, **kwargs)
 
         return staticmethod(wrapper)
+
+    # Handle regular functions
     else:
-        # Regular function handling
         @wraps(func)
         def wrapper(*args, **kwargs):
             if BACKEND_DETACHED():
                 return None
             return func(*args, **kwargs)
 
-
+        return wrapper
 
 
 JSON_COMPRESSED_PREFIX = ["json_compressed", "jcomp_"]
