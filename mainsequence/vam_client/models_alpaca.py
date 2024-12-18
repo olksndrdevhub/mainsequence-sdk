@@ -11,7 +11,7 @@ from .utils import CONSTANTS, get_vam_client_logger
 from cryptography.fernet import Fernet
 from pydantic import  condecimal
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import GetAssetsRequest
+
 from alpaca.trading.enums import AssetClass as AlpacaAssetClass, PositionSide
 from alpaca.data.historical import CryptoHistoricalDataClient
 from alpaca.data.historical import StockHistoricalDataClient
@@ -245,85 +245,6 @@ def build_alpaca_account_from_keys(execution_venue: ExecutionVenue, api_key: str
     orm_account.sync_funds()
 
 
-def build_alpaca_exchange_assets(execution_venue: ExecutionVenue,
-                                 api_key: str, api_secret: str,
-                                 asset_class: object):
-    """
-    Builds and updates tradable assets in Alpaca
-    Args:
-        execution_venue:
-        api_key:
-        api_secret:
-        asset_class:
-
-    Returns:
-
-    """
-    is_paper_account = execution_venue.symbol == CONSTANTS.ALPACA_TESTNET_EV_SYMBOL
-    trading_client = TradingClient(api_key, api_secret, paper=is_paper_account)
-
-    # Get our account information.
-    account = trading_client.get_account()
-    try:
-        cash_asset, r = AlpacaAsset.get(symbol=account.currency,
-                                               asset_type=CONSTANTS.ASSET_TYPE_SETTLEMENT_ASSET,
-                                               execution_venue__symbol=execution_venue.symbol,
-                                               )
-    except DoesNotExist as e:
-   
-        cash_asset = AlpacaAsset.create(symbol=account.currency, name=account.currency,
-                               settlement_asset_symbol=account.currency,
-                               asset_type=CONSTANTS.ASSET_TYPE_SETTLEMENT_ASSET,
-                               execution_venue__symbol=execution_venue.symbol,
-                               marginable=False, shortable=False,
-                               ticker=account.currency, can_trade=False, status="active",
-                               easy_to_borrow=False, fractionable=True, exchange=execution_venue.symbol,
-                               )
-
-    # Check if our account is restricted from trading.
-    if account.trading_blocked:
-        logger.info('Account is currently restricted from trading.')
-
-    # search for US equities
-    search_params = GetAssetsRequest(asset_class=asset_class, status="active")
-    assets = trading_client.get_all_assets(search_params)
-
-    assets = pd.DataFrame([a.__dict__ for a in assets])
-    assets = assets[assets.tradable == True]
-    assets['asset_class'] = assets["asset_class"].apply(lambda x: x.value)
-
-    assets['status'] = assets["status"].apply(lambda x: x.value)
-    assets['exchange'] = assets["exchange"].apply(lambda x: x.value)
-
-    assets = assets.rename(columns={"tradable": "can_trade",
-                                    "symbol": "ticker",
-                                    })
-    
-    if asset_class == AlpacaAssetClass.US_EQUITY:
-        asset_type = CONSTANTS.ASSET_TYPE_CASH_EQUITY
-        assets["symbol"] = assets["ticker"]
-        assets["settlement_asset_symbol"]=cash_asset.symbol
-    elif asset_class == AlpacaAssetClass.CRYPTO:
-        asset_type = CONSTANTS.ASSET_TYPE_CRYPTO_SPOT
-      
-        assets["symbol"] = assets["ticker"].apply(lambda x: x.replace("/",""))
-        assets["settlement_asset_symbol"] = assets["ticker"].apply(lambda x: x[x.find("/")+1:])
-        
-
-
-
-    else:
-        raise NotImplementedError(f"Asset class {asset_class} is not supported")
-    assets["asset_type"] = asset_type
-    COLUMNS = ["symbol", "name", "asset_class", "status", "can_trade", "marginable",
-               "shortable", "easy_to_borrow", "fractionable","settlement_asset_symbol"]
-
-    assets = assets[COLUMNS].to_dict("records")
-
-    logger.info(f"Upsert {len(assets)} assets for asset type {asset_type} with execution venue {execution_venue.symbol} to VAM")
-    r = AlpacaAsset.batch_upsert(execution_venue_symbol=execution_venue.symbol,
-                                 asset_type=asset_type,
-                                 asset_config_list=assets, timeout=60 * 15)
 
 
 def make_alpaca_account_snapshot(api_key, secret_key, orm_account):

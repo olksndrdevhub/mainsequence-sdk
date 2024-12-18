@@ -1518,6 +1518,9 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                 local_hash_id=local_hash_id, data_source_id=self.data_source.id
                                                 )
 
+    def run(self):
+        assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+        self.local_persist_manager
     @property
     def local_persist_manager(self):
         if hasattr(self, "logger") == False:
