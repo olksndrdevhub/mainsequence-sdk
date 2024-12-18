@@ -895,6 +895,7 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
     latest_rebalance: Optional[datetime.datetime] = None
 
     is_asset_only: bool = False
+    build_purpose:str
     is_active: bool = False
     time_serie_hash_id: str = Field(..., max_length=100)
     time_serie_signal_hash_id:str = Field(..., max_length=100)
