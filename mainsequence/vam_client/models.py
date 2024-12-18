@@ -378,6 +378,10 @@ class WeightExecutionPosition(BaseObjectOrm,BaseVamPydanticModel):
 class AccountCoolDown(BaseObjectOrm):
     
     pass
+class Calendar(BaseObjectOrm,BaseVamPydanticModel):
+    id: Optional[int] = None
+    name: str
+    calendar_dates:dict
 
 class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
 
@@ -386,7 +390,7 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
     name: str
     asset_type: str
     can_trade: bool
-    calendar:Optional[str]
+    calendar:Calendar
     execution_venue: Union["ExecutionVenue", int]
     delisted_datetime: Optional[datetime.datetime] = None
 
