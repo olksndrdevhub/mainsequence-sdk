@@ -523,7 +523,6 @@ class FutureUSDMMixin(AssetMixin, BaseVamPydanticModel):
     def get_spot_reference_asset_symbol(self):
         FUTURE_TO_SPOT_MAP = {
             CONSTANTS.BINANCE_FUTURES_EV_SYMBOL: {"1000SHIB": "SHIB"},
-            CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL: {"1000SHIB": "SHIB"},
         }
 
         future = self.symbol.replace(self.quote_asset.symbol, "")
