@@ -508,22 +508,22 @@ class PersistManager:
 
         metadata = self.dth.get(hash_id=self.remote_table_hashed_name,data_source__id=self.data_source.id)
 
-        last_time_in_table, last_time_per_asset = None, None
+        last_update_in_table, last_update_per_asset = None, None
         if "sourcetableconfiguration" in metadata.keys():
             if metadata['sourcetableconfiguration'] is not None:
-                last_time_in_table = metadata['sourcetableconfiguration']['last_time_index_value']
-                if last_time_in_table is None:
-                    return last_time_in_table, last_time_per_asset
-                last_time_in_table = self.dth.request_to_datetime(last_time_in_table)
+                last_update_in_table = metadata['sourcetableconfiguration']['last_time_index_value']
+                if last_update_in_table is None:
+                    return last_update_in_table, last_update_per_asset
+                last_update_in_table = self.dth.request_to_datetime(last_update_in_table)
                 if metadata['sourcetableconfiguration']['multi_index_stats'] is not None:
-                    last_time_per_asset = metadata['sourcetableconfiguration']['multi_index_stats']['max_per_asset_symbol']
-                    if last_time_per_asset is not None:
-                        last_time_per_asset = {symbol:{ev:self.dth.request_to_datetime(v) for ev,v in ev_dict.items()} for symbol,ev_dict in last_time_per_asset.items()}
+                    last_update_per_asset = metadata['sourcetableconfiguration']['multi_index_stats']['max_per_asset_symbol']
+                    if last_update_per_asset is not None:
+                        last_update_per_asset = {symbol:{ev:self.dth.request_to_datetime(v) for ev,v in ev_dict.items()} for symbol,ev_dict in last_update_per_asset.items()}
 
-        if asset_symbols is not None and last_time_per_asset is not None:
-            last_time_per_asset = {asset: value for asset, value in last_time_per_asset.items() if asset in asset_symbols}
+        if asset_symbols is not None and last_update_per_asset is not None:
+            last_update_per_asset = {asset: value for asset, value in last_update_per_asset.items() if asset in asset_symbols}
 
-        return last_time_in_table, last_time_per_asset
+        return last_update_in_table, last_update_per_asset
 
     def _add_to_data_source(self,data_df,overwrite:bool):
         raise NotImplementedError
@@ -709,23 +709,17 @@ class DataLakePersistManager(PersistManager):
                             "table_name": self.remote_table_hashed_name
                             }
             self.local_metadata= {"local_hash_id":self.local_hash_id}
-
+            last_update_in_table=None
             if self.table_exist():
-                # check if table is complete and continue with earlist latest value to avoid data gaps
-                latest_value, latest_values_per_asset = ts.get_update_statistics()
+                # check if table is complete and continue with earliest latest value to avoid data gaps
+                last_update_in_table, last_update_per_asset = ts.get_update_statistics()
+                if last_update_in_table is not None:
+                    last_update_in_table = ts.get_earliest_updated_asset_filter(last_update_per_asset)
 
-                if latest_value is None:
-                    return None
-                else:
-                    # get earlist latest value of the assets to avoid gaps
-                    latest_value = min([t for a in latest_values_per_asset.values() for t in a.values()])
-                    self.logger.debug(f"Building local data lake from latest value  {latest_value}")
-            else:
-                self.logger.debug(f"Building local data lake for the first time for  {self.local_hash_id}")
-                latest_value = None
+            self.logger.debug(f"Building local data lake from latest value  {last_update_in_table}")
 
-            self.set_introspection(True)
-            df = ts.update_series_from_source(latest_value=latest_value)
+            self.set_already_run(True)
+            df = ts.update_series_from_source(latest_value=last_update_in_table)
             if df is None:
                 return None
             if df.shape[0] == 0:

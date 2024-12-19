@@ -1126,9 +1126,9 @@ class DataPersistanceMethods(ABC):
 
         """
 
-        last_time_in_table, last_time_per_asset = self.local_persist_manager.get_update_statistics(asset_symbols=asset_symbols)
+        last_update_in_table, last_update_per_asset = self.local_persist_manager.get_update_statistics(asset_symbols=asset_symbols)
 
-        return last_time_in_table, last_time_per_asset
+        return last_update_in_table, last_update_per_asset
 
     def get_earliest_value(self) -> datetime.datetime:
         earliest_value = self.local_persist_manager.get_earliest_value()
@@ -1197,12 +1197,40 @@ class DataPersistanceMethods(ABC):
 
         return pandas_df
 
+
+    def get_latest_update_by_assets_filter(self,asset_symbols:Union[list,None],last_update_per_asset:dict):
+        """
+        Gets the latest update from a symbol list
+        :param asset_symbols:
+        :return:
+        """
+        if asset_symbols is not None:
+            last_update_in_table = np.max([np.max(list(i.values()))
+                                           for i in list(last_update_per_asset.values())
+                                           if i in asset_symbols
+
+                                           ])
+        else:
+            last_update_in_table = np.max([np.max(list(i.values()))
+                                           for i in list(last_update_per_asset.values())
+
+
+                                           ])
+
+        return last_update_in_table
+    def get_earliest_updated_asset_filter(self,asset_symbols:Union[list,None],last_update_per_asset:dict):
+        if asset_symbols is not None:
+            last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values() if a in asset_symbols])
+        else:
+            last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values()])
+        return last_update_in_table
+
     def get_last_observation(self, asset_symbols: Union[None, list] = None,
 
                              ):
         """
-        (1) Request latest value  in parquet and segregated by asset symbol from DB
-        (2) Requests last observatiion from local persist manager
+
+        (1) Requests last observatiion from local persist manager
         (3) evaluates if last observation is consistent
         Parameters
         ----------
@@ -1213,18 +1241,20 @@ class DataPersistanceMethods(ABC):
 
         """
 
-        latest_value, multiindex = self.get_update_statistics(asset_symbols=asset_symbols,
+        last_update_in_table, last_update_per_asset= self.get_update_statistics(asset_symbols=asset_symbols,
 
                                                          )
-        if latest_value is None and multiindex is None:
+        if last_update_in_table is None and last_update_per_asset is None:
             return None
-        if asset_symbols is not None and multiindex is not None:
-            if len(multiindex) > 0:
-                latest_value = np.max([np.max(list(i.values())) for i in list(multiindex.values())])
+        if asset_symbols is not None and last_update_per_asset is not None:
+            if len(last_update_per_asset) > 0:
+                last_update_in_table = self.get_latest_update_by_assets_filter(asset_symbols=asset_symbols,
+                                                                              last_update_per_asset=last_update_per_asset
+                                                                              )
 
 
         last_observation = self.get_df_between_dates(
-            start_date=latest_value, great_or_equal=True,
+            start_date=last_update_in_table, great_or_equal=True,
             asset_symbols=asset_symbols
         )
 
