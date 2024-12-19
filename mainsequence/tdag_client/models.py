@@ -1452,7 +1452,7 @@ class DynamicTableHelpers:
                 raise Exception(r.text)
         return r.json()
 
-    def get_latest_value(self, hash_id):
+    def get_update_statistics(self, hash_id):
         """
         Gets latest value from Hash_id
         :param hash_id:

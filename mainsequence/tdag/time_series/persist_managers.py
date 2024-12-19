@@ -502,28 +502,28 @@ class PersistManager:
 
     #table dependes
 
-    def get_latest_value(self, asset_symbols:list) -> [datetime.datetime,Dict[str, datetime.datetime]]:
+    def get_update_statistics(self, asset_symbols:list) -> [datetime.datetime,Dict[str, datetime.datetime]]:
         if BACKEND_DETACHED(): #todo this can be optimized by running stats per data lake
-            return self._get_local_lake_lastest_value()
+            return self._get_local_lake_update_statistics()
 
         metadata = self.dth.get(hash_id=self.remote_table_hashed_name,data_source__id=self.data_source.id)
 
-        last_index_value, last_multiindex = None, None
+        last_time_in_table, last_time_per_asset = None, None
         if "sourcetableconfiguration" in metadata.keys():
             if metadata['sourcetableconfiguration'] is not None:
-                last_index_value = metadata['sourcetableconfiguration']['last_time_index_value']
-                if last_index_value is None:
-                    return last_index_value, last_multiindex
-                last_index_value = self.dth.request_to_datetime(last_index_value)
+                last_time_in_table = metadata['sourcetableconfiguration']['last_time_index_value']
+                if last_time_in_table is None:
+                    return last_time_in_table, last_time_per_asset
+                last_time_in_table = self.dth.request_to_datetime(last_time_in_table)
                 if metadata['sourcetableconfiguration']['multi_index_stats'] is not None:
-                    last_multiindex = metadata['sourcetableconfiguration']['multi_index_stats']['max_per_asset_symbol']
-                    if last_multiindex is not None:
-                        last_multiindex = {symbol:{ev:self.dth.request_to_datetime(v) for ev,v in ev_dict.items()} for symbol,ev_dict in last_multiindex.items()}
+                    last_time_per_asset = metadata['sourcetableconfiguration']['multi_index_stats']['max_per_asset_symbol']
+                    if last_time_per_asset is not None:
+                        last_time_per_asset = {symbol:{ev:self.dth.request_to_datetime(v) for ev,v in ev_dict.items()} for symbol,ev_dict in last_time_per_asset.items()}
 
-        if asset_symbols is not None and last_multiindex is not None:
-            last_multiindex = {asset: value for asset, value in last_multiindex.items() if asset in asset_symbols}
+        if asset_symbols is not None and last_time_per_asset is not None:
+            last_time_per_asset = {asset: value for asset, value in last_time_per_asset.items() if asset in asset_symbols}
 
-        return last_index_value, last_multiindex
+        return last_time_in_table, last_time_per_asset
 
     def _add_to_data_source(self,data_df,overwrite:bool):
         raise NotImplementedError
@@ -692,10 +692,10 @@ class DataLakePersistManager(PersistManager):
 
 
         super().__init__(*args,**kwargs)
-        self.already_introspected = self.set_introspection(introspection=False)
+        self.already_run = self.already_run(already_run=False)
 
 
-    def verify_introspection(self, ts):
+    def verify_if_already_run(self, ts):
         """
         This method handles all the configuration and setup necessary when running a detached local data lake
         :param ts:
@@ -712,7 +712,7 @@ class DataLakePersistManager(PersistManager):
 
             if self.table_exist():
                 # check if table is complete and continue with earlist latest value to avoid data gaps
-                latest_value, latest_values_per_asset = ts.get_latest_value()
+                latest_value, latest_values_per_asset = ts.get_update_statistics()
 
                 if latest_value is None:
                     return None
@@ -739,12 +739,12 @@ class DataLakePersistManager(PersistManager):
 
 
 
-    def set_introspection(self, introspection: bool):
+    def set_already_run(self, already_run: bool):
         """
         This methos is critical as it control the level of introspection and avouids recursivity\
         This happens for example when TimeSeries.update_series_from_source(*,**):
         TimeSeries.update_series_from_source(latest_value,*,**):
-            self.get_latest_value() <- will incurr in a circular refefence using local data late
+            self.get_update_statistics() <- will incurr in a circular refefence using local data late
         Args:
             introspection:
 
@@ -752,9 +752,9 @@ class DataLakePersistManager(PersistManager):
 
         """
 
-        self.introspection = introspection
+        self.already_run = already_run
 
-    def _get_local_lake_lastest_value(self):
+    def _get_local_lake_update_statistics(self):
         from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
         last_index_value, last_multiindex = DataLakeInterface(data_lake_source=self.data_source,

@@ -1111,7 +1111,7 @@ class DataPersistanceMethods(ABC):
 
         return self.local_persist_manager.persist_size
 
-    def get_latest_value(self, asset_symbols: Union[list, None] = None,
+    def get_update_statistics(self, asset_symbols: Union[list, None] = None,
                          ) -> datetime.datetime:
         """
         getts latest value directly from querying the DB,
@@ -1126,9 +1126,9 @@ class DataPersistanceMethods(ABC):
 
         """
 
-        latest_value, last_multiindex = self.local_persist_manager.get_latest_value(asset_symbols=asset_symbols)
+        last_time_in_table, last_time_per_asset = self.local_persist_manager.get_update_statistics(asset_symbols=asset_symbols)
 
-        return latest_value, last_multiindex
+        return last_time_in_table, last_time_per_asset
 
     def get_earliest_value(self) -> datetime.datetime:
         earliest_value = self.local_persist_manager.get_earliest_value()
@@ -1213,7 +1213,7 @@ class DataPersistanceMethods(ABC):
 
         """
 
-        latest_value, multiindex = self.get_latest_value(asset_symbols=asset_symbols,
+        latest_value, multiindex = self.get_update_statistics(asset_symbols=asset_symbols,
 
                                                          )
         if latest_value is None and multiindex is None:
@@ -1971,7 +1971,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
 
             else:
-                latest_value, last_multiindex = self.get_latest_value()
+                latest_value, last_multiindex = self.get_update_statistics()
                 if latest_value is None:
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
 
@@ -2056,7 +2056,7 @@ class WrapperTimeSerie(TimeSerie):
         """
         updates = {}
         for key, ts in self.related_time_series.items():
-            updates[key] = ts.get_latest_value()
+            updates[key] = ts.get_update_statistics()
 
         return updates
 
