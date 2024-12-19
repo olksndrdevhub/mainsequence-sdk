@@ -1,5 +1,3 @@
-from graphene import Dynamic
-
 from .utils import (TDAG_ENDPOINT, is_process_running, get_network_ip,
                     CONSTANTS,
                     DATE_FORMAT, get_authorization_headers, AuthLoaders, make_request, get_tdag_client_logger, set_types_in_table)
