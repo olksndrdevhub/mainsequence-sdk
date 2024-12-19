@@ -692,7 +692,7 @@ class DataLakePersistManager(PersistManager):
 
 
         super().__init__(*args,**kwargs)
-        self.already_run = self.already_run(already_run=False)
+        self.already_run = self.set_already_run(already_run=False)
 
 
     def verify_if_already_run(self, ts):
@@ -702,7 +702,7 @@ class DataLakePersistManager(PersistManager):
         :return:
         """
         from mainsequence.tdag_client.models import BACKEND_DETACHED
-        if self.already_introspected== True:
+        if self.already_run== True:
             return None
         if BACKEND_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             self.metadata = {"sourcetableconfiguration":None, "hash_id": self.remote_table_hashed_name,
@@ -714,7 +714,8 @@ class DataLakePersistManager(PersistManager):
                 # check if table is complete and continue with earliest latest value to avoid data gaps
                 last_update_in_table, last_update_per_asset = ts.get_update_statistics()
                 if last_update_in_table is not None:
-                    last_update_in_table = ts.get_earliest_updated_asset_filter(last_update_per_asset)
+                    last_update_in_table = ts.get_earliest_updated_asset_filter(last_update_per_asset=last_update_per_asset,
+                                                                                asset_symbols=None)
 
             self.logger.debug(f"Building local data lake from latest value  {last_update_in_table}")
 

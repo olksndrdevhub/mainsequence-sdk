@@ -4,12 +4,14 @@ import pandas as pd
 from typing import Union, List
 import s3fs
 import yaml
-import pyarrow.parquet as pq
+
 import json
 from functools import lru_cache
 import psutil
 import datetime
 import pyarrow.dataset as ds
+import pyarrow.parquet as pq
+import pyarrow as pa
 import pytz
 from tqdm import tqdm
 
@@ -248,7 +250,9 @@ class DataLakeInterface:
         partition_cols = [TIME_PARTITION]
         data = data.sort_values(by=time_index_name)
         data.set_index(index_names, inplace=True)
-        self.write_to_parquet(data=data, partition_cols=partition_cols, file_path=file_path)
+        self.write_to_parquet(data=data, partition_cols=partition_cols, file_path=file_path,
+                              upsert=self.table_exist(table_name)
+                              )
 
     def table_exist(self, table_name: str):
         file_path = self.get_file_path_for_table(table_name=table_name)
@@ -351,7 +355,9 @@ class DataLakeInterface:
         return data_set
 
 
-    def write_to_parquet(self, data: pd.DataFrame, file_path: str, partition_cols: list):
+    def write_to_parquet(self, data: pd.DataFrame, file_path: str, partition_cols: list,
+                         upsert: bool
+                         ):
         """
 
         Parameters
@@ -368,4 +374,91 @@ class DataLakeInterface:
                             storage_options=storage_options)
         else:
             os.makedirs(os.path.dirname(file_path, ), exist_ok=True)
-            data.to_parquet(file_path, partition_cols=partition_cols, engine='pyarrow')
+
+            if upsert ==True:
+                self.upsert_to_parquet(new_data_table=data,file_path=file_path)
+            else:
+                data.to_parquet(file_path, partition_cols=partition_cols, engine='pyarrow')
+
+    def upsert_to_parquet(self, new_data_table: pd.DataFrame, file_path: str):
+        unique_partitions = new_data_table[TIME_PARTITION].unique()
+        existing_dataset = ds.dataset(file_path, format="parquet", partitioning="hive")
+
+        # Determine index columns
+        if isinstance(new_data_table.index, pd.MultiIndex):
+            index_names = list(new_data_table.index.names)
+        else:
+            index_name = new_data_table.index.name if new_data_table.index.name else "index"
+            index_names = [index_name]
+
+        for partition_val in unique_partitions:
+            # Filter the new data for this partition
+            partition_df = new_data_table[new_data_table[TIME_PARTITION] == partition_val].copy()
+
+            # Read existing partition data first (may be empty)
+            partition_filter = ds.field(TIME_PARTITION) == partition_val
+            existing_partition_data = existing_dataset.to_table(filter=partition_filter)
+
+            # Reset index on the new data to include index columns
+            partition_df.reset_index(inplace=True)
+
+            # If we have existing data, match its schema exactly
+            if existing_partition_data.num_rows > 0:
+                existing_cols = existing_partition_data.schema.names
+
+                # Ensure all existing columns are in new DataFrame
+                missing_cols = [col for col in existing_cols if col not in partition_df.columns]
+                if missing_cols:
+                    raise ValueError(f"Missing columns in new data for partition {partition_val}: {missing_cols}")
+
+                # Reorder new data to match existing schema column order
+                partition_df = partition_df[existing_cols]
+
+                # Convert new DataFrame to a PyArrow Table
+                new_partition_data = pa.Table.from_pandas(partition_df, preserve_index=False)
+
+                # Cast the new table to the existing schema to ensure matching types
+                # This step ensures float/double alignment and any other subtle type differences.
+                new_partition_data = new_partition_data.cast(existing_partition_data.schema)
+
+                # Create combined keys for both existing and new data
+                def combined_key_array(table: pa.Table, idx_cols: list[str]) -> pa.Array:
+                    str_arrays = [table[col].cast(pa.string()) for col in idx_cols]
+                    if len(str_arrays) == 1:
+                        return str_arrays[0]
+                    combined = str_arrays[0]
+                    for col_arr in str_arrays[1:]:
+                        combined = pa.compute.binary_join_element_wise(
+                            combined, pa.array(["-"] * len(col_arr)), col_arr
+                        )
+                    return combined
+
+                existing_keys = combined_key_array(existing_partition_data, index_names)
+                new_keys = combined_key_array(new_partition_data, index_names)
+
+                in_filter = pa.compute.is_in(existing_keys, value_set=new_keys)
+                inverted_filter = pa.compute.invert(in_filter)
+                existing_partition_filtered = existing_partition_data.filter(inverted_filter)
+
+            else:
+                # No existing data, just use the new data's schema
+                new_partition_data = pa.Table.from_pandas(partition_df, preserve_index=False)
+                # Create an empty table with the same schema as the new data
+                existing_partition_filtered = pa.Table.from_arrays(
+                    [pa.array([], type=field.type) for field in new_partition_data.schema],
+                    schema=new_partition_data.schema
+                )
+
+            # Now we can safely concatenate since both match exactly
+            merged_data = pa.concat_tables([existing_partition_filtered, new_partition_data])
+
+            # Write the updated data back
+            partition_path = os.path.join(file_path, f"{TIME_PARTITION}={partition_val}")
+            temp_partition_path = f"{partition_path}_tmp"
+
+            pq.write_table(merged_data, temp_partition_path)
+            if os.path.exists(partition_path):
+                shutil.rmtree(partition_path)
+            os.rename(temp_partition_path, partition_path)
+
+        print("Upsert operation complete.")

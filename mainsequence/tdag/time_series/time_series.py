@@ -1590,7 +1590,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                                         data_source=self.data_source
                                                                         )
         if isinstance(self._local_persist_manager, DataLakePersistManager):
-            self._local_persist_manager.verify_introspection(self)
+            self._local_persist_manager.verify_if_already_run(self)
         self._verify_and_build_remote_objects()
 
     @none_if_backend_detached
