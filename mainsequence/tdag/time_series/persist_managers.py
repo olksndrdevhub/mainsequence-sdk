@@ -36,7 +36,7 @@ class PersistManager:
                  local_metadata: Union[dict, None] = None
 
                  ):
-        self.data_source=data_source
+        self.data_source = data_source
         self.local_hash_id = local_hash_id
         self.description = description or ""
         if local_metadata is not None and metadata is None:
@@ -65,7 +65,7 @@ class PersistManager:
             return DataLakePersistManager(data_source=data_source,*args, **kwargs)
 
         elif data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-            return TimeScaleLocalPersistManager(data_source=data_source,*args, **kwargs)
+            return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
 
     def depends_on_connect(self,new_ts:"TimeSerie"):
         """

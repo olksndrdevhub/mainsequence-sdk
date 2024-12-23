@@ -17,6 +17,7 @@ import gc
 from mainsequence.tdag.logconf import get_tdag_logger, create_logger_in_path
 
 from contextlib import contextmanager
+from mainsequence.tdag_client import LocalDiskSourceLake, DynamicTableDataSource
 
 logger = get_tdag_logger()
 TDAG_RAY_CLUSTER_ADDRESS = os.getenv("TDAG_RAY_CLUSTER_ADDRESS")
@@ -267,29 +268,38 @@ class TimeSerieHeadUpdateActorDist(TimeSerieHeadUpdateActor):
 
 
 @contextmanager
-def set_data_lake(pod_source, tdag_detached=False, override_all: bool = False):
+def set_data_source(pod_source=None, tdag_detached=False, override_all: bool = False):
     """
 
     :param override_all:
     :return:
     """
-    vars = ["POD_DEFAULT_DATA_SOURCE", "POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE", "BACKEND_DETACHED"]
-    original_values = {k: os.environ.get(k, None) for k in vars}
+    if pod_source is not None:
 
-    # Override the environment variables
-    os.environ["POD_DEFAULT_DATA_SOURCE"] = pod_source.model_dump_json()
-    os.environ["POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE"] = str(override_all)
-    os.environ["BACKEND_DETACHED"] = str(tdag_detached)
+        vars = ["POD_DEFAULT_DATA_SOURCE", "POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE", "BACKEND_DETACHED"]
+        original_values = {k: os.environ.get(k, None) for k in vars}
 
-    try:
-        yield pod_source
-    finally:
-        # Restore the original environment variables
-        for key, value in original_values.items():
-            if value is None:  # Variable was not originally set
-                del os.environ[key]
-            else:
-                os.environ[key] = value
+        # Override the environment variables
+        os.environ["POD_DEFAULT_DATA_SOURCE"] = pod_source.model_dump_json()
+        os.environ["POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE"] = str(override_all)
+        os.environ["BACKEND_DETACHED"] = str(tdag_detached)
+
+        try:
+            yield pod_source
+        finally:
+            # Restore the original environment variables
+            if pod_source is None: return
+            for key, value in original_values.items():
+                if value is None:  # Variable was not originally set
+                    del os.environ[key]
+                else:
+                    os.environ[key] = value
+    else:
+        # default data source for pod
+        yield DynamicTableDataSource.get_default_data_source_for_token()
+
+
+
 
 
 class LocalDataLakeScheduler:

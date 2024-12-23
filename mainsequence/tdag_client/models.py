@@ -1,6 +1,6 @@
 from .utils import (TDAG_ENDPOINT, is_process_running, get_network_ip,
                     CONSTANTS,
-                    DATE_FORMAT, get_authorization_headers, AuthLoaders, make_request, get_tdag_client_logger, set_types_in_table)
+                    DATE_FORMAT, get_authorization_headers, AuthLoaders, make_request, get_tdag_client_logger, set_types_in_table, parse_postgres_url)
 import copy
 import datetime
 import pytz
@@ -20,7 +20,6 @@ from typing import Optional, List, Dict, Any
 from .data_sources_interfaces.local_data_lake import DataLakeInterface
 from .data_sources_interfaces import timescale as TimeScaleInterface
 from functools import wraps
-
 
 _default_data_source = None  # Module-level cache
 BACKEND_DETACHED=lambda : os.environ.get('BACKEND_DETACHED',"false").lower()=="true"
@@ -190,12 +189,10 @@ class BaseObject:
 
     @none_if_backend_detached
     def patch(self,*args,**kwargs):
-
-
         url = self.ROOT_URL + "/update/"
-        payload = {"json": {"uid": self.uid,"patch_data":serialize_to_json(kwargs)}}
+        payload = {"json": {"uid": self.uid, "patch_data":serialize_to_json(kwargs)}}
         s = self.build_session()
-        r = make_request(s=s,loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
+        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
 
@@ -1012,7 +1009,7 @@ class LocalDiskSourceLake(DynamicTableDataSource):
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload={"json":kwargs})
 
-        if r.status_code not in  [200,201]:
+        if r.status_code not in  [200, 201]:
             raise Exception(f"Error in request {r.text}")
         return cls(**r.json())
 

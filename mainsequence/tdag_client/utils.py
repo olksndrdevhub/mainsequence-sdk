@@ -19,6 +19,8 @@ import socket
 import logging
 import subprocess
 from mainsequence.tdag.logconf import create_logger_in_path
+from urllib.parse import urlparse, unquote
+from typing import Dict
 
 TDAG_ENDPOINT = f"{os.environ.get('TDAG_ENDPOINT')}"
 
@@ -584,8 +586,6 @@ def get_mean_bid_ask_spread(interval: str, book_table_name: str, symbol_list: li
     return average_bid_offer
 
 
-
-
 def set_types_in_table(df, column_types):
     index_cols = [name for name in df.index.names if name is not None]
     if index_cols:
@@ -601,3 +601,25 @@ def set_types_in_table(df, column_types):
     if index_cols:
         df = df.set_index(index_cols)
     return df
+
+
+def parse_postgres_url(url: str) -> Dict[str, str]:
+    parsed_url = urlparse(url)
+
+    # Extract and decode components
+    scheme = parsed_url.scheme
+    username = unquote(parsed_url.username) if parsed_url.username else None
+    password = unquote(parsed_url.password) if parsed_url.password else None
+    host = parsed_url.hostname
+    port = str(parsed_url.port) if parsed_url.port else None
+    # Remove the leading '/' from the path to get the database name
+    database = parsed_url.path[1:] if parsed_url.path.startswith('/') else parsed_url.path
+
+    return {
+        'scheme': scheme,
+        'username': username,
+        'password': password,
+        'host': host,
+        'port': port,
+        'database': database
+    }
