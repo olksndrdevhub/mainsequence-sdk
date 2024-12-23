@@ -48,7 +48,6 @@ def read_parquet_from_lake(
         filters: Union[list,None]=None,
         s3_storage_options: Union[dict,None]=None,
 ):
-    data_buffer = []
     extra_kwargs = {'filters': filters} if filters is not None and len(filters) > 0 else {}
 
     if use_s3_if_available:
@@ -57,7 +56,7 @@ def read_parquet_from_lake(
     else:
         data = pd.read_parquet(file_path, **extra_kwargs)
 
-    return data
+    return data.sort_index()
 
 
 

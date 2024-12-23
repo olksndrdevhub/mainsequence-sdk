@@ -110,15 +110,15 @@ def copy_assets_between_orms(execution_venue_symbol: Union[list,None],
 
     for execution_venue_symbol in evs:
         #1 query Assets:
-        spot,_=AssetSource.filter(execution_venue_symbol=execution_venue_symbol,
+        spot, _ = AssetSource.filter(execution_venue_symbol=execution_venue_symbol,
                                     asset_type=CONSTANTS.ASSET_TYPE_CRYPTO_SPOT)
         futures, _ = AssetFutureUSDMSource.filter(execution_venue_symbol=execution_venue_symbol,
                                      asset_type=CONSTANTS.ASSET_TYPE_CRYPTO_USDM)
       
-        assets=spot+futures
-        total_assets=len(assets)
-        batch_size=min(batch_copy,total_assets)
-        for i in tqdm(range(0,total_assets,batch_size),desc=f"Copying Assets in {execution_venue_symbol}"):
+        assets = spot + futures
+        total_assets = len(assets)
+        batch_size = min(batch_copy, total_assets)
+        for i in tqdm(range(0, total_assets,batch_size),desc=f"Copying Assets in {execution_venue_symbol}"):
     
             end_batch=min(i+batch_size,total_assets)
             tmp_assets=assets[i:end_batch]
