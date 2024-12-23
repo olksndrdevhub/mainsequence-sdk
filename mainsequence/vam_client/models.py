@@ -98,8 +98,7 @@ class BaseVamPydanticModel(BaseModel):
 
 
 def get_correct_asset_class(asset_type):
-    if asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_SPOT, CONSTANTS.ASSET_TYPE_CASH_EQUITY,
-                               CONSTANTS.ASSET_TYPE_SETTLEMENT_ASSET]:
+    if asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_SPOT, CONSTANTS.ASSET_TYPE_CASH_EQUITY]:
         return Asset
     elif asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_USDM]:
         return AssetFutureUSDM
@@ -280,6 +279,7 @@ class BaseObjectOrm:
                          payload=payload)
         if r.status_code != 204:
             raise Exception(r.text)
+
     @classmethod
     def patch_by_id(cls,instance_id, *args, **kwargs):
         """
@@ -353,17 +353,12 @@ class ExecutionPositions(BaseObjectOrm,BaseVamPydanticModel):
 class WeightExecutionPosition(BaseObjectOrm,BaseVamPydanticModel):
     id: Optional[int] = None
     parent_execution_positions: int
-    asset: Union["Asset","AssetFutureUSDM",int]
-    settlement_asset: Union["Asset",int]
+    asset: Union["Asset", "AssetFutureUSDM",int]
     weight_notional_exposure: float
-
 
     @property
     def asset_id(self):
         return self.asset if isinstance(self.asset,int) else self.asset.id
-    @property
-    def settlement_asset_id(self):
-        return self.settlement_asset if isinstance(self.settlement_asset, int) else self.settlement_asset.id
 
     @root_validator(pre=True)
     def resolve_assets(cls, values):
@@ -464,9 +459,6 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
         else:
             return  f"{self.symbol}/{settlement_symbol}:{settlement_symbol}"
 
-    def get_settlement_asset_symbol(self):
-        raise NotImplementedError
-
     @classmethod
     def get_all_assets_on_positions(cls, execution_venue_symbol:str, asset_type: str):
         url = f"{cls.get_object_url()}/get_all_assets_on_positions"
@@ -497,9 +489,7 @@ class Asset(AssetMixin,BaseObjectOrm):
 
 
 class IndexAsset(Asset):
-    valuation_asset:AssetMixin
-    def get_settlement_asset_symbol(self):
-        return self.valuation_asset.symbol
+    valuation_asset: AssetMixin
 
 class TargetPortfolioIndexAsset(IndexAsset):
     asset_type: str = CONSTANTS.ASSET_TYPE_INDEX
@@ -528,9 +518,6 @@ class FutureUSDMMixin(AssetMixin, BaseVamPydanticModel):
         future = self.symbol.replace(self.quote_asset.symbol, "")
         spot = FUTURE_TO_SPOT_MAP[self.execution_venue_symbol].get(future, future)
         return spot
-
-    def get_settlement_asset_symbol(self):
-        return self.quote_asset.symbol
 
 class AssetFutureUSDM(FutureUSDMMixin,BaseObjectOrm):
     pass
@@ -791,19 +778,15 @@ class AccountPortfolioHistoricalWeights(BaseObjectOrm):
 
 
 
-class WeightPosition(BaseObjectOrm,BaseVamPydanticModel):
+class WeightPosition(BaseObjectOrm, BaseVamPydanticModel):
     id: Optional[int] = None
     parent_weights: int
     asset: Union[Asset,AssetFutureUSDM,  int]
-    settlement_asset: Union[Asset,int]
     weight_notional_exposure: float
 
     @property
     def asset_id(self):
         return self.asset if isinstance(self.asset,int) else self.asset.id
-    @property
-    def settlement_asset_id(self):
-        return self.settlement_asset if isinstance(self.settlement_asset, int) else self.settlement_asset.id
 
     @root_validator(pre=True)
     def resolve_assets(cls, values):
@@ -1020,15 +1003,11 @@ class VirtualFundPositionDetail(BaseObjectOrm, BaseVamPydanticModel):
     asset: Union[Asset,AssetFutureUSDM,int]
     price: float
     quantity: float
-    settlement_asset: Union[Asset,int]
     parents_holdings: Union[int,"VirtualFundHistoricalHoldings"]
 
     @property
     def asset_id(self):
         return self.asset if isinstance(self.asset,int) else self.asset.id
-    @property
-    def settlement_asset_id(self):
-        return self.settlement_asset if isinstance(self.settlement_asset, int) else self.settlement_asset.id
 
     @root_validator(pre=True)
     def resolve_assets(cls, values):
@@ -1053,7 +1032,6 @@ class ExecutionQuantity(BaseModel):
     asset: Union[Asset,AssetFutureUSDM,  int]
     quantity: float
     reference_price:Union[None,float]
-    settlement_asset:Union[Asset,int]
 
     def __repr__(self):
         return f"{self.__class__.__name__}(asset={self.asset}, quantity={self.quantity})"
@@ -1154,7 +1132,6 @@ class VirtualFund(BaseObjectOrm, BaseVamPydanticModel):
                 if position.asset_id not in target_weights.keys():
                     positions_to_unwind.append(ExecutionQuantity(asset=position.asset,
                                                      reference_price=None,
-                                                     settlement_asset=position.settlement_asset,
                                                      quantity=-position.quantity))
 
             positions_to_rebalance.extend(positions_to_unwind)
@@ -1172,7 +1149,6 @@ class VirtualFund(BaseObjectOrm, BaseVamPydanticModel):
             target_quantity = self.notional_exposure_in_account * target_position.weight_notional_exposure / price
             rebalance_quantity = target_quantity - current_position
             positions_to_rebalance.append(ExecutionQuantity(asset=target_position.asset,
-                                                            settlement_asset=target_position.settlement_asset,
                                                             quantity=rebalance_quantity,
                                                             reference_price=price
                                                             ))

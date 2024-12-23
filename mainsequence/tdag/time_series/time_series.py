@@ -1127,7 +1127,6 @@ class DataPersistanceMethods(ABC):
         """
 
         last_update_in_table, last_update_per_asset = self.local_persist_manager.get_update_statistics(asset_symbols=asset_symbols)
-
         return last_update_in_table, last_update_per_asset
 
     def get_earliest_value(self) -> datetime.datetime:
@@ -1198,7 +1197,7 @@ class DataPersistanceMethods(ABC):
         return pandas_df
 
 
-    def get_latest_update_by_assets_filter(self,asset_symbols:Union[list,None],last_update_per_asset:dict):
+    def get_latest_update_by_assets_filter(self,asset_symbols:Union[list,None], last_update_per_asset:dict):
         """
         Gets the latest update from a symbol list
         :param asset_symbols:
@@ -1206,19 +1205,16 @@ class DataPersistanceMethods(ABC):
         """
         if asset_symbols is not None:
             last_update_in_table = np.max([np.max(list(i.values()))
-                                           for i in list(last_update_per_asset.values())
-                                           if i in asset_symbols
-
+                                           for asset_symbol, i in last_update_per_asset.items()
+                                           if asset_symbol in asset_symbols
                                            ])
         else:
             last_update_in_table = np.max([np.max(list(i.values()))
                                            for i in list(last_update_per_asset.values())
-
-
                                            ])
-
         return last_update_in_table
-    def get_earliest_updated_asset_filter(self,asset_symbols:Union[list,None],last_update_per_asset:dict):
+
+    def get_earliest_updated_asset_filter(self, asset_symbols:Union[list,None], last_update_per_asset:dict):
         if asset_symbols is not None:
             last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values() if a in asset_symbols])
         else:
@@ -1543,9 +1539,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                 local_hash_id=local_hash_id, data_source_id=self.data_source.id
                                                 )
 
-    def run(self):
-        assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+    def run(self, tdag_detached=True):
         self.local_persist_manager
+        return self.get_df_between_dates()
+
     @property
     def local_persist_manager(self):
         if hasattr(self, "logger") == False:
@@ -1627,6 +1624,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def flush_pickle(self):
         if os.path.isfile(self.pickle_path):
             os.remove(self.pickle_path)
+
     @none_if_backend_detached
     def patch_build_configuration(self):
         """
@@ -1636,8 +1634,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         -------
 
         """
-
-
         patch_build = os.environ.get("PATCH_BUILD_CONFIGURATION", False) in ["true", "True", 1]
         if patch_build == True:
             self.local_persist_manager  # just call it before to initilaize dts
@@ -2264,7 +2260,6 @@ class WrapperTimeSerie(TimeSerie):
         thread = True
 
         def add_ts(ts, key, thread, asset_symbols, key_date_filter):
-
             data_start_date = start_date
             if isinstance(start_date, dict):
                 data_start_date = start_date[key]
@@ -2274,18 +2269,13 @@ class WrapperTimeSerie(TimeSerie):
             tmp_df = ts.get_df_between_dates(start_date=data_start_date, great_or_equal=great_or_equal,
                                              end_date=end_date, less_or_equal=less_or_equal,
                                              asset_symbols=asset_symbols,
-
-                                             )
+            )
             tmp_df["key"] = key
-
             all_dfs_thread[key] = tmp_df
 
         if thread == False:
             for key, ts in self.related_time_series.items():
                 add_ts(ts, key, thread, asset_symbols, key_date_filter)
-
-
-
         else:
 
             with ThreadPoolExecutor(max_workers=10) as executor:

@@ -60,13 +60,11 @@ class PersistManager:
     @classmethod
     def get_from_data_type(self,data_source:DynamicTableDataSource, *args, **kwargs):
 
-
-
-        data_type=data_source.data_type
-        if data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+        data_type = data_source.data_type
+        if data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             return DataLakePersistManager(data_source=data_source,*args, **kwargs)
 
-        elif data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+        elif data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             return TimeScaleLocalPersistManager(data_source=data_source,*args, **kwargs)
 
     def depends_on_connect(self,new_ts:"TimeSerie"):
@@ -577,7 +575,6 @@ class PersistManager:
                 "index_names"], "Table does not contain asset_symbol column"
 
         df = self.dth.filter_by_assets_ranges(metadata=self.metadata, asset_ranges_map=asset_ranges_map,
-
                                               data_source=self.data_source)
 
 
@@ -689,8 +686,6 @@ class DataLakePersistManager(PersistManager):
         """
         Initializes the DataLakePersistManager with configuration from environment variables.
         """
-
-
         super().__init__(*args,**kwargs)
         self.already_run = self.set_already_run(already_run=False)
 
@@ -713,7 +708,7 @@ class DataLakePersistManager(PersistManager):
             if self.table_exist():
                 # check if table is complete and continue with earliest latest value to avoid data gaps
                 last_update_in_table, last_update_per_asset = ts.get_update_statistics()
-                if last_update_in_table is not None:
+                if last_update_per_asset is not None:
                     last_update_in_table = ts.get_earliest_updated_asset_filter(last_update_per_asset=last_update_per_asset,
                                                                                 asset_symbols=None)
 
@@ -752,10 +747,12 @@ class DataLakePersistManager(PersistManager):
     def _get_local_lake_update_statistics(self):
         from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
-        last_index_value, last_multiindex = DataLakeInterface(data_lake_source=self.data_source,
-                                                              logger=self.logger).get_parquet_latest_value(
-            table_name=self.remote_table_hashed_name)
-
+        last_index_value, last_multiindex = DataLakeInterface(
+            data_lake_source=self.data_source,
+            logger=self.logger
+        ).get_parquet_latest_value(
+            table_name=self.remote_table_hashed_name
+        )
         return last_index_value, last_multiindex
 
     def table_exist(self):

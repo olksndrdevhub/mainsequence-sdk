@@ -40,12 +40,12 @@ def module_factory(execution_venue_symbol):
         from mainsequence.vam_client import models_alpaca as model_module
     elif execution_venue_symbol in CONSTANTS.NON_TRADABLE_VENUES:
         from mainsequence.vam_client import models as model_module
-        
     else:
         raise NotImplementedError
+
     return model_module
 def get_right_account_class(account:Account):
-    execution_venue_symbol=account.execution_venue.symbol
+    execution_venue_symbol = account.execution_venue.symbol
     model_module = module_factory(execution_venue_symbol)
     AccountClass = getattr(model_module, CONSTANTS.ACCOUNT_VENUE_FACTORY[execution_venue_symbol])
     account, _ = AccountClass.get(id=account.id)

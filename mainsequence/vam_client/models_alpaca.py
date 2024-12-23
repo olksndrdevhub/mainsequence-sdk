@@ -35,14 +35,10 @@ class AlpacaAsset(AssetMixin, AlpacaBaseObject):
     shortable: bool
     easy_to_borrow: bool
     fractionable: bool
-    settlement_asset_symbol: str
 
     def get_spot_reference_asset_symbol(self):
-
         return self.symbol
 
-    def get_settlement_asset_symbol(self):
-        return self.settlement_asset_symbol
 
 class AlapaAccountRiskFactors(AccountRiskFactors):
     total_initial_margin: float

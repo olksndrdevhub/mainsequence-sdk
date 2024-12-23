@@ -999,8 +999,8 @@ class TimeScaleDB(DataSource):
     port :int
 
 class LocalDiskSourceLake(DynamicTableDataSource):
-    related_resource:PodLocalLake
-    data_type:str=CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+    related_resource: PodLocalLake
+    data_type: str=CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
 
     @classmethod
     def get_or_create(cls, *args,**kwargs):
@@ -1015,9 +1015,6 @@ class LocalDiskSourceLake(DynamicTableDataSource):
         if r.status_code not in  [200,201]:
             raise Exception(f"Error in request {r.text}")
         return cls(**r.json())
-
-
-
 
 class TimeScaleDBDataSource(DynamicTableDataSource):
     related_resource: TimeScaleDB
@@ -1696,22 +1693,20 @@ class DynamicTableHelpers:
         return local_metadata
 
     def filter_by_assets_ranges(self,metadata: dict,
-
-                                asset_ranges_map:dict,data_source:object):
-
+                                asset_ranges_map:dict,data_source:object
+    ):
         table_name=metadata["table_name"]
-
         if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
 
             data_lake_interface = DataLakeInterface(data_lake_source=data_source, logger=logger, )
-            df=data_lake_interface.filter_by_assets_ranges(table_name=table_name,
+            df = data_lake_interface.filter_by_assets_ranges(table_name=table_name,
                                                  asset_ranges_map=asset_ranges_map,
                                                  )
 
         elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             index_names = metadata["sourcetableconfiguration"]["index_names"]
             column_types = metadata["sourcetableconfiguration"]["column_dtypes_map"]
-            df = TimeScaleInterface.filter_by_assets_ranges(table_name=table_name,asset_ranges_map=asset_ranges_map,index_names=index_names,
+            df = TimeScaleInterface.filter_by_assets_ranges(table_name=table_name, asset_ranges_map=asset_ranges_map, index_names=index_names,
                                     data_source=data_source, column_types=column_types
                                     )
         else:
@@ -1734,7 +1729,7 @@ class DynamicTableHelpers:
             less_or_equal = less_or_equal, end_date = end_date, columns = columns, asset_symbols=asset_symbols)
             df = set_types_in_table(df, metadata["sourcetableconfiguration"]["column_dtypes_map"])
         elif data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            data_lake_interface = DataLakeInterface(data_lake_source=data_source,logger=self.logger)
+            data_lake_interface = DataLakeInterface(data_lake_source=data_source, logger=self.logger)
             filters = data_lake_interface.build_time_and_symbol_filter(start_date=start_date,
                                                                        great_or_equal=great_or_equal,
                                                                        less_or_equal=less_or_equal,

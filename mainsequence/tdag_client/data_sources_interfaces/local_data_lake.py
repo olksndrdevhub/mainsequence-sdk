@@ -14,7 +14,7 @@ import pyarrow.parquet as pq
 import pyarrow as pa
 import pytz
 from tqdm import tqdm
-
+import shutil
 from mainsequence.tdag_client.utils import set_types_in_table
 
 TIME_PARTITION = "TIME_PARTITION"
@@ -32,15 +32,13 @@ def memory_usage_exceeds_limit(max_usage_percentage):
     return used_memory_percentage > max_usage_percentage
 
 @lru_cache(maxsize=50)
-def read_full_data(file_path,filters=None, use_s3_if_available=False, max_memory_usage=80):
+def read_full_data(file_path, filters=None, use_s3_if_available=False, max_memory_usage=80):
     " Cached access to static datalake file "
-    # logger.debug("in data lake read")
     if memory_usage_exceeds_limit(max_memory_usage):
         # Clear cache if memory exceeds the limit
         read_full_data.cache_clear()
-        # logger.info("Cache cleared due to high memory usage.")
 
-    data = read_parquet_from_lake(file_path=file_path,filters=filters,use_s3_if_available=use_s3_if_available)
+    data = read_parquet_from_lake(file_path=file_path, filters=filters, use_s3_if_available=use_s3_if_available)
     data = data.drop(columns=[TIME_PARTITION])
     return data
 
@@ -51,17 +49,15 @@ def read_parquet_from_lake(
         s3_storage_options: Union[dict,None]=None,
 ):
     data_buffer = []
-    for filter in tqdm(filters):
-        extra_kwargs = {} if filters is None else {'filters': (filter,)}
+    extra_kwargs = {'filters': filters} if filters is not None and len(filters) > 0 else {}
 
-        if use_s3_if_available:
-            s3_path, storage_options = self._get_storage_options(file_path)
-            data = pd.read_parquet(s3_path, engine='pyarrow', storage_options=storage_options, **extra_kwargs)
-        else:
-            data = pd.read_parquet(file_path, **extra_kwargs)
+    if use_s3_if_available:
+        s3_path, storage_options = self._get_storage_options(file_path)
+        data = pd.read_parquet(s3_path, engine='pyarrow', storage_options=storage_options, **extra_kwargs)
+    else:
+        data = pd.read_parquet(file_path, **extra_kwargs)
 
-        data_buffer.append(data)
-    return pd.concat(data_buffer)
+    return data
 
 
 
@@ -148,7 +144,6 @@ class DataLakeInterface:
         return tuple(filters)
 
     def filter_by_assets_ranges(self,table_name:str,
-
                                 asset_ranges_map:dict,
 
     ):
@@ -177,9 +172,11 @@ class DataLakeInterface:
             for group in filters
         )
 
-        df = self.query_datalake(table_name,filters=filters)
+        df_buffer = []
+        for filter in tqdm(filters):
+            df_buffer.append(self.query_datalake(table_name, filters=(filter,)))
 
-        return df
+        return pd.concat(df_buffer)
 
     def get_file_path_for_table(self,table_name):
 
@@ -194,6 +191,7 @@ class DataLakeInterface:
     def lake_exists(self,table_name):
         file_path = self.get_file_path_for_table(table_name)
         return self.lake_exists(file_path)
+
     def query_datalake(
             self,
             table_name:str, index_names=list,
@@ -216,19 +214,12 @@ class DataLakeInterface:
         Returns:
             pd.DataFrame: The queried data.
         """
-
-
-
-        self.logger.debug(f"Read {table_name} ")
+        self.logger.debug(f"Data Lake Read {table_name} ")
         data = read_full_data(file_path=self.get_file_path_for_table(table_name=table_name),
                               filters=filters,
-                              )
-
-
-
-
-
+        )
         return data
+
     def persist_datalake(self, data: pd.DataFrame,overwrite:bool,table_name,time_index_name:str,
                          index_names:list):
         """
@@ -272,8 +263,8 @@ class DataLakeInterface:
     def get_parquet_latest_value(self,table_name):
 
         file_path = self.get_file_path_for_table(table_name)
-        if self.table_exist(table_name)==False:
-            return None,None
+        if not self.table_exist(table_name):
+            return None, None
         self.logger.warning("IMPROVE SPEED READ FROM STATS")
         data_set = self.get_parquet_data_set(file_path)
         time_index_column_name = data_set.schema.pandas_metadata['index_columns'][0]
@@ -287,12 +278,12 @@ class DataLakeInterface:
             key=lambda x: (int(x.split('-W')[0]), int(x.split('-W')[1]))
         )
 
-        filtered_dataset=read_parquet_from_lake(file_path=file_path,
-                                                use_s3_if_available=False,
-                                                filters=[(TIME_PARTITION, "=",
-                                                                                     time_partition[-1])])
-        last_multiindex={}
-
+        filtered_dataset = read_parquet_from_lake(
+            file_path=file_path,
+            use_s3_if_available=False,
+            filters=[(TIME_PARTITION, "=", time_partition[-1])]
+        )
+        last_multiindex = {}
         if "asset_symbol" in filtered_dataset.index.names:
             # Get the latest index value for each asset and execution venue
             last_multiindex = (
@@ -310,11 +301,14 @@ class DataLakeInterface:
             # Get the latest time index value across all assets and execution venues
             last_index_value = filtered_dataset.index.get_level_values('time_index').max()
         else:
-            last_index_value=filtered_dataset.index.max()
+            last_index_value = filtered_dataset.index.max()
+
         if len(last_multiindex) == 0:
             last_multiindex = None
 
+        assert last_index_value
         return last_index_value, last_multiindex
+
     def _create_base_path(self):
         if self.s3_data_lake:
 
@@ -354,34 +348,25 @@ class DataLakeInterface:
             data_set=pq.ParquetDataset(file_path)
         return data_set
 
-
-    def write_to_parquet(self, data: pd.DataFrame, file_path: str, partition_cols: list,
-                         upsert: bool
-                         ):
-        """
-
-        Parameters
-        ----------
-        data
-
-        Returns
-        -------
-
-        """
+    def write_to_parquet(self, data: pd.DataFrame, file_path: str, partition_cols: list, upsert: bool):
         if self.s3_data_lake:
+            # Write directly to S3
             s3_path, storage_options = self._get_storage_options(file_path)
-            data.to_parquet(s3_path, partition_cols=partition_cols, engine='pyarrow',
-                            storage_options=storage_options)
+            data.to_parquet(s3_path, partition_cols=partition_cols, engine='pyarrow', storage_options=storage_options)
         else:
-            os.makedirs(os.path.dirname(file_path, ), exist_ok=True)
+            # Local filesystem
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-            if upsert ==True:
-                self.upsert_to_parquet(new_data_table=data,file_path=file_path)
+            if upsert:
+                self.upsert_to_parquet(new_data_table=data, file_path=file_path)
             else:
                 data.to_parquet(file_path, partition_cols=partition_cols, engine='pyarrow')
 
     def upsert_to_parquet(self, new_data_table: pd.DataFrame, file_path: str):
+        # Identify unique partitions
         unique_partitions = new_data_table[TIME_PARTITION].unique()
+
+        # Load existing dataset
         existing_dataset = ds.dataset(file_path, format="parquet", partitioning="hive")
 
         # Determine index columns
@@ -394,15 +379,13 @@ class DataLakeInterface:
         for partition_val in unique_partitions:
             # Filter the new data for this partition
             partition_df = new_data_table[new_data_table[TIME_PARTITION] == partition_val].copy()
+            partition_df.reset_index(inplace=True)  # Ensure index columns are present as normal columns
 
-            # Read existing partition data first (may be empty)
+            # Filter existing dataset for this partition
             partition_filter = ds.field(TIME_PARTITION) == partition_val
             existing_partition_data = existing_dataset.to_table(filter=partition_filter)
 
-            # Reset index on the new data to include index columns
-            partition_df.reset_index(inplace=True)
-
-            # If we have existing data, match its schema exactly
+            # If we have existing data, ensure schema alignment
             if existing_partition_data.num_rows > 0:
                 existing_cols = existing_partition_data.schema.names
 
@@ -411,17 +394,12 @@ class DataLakeInterface:
                 if missing_cols:
                     raise ValueError(f"Missing columns in new data for partition {partition_val}: {missing_cols}")
 
-                # Reorder new data to match existing schema column order
+                # Reorder and convert new DataFrame to match existing schema
                 partition_df = partition_df[existing_cols]
-
-                # Convert new DataFrame to a PyArrow Table
                 new_partition_data = pa.Table.from_pandas(partition_df, preserve_index=False)
-
-                # Cast the new table to the existing schema to ensure matching types
-                # This step ensures float/double alignment and any other subtle type differences.
                 new_partition_data = new_partition_data.cast(existing_partition_data.schema)
 
-                # Create combined keys for both existing and new data
+                # Create combined keys for deduplication
                 def combined_key_array(table: pa.Table, idx_cols: list[str]) -> pa.Array:
                     str_arrays = [table[col].cast(pa.string()) for col in idx_cols]
                     if len(str_arrays) == 1:
@@ -443,20 +421,30 @@ class DataLakeInterface:
             else:
                 # No existing data, just use the new data's schema
                 new_partition_data = pa.Table.from_pandas(partition_df, preserve_index=False)
-                # Create an empty table with the same schema as the new data
+                # Create empty table with the same schema for easy concatenation
                 existing_partition_filtered = pa.Table.from_arrays(
                     [pa.array([], type=field.type) for field in new_partition_data.schema],
                     schema=new_partition_data.schema
                 )
 
-            # Now we can safely concatenate since both match exactly
             merged_data = pa.concat_tables([existing_partition_filtered, new_partition_data])
 
-            # Write the updated data back
-            partition_path = os.path.join(file_path, f"{TIME_PARTITION}={partition_val}")
-            temp_partition_path = f"{partition_path}_tmp"
+            # Write out the merged data
+            partition_dir_name = f"{TIME_PARTITION}={partition_val}"
+            partition_path = os.path.join(file_path, partition_dir_name)
+            temp_partition_path = partition_path + "_tmp"
 
-            pq.write_table(merged_data, temp_partition_path)
+            # Clean up temp directory if exists
+            if os.path.exists(temp_partition_path):
+                shutil.rmtree(temp_partition_path)
+
+            os.makedirs(temp_partition_path, exist_ok=True)
+
+            # Write a single parquet file inside the temp partition directory
+            temp_file = os.path.join(temp_partition_path, "part-0.parquet")
+            pq.write_table(merged_data, temp_file)
+
+            # Replace old partition directory
             if os.path.exists(partition_path):
                 shutil.rmtree(partition_path)
             os.rename(temp_partition_path, partition_path)
