@@ -1,5 +1,8 @@
 import pandas as pd
 import psycopg2
+from psycopg2 import errors
+from psycopg2.extras import execute_batch
+from pgcopy import CopyManager
 import tempfile
 import tqdm
 
