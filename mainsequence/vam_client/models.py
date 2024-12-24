@@ -503,12 +503,14 @@ class TargetPortfolioIndexAsset(IndexAsset):
     )
 
 
+class CurrencyPair(AssetMixin,BaseObjectOrm):
+    base_asset:AssetMixin
+    quote_asset:AssetMixin
 
 class FutureUSDMMixin(AssetMixin, BaseVamPydanticModel):
     maturity_code: str = Field(..., max_length=50)
     last_trade_time: Optional[datetime.datetime] = None
-    base_asset: AssetMixin
-    quote_asset: AssetMixin
+    currency_pair:CurrencyPair
 
     def get_spot_reference_asset_symbol(self):
         FUTURE_TO_SPOT_MAP = {
