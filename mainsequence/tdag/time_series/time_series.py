@@ -1481,12 +1481,19 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         pod_source = ModelClass(**pod_source)
         return pod_source
 
+    @property
+    def data_source(self):
+        if hasattr(self, "_data_source"):
+            return self._data_source
+        else:
+            raise Exception("Data source has not been set")
+
     def set_data_source(self):
         """
 
         :return:
         """
-        self.data_source = self.get_data_source()
+        self._data_source = self.get_data_source()
 
     def run_after_post_init_routines(self):
         pass
