@@ -7,6 +7,12 @@ import os
 import tempfile
 import pandas as pd
 
+import numpy as np
+
+
+from typing import Union
+import pandas as pd
+
 from typing import Union, List
 import time
 import traceback
@@ -344,11 +350,7 @@ def individual_copy(records: list, time_series_orm_db_connection: str, table_nam
             cur.rollback()
             raise e
 
-import numpy as np
-import psycopg2
-from psycopg2.extras import execute_values
-from typing import Union
-import pandas as pd
+
 
 
 
