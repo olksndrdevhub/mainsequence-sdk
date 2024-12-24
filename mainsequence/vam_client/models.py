@@ -504,8 +504,8 @@ class TargetPortfolioIndexAsset(IndexAsset):
 
 
 class CurrencyPair(AssetMixin,BaseObjectOrm):
-    base_asset:AssetMixin
-    quote_asset:AssetMixin
+    base_asset:Union[AssetMixin,int]
+    quote_asset:Union[AssetMixin,int]
 
 class FutureUSDMMixin(AssetMixin, BaseVamPydanticModel):
     maturity_code: str = Field(..., max_length=50)
@@ -517,8 +517,8 @@ class FutureUSDMMixin(AssetMixin, BaseVamPydanticModel):
             CONSTANTS.BINANCE_FUTURES_EV_SYMBOL: {"1000SHIB": "SHIB"},
         }
 
-        future = self.symbol.replace(self.quote_asset.symbol, "")
-        spot = FUTURE_TO_SPOT_MAP[self.execution_venue_symbol].get(future, future)
+        base_asset_symbol = self.symbol.replace(self.currency_pair.quote_asset.symbol, "")
+        spot = FUTURE_TO_SPOT_MAP[self.execution_venue_symbol].get(base_asset_symbol, base_asset_symbol)
         return spot
 
 class AssetFutureUSDM(FutureUSDMMixin,BaseObjectOrm):
