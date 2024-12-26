@@ -2232,9 +2232,10 @@ class WrapperTimeSerie(TimeSerie):
                         raise e
         else:
             self.logger.warning("NOT using threads for  loading state")
-            t = update_ts(self.related_time_series, ts_key,
-                          include_vam_client_objects, graph_depth,
-                          graph_depth_limit, errors, local_metadatas, rel_ts)
+            for ts_key, rel_ts in self.related_time_series.items():
+                t = update_ts(self.related_time_series, ts_key,
+                              include_vam_client_objects, graph_depth,
+                              graph_depth_limit, errors, local_metadatas, rel_ts)
 
         if len(errors.keys()) > 0:
             raise Exception(f"Error setting state for {errors}")

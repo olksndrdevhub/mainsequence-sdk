@@ -28,7 +28,8 @@ def get_model_class(model_class:str):
                      "BinanceAsset":BinanceAsset,
                      "BinanceAssetFutureUSDM":BinanceAssetFutureUSDM,
                      "IndexAsset":IndexAsset,
-                     "TargetPortfolioIndexAsset":TargetPortfolioIndexAsset
+                     "TargetPortfolioIndexAsset":TargetPortfolioIndexAsset,
+                     "Calendar":Calendar
                      }
 
     return MODEL_CLASS_MAP[model_class]
