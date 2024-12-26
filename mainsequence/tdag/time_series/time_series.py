@@ -723,7 +723,7 @@ class TimeSerieRebuildMethods(ABC):
             time_serie = cloudpickle.load(handle)
 
         data_source = time_serie.load_data_source_from_pickle(pickle_path=pickle_path)
-        time_serie.data_source = data_source
+        time_serie.set_data_source(data_source=data_source)
         # verify pickle
         time_serie.verify_backend_git_hash_with_pickle()
 
@@ -738,7 +738,7 @@ class TimeSerieRebuildMethods(ABC):
 
     def set_data_source_from_pickle_path(self, pikle_path):
         data_source = self.load_data_source_from_pickle(pikle_path)
-        self.data_source = data_source
+        self.set_data_source(data_source=data_source)
 
     @classmethod
     def load_and_set_from_pickle(cls, pickle_path, graph_depth_limit=1, ):
@@ -1462,7 +1462,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         """
         self.pre_load_routines_run = True
 
-    def get_data_source(self):
+    def get_data_source_from_orm(self):
         from mainsequence.tdag_client import POD_DEFAULT_DATA_SOURCE
 
         pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
@@ -1488,12 +1488,16 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         else:
             raise Exception("Data source has not been set")
 
-    def set_data_source(self):
+    def set_data_source(self,data_source:Union[object,None]=None):
         """
 
         :return:
         """
-        self._data_source = self.get_data_source()
+        if data_source is None:
+            
+            self._data_source = self.get_data_source_from_orm()
+        else:
+            self._data_source = data_source
 
     def run_after_post_init_routines(self):
         pass
@@ -2111,9 +2115,9 @@ class WrapperTimeSerie(TimeSerie):
             if isinstance(value, dict) == True:
                 local_hash_id = value["local_hash_id"]
 
-                module = importlib.import_module(state["data_source"]["pydantic_model_import_path"]["module"])
-                PydanticClass = getattr(module, state["data_source"]["pydantic_model_import_path"]['qualname'])
-                data_source = PydanticClass(**state["data_source"]['serialized_model'])
+                module = importlib.import_module(state["_data_source"]["pydantic_model_import_path"]["module"])
+                PydanticClass = getattr(module, state["_data_source"]["pydantic_model_import_path"]['qualname'])
+                data_source = PydanticClass(**state["_data_source"]['serialized_model'])
                 pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
                                                         data_source_id=data_source.id
                                                         )
@@ -2143,7 +2147,7 @@ class WrapperTimeSerie(TimeSerie):
 
     def set_data_source_from_pickle_path(self, pikle_path):
         data_source = self.load_data_source_from_pickle(pikle_path)
-        self.data_source = data_source
+        self.set_data_source(data_source=data_source)
 
     def set_local_persist_manager_if_not_set(self) -> None:
         """
