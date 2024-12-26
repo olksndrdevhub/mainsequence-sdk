@@ -195,7 +195,7 @@ class BaseObject:
         r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
-
+        return Scheduler(**r.json())
 
 class SchedulerDoesNotExist(Exception):
     pass
@@ -372,6 +372,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
     is_running: bool
     running_process_pid: Optional[int]
     running_in_debug_mode: bool
+    updates_halted:bool
     host: Optional[str]
     api_address: Optional[str]
     api_port: Optional[int]

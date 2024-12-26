@@ -781,15 +781,17 @@ class SchedulerUpdater:
     def _scheduler_heart_beat_patch(self):
         from mainsequence.tdag_client.utils import get_network_ip
         try:
-            self.node_scheduler.patch(is_running=True,
+            scheduler=self.node_scheduler.patch(is_running=True,
                                       running_process_pid=os.getpid(),
                                       running_in_debug_mode=self._debug_mode,
                                       last_heart_beat=datetime.datetime.utcnow().timestamp(),
                                       api_address=get_network_ip(),
                                       api_port=self._api_port
                                       )
+            self.node_scheduler = scheduler
         except Exception as e:
             logger.error(e)
+
 
     def start(self, debug=False, update_tree: Union[bool, dict] = True, break_after_one_update=False,
               wait_for_update=True,
@@ -840,6 +842,12 @@ class SchedulerUpdater:
             unready = True if len(unready) == 0 else unready
 
             while unready:
+
+                if self.node_scheduler.updates_halted == True:
+                    self.logger.info("Scheduler Updates have been halted")
+                    time.sleep(60)
+                    continue
+
                 task_hex_to_uid, wait_list = self._evaluate_read_task(ready=ready,
                                                                           task_hex_to_uid=task_hex_to_uid,
                                                                           wait_list=wait_list)
