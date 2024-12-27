@@ -823,8 +823,8 @@ class SchedulerUpdater:
         self._scheduler_heart_beat_patch()
 
         update_extra_kwargs = {} if update_extra_kwargs is None else update_extra_kwargs
-
-        _ = RayUpdateManager(scheduler_uid=self.node_scheduler.uid)  # on initi verifys ray is running
+        if debug ==False:
+            _ = RayUpdateManager(scheduler_uid=self.node_scheduler.uid)  # on initi verifys ray is running
         running_distributed_heads = True
         if run_head_in_main_process == True or debug == True:
             running_distributed_heads = False
