@@ -784,9 +784,7 @@ class SchedulerUpdater:
             scheduler=self.node_scheduler.patch(is_running=True,
                                       running_process_pid=os.getpid(),
                                       running_in_debug_mode=self._debug_mode,
-                                      last_heart_beat=datetime.datetime.utcnow().timestamp(),
-                                      api_address=get_network_ip(),
-                                      api_port=self._api_port
+                                      last_heart_beat=datetime.datetime.utcnow().replace(tzinfo=pytz.utc).timestamp(),
                                       )
             self.node_scheduler = scheduler
         except Exception as e:
@@ -816,11 +814,35 @@ class SchedulerUpdater:
         -------
 
         """
-
+        import threading
+        from mainsequence.tdag_client import CONSTANTS as TDAG_CONSTANTS
         self._debug_mode = debug
         self._api_port = api_port
 
-        self._scheduler_heart_beat_patch()
+        # ---------------------------------------------------------
+        # 1. Spawn a daemon thread that calls the heartbeat method
+        #    every 30 seconds
+        # ---------------------------------------------------------
+        self.stop_heart_beat=False
+        run_interval=TDAG_CONSTANTS.SCHEDULER_HEART_BEAT_FREQUENCY_SECONDS
+        def _heartbeat_runner():
+            """
+            Runs forever (until the main thread ends),
+            calling _scheduler_heart_beat_patch every 30 seconds.
+            """
+            while True:
+                self._scheduler_heart_beat_patch()
+                # Sleep in a loop so that if we ever decide to
+                # add a cancellation event, we can check it in smaller intervals
+                for _ in range(run_interval):
+                    # could check for a stop event here if not daemon
+                    if  self.stop_heart_beat == True:
+                        return None
+                    time.sleep(1)
+
+
+        heartbeat_thread = threading.Thread(target=_heartbeat_runner, daemon=True)
+        heartbeat_thread.start()
 
         update_extra_kwargs = {} if update_extra_kwargs is None else update_extra_kwargs
         if debug ==False:
@@ -893,16 +915,18 @@ class SchedulerUpdater:
                 unready = True if len(unready) == 0 else unready
 
 
-
         except KeyboardInterrupt as ki:
             self.node_scheduler.patch(is_running=False, running_process_pid=0, )
             self._clear_idle_scheduled_tree(node_scheduler=self.node_scheduler)
+            self.stop_heart_beat = True
             raise KeyboardInterrupt
         except Exception as e:
             self.node_scheduler.patch(is_running=False, running_process_pid=0, )
             self.logger.exception(e)
+            self.stop_heart_beat = True
             self._clear_idle_scheduled_tree(node_scheduler=self.node_scheduler)
             time.sleep(60)
 
             if raise_exception_on_error == True:
                 raise e
+        self.stop_heart_beat = True
