@@ -889,7 +889,7 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
     builds_from_target_positions: bool = False
     follow_account_rebalance: bool = False
     tracking_funds_expected_exposure_from_latest_holdings: bool = False
-    required_execution_venues: List[Union[int, ExecutionVenue]]
+    available_in_venues: List[Union[int, ExecutionVenue]]
     latest_weights:Optional[HistoricalWeights] =None
 
     creation_date: Optional[datetime.datetime] = None
