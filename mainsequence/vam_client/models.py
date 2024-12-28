@@ -502,10 +502,11 @@ class TargetPortfolioIndexAsset(IndexAsset):
         default_factory=lambda: ExecutionVenue(**CONSTANTS.VENUE_MAIN_SEQUENCE_PORTFOLIOS)
     )
 
-
-class CurrencyPair(AssetMixin,BaseObjectOrm):
-    base_asset:Union[AssetMixin,int]
-    quote_asset:Union[AssetMixin,int]
+class CurrencyPairMixin(AssetMixin, BaseVamPydanticModel):
+    base_asset: Union[AssetMixin, int]
+    quote_asset: Union[AssetMixin, int]
+class CurrencyPair(CurrencyPairMixin):
+  pass
 
 class FutureUSDMMixin(AssetMixin, BaseVamPydanticModel):
     maturity_code: str = Field(..., max_length=50)

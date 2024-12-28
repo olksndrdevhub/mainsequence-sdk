@@ -3,6 +3,7 @@ from typing import  Union
 
 from .models import (loaders,VAM_API_ENDPOINT,BaseObjectOrm, make_request ,AccountMixin, AssetMixin,FutureUSDMMixin,
 Asset,AssetFutureUSDM,ExecutionVenue,Trade,BaseVamPydanticModel,Optional,DATE_FORMAT,AccountRiskFactors,
+CurrencyPairMixin,
 DoesNotExist )
 import datetime
 import pandas as pd
@@ -21,7 +22,8 @@ class BinanceBaseObject(BaseObjectOrm):
         "BinanceSpotAccount": 'account/spot',
         "BinanceFuturesAccount":  'account/futures',
         "BinanceAsset":'asset/spot',
-        "BinanceAssetFutureUSDM":'asset/futureusdm'
+        "BinanceAssetFutureUSDM":'asset/futureusdm',
+        "BinanceCurrencyPair":'asset/currency_pair'
     }
     ROOT_URL = VAM_API_ENDPOINT+"/binance"
 
@@ -30,6 +32,10 @@ class BinanceBaseObject(BaseObjectOrm):
 
 class BinanceAsset(AssetMixin,BinanceBaseObject):
     pass
+
+class BinanceCurrencyPair(CurrencyPairMixin,BinanceBaseObject):
+   pass
+
 
 class BinanceAssetFutureUSDM(FutureUSDMMixin,BinanceBaseObject):
 
