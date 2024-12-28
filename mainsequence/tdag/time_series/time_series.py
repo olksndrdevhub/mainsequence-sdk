@@ -692,7 +692,7 @@ class GraphNodeMethods(ABC):
 class TimeSerieRebuildMethods(ABC):
 
     @none_if_backend_detached
-    def verify_backend_git_hash_with_pickle(self):
+    def verify_backend_git_hash_with_pickle(self)->TimeSerie:
         if self.local_persist_manager.metadata is not None:
             load_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
 
@@ -702,14 +702,16 @@ class TimeSerieRebuildMethods(ABC):
                     f"{bcolors.WARNING}Source code does not match with pickle rebuilding{bcolors.ENDC}")
                 self.flush_pickle()
 
-                self = TimeSerie.rebuild_from_configuration(local_hash_id=time_serie.local_hash_id,
-                                                                   remote_table_hashed_name=time_serie.remote_table_hashed_name,
+                rebuild_time_serie = TimeSerie.rebuild_from_configuration(local_hash_id=self.local_hash_id,
+                                                                   remote_table_hashed_name=self.remote_table_hashed_name,
                                                                    data_source=data_source
                                                                    )
-                self.persist_to_pickle()
+                rebuild_time_serie.persist_to_pickle()
             else:
                 # if no need to rebuild, just sync the metadata
                 self.local_persist_manager.synchronize_metadata(meta_data=None, local_metadata=None)
+
+
 
     @classmethod
     @tracer.start_as_current_span("TS: load_from_pickle")
