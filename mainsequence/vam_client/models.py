@@ -217,7 +217,7 @@ class BaseObjectOrm:
             elif r.status_code == 500:
                 raise Exception("Server Error")
             else:
-                return {}, r
+                return {}
         else:
             serialized=[r.json()] if "pk" in kwargs else r.json()
             new_serialized=[]
@@ -229,7 +229,7 @@ class BaseObjectOrm:
                 except Exception as e:
                     raise e
 
-            return  new_serialized,r
+            return  new_serialized
 
     @classmethod
     def get(cls,*args,**kwargs):
