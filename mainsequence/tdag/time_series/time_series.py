@@ -342,17 +342,14 @@ class ConfigSerializer:
             if isinstance(value, ModelList):
                 value = serialize_model_list(value)
             else:
-                if issubclass(value[0].__class__, BaseObjectOrm):
-                    to_sort = {v.unique_identifier: v.to_serialized_dict() for v in value}
-                    ids = list(to_sort.keys())
-                    ids.sort()
-                    value = [to_sort[i] for i in ids]
-                    raise Exception("Use Model List")
+                if all(isinstance(member, BaseObjectOrm) for member in value):
+                    value = serialize_model_list(value)
+                elif issubclass(value[0].__class__, BaseObjectOrm):
+
+                    raise Exception("Use Mixed Object Model ")
                 elif issubclass(value[0].__class__, dict):
-                    a = 5
                     value = [self._serialize_configuration_dict(v) for v in value]
                 elif isinstance(value[0], BaseModel):
-                    a = 5
                     value = [self._serialize_signature_argument(v, pickle_ts=pickle_ts) for v in value]
                 else:
                     new_value = []
@@ -963,6 +960,37 @@ class TimeSerieRebuildMethods(ABC):
 
         properties = {key: value for key, value in properties.items() if key not in names_to_remove}
         return properties
+
+
+    def run_in_debug_sheduler(self,break_after_one_update=True,run_head_in_main_process=True,
+                              wait_for_update=True,force_update=True,debug=True,update_tree=True):
+        """
+
+        Args:
+            break_after_one_update:
+            run_head_in_main_process:
+            wait_for_update:
+            force_update:
+            debug:
+            update_tree:
+
+        Returns:
+
+        """
+
+
+        from .update.scheduler import SchedulerUpdater
+        SchedulerUpdater.debug_schedule_ts(
+            time_serie_hash_id=self.local_hash_id,
+            data_source_id=self.data_source.id,
+            break_after_one_update=True,
+            run_head_in_main_process=True,
+            wait_for_update=False,
+            force_update=True,
+            debug=True,
+            update_tree=True,
+        )
+
 
     @tracer.start_as_current_span("TS: Update")
     def update(self, update_tracker: object, debug_mode: bool,
