@@ -698,7 +698,7 @@ class TimeSerieRebuildMethods(ABC):
 
             persisted_pickle_hash = self.local_persist_manager.metadata["time_serie_source_code_git_hash"]
             if load_git_hash != persisted_pickle_hash:
-                time_serie.logger.warning(
+                self.logger.warning(
                     f"{bcolors.WARNING}Source code does not match with pickle rebuilding{bcolors.ENDC}")
                 self.flush_pickle()
 
