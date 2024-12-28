@@ -1579,6 +1579,15 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                 logger_file=f'{ogm.get_logging_path()}/{self.data_source.id}/{local_hash_id}.log',
                                                 local_hash_id=local_hash_id, data_source_id=self.data_source.id
                                                 )
+    @staticmethod
+    def get_logger_from_context(logger_context:dict):
+        local_hash_id = logger_context['local_hash_id']
+        data_source_id =logger_context['data_source_id']
+        logger=create_logger_in_path(logger_name=f"{local_hash_id}_{data_source_id}", application_name="tdag",
+                              logger_file=f'{ogm.get_logging_path()}/{data_source_id}/{local_hash_id}.log',
+                              local_hash_id=local_hash_id, data_source_id=data_source_id
+                              )
+        return logger
 
     def run(self, tdag_detached=True):
         self.local_persist_manager

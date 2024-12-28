@@ -228,7 +228,6 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
         with psycopg2.connect(time_series_orm_db_connection) as conn:
             try:
                 with conn.cursor() as cur:
-                    GROUPED_DELETE_CONDITIONS = []
 
                     if len(index_names) > 1:
 
