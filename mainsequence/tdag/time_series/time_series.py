@@ -692,7 +692,7 @@ class GraphNodeMethods(ABC):
 class TimeSerieRebuildMethods(ABC):
 
     @none_if_backend_detached
-    def verify_backend_git_hash_with_pickle(self)->TimeSerie:
+    def verify_backend_git_hash_with_pickle(self):
         if self.local_persist_manager.metadata is not None:
             load_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
 
