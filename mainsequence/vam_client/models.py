@@ -460,10 +460,12 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
             return  f"{self.symbol}/{settlement_symbol}:{settlement_symbol}"
 
     @classmethod
-    def get_all_assets_on_positions(cls, execution_venue_symbol:str, asset_type: str):
+    def get_all_assets_on_positions(cls, execution_venue_symbol:str, asset_type: str,
+                                    switch_to_currency_pair_with_quote:str,):
         url = f"{cls.get_object_url()}/get_all_assets_on_positions"
         payload = dict(params={"execution_venue_symbol": execution_venue_symbol,
-                               "asset_type":asset_type
+                               "asset_type":asset_type,
+                               "switch_to_currency_pair_with_quote":switch_to_currency_pair_with_quote,
                                })
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
 
