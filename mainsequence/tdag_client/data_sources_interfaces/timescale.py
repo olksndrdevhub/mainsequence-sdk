@@ -447,7 +447,7 @@ def process_and_update_table(
         serialized_data_frame=serialized_data_frame,
         grouped_dates=grouped_dates,
         time_series_orm_db_connection=data_source.get_connection_uri(),
-        table_name=metadata["hash_id"],
+        table_name=metadata["table_name"],
         overwrite=overwrite,
         index_names=index_names,
         time_index_name=time_index_name,

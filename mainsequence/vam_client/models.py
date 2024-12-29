@@ -461,16 +461,18 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
 
     @classmethod
     def get_all_assets_on_positions(cls, execution_venue_symbol:str, asset_type: str,
-                                    switch_to_currency_pair_with_quote:str,):
-        url = f"{cls.get_object_url()}/get_all_assets_on_positions"
+                                    switch_to_currency_pair_with_quote:Union[str,None]=None,):
+        url = f"{Asset.get_object_url()}/get_all_assets_on_positions"
         payload = dict(params={"execution_venue_symbol": execution_venue_symbol,
                                "asset_type":asset_type,
-                               "switch_to_currency_pair_with_quote":switch_to_currency_pair_with_quote,
+
                                })
+        if switch_to_currency_pair_with_quote is not None:
+            payload["params"]["switch_to_currency_pair_with_quote"]=switch_to_currency_pair_with_quote
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
 
         if r.status_code != 200:
-            raise Exception("Error switching cash asset")
+            raise Exception("Error getting all assets in positions")
         return [cls(**a) for a in r.json()]
 
 class Asset(AssetMixin,BaseObjectOrm):

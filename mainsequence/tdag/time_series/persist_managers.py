@@ -295,7 +295,7 @@ class PersistManager:
 
     def local_persist_exist_set_config(self, local_configuration:dict, remote_configuration:dict,data_source:dict,
                                        time_serie_source_code_git_hash:str, time_serie_source_code:str,
-        remote_build_metadata:dict,
+        remote_build_metadata:dict,override_table_name:Union[str, None]
                                        ):
         """
         This method runs on initialization of the TimeSerie class. We also use it to retrieve the table if
@@ -325,6 +325,8 @@ class PersistManager:
                               build_configuration=remote_configuration,
                               data_source=data_source.model_dump(),
                               build_meta_data=remote_build_metadata)
+                if override_table_name is not None:
+                    kwargs["table_name"] = override_table_name
                 if self.human_readable is not None:
                     kwargs["human_readable"] = self.human_readable
                 # node_kwargs={"hash_id":self.remote_table_hashed_name,
