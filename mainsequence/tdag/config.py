@@ -51,7 +51,8 @@ class Configuration:
     OBLIGATORY_ENV_VARIABLES = [
         "VAM_ENDPOINT", 
         "TDAG_ENDPOINT",
-        "TDAG_RAY_CLUSTER_ADDRESS"
+        "TDAG_RAY_CLUSTER_ADDRESS",
+        "MAINSEQUENCE_TOKEN",
     ]
     OPTIONAL_ENV_VARIABLES = []
 
