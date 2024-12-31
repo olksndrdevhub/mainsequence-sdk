@@ -853,6 +853,32 @@ class TimeSerieLocalUpdate(BaseObject):
 
         return r
 
+    @classmethod
+    def get_data_between_dates_from_api(cls,local_hash_id:str, data_source_id:int, start_date: datetime.datetime,
+                                        end_date: datetime.datetime, great_or_equal: bool,
+                                        less_or_equal: bool,
+                                        asset_symbols: list,
+                                        columns: list,
+                                        execution_venue_symbols: list, ):
+        s = cls.build_session()
+        url = cls.ROOT_URL + f"/get_data_between_dates/"
+        payload = {
+            "local_hash_id": local_hash_id,
+            "data_source_id": data_source_id,
+            "start_timestamp": start_date.timestamp(),
+            "end_timestamp": end_date.timestamp(),
+            "great_or_equal": great_or_equal,
+            "less_or_equal": less_or_equal,
+            "asset_symbols": asset_symbols,
+            "columns": columns,
+            "execution_venue_symbols": execution_venue_symbols,
+        }
+        r = make_request(s=s, loaders=cls.LOADERS,payload=payload, r_type="POST", url=url, )
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+        return r
+
 
 
 class TimeSerie(BaseObject):
@@ -1732,7 +1758,8 @@ class DynamicTableHelpers:
             raise NotImplementedError
 
         return df
-        
+
+
     def get_data_by_time_index(self, metadata: dict,     data_source:object,
                                start_date: Union[datetime.datetime, None] = None,
                                great_or_equal: bool = True, less_or_equal: bool = True,

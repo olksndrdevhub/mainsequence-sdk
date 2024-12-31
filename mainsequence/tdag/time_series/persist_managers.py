@@ -37,13 +37,14 @@ class APIPersistManager:
                              less_or_equal=True,
                              asset_symbols: Union[list, None] = None,execution_venue_symbols: Union[list, None] = None,
                              columns: Union[list, None] = None):
-        filtered_data = self.dth.get_data_by_time_index_from_api(data_source_id=self.data_source_id, start_date=start_date,
+
+
+        filtered_data=TimeSerieLocalUpdate.get_data_between_dates_from_api(data_source_id=self.data_source_id, start_date=start_date,
                                                         end_date=end_date, great_or_equal=great_or_equal,
                                                         less_or_equal=less_or_equal,
                                                         asset_symbols=asset_symbols,
                                                         columns=columns,
-                                                        execution_venue_symbols=execution_venue_symbols
-                                                        )
+                                                        execution_venue_symbols=execution_venue_symbols)
 
         return filtered_data
 
