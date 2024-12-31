@@ -650,31 +650,21 @@ class GraphNodeMethods(ABC):
         """
 
         members = self.__dict__
+        self.remote_api_tables=[]
 
         if self.is_local_relation_tree_set == False:
 
             for key, value in members.items():
                 try:
-                    if "related_time_series" in key:
-                        # add to tree
-                        if isinstance(value, list):
-                            raise NotImplementedError
-                        elif isinstance(value, dict):
-                            for tm_ts in value.values():
-                                if isinstance(tm_ts, dict):
-                                    pickle_path = self.get_pickle_path(local_hash_id=tm_ts["hash_id"])
-                                    new_ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
-                                    new_ts.local_persist_manager  # before connection call local persist manager to garantee ts is created
-                                    self.local_persist_manager.depends_on_connect(new_ts)
-                                    new_ts.set_relation_tree()
-                                else:
-                                    tm_ts.local_persist_manager  # before connection call local persist manager to garantee ts is created
-                                    self.local_persist_manager.depends_on_connect(tm_ts)
-                                    tm_ts.set_relation_tree()
+
                     if isinstance(value, TimeSerie):
                         value.local_persist_manager  # before connection call local persist manager to garantee ts is created
-                        self.local_persist_manager.depends_on_connect(value)
+                        self.local_persist_manager.depends_on_connect(value,is_api=False)
                         value.set_relation_tree()
+                    if isinstance(value, APITimeSerie):
+                        value.local_persist_manager  # before conne
+                        self.local_persist_manager.depends_on_connect(value,is_api=True)
+
                     if isinstance(value, dict):
                         if "is_time_serie_pickled" in value.keys():
                             pickle_path = self.get_pickle_path(local_hash_id=value["hashed_name"])
@@ -1333,6 +1323,58 @@ class ModelList(list):
     Necessary for configuration
     """
     pass
+
+
+
+class APITimeSerie:
+
+    def __init__(self,data_source_id:int,local_hash_id:str):
+        """
+        A time serie is uniquely identified in tdag by  data_source_id and table_name
+        :param data_source_id:
+        :param table_name:
+        """
+        self.data_source_id = data_source_id
+        self.local_hash_id=local_hash_id
+        self.local_persist_manager
+
+    @property
+    def local_persist_manager(self):
+        if hasattr(self, "logger") == False:
+            self._set_logger(local_hash_id=self.local_hash_id)
+        if hasattr(self, "_local_persist_manager") == False:
+            self.logger.info(f"Setting local persist manager for {self.local_hash_id}")
+            self._set_local_persist_manager()
+        return self._local_persist_manager
+
+    def _set_logger(self, local_hash_id):
+        if hasattr(self, "logger") == False:
+
+            self.logger = create_logger_in_path(logger_name=f"{self.data_source_id}_{self.local_hash_id}", application_name="tdag",
+                                                logger_file=f'{ogm.get_logging_path()}/{self.data_source_id}/{self.local_hash_id}.log',
+                                                local_hash_id=self.local_hash_id, data_source_id=self.data_source_id,
+                                                api_time_series=True,
+                                                )
+    def _set_local_persist_manager(self):
+        from mainsequence.tdag.time_series.persist_managers import APIPersistManager
+
+        self._local_persist_manager=APIPersistManager(data_source_id=self.data_source_id,local_hash_id=self.local_hash_id,
+                                                      logger=self.logger)
+
+    def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
+                             end_date: Union[datetime.datetime, None] = None,
+                             asset_symbols: Union[None, list] = None,
+                             data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True,
+                             ):
+
+        filtered_data = self.local_persist_manager.get_df_between_dates(start_date=start_date,
+                                                                        end_date=end_date,
+                                                                        asset_symbols=asset_symbols,
+                                                                        great_or_equal=great_or_equal,
+                                                                        less_or_equal=less_or_equal,
+                                                                        )
+
+        return filtered_data
 
 
 class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):

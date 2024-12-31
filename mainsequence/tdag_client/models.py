@@ -267,6 +267,27 @@ class TimeSerieNode(BaseTdagPydanticModel,BaseObject):
         return depth_df
 
     @classmethod
+    def depends_on_connect_remote_table(cls, source_hash_id: str,
+                           source_local_hash_id: str,
+                           source_data_source_id: id,
+                           target_data_source_id: id,
+                           target_local_hash_id: str):
+        """
+
+        """
+        s = cls.build_session()
+        url = cls.ROOT_URL + "/depends_on_connect_remote_table/"
+        payload = dict(json={"source_hash_id": source_hash_id,
+                             "source_local_hash_id": source_local_hash_id,
+                             "source_data_source_id": source_data_source_id,
+                             "target_data_source_id":target_data_source_id,
+                             "target_local_hash_id": target_local_hash_id,
+                             })
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
+        if r.status_code != 201:
+            raise Exception(f"Error in request {r.text}")
+
+    @classmethod
     def depends_on_connect(cls, source_hash_id: str, target_hash_id: str, target_class_name: str,
                            source_local_hash_id: str,
                            target_local_hash_id: str,
@@ -1911,6 +1932,16 @@ class DynamicTableHelpers:
     #     r = self.make_request(r_type="PATCH",url=f"{base_url}/batch_set_end_of_execution/", payload=payload)
     #     if r.status_code != 200:
     #         raise Exception(f"Error in request ")
+    def depends_on_connect_remote_table(self, source_hash_id: str,
+                           source_local_hash_id: str,
+                           source_data_source_id: id,
+                           target_data_source_id: id,
+                           target_local_hash_id: str):
+        TimeSerieNode.depends_on_connect_remote_table(source_hash_id=source_hash_id,
+                                         source_local_hash_id=source_local_hash_id,
+                                         source_data_source_id=source_data_source_id,
+                                         target_data_source_id=target_data_source_id,
+                                         target_local_hash_id=target_local_hash_id)
 
     def depends_on_connect(self,source_hash_id:str, target_hash_id:str,target_class_name:str,
                            source_local_hash_id:str,

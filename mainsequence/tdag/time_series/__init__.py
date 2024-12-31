@@ -1,5 +1,5 @@
 
-from .time_series import TimeSerie, WrapperTimeSerie ,TimeSerieConfigKwargs, ModelList
+from .time_series import TimeSerie, WrapperTimeSerie ,TimeSerieConfigKwargs, ModelList,APITimeSerie
 
 
 

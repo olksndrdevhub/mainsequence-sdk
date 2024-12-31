@@ -9,8 +9,8 @@ import os
 from mainsequence.tdag.logconf import console_logger, create_logger_in_path
 
 from mainsequence.tdag_client import (DynamicTableHelpers, TimeSerieNode, TimeSerieLocalUpdate,
-                                      LocalTimeSeriesDoesNotExist,PodLocalLake,
-                                      DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS)
+                                      LocalTimeSeriesDoesNotExist, PodLocalLake,
+                                      DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS, TimeSerie)
 
 from mainsequence.tdag.logconf import get_tdag_logger
 from mainsequence.tdag_client.models import BACKEND_DETACHED, none_if_backend_detached
@@ -24,7 +24,28 @@ logger = get_tdag_logger()
 
 
 
+class APIPersistManager:
 
+    def __init__(self,data_source_id:int,local_hash_id:str,logger):
+        self.logger = logger if logger is not None else console_logger("persist_manager_logger",
+                                                                       application_name="tdag")
+        self.dth = DynamicTableHelpers(logger=logger)
+        self.data_source_id = data_source_id
+        self.local_hash_id = local_hash_id
+
+    def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
+                             less_or_equal=True,
+                             asset_symbols: Union[list, None] = None,execution_venue_symbols: Union[list, None] = None,
+                             columns: Union[list, None] = None):
+        filtered_data = self.dth.get_data_by_time_index_from_api(data_source_id=self.data_source_id, start_date=start_date,
+                                                        end_date=end_date, great_or_equal=great_or_equal,
+                                                        less_or_equal=less_or_equal,
+                                                        asset_symbols=asset_symbols,
+                                                        columns=columns,
+                                                        execution_venue_symbols=execution_venue_symbols
+                                                        )
+
+        return filtered_data
 
 
 class PersistManager:
@@ -44,7 +65,7 @@ class PersistManager:
             metadata = local_metadata["remote_table"]
 
         self.remote_table_hashed_name = remote_table_hashed_name
-        self.logger = logger if logger is not None else console_logger("timescale_persist_manager",
+        self.logger = logger if logger is not None else console_logger("persist_manager_logger",
                                                                        application_name="tdag")
         self.dth = DynamicTableHelpers(logger=logger)
 
@@ -67,7 +88,51 @@ class PersistManager:
         elif data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
 
-    def depends_on_connect(self,new_ts:"TimeSerie"):
+    def synchronize_metadata(self, meta_data: Union[dict, None], local_metadata: Union[dict, None],
+                             set_last_index_value: bool = False,
+                             class_name: Union[str, None] = None
+                             ):
+        """
+        forces a synchronization between table and metadata
+        :return:
+        """
+        # start with remote metadata
+        if set_last_index_value == True:
+            TimeSerieLocalUpdate.set_last_update_index_time(metadata=self.local_metadata)
+        if meta_data is None or local_metadata is None:  # avoid calling 2 times the DB
+            meta_data = {}
+            try:
+                local_metadata = {}  # set to empty in case not exist
+                local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
+                                                          data_source_id=self.data_source.id
+                                                          )
+                if len(local_metadata) == 0:
+                    raise LocalTimeSeriesDoesNotExist
+            except LocalTimeSeriesDoesNotExist:
+                # could be localmetadata is none but table could exist
+                try:
+                    meta_data = self.dth.get(hash_id=self.remote_table_hashed_name,
+                                             data_source__id=self.data_source.id
+                                             )
+                except DynamicTableDoesNotExist:
+                    pass
+
+        if len(local_metadata) != 0:
+            self.local_build_configuration = local_metadata["build_configuration"]
+            self.local_build_metadata = local_metadata["build_meta_data"]
+            self.local_metadata = local_metadata
+
+            # metadata should always exist
+            meta_data = local_metadata["remote_table"]
+
+        if len(meta_data) != 0:
+            remote_build_configuration, remote_build_metadata = meta_data["build_configuration"], meta_data[
+                "build_meta_data"]
+            self.remote_build_configuration = remote_build_configuration
+            self.remote_build_metadata = remote_build_metadata
+            self.metadata = meta_data
+
+    def depends_on_connect(self,new_ts:"TimeSerie",is_api:bool):
         """
         Connects a time Serie as relationship in the DB
         Parameters
@@ -78,23 +143,35 @@ class PersistManager:
         -------
 
         """
-        try:
-            human_readable=new_ts.local_persist_manager.metadata['human_readable']
-        except KeyError:
-            human_readable=new_ts.human_readable
-        self.dth.depends_on_connect(source_hash_id=self.metadata["hash_id"],
-                                    target_hash_id=new_ts.remote_table_hashed_name,
 
-                                    source_local_hash_id=self.local_metadata["local_hash_id"],
-                                    target_local_hash_id=new_ts.local_hash_id,
+        if is_api ==False:
+            try:
+                human_readable = new_ts.local_persist_manager.metadata['human_readable']
+            except KeyError:
+                human_readable = new_ts.human_readable
+            self.dth.depends_on_connect(source_hash_id=self.metadata["hash_id"],
+                                        target_hash_id=new_ts.remote_table_hashed_name,
 
-                                    target_class_name=new_ts.__class__.__name__,
-                                    target_human_readable=human_readable,
+                                        source_local_hash_id=self.local_metadata["local_hash_id"],
+                                        target_local_hash_id=new_ts.local_hash_id,
 
-                                    source_data_source_id=self.data_source.id,
-                                    target_data_source_id=new_ts.data_source.id
+                                        target_class_name=new_ts.__class__.__name__,
+                                        target_human_readable=human_readable,
 
-                                    )
+                                        source_data_source_id=self.data_source.id,
+                                        target_data_source_id=new_ts.data_source.id
+
+                                        )
+        else:
+            self.dth.depends_on_connect_remote_table(
+                source_hash_id=self.metadata["hash_id"],
+                source_local_hash_id=self.local_metadata["local_hash_id"],
+                source_data_source_id=self.data_source.id,
+
+                                        target_data_source_id=new_ts.data_source_id,
+                                        target_local_hash_id=new_ts.local_hash_id
+                                        )
+
 
     def display_mermaid_dependency_diagram(self):
         from IPython.core.display import display, HTML, Javascript
@@ -200,49 +277,6 @@ class PersistManager:
 
         return exist
 
-    def synchronize_metadata(self, meta_data: Union[dict, None], local_metadata: Union[dict, None],
-                             set_last_index_value: bool = False,
-                             class_name: Union[str, None] = None
-                             ):
-        """
-        forces a synchronization between table and metadata
-        :return:
-        """
-        # start with remote metadata
-        if set_last_index_value == True:
-            TimeSerieLocalUpdate.set_last_update_index_time(metadata=self.local_metadata)
-        if meta_data is None or local_metadata is None:  # avoid calling 2 times the DB
-            meta_data = {}
-            try:
-                local_metadata = {}  # set to empty in case not exist
-                local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
-                                                          data_source_id=self.data_source.id
-                                                          )
-                if len(local_metadata) == 0:
-                    raise LocalTimeSeriesDoesNotExist
-            except LocalTimeSeriesDoesNotExist:
-                # could be localmetadata is none but table could exist
-                try:
-                    meta_data = self.dth.get(hash_id=self.remote_table_hashed_name,
-                                             data_source__id=self.data_source.id
-                                             )
-                except DynamicTableDoesNotExist:
-                    pass
-
-        if len(local_metadata) != 0:
-            self.local_build_configuration = local_metadata["build_configuration"]
-            self.local_build_metadata = local_metadata["build_meta_data"]
-            self.local_metadata = local_metadata
-
-            # metadata should always exist
-            meta_data = local_metadata["remote_table"]
-
-        if len(meta_data) != 0:
-            remote_build_configuration, remote_build_metadata = meta_data["build_configuration"], meta_data[
-                "build_meta_data"]
-            self.remote_build_configuration = remote_build_configuration
-            self.remote_build_metadata = remote_build_metadata
-            self.metadata = meta_data
 
     def add_tags(self, tags: list):
         if any([t not in self.local_metadata["tags"] for t in tags]) == True:
