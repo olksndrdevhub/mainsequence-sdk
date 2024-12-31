@@ -231,6 +231,7 @@ class TimeSerieHeadUpdateActor:
 
                 if self.wait_for_update == True and force_update == False:
                     SchedulerUpdater.wait_for_update_time(local_hash_id=self.local_hash_id,
+                                                          data_source_id=self.ts.data_source.id,
                                                           logger=self.ts.logger,
                                                           force_next_start_of_minute=force_next_start_of_minute)
 
@@ -489,9 +490,9 @@ class SchedulerUpdater:
         return time_to_wait, next_update
 
     @staticmethod
-    def wait_for_update_time(local_hash_id, logger, force_next_start_of_minute=False):
+    def wait_for_update_time(local_hash_id, data_source_id, logger, force_next_start_of_minute=False):
 
-        time_to_wait, next_update = SchedulerUpdater.get_time_to_wait_from_hash_id(local_hash_id=local_hash_id)
+        time_to_wait, next_update = SchedulerUpdater.get_time_to_wait_from_hash_id(local_hash_id=local_hash_id, data_source_id=data_source_id)
         if time_to_wait > 0 and force_next_start_of_minute == False:
 
             logger.info(f"Scheduler Waiting for ts update time at {next_update} {time_to_wait}")
