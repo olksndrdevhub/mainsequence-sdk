@@ -11,7 +11,6 @@ import logging
 
 from mainsequence.vam_client.local_vault import get_all_entries_in_vault_for_venue
 from tqdm import tqdm
-from alpaca.trading.enums import AssetClass as AlpacaAssetClass
 VAM_ENDPOINT=os.environ.get('VAM_ENDPOINT')
 VAM_API_ENDPOINT=f"{VAM_ENDPOINT}/orm/api"
 VAM_REST_TOKEN_URL=f"{VAM_ENDPOINT}/auth/rest-token-auth/"
@@ -226,26 +225,6 @@ def get_rest_token_header(token_url:str,  username:str,password:str  ):
 
     return headers,gcp_token_decoded
 
-def build_assets_for_venue(execution_venue, api_key, api_secret):
-    """
-    Builds the assets for a venue
-    """
-    from mainsequence.vam_client.models_binance import build_binance_perpetual_futures_asset
-    from mainsequence.vam_client.models_alpaca import build_alpaca_exchange_assets
-    BINANCE_FUTURES_VENUES = [CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL, CONSTANTS.BINANCE_FUTURES_EV_SYMBOL]
-
-    if execution_venue.symbol in BINANCE_FUTURES_VENUES:
-        build_binance_perpetual_futures_asset(execution_venue=execution_venue, api_key=api_key, api_secret=api_secret)
-    elif execution_venue.symbol in  CONSTANTS.ALPACA_VENUES:
-        for asset_class in [AlpacaAssetClass.CRYPTO, AlpacaAssetClass.US_EQUITY]:
-            build_alpaca_exchange_assets(
-                execution_venue=execution_venue,
-                api_key=api_key,
-                api_secret=api_secret,
-                asset_class=asset_class
-            )
-    else:
-        raise NotImplementedError(f"Execution venue {execution_venue} not supported")
 
 def build_account_for_venue(execution_venue, account_id, api_key, api_secret):
     """
