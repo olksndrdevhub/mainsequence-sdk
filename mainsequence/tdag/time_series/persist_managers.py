@@ -39,13 +39,27 @@ class APIPersistManager:
                              columns: Union[list, None] = None):
 
 
-        filtered_data=TimeSerieLocalUpdate.get_data_between_dates_from_api(data_source_id=self.data_source_id, start_date=start_date,
+        filtered_data=TimeSerieLocalUpdate.get_data_between_dates_from_api(
+                                                        local_hash_id=self.local_hash_id,
+                                                        data_source_id=self.data_source_id, start_date=start_date,
                                                         end_date=end_date, great_or_equal=great_or_equal,
                                                         less_or_equal=less_or_equal,
                                                         asset_symbols=asset_symbols,
                                                         columns=columns,
                                                         execution_venue_symbols=execution_venue_symbols)
 
+        #fix types
+        local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
+                                                  data_source_id=self.data_source_id
+                                                  )
+        stc=local_metadata["remote_table"]["sourcetableconfiguration"]
+        filtered_data[stc["time_index_name"]]=pd.to_datetime(filtered_data[stc["time_index_name"]])
+        for c, c_type in stc["column_dtypes_map"].items():
+            if c!=stc["time_index_name"]:
+                if c_type=="object":
+                    c_type="str"
+                filtered_data[c]=filtered_data[c].astype(c_type)
+        filtered_data=filtered_data.set_index(stc["index_names"])
         return filtered_data
 
 

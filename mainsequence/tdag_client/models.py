@@ -861,23 +861,44 @@ class TimeSerieLocalUpdate(BaseObject):
                                         columns: list,
                                         execution_venue_symbols: list, ):
         s = cls.build_session()
-        url = cls.ROOT_URL + f"/get_data_between_dates/"
-        payload = {
+        url = cls.LOCAL_UPDATE_URL + f"/get_data_between_dates_from_remote/"
+        payload = {"json":{
             "local_hash_id": local_hash_id,
             "data_source_id": data_source_id,
-            "start_timestamp": start_date.timestamp(),
-            "end_timestamp": end_date.timestamp(),
+            "start_date": start_date.timestamp() if start_date else None,
+            "end_date": end_date.timestamp() if end_date else None,
             "great_or_equal": great_or_equal,
             "less_or_equal": less_or_equal,
             "asset_symbols": asset_symbols,
             "columns": columns,
             "execution_venue_symbols": execution_venue_symbols,
-        }
-        r = make_request(s=s, loaders=cls.LOADERS,payload=payload, r_type="POST", url=url, )
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
+            "offset": 0,  # Will increase in each loop
+        }}
+        all_results = []
+        while True:
+            # Make the POST request
+            r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url)
 
-        return r
+            if r.status_code != 200:
+                raise Exception(f"Error in request: {r.text}")
+
+            response_data = r.json()
+
+            # Accumulate results
+            chunk = response_data.get("results", [])
+            all_results.extend(chunk)
+
+            # Retrieve next offset; if None, we've got all the data
+            next_offset = response_data.get("next_offset")
+            if not next_offset:
+                break
+
+            # Update payload with the new offset
+            payload["json"]["offset"] = next_offset
+
+        return pd.DataFrame(all_results)
+
+
 
 
 
