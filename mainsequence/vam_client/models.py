@@ -134,7 +134,9 @@ class BaseObjectOrm:
         "ExecutionPositions": "execution_positions",
         "AccountCoolDown": "account_cooldown",
         "HistoricalWeights": "portfolio_weights",
-        "TargetPortfolioIndexAsset":"target_portfolio_index_asset"
+        "TargetPortfolioIndexAsset":"target_portfolio_index_asset",
+
+        "HistoricalBarsSource":"historical-bars-source",
 
     }
     ROOT_URL = VAM_API_ENDPOINT
@@ -843,6 +845,26 @@ class ExecutionVenue(BaseObjectOrm,BaseVamPydanticModel):
     @property
     def unique_identifier(self):
         return f"{self.symbol}"
+
+class BarFrequency(str, Enum):
+    one_m = "1m"
+    five_m = "5m"
+    one_d = "1d"
+    one_w = "1w"
+    one_month ="1mo"
+
+class HistoricalBarsSource(BaseObjectOrm,BaseVamPydanticModel):
+    execution_venue: int
+    data_source_id: int
+    local_hash_id: str
+    bar_frequency_id: BarFrequency
+
+    @classmethod
+    def get_object_url(cls):
+        url = f"{cls.ROOT_URL.replace('orm','data_sources')}/{cls.END_POINTS[cls.class_name()]}"
+        return url
+
+
 
 
 
