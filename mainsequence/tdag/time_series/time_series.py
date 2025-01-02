@@ -954,8 +954,8 @@ class TimeSerieRebuildMethods(ABC):
         return properties
 
 
-    def run_in_debug_sheduler(self,break_after_one_update=True,run_head_in_main_process=True,
-                              wait_for_update=True,force_update=True,debug=True,update_tree=True):
+    def run_in_debug_scheduler(self, break_after_one_update=True, run_head_in_main_process=True,
+                               wait_for_update=True, force_update=True, debug=True, update_tree=True):
         """
 
         Args:
@@ -1328,14 +1328,14 @@ class ModelList(list):
 
 class APITimeSerie:
 
-    def __init__(self,data_source_id:int,local_hash_id:str):
+    def __init__(self, data_source_id:int, local_hash_id:str):
         """
         A time serie is uniquely identified in tdag by  data_source_id and table_name
         :param data_source_id:
         :param table_name:
         """
         self.data_source_id = data_source_id
-        self.local_hash_id=local_hash_id
+        self.local_hash_id = local_hash_id
         self.local_persist_manager
 
     @property
@@ -1358,7 +1358,7 @@ class APITimeSerie:
     def _set_local_persist_manager(self):
         from mainsequence.tdag.time_series.persist_managers import APIPersistManager
 
-        self._local_persist_manager=APIPersistManager(data_source_id=self.data_source_id,local_hash_id=self.local_hash_id,
+        self._local_persist_manager = APIPersistManager(data_source_id=self.data_source_id,local_hash_id=self.local_hash_id,
                                                       logger=self.logger)
 
     def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,

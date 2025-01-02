@@ -455,6 +455,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
             raise Exception(f"Error in request {r.text}")
         scheduler=cls(**r.json())
         return scheduler
+    
     @classmethod
     def initialize_debug_for_ts(cls,local_hash_id:str,
                                 data_source_id:int,

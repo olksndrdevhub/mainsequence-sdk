@@ -853,7 +853,7 @@ class BarFrequency(str, Enum):
     one_w = "1w"
     one_month ="1mo"
 
-class HistoricalBarsSource(BaseObjectOrm,BaseVamPydanticModel):
+class HistoricalBarsSource(BaseObjectOrm, BaseVamPydanticModel):
     execution_venue: int
     data_source_id: int
     local_hash_id: str
