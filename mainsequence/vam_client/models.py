@@ -268,7 +268,7 @@ class BaseObjectOrm:
         r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="POST", url=f"{base_url}/", payload=payload,
                          timeout=timeout
                          )
-        if r.status_code not in [201,200]:
+        if r.status_code not in [201, 200]:
            raise Exception(r.text)
         return cls(** r.json())
     
@@ -857,11 +857,12 @@ class HistoricalBarsSource(BaseObjectOrm, BaseVamPydanticModel):
     execution_venue: int
     data_source_id: int
     local_hash_id: str
+    table_name: str
     bar_frequency_id: BarFrequency
 
     @classmethod
     def get_object_url(cls):
-        url = f"{cls.ROOT_URL.replace('orm','data_sources')}/{cls.END_POINTS[cls.class_name()]}"
+        url = f"{cls.ROOT_URL.replace('orm', 'data_sources')}/{cls.END_POINTS[cls.class_name()]}"
         return url
 
 
