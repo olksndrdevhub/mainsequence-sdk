@@ -54,7 +54,12 @@ class Configuration:
         "TDAG_RAY_CLUSTER_ADDRESS",
         "MAINSEQUENCE_TOKEN",
     ]
-    OPTIONAL_ENV_VARIABLES = []
+    OPTIONAL_ENV_VARIABLES = [
+        "ALPACA_API_KEY",
+        "ALPACA_SECRET_KEY",
+        "BINANCE_API_KEY",
+        "BINANCE_API_SECRET",
+    ]
 
     def __init__(self):
         self.set_gt_configuration()
