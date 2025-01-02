@@ -1462,7 +1462,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
     def __init__(self, init_meta=None,
                  build_meta_data: Union[dict, None] = None, local_kwargs_to_ignore: Union[List[str], None] = None,
-                 override_table_name:Union[str, None] = None,
+
                  *args, **kwargs):
         """
         Initializes the TimeSerie object with the provided metadata and configurations.
@@ -1489,7 +1489,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         self.init_meta = init_meta
         self.build_meta_data = self.sanitize_default_build_metadata(build_meta_data)
         self.local_kwargs_to_ignore = local_kwargs_to_ignore
-        self.override_table_name=override_table_name
+
         self.pre_load_routines_run = False
 
         # asser that method is decorated
@@ -1695,7 +1695,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             time_serie_source_code_git_hash=time_serie_source_code_git_hash,
             time_serie_source_code=time_serie_source_code,
             data_source=self.data_source,
-            override_table_name=self.override_table_name
+
         )
         if remote_meta_exist == False or local_meta_exist == False:
 
