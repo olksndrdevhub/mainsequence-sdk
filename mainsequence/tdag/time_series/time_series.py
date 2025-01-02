@@ -975,7 +975,7 @@ class TimeSerieRebuildMethods(ABC):
         SchedulerUpdater.debug_schedule_ts(
             time_serie_hash_id=self.local_hash_id,
             data_source_id=self.data_source.id,
-            break_after_one_update=True,
+            break_after_one_update=break_after_one_update,
             run_head_in_main_process=True,
             wait_for_update=False,
             force_update=True,
