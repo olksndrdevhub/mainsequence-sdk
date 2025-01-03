@@ -929,8 +929,8 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
     is_asset_only: bool = False
     build_purpose:str
     is_active: bool = False
-    time_serie_hash_id: str = Field(..., max_length=100)
-    time_serie_signal_hash_id:str = Field(..., max_length=100)
+    local_time_serie_id: int = Field(...,)
+    local_signal_time_serie_id:int = Field(...,)
 
     builds_from_predictions: bool = False
     builds_from_target_positions: bool = False
@@ -966,8 +966,6 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
 
 class TargetPortfolioFrontEndDetails(BaseObjectOrm, BaseVamPydanticModel):
     target_portfolio: Optional[dict] = None  # different serialization of target portfolio
-    about_text: Optional[str] = None  # Field is optional, no need for Field(...)
-    backtest_hash_id: Optional[str] = Field(None, max_length=100)
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_time_index_name: Optional[str] = Field(None, max_length=20)
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
@@ -1001,6 +999,22 @@ class TargetPortfolioFrontEndDetails(BaseObjectOrm, BaseVamPydanticModel):
         :rtype:
         """
         base_url = cls.get_base_endpoint()+"target-portfolio-details"
+        data = cls.serialize_for_json(kwargs)
+        payload = {"json": data}
+
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=f"{base_url}/", payload=payload)
+        if r.status_code not in [201, 200]:
+            raise Exception(r.text)
+        return cls(**r.json())
+
+    @classmethod
+    def create_or_update(cls, *args, **kwargs):
+        """
+
+        :return:
+        :rtype:
+        """
+        base_url = cls.get_base_endpoint() + "target-portfolio-details/create_or_update"
         data = cls.serialize_for_json(kwargs)
         payload = {"json": data}
 

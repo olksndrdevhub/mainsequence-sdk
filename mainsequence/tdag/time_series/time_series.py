@@ -428,7 +428,8 @@ class ConfigSerializer:
             ts_kwargs = {}
             ts = collections.OrderedDict(sorted(kwargs["time_series_dict"].items()))
             for key, ts in ts.items():
-                ts_kwargs[key] = ts.hashed_name
+
+                ts_kwargs[key] = (ts.local_hash_id,ts.data_source_id)
             kwargs["time_series_dict"] = ts_kwargs
 
         ordered_kwargs = self._serialize_configuration_dict(kwargs=kwargs)
@@ -1331,6 +1332,13 @@ class ModelList(list):
 
 class APITimeSerie:
 
+
+    @classmethod
+    def build_from_local_time_serie(cls,local_time_serie:"TimeSerieLocalUpdate"):
+        return cls(data_source_id=local_time_serie.remote_table["data_source"]["id"],
+                   local_hash_id=local_time_serie.local_hash_id
+                   )
+
     def __init__(self, data_source_id:int, local_hash_id:str):
         """
         A time serie is uniquely identified in tdag by  data_source_id and table_name
@@ -1524,7 +1532,9 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
         """
         return self.remote_table_hashed_name
-
+    @property
+    def data_source_id(self):
+        return self.data_source.id
     @property
     def local_hash_id(self):
         return self.hashed_name
@@ -2159,11 +2169,13 @@ class WrapperTimeSerie(TimeSerie):
         """
         super().__init__(*args, **kwargs)
         for key, value in time_series_dict.items():
-            if isinstance(value, TimeSerie) is False and "tdag.time_series.time_series.TimeSerie" not in [
+            if isinstance(value, TimeSerie) == False and "tdag.time_series.time_series.TimeSerie" not in [
                 ".".join([o.__module__, o.__name__]) for o in inspect.getmro(value.__class__)]:
-                logger.error("value is not a time serie")
-                logger.error(self)
-                raise Exception
+                if isinstance(value, APITimeSerie) ==False and "tdag.time_series.time_series.APITimeSerie" not in [
+                ".".join([o.__module__, o.__name__]) for o in inspect.getmro(value.__class__)]:
+                    logger.error("value is not of class TimeSerie nor APITimeSerie")
+                    logger.error(self)
+                    raise Exception
 
         self.related_time_series = time_series_dict
 

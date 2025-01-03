@@ -820,11 +820,14 @@ class TimeSerieLocalUpdate(BaseObject):
         return r.json()
 
     @classmethod
-    def get(cls, local_hash_id,data_source_id:int):
+    def get(cls,*args, **kwargs):
+        if "id" in kwargs:
+            url = cls.LOCAL_UPDATE_URL + f"/{kwargs['id']}/"
+            s = cls.build_session()
+            r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url)
+            return cls(**r.json())
 
-        result = cls.filter(**{"local_hash_id": local_hash_id,
-                               "remote_table__data_source__id":data_source_id,
-                               "detail": True})
+        result = cls.filter(**kwargs)
         if len(result) > 1:
             raise Exception("More than 1 return")
         if len(result)==0:
