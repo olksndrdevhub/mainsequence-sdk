@@ -59,8 +59,10 @@ class RayUpdateManager:
 
             extra_ray_env = os.getenv("EXTRA_RAY_ENV_VARIABLES")
             if extra_ray_env:
-                for env_var in extra_ray_env.split(","):
-                    env_vars[env_var] = os.environ.get(env_var)
+                for env_key in extra_ray_env.split(","):
+                    env_val = os.environ.get(env_key)
+                    assert env_val, f"{env_key} is not set"
+                    env_vars[env_key] = env_val
 
             kwargs = dict(address=ray_address,
                           namespace=NAMESPACE,
