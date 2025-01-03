@@ -297,8 +297,18 @@ class ConfigSerializer:
                 new_value = {"is_time_serie_pickled": True}
                 try:
                     full_path, relative_path = value.persist_to_pickle()
-                    new_value["hashed_name"] = value.hashed_name
-                    new_value['remote_table_hashed_name'] = value.remote_table_hashed_name
+                    new_value["local_hash_id"] = value.local_hash_id
+                    new_value['data_source_id'] = value.data_source_id
+                except Exception as e:
+                    raise e
+                value = new_value
+        elif issubclass(value.__class__, APITimeSerie):
+            if pickle_ts == True:
+                new_value = {"is_api_time_serie_pickled": True}
+                try:
+                    full_path, relative_path = value.persist_to_pickle()
+                    new_value["local_hash_id"] = value.local_hash_id
+                    new_value['data_source_id'] = value.data_source_id
                 except Exception as e:
                     raise e
                 value = new_value
@@ -399,7 +409,7 @@ class ConfigSerializer:
                 new_kwargs[key] = value
                 continue
             if isinstance(value, dict):
-                if "is_time_serie_pickled" in value.keys():
+                if "is_time_serie_pickled" in value.keys() or "is_api_time_serie_pickled"  in value.keys():
                     new_kwargs[key] = value
                     continue
 
@@ -462,8 +472,8 @@ class ConfigSerializer:
                 new_value = ModelList([build_model(v) for v in value['model_list']])
             elif "is_time_serie_pickled" in value.keys():
                 try:
-                    full_path = TimeSerie.get_pickle_path(local_hash_id=value['hashed_name'],
-                                                          data_source_id=data_source_id
+                    full_path = TimeSerie.get_pickle_path(local_hash_id=value['local_hash_id'],
+                                                          data_source_id=value['data_source_id']
                                                           )
                 except Exception as e:
                     raise e
@@ -477,6 +487,13 @@ class ConfigSerializer:
                             local_metadatas=local_metadatas,
                             include_vam_client_objects=include_vam_client_objects)
                     new_value = ts
+            elif "is_api_time_serie_pickled" in value.keys():
+                full_path = APITimeSerie.get_pickle_path(local_hash_id=value['local_hash_id'],
+                                                      data_source_id=value['data_source_id']
+                                                      )
+                with open(full_path, 'rb') as handle:
+                    ts = cloudpickle.load(handle)
+                new_value=ts
             elif "orm_class" in value.keys():
                 new_value = build_model(value)
             elif "pydantic_model_import_path" in value.keys():
@@ -668,11 +685,16 @@ class GraphNodeMethods(ABC):
 
                     if isinstance(value, dict):
                         if "is_time_serie_pickled" in value.keys():
-                            pickle_path = self.get_pickle_path(local_hash_id=value["hashed_name"])
+                            pickle_path = self.get_pickle_path(local_hash_id=value["local_hash_id"],data_source_id=value["data_source_id"])
                             new_ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
                             new_ts.local_persist_manager  # before connection call local persist manager to garantee ts is created
                             self.local_persist_manager.depends_on_connect(new_ts)
                             new_ts.set_relation_tree()
+                        if "is_api_time_serie_pickled" in value.keys():
+
+                            new_ts = APITimeSerie.load_and_set_from_pickle(local_hash_id=value["local_hash_id"],
+                                                                           data_source_id=value["data_source_id"]
+                                                                           )
                 except Exception as e:
                     raise e
             self.local_persist_manager.set_ogm_dependencies_linked()
@@ -702,20 +724,10 @@ class TimeSerieRebuildMethods(ABC):
                 # if no need to rebuild, just sync the metadata
                 self.local_persist_manager.synchronize_metadata(meta_data=None, local_metadata=None)
 
-
-
     @classmethod
     @tracer.start_as_current_span("TS: load_from_pickle")
     def load_from_pickle(cls, pickle_path):
-        import cloudpickle
-        from pathlib import Path
-        with open(pickle_path, 'rb') as handle:
-            time_serie = cloudpickle.load(handle)
-
-        data_source = time_serie.load_data_source_from_pickle(pickle_path=pickle_path)
-        time_serie.set_data_source(data_source=data_source)
-        # verify pickle
-        time_serie.verify_backend_git_hash_with_pickle()
+        time_serie=load_from_pickle(pickle_path)
 
         return time_serie
 
@@ -787,7 +799,7 @@ class TimeSerieRebuildMethods(ABC):
                                               data_source_id=data_source)
             if os.path.isfile(pickle_path) == False:
                 data_source = DynamicTableDataSource.get(id=data_source)
-                data_source.persist_to_pickle(data_source_pickle_path(ogm.pickle_storage_path,data_source.id))
+                data_source.persist_to_pickle(data_source_pickle_path(data_source.id))
 
             data_source = cls.load_data_source_from_pickle(pickle_path=pickle_path)
 
@@ -841,7 +853,7 @@ class TimeSerieRebuildMethods(ABC):
 
     @property
     def pickle_path(self):
-        pp = data_source_dir_path(ogm.pickle_storage_path,self.data_source)
+        pp = data_source_dir_path(self.data_source.id)
         path = f"{pp}/{self.local_hash_id}.pickle"
         return path
 
@@ -864,7 +876,7 @@ class TimeSerieRebuildMethods(ABC):
         self.logger.info(f"Persisting pickle and patching source code and git hash for {self.hash_id}")
         self._update_git_and_code_in_backend()
 
-        pp = data_source_pickle_path(ogm.pickle_storage_path,self.data_source.id)
+        pp = data_source_pickle_path(self.data_source.id)
         if os.path.isfile(pp) == False or overwrite == True:
             self.data_source.persist_to_pickle(pp)
 
@@ -1338,16 +1350,45 @@ class ModelList(list):
     pass
 
 
-def data_source_dir_path( path,data_source_id):
+def data_source_dir_path(data_source_id):
+    path = ogm.pickle_storage_path
     return f"{path}/{data_source_id}"
 
 
-def data_source_pickle_path(path,data_source_id):
-    return f"{data_source_dir_path(path,data_source_id)}/data_source.pickle"
+def data_source_pickle_path(data_source_id):
+
+    return f"{data_source_dir_path(data_source_id)}/data_source.pickle"
+
+@tracer.start_as_current_span("TS: load_from_pickle")
+def load_from_pickle(pickle_path):
+    import cloudpickle
+    from pathlib import Path
+
+    directory = os.path.dirname(pickle_path)
+    filename = os.path.basename(pickle_path)
+    prefixed_path = os.path.join(directory, f"{APITimeSerie.PICKLE_PREFIFX }{filename}")
+    if os.path.isfile(prefixed_path):
+        pickle_path = prefixed_path
+
+
+    try:
+        with open(pickle_path, 'rb') as handle:
+            time_serie = cloudpickle.load(handle)
+    except Exception as e:
+        raise e
+
+    if isinstance(time_serie,APITimeSerie):
+        return time_serie
+    data_source = time_serie.load_data_source_from_pickle(pickle_path=pickle_path)
+    time_serie.set_data_source(data_source=data_source)
+    # verify pickle
+    time_serie.verify_backend_git_hash_with_pickle()
+
+    return time_serie
 
 class APITimeSerie:
 
-
+    PICKLE_PREFIFX="api-"
     @classmethod
     def build_from_local_time_serie(cls,local_time_serie:"TimeSerieLocalUpdate"):
         return cls(data_source_id=local_time_serie.remote_table["data_source"]["id"],
@@ -1404,16 +1445,20 @@ class APITimeSerie:
 
     @property
     def pickle_path(self):
-        pp = data_source_dir_path(ogm.pickle_storage_path)
-        path = f"{pp}/{self.local_hash_id}.pickle"
+        pp = data_source_dir_path(ogm.pickle_storage_path,self.data_source_id)
+        path = f"{pp}/{self.PICKLE_PREFIFX}{self.local_hash_id}.pickle"
         return path
 
-    def persist_to_pickle(self):
+    @classmethod
+    def get_pickle_path(cls, local_hash_id, data_source_id: int):
+        return f"{ogm.pickle_storage_path}/{data_source_id}/{cls.PICKLE_PREFIFX}{local_hash_id}.pickle"
+
+    def persist_to_pickle(self,overwrite=False):
         path = self.pickle_path
         # after persisting pickle , build_hash and source code need to be patched
         self.logger.info(f"Persisting pickle")
 
-        pp = data_source_pickle_path(ogm.pickle_storage_path,self.data_source_id)
+        pp = data_source_pickle_path(self.data_source_id)
         if os.path.isfile(pp) == False or overwrite == True:
 
             self.data_source.persist_to_pickle(pp)
@@ -1421,7 +1466,7 @@ class APITimeSerie:
         if os.path.isfile(path) == False or overwrite == True:
             with open(path, 'wb') as handle:
                 cloudpickle.dump(self, handle)
-
+        return path, path.replace(ogm.pickle_storage_path + "/", "")
 
 class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):
     """
@@ -2254,7 +2299,7 @@ class WrapperTimeSerie(TimeSerie):
                 pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
                                                         data_source_id=data_source.id
                                                         )
-                state["related_time_series"][key] = TimeSerie.load_from_pickle(pickle_path=pickle_path)
+                state["related_time_series"][key] = load_from_pickle(pickle_path=pickle_path)
 
         self.__dict__.update(state)
 
@@ -2320,7 +2365,7 @@ class WrapperTimeSerie(TimeSerie):
             local_metadatas: Optional metadata dictionary.
         """
 
-        USE_THREADS = True
+        USE_THREADS = False
 
         super(TimeSerie, self).set_state_with_sessions(
             include_vam_client_objects=include_vam_client_objects,
@@ -2331,17 +2376,21 @@ class WrapperTimeSerie(TimeSerie):
 
         def update_ts(related_time_series, ts_key, include_vam_client_objects,
                       graph_depth,
-                      graph_depth_limit, error_list, local_metadatas, rel_ts):
+                      graph_depth_limit, error_list, local_metadatas, rel_ts,raise_exceptions=USE_THREADS):
             if isinstance(rel_ts, dict):
                 pickle_path = TimeSerie.get_pickle_path(local_hash_id=rel_ts['local_hash_id'])
-                related_time_series[ts_key] = TimeSerie.load_from_pickle(pickle_path=pickle_path)
+                related_time_series[ts_key] = load_from_pickle(pickle_path=pickle_path)
             try:
+                if isinstance(related_time_series[ts_key],APITimeSerie):
+                    return None
                 related_time_series[ts_key].set_state_with_sessions(
                     graph_depth=graph_depth, graph_depth_limit=graph_depth_limit,
                     include_vam_client_objects=include_vam_client_objects,
                     local_metadatas=local_metadatas
                 )
             except Exception as e:
+                if raise_exceptions ==True:
+                    raise e
                 tb_str = traceback.format_exc()
                 # Store the exception along with its traceback
                 error_list[ts_key] = {'error': str(e), 'traceback': tb_str}
@@ -2368,7 +2417,7 @@ class WrapperTimeSerie(TimeSerie):
             for ts_key, rel_ts in self.related_time_series.items():
                 t = update_ts(self.related_time_series, ts_key,
                               include_vam_client_objects, graph_depth,
-                              graph_depth_limit, errors, local_metadatas, rel_ts)
+                              graph_depth_limit, errors, local_metadatas, rel_ts,True)
 
         if len(errors.keys()) > 0:
             raise Exception(f"Error setting state for {errors}")

@@ -984,11 +984,11 @@ class DataSource(BaseTdagPydanticModel,BaseObject):
 class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     id:int
     data_type:str
-    related_resource:Optional[DataSource]=None
+    related_resource:Optional[Union[DataSource,int]]=None
     class Config:
         use_enum_values = True  # This ensures that enums are stored as their values (e.g., 'TEXT')
     def __str__(self):
-        return f"{self.data_type} object created at {self.created_at}"
+        return f"{self.data_type}"
 
     @classmethod
     @property
