@@ -1071,7 +1071,7 @@ class DataPersistanceMethods(ABC):
     def reset_dependencies_states(self, hash_id_list: list):
         return self.local_persist_manager.reset_dependencies_states(hash_id_list=hash_id_list)
 
-    def update_details_in_dependecy_tree(self, set_relation_tree=True, *args, **kwargs):
+    def update_details_in_dependecy_tree(self, set_relation_tree=True, include_head=False, *args, **kwargs):
         """
         updates schedule from all tree related time series
         :param schedule:
@@ -1082,7 +1082,14 @@ class DataPersistanceMethods(ABC):
             self.set_relation_tree()
         dependants_df = self.get_all_local_dependencies()
 
-        all_metadatas = self.get_metadatas_and_set_updates(local_hash_id__in=dependants_df[["local_hash_id", "data_source_id"]].to_dict("records"),
+        dependants_records = []
+        if len(dependants_df) > 0:
+            dependants_records = dependants_df[["local_hash_id", "data_source_id"]].to_dict("records")
+
+        if include_head:
+            dependants_records.append({"local_hash_id": self.local_hash_id, "data_source_id": self.data_source.id})
+
+        all_metadatas = self.get_metadatas_and_set_updates(local_hash_id__in=dependants_records,
                                                            multi_index_asset_symbols_filter=self.multi_index_asset_symbols_filter,
                                                            update_priority_dict=None,
                                                            update_details_kwargs=kwargs)
