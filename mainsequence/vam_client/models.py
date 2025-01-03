@@ -271,6 +271,24 @@ class BaseObjectOrm:
         if r.status_code not in [201, 200]:
            raise Exception(r.text)
         return cls(** r.json())
+
+    @classmethod
+    def update_or_create(cls, timeout=None, *args, **kwargs):
+        """
+
+        :return:
+        :rtype:
+        """
+        base_url = cls.get_object_url()
+        data = cls.serialize_for_json(kwargs)
+        payload={"json":data}
+
+        r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="POST", url=f"{base_url}/update_or_create/", payload=payload,
+                         timeout=timeout
+                         )
+        if r.status_code not in [201, 200]:
+           raise Exception(r.text)
+        return cls(** r.json())
     
     @classmethod
     def destroy_by_id(cls,instance_id,*args,**kwargs):
@@ -854,7 +872,7 @@ class BarFrequency(str, Enum):
     one_month ="1mo"
 
 class HistoricalBarsSource(BaseObjectOrm, BaseVamPydanticModel):
-    execution_venue: int
+    execution_venue_symbol: int
     data_source_id: int
     local_hash_id: str
     table_name: str

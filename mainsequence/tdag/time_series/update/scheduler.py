@@ -788,21 +788,39 @@ class SchedulerUpdater:
 
               ):
         """
-
-        Parameters
-        ----------
-        debug :
-        update_tree :
-        break_after_one_update :
-        wait_for_update :
-        raise_exception_on_error :
-        update_extra_kwargs :
-        run_head_in_main_process :
-
-        Returns
-        -------
-
+            Parameters
+            ----------
+            debug : bool, optional
+                If True, all dependencies of a time series run in the same process.
+                Defaults to False.
+            update_tree : bool or dict, optional
+                If True, updates the tree of dependent tasks.
+            break_after_one_update : bool, optional
+                If True, the process stops after the first update cycle. Defaults to False.
+            wait_for_update : bool, optional
+                If True, waits for the next update according to the update schedule
+                before proceeding. Defaults to True.
+            raise_exception_on_error : bool, optional
+                If True, raises an exception on encountering an error during execution.
+                Otherwise, errors are handled silently. Defaults to False.
+            update_extra_kwargs : dict or None, optional
+                Additional parameters (if any) to pass along when updating. Defaults to None.
+            run_head_in_main_process : bool, optional
+                If True, each "head" time series is run in the main scheduler process. Useful for debugging.
+                Defaults to False.
+            force_update : bool, optional
+                If True, forces an update run even if it's not required. Defaults to False.
+            sequential_update : bool, optional
+                If True, runs each "head" time series one by one instead of in parallel.
+                Defaults to False.
+            update_only_tree : bool, optional
+                If True, only the dependency tree is updated without fully processing
+                every step. Defaults to False.
+            api_port : int or None, optional
+                The port on which any exposed APIs should run. If None, no API is exposed.
+                Defaults to None.
         """
+
         import threading
         from mainsequence.tdag_client import CONSTANTS as TDAG_CONSTANTS
         self._debug_mode = debug
@@ -860,8 +878,9 @@ class SchedulerUpdater:
                     continue
 
                 task_hex_to_uid, wait_list = self._evaluate_read_task(ready=ready,
-                                                                          task_hex_to_uid=task_hex_to_uid,
-                                                                          wait_list=wait_list)
+                                                                      task_hex_to_uid=task_hex_to_uid,
+                                                                      wait_list=wait_list
+                )
 
                 # requery DB looking for new TS added to scheduler
                 actors_map, target_ts, wait_list = self._build_scheduler_actors_if_not_exist(
@@ -918,3 +937,5 @@ class SchedulerUpdater:
             if raise_exception_on_error == True:
                 raise e
         self.stop_heart_beat = True
+
+        self.logger.info("Scheduler is stopping")
