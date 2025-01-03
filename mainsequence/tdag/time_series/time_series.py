@@ -429,7 +429,7 @@ class ConfigSerializer:
             ts = collections.OrderedDict(sorted(kwargs["time_series_dict"].items()))
             for key, ts in ts.items():
 
-                ts_kwargs[key] = (ts.local_hash_id,ts.data_source_id)
+                ts_kwargs[key] = f"{ts.local_hash_id}_{ts.data_source_id}
             kwargs["time_series_dict"] = ts_kwargs
 
         ordered_kwargs = self._serialize_configuration_dict(kwargs=kwargs)
