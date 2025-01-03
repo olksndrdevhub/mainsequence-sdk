@@ -54,19 +54,14 @@ class Configuration:
         "TDAG_RAY_CLUSTER_ADDRESS",
         "MAINSEQUENCE_TOKEN",
     ]
-    OPTIONAL_ENV_VARIABLES = [
-        "ALPACA_API_KEY",
-        "ALPACA_SECRET_KEY",
-        "BINANCE_API_KEY",
-        "BINANCE_API_SECRET",
-    ]
 
     def __init__(self):
         self.set_gt_configuration()
         self._assert_env_variables()
+
     @classmethod
     def add_env_variables_to_registry(cls,env_vars:list):
-        cls.OPTIONAL_ENV_VARIABLES.extend(env_vars)
+        cls.OBLIGATORY_ENV_VARIABLES.extend(env_vars)
 
     def set_gt_configuration(self):
         if not os.path.isfile(TDAG_CONFIG_PATH):
@@ -74,14 +69,9 @@ class Configuration:
 
         self.configuration = read_yaml(TDAG_CONFIG_PATH)
 
-
     def _assert_env_variables(self):
         for ob_var in self.OBLIGATORY_ENV_VARIABLES:
             assert ob_var in os.environ, f"{ob_var} not in environment variables"
-
-        for opt_var in self.OPTIONAL_ENV_VARIABLES:
-            if opt_var not in os.environ:
-                logger.warning(f"Warning: {opt_var} not in environment variables")
 
     def _build_template_yaml(self):
         config = {
