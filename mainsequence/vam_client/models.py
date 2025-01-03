@@ -872,7 +872,7 @@ class BarFrequency(str, Enum):
     one_month ="1mo"
 
 class HistoricalBarsSource(BaseObjectOrm, BaseVamPydanticModel):
-    execution_venue_symbol: int
+    execution_venue: int
     data_source_id: int
     local_hash_id: str
     table_name: str
@@ -883,7 +883,8 @@ class HistoricalBarsSource(BaseObjectOrm, BaseVamPydanticModel):
         url = f"{cls.ROOT_URL.replace('orm', 'data_sources')}/{cls.END_POINTS[cls.class_name()]}"
         return url
 
-
+    def __str__(self):
+        return self.class_name()
 
 
 
