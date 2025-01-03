@@ -786,7 +786,9 @@ class TimeSerieRebuildMethods(ABC):
             pickle_path = cls.get_pickle_path(local_hash_id,
                                               data_source_id=data_source)
             if os.path.isfile(pickle_path) == False:
-                DynamicTableDataSource.pickle_from_remote(id=data_source, path=ogm.pickle_storage_path)
+                data_source = DynamicTableDataSource.get(id=data_source)
+                data_source.persist_to_pickle(data_source_pickle_path(ogm.pickle_storage_path,data_source.id))
+
             data_source = cls.load_data_source_from_pickle(pickle_path=pickle_path)
 
         persist_manager = PersistManager.get_from_data_type(local_hash_id=local_hash_id,
@@ -839,7 +841,7 @@ class TimeSerieRebuildMethods(ABC):
 
     @property
     def pickle_path(self):
-        pp = self.data_source.data_source_dir_path(ogm.pickle_storage_path)
+        pp = data_source_dir_path(ogm.pickle_storage_path,self.data_source)
         path = f"{pp}/{self.local_hash_id}.pickle"
         return path
 
@@ -862,7 +864,7 @@ class TimeSerieRebuildMethods(ABC):
         self.logger.info(f"Persisting pickle and patching source code and git hash for {self.hash_id}")
         self._update_git_and_code_in_backend()
 
-        pp = self.data_source.data_source_pickle_path(ogm.pickle_storage_path)
+        pp = data_source_pickle_path(ogm.pickle_storage_path,self.data_source.id)
         if os.path.isfile(pp) == False or overwrite == True:
             self.data_source.persist_to_pickle(pp)
 
@@ -1336,12 +1338,12 @@ class ModelList(list):
     pass
 
 
-def data_source_dir_path( path):
-    return f"{path}/{self.id}"
+def data_source_dir_path( path,data_source_id):
+    return f"{path}/{data_source_id}"
 
 
-def data_source_pickle_path(path):
-    return f"{data_source_dir_path(path)}/data_source.pickle"
+def data_source_pickle_path(path,data_source_id):
+    return f"{data_source_dir_path(path,data_source_id)}/data_source.pickle"
 
 class APITimeSerie:
 
@@ -1402,7 +1404,7 @@ class APITimeSerie:
 
     @property
     def pickle_path(self):
-        pp = self.data_source.data_source_dir_path(ogm.pickle_storage_path)
+        pp = data_source_dir_path(ogm.pickle_storage_path)
         path = f"{pp}/{self.local_hash_id}.pickle"
         return path
 
@@ -1411,10 +1413,10 @@ class APITimeSerie:
         # after persisting pickle , build_hash and source code need to be patched
         self.logger.info(f"Persisting pickle")
 
-        pp = self.data_source.data_source_pickle_path(ogm.pickle_storage_path)
+        pp = data_source_pickle_path(ogm.pickle_storage_path,self.data_source_id)
         if os.path.isfile(pp) == False or overwrite == True:
 
-            self.data_source.persist_to_pickle(data_source_pickle_path(ogm.pickle_storage_path))
+            self.data_source.persist_to_pickle(pp)
 
         if os.path.isfile(path) == False or overwrite == True:
             with open(path, 'wb') as handle:

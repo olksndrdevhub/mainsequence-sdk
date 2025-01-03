@@ -988,7 +988,7 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     class Config:
         use_enum_values = True  # This ensures that enums are stored as their values (e.g., 'TEXT')
     def __str__(self):
-        return f"{self.object_type} object created at {self.created_at}"
+        return f"{self.data_type} object created at {self.created_at}"
 
     @classmethod
     @property
@@ -1032,10 +1032,7 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
                          CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB: TimeScaleDBDataSource
                          }
         return CLASS_FACTORY[data_type]
-    @classmethod
-    def pickle_from_remote(self,id,path):
-        data_source=self.get(id=id)
-        data_source.persist_to_pickle(path)
+
 
 
 
