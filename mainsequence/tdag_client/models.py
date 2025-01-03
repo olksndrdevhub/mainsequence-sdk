@@ -1037,15 +1037,10 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
         data_source=self.get(id=id)
         data_source.persist_to_pickle(path)
 
-    def data_source_dir_path(self, path):
-        return f"{path}/{self.id}"
 
-    def data_source_pickle_path(self, path):
-        return f"{self.data_source_dir_path(path)}/data_source.pickle"
 
     def persist_to_pickle(self, path):
         import cloudpickle
-        path = self.data_source_pickle_path(path)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'wb') as handle:
             cloudpickle.dump(self, handle)

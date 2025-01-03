@@ -1336,6 +1336,12 @@ class ModelList(list):
     pass
 
 
+def data_source_dir_path( path):
+    return f"{path}/{self.id}"
+
+
+def data_source_pickle_path(path):
+    return f"{data_source_dir_path(path)}/data_source.pickle"
 
 class APITimeSerie:
 
@@ -1393,6 +1399,26 @@ class APITimeSerie:
                                                                         )
 
         return filtered_data
+
+    @property
+    def pickle_path(self):
+        pp = self.data_source.data_source_dir_path(ogm.pickle_storage_path)
+        path = f"{pp}/{self.local_hash_id}.pickle"
+        return path
+
+    def persist_to_pickle(self):
+        path = self.pickle_path
+        # after persisting pickle , build_hash and source code need to be patched
+        self.logger.info(f"Persisting pickle")
+
+        pp = self.data_source.data_source_pickle_path(ogm.pickle_storage_path)
+        if os.path.isfile(pp) == False or overwrite == True:
+
+            self.data_source.persist_to_pickle(data_source_pickle_path(ogm.pickle_storage_path))
+
+        if os.path.isfile(path) == False or overwrite == True:
+            with open(path, 'wb') as handle:
+                cloudpickle.dump(self, handle)
 
 
 class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):
