@@ -1445,7 +1445,7 @@ class APITimeSerie:
 
     @property
     def pickle_path(self):
-        pp = data_source_dir_path(ogm.pickle_storage_path,self.data_source_id)
+        pp = data_source_dir_path(self.data_source_id)
         path = f"{pp}/{self.PICKLE_PREFIFX}{self.local_hash_id}.pickle"
         return path
 
