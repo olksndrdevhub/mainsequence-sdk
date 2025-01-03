@@ -273,8 +273,7 @@ class PersistManager:
         self.metadata = self.dth.patch(metadata=self.metadata, time_serie_source_code_git_hash=git_hash_id,
                             time_serie_source_code=source_code,)
 
-    def set_last_index_value(self):
-        return TimeSerieLocalUpdate.set_last_update_index_time(metadata=self.local_metadata)
+    
 
     @staticmethod
     def batch_data_persisted(hash_id_list: list):

@@ -3,16 +3,10 @@
 
 def string_freq_to_time_delta(frequency):
     import datetime
-    if "min" in frequency:
-        kwargs={"minutes":int(frequency.replace("min",""))}
-    elif "minutes" in frequency:
-        kwargs={"minutes":int(frequency.replace("minutes",""))}
-    elif "minute" in frequency:
-        kwargs={"minutes":int(frequency.replace("minute",""))}
-    elif "days" in frequency:
-        kwargs = {"days": int(frequency.replace("days", ""))}
-    elif "day" in frequency:
-        kwargs = {"days": int(frequency.replace("day", ""))}
+    if "m" in frequency:
+        kwargs={"minutes":int(frequency.replace("m",""))}
+    elif "d" in frequency:
+        kwargs = {"days": int(frequency.replace("d", ""))}
     else:
         raise NotImplementedError
 
@@ -20,16 +14,10 @@ def string_freq_to_time_delta(frequency):
     return time_delta
 
 def string_frequency_to_minutes(frequency):
-    if "min" in frequency:
-        minutes= int(frequency.replace("min",""))
-    elif "minutes" in frequency:
-        minutes= int(frequency.replace("minutes",""))
-    elif "minute" in frequency:
-        minutes= int(frequency.replace("minute",""))
-    elif "days" in frequency:
-        minutes=int(frequency.replace("days",""))*24*60
-    elif "day" in frequency:
-        minutes = int(frequency.replace("day", "")) * 24 * 60
+    if "m" in frequency:
+        minutes= int(frequency.replace("m",""))
+    elif "d" in frequency:
+        minutes = int(frequency.replace("d", "")) * 24 * 60
     else:
         raise NotImplementedError
 

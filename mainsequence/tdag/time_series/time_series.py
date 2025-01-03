@@ -955,7 +955,9 @@ class TimeSerieRebuildMethods(ABC):
 
 
     def run_in_debug_scheduler(self, break_after_one_update=True, run_head_in_main_process=True,
-                               wait_for_update=True, force_update=True, debug=True, update_tree=True):
+                               wait_for_update=True, force_update=True, debug=True, update_tree=True,
+                               raise_exception_on_error=True
+                               ):
         """
 
         Args:
@@ -981,6 +983,7 @@ class TimeSerieRebuildMethods(ABC):
             force_update=True,
             debug=True,
             update_tree=True,
+            raise_exception_on_error=raise_exception_on_error
         )
 
 

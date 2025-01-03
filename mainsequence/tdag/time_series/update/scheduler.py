@@ -124,6 +124,7 @@ class RayUpdateManager:
 
 
 class TimeSerieHeadUpdateActor:
+    IS_DISTRIBUTED=False
     TRACE_ID = "NO_TRACE"
 
     def __init__(self, local_hash_id: str, data_source_id: int, scheduler: Scheduler, wait_for_update, debug,
@@ -242,11 +243,7 @@ class TimeSerieHeadUpdateActor:
                                                  metadatas=all_metadatas, update_tracker=self.ts.update_tracker,
                                                  )
 
-                # self.ts.patch_update_details(update_pid=0, active_update_status=False)
-                try:
-                    self.ts.local_persist_manager.set_last_index_value()
-                except SourceTableConfigurationDoesNotExist as de:
-                    self.ts.logger.warning("Last index value not set as source table configuration does not exist")
+                
 
                 del self.ts.update_tracker
                 gc.collect()
@@ -265,6 +262,7 @@ class TimeSerieHeadUpdateActor:
 
 @ray.remote(num_cpus=1, )
 class TimeSerieHeadUpdateActorDist(TimeSerieHeadUpdateActor):
+    IS_DISTRIBUTED=True
     ...
 
 
@@ -635,7 +633,9 @@ class SchedulerUpdater:
                     f"{bcolors.WARNING}Killing and removing actor {active_uid} from scheduler{bcolors.ENDC}")
                 # 1 kill actor
                 try:
-                    ray.kill(actors_map[active_uid]['actor_handle'])
+                    if actors_map[active_uid]['actor_handle'].IS_DISTRIBUTED==True:
+                        ray.kill(actors_map[active_uid]['actor_handle'])
+                    
                 except Exception as e:
                     raise e
                 uids_to_remove.append(active_uid)
@@ -765,19 +765,7 @@ class SchedulerUpdater:
 
         return task_hex_to_uid, wait_list
 
-    def _print_failed_updates(self):
-        """
-        Call scheduler time series TREE with detail
-        Returns:
-
-        """
-        logger.info("Not implemented failed updates")
-        # global_queue = GlobalTimeSerieQueueActor.options(max_concurrency=10,
-        #                                                  get_if_exists=True,
-        #                                                  lifetime="detached",
-        #                                                  name="global_ts_queue").remote()
-        # hash_id_map = ray.get(global_queue.get_update_queue.remote())
-        # logger.info(pd.DataFrame({k: v for k, v in hash_id_map.items() if v['error_on_last_update'] == True}).T)
+    
 
     def _scheduler_heart_beat_patch(self):
         from mainsequence.tdag_client.utils import get_network_ip
@@ -904,7 +892,6 @@ class SchedulerUpdater:
                                      {bcolors.ENDC}
                                      """
                                  )
-                self._print_failed_updates()
 
                 if len(ts_updating) == 0:
                     self._scheduler_heart_beat_patch()

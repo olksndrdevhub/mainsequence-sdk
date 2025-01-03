@@ -241,7 +241,7 @@ class BaseObjectOrm:
         if len(instance)==0:
             raise DoesNotExist
         if len(instance)!=1:
-            raise Exception(f"Get does not return only one instance {r}")
+            raise Exception(f"Get does not return only one instance ")
         return instance[0]
 
     @staticmethod
