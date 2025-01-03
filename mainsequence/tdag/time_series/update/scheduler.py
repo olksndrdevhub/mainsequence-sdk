@@ -50,17 +50,20 @@ class RayUpdateManager:
             self.check_node_is_healthy_in_ip()
             ray_address = TDAG_RAY_CLUSTER_ADDRESS
             env_vars = {
-
                 "RAY_PROFILING": "0", "RAY_event_stats": "0",
-                "RAY_BACKEND_LOG_LEVEL": "error", }
+                "RAY_BACKEND_LOG_LEVEL": "error",
+            }
 
             for c in Configuration.OBLIGATORY_ENV_VARIABLES:
                 env_vars[c] = os.environ.get(c)
-            for c in Configuration.OPTIONAL_ENV_VARIABLES:
-                if c in os.environ:
-                    env_vars[c] = os.environ.get(c)
 
-            kwargs = dict(address=ray_address, namespace=NAMESPACE,
+            extra_ray_env = os.getenv("EXTRA_RAY_ENV_VARIABLES")
+            if extra_ray_env:
+                for env_var in extra_ray_env.split(","):
+                    env_vars[env_var] = os.environ.get(env_var)
+
+            kwargs = dict(address=ray_address,
+                          namespace=NAMESPACE,
                           local_mode=local_mode,
                           # log_to_driver=False,
                           runtime_env={"env_vars": env_vars,
@@ -614,6 +617,7 @@ class SchedulerUpdater:
                                              ):
         """
         Queries ts_orm scheduler and build update actors if not exist
+        Returns
         Returns
         -------
 
