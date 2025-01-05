@@ -668,12 +668,28 @@ class GraphNodeMethods(ABC):
         """
 
         members = self.__dict__
-        self.remote_api_tables=[]
 
         if self.is_local_relation_tree_set == False:
 
             for key, value in members.items():
                 try:
+                    if "related_time_series" in key: #this is necessary for WrapperTimeSeries
+                        # add to tree
+                        if isinstance(value, list):
+                            raise NotImplementedError
+                        elif isinstance(value, dict):
+                            for tm_ts in value.values():
+                                if isinstance(tm_ts, dict):
+                                    pickle_path = self.get_pickle_path(local_hash_id=tm_ts["hash_id"])
+                                    new_ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
+                                    new_ts.local_persist_manager  # before connection call local persist manager to garantee ts is created
+                                    self.local_persist_manager.depends_on_connect(new_ts)
+                                    new_ts.set_relation_tree()
+                                else:
+                                    is_api = isinstance(tm_ts, APITimeSerie)
+                                    tm_ts.local_persist_manager  # before connection call local persist manager to garantee ts is created
+                                    self.local_persist_manager.depends_on_connect(tm_ts,is_api=is_api)
+                                    tm_ts.set_relation_tree()
 
                     if isinstance(value, TimeSerie):
                         value.local_persist_manager  # before connection call local persist manager to garantee ts is created
@@ -695,6 +711,8 @@ class GraphNodeMethods(ABC):
                             new_ts = APITimeSerie.load_and_set_from_pickle(local_hash_id=value["local_hash_id"],
                                                                            data_source_id=value["data_source_id"]
                                                                            )
+                            self.local_persist_manager.depends_on_connect(new_ts)
+                            new_ts.set_relation_tree()
                 except Exception as e:
                     raise e
             self.local_persist_manager.set_ogm_dependencies_linked()
@@ -1413,7 +1431,8 @@ class APITimeSerie:
             self.logger.info(f"Setting local persist manager for {self.local_hash_id}")
             self._set_local_persist_manager()
         return self._local_persist_manager
-
+    def set_relation_tree(self):
+        pass #do nothing  for API Time Series
     def _set_logger(self, local_hash_id):
         if hasattr(self, "logger") == False:
 
