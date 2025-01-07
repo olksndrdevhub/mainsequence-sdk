@@ -265,6 +265,9 @@ class TimeSerieHeadUpdateActor:
         return error_on_update
 
 
+    def is_distributed(self):
+        return self.IS_DISTRIBUTED
+
 @ray.remote(num_cpus=1, )
 class TimeSerieHeadUpdateActorDist(TimeSerieHeadUpdateActor):
     IS_DISTRIBUTED=True
