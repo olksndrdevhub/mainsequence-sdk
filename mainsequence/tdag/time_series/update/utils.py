@@ -98,7 +98,7 @@ class UpdateInterface:
         new_starts, all_starts = {}, {}
 
         for lts in local_time_series_list:
-            all_starts[(lts[0],lts[1])] = self._build_new_update_for_hash_id(local_hash_id=lts[0],data_source_id=lts[1])
+            all_starts[(lts[0], lts[1])] = self._build_new_update_for_hash_id(local_hash_id=lts[0], data_source_id=lts[1])
         in_update_queue = self.get_ts_in_update_queue(hash_id_list=local_time_series_list)
         to_place_in_queue = []
         for lts, start_data in all_starts.items():
