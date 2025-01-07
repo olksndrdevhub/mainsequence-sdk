@@ -1467,7 +1467,7 @@ class APITimeSerie:
         self._verify_local_data_source()
         local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
         if self.data_source is None:
-            if isinstance(local_metadata["remote_table"]["data_source"],dict):
+            if isinstance(local_metadata["remote_table"]["data_source"], dict):
                 #data source is open use direct connection
 
                 self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=self.local_hash_id,

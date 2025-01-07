@@ -315,7 +315,7 @@ class DataLakeInterface:
         filtered_dataset = read_parquet_from_lake(
             file_path=file_path,
             use_s3_if_available=False,
-            filters=[(TIME_PARTITION, "=", time_partition[-1])]
+            filters=[[(TIME_PARTITION, "=", time_partition[-1])]]
         )
         last_multiindex = {}
         if "asset_symbol" in filtered_dataset.index.names:
