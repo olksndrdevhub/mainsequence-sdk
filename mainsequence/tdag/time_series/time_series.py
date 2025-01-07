@@ -1445,8 +1445,21 @@ class APITimeSerie:
                                                 local_hash_id=self.local_hash_id, data_source_id=self.data_source_id,
                                                 api_time_series=True,
                                                 )
+    def _verify_local_data_source(self):
+        pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
+        if pod_source != None:
+            from mainsequence.tdag_client import models as models
+            pod_source = json.loads(pod_source)
+            ModelClass = pod_source["tdag_orm_class"]
+            pod_source.pop("tdag_orm_class", None)
+            ModelClass = getattr(models, ModelClass)
+            pod_source = ModelClass(**pod_source)
+            self.data_source = pod_source
     def _set_local_persist_manager(self):
         from mainsequence.tdag.time_series.persist_managers import APIPersistManager
+
+
+        self._verify_local_data_source()
         if self.data_source is None:
             self._local_persist_manager = APIPersistManager(data_source_id=self.data_source_id,local_hash_id=self.local_hash_id,
                                                           logger=self.logger)
@@ -1740,7 +1753,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         pass
 
     def __repr__(self):
-        local_id=self.local_metadata["id"]
+        try:
+            local_id=self.local_metadata["id"]
+        except:
+            local_id = 0
         repr = self.__class__.__name__ + f" {os.environ['TDAG_ENDPOINT']}/local-time-series/details/?local_time_serie_id={local_id}"
         return repr
 
