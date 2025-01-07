@@ -868,15 +868,18 @@ class TimeSerieLocalUpdate(BaseObject):
         return r
 
     @classmethod
-    def get_data_between_dates_from_api(cls,local_hash_id:str, data_source_id:int, start_date: datetime.datetime,
+    def get_data_between_dates_from_api(cls, local_hash_id:str, data_source_id:int, start_date: datetime.datetime,
                                         end_date: datetime.datetime, great_or_equal: bool,
                                         less_or_equal: bool,
                                         asset_symbols: list,
                                         columns: list,
-                                        execution_venue_symbols: list,symbol_range_map:Union[None,dict] ):
+                                        execution_venue_symbols: list,
+                                        symbol_range_map: Union[None,dict]
+    ):
         s = cls.build_session()
         url = cls.LOCAL_UPDATE_URL + f"/get_data_between_dates_from_remote/"
 
+        symbol_range_map = copy.deepcopy(symbol_range_map)
         if symbol_range_map is not None:
             for symbol, date_info in symbol_range_map.items():
                 # Convert start_date if present
@@ -899,7 +902,7 @@ class TimeSerieLocalUpdate(BaseObject):
             "columns": columns,
             "execution_venue_symbols": execution_venue_symbols,
             "offset": 0,  # Will increase in each loop
-            "symbol_range_map":symbol_range_map
+            "symbol_range_map": symbol_range_map
         }}
         all_results = []
         while True:
@@ -1506,7 +1509,6 @@ class DynamicTableHelpers:
      
         metadata_kwargs = self.serialize_for_json(metadata_kwargs)
         time_serie_node, metadata = TimeSerieNode.create(metadata_kwargs=metadata_kwargs)
-       
         return metadata
 
     def create_table_from_source_table_configuration(self,source_table_config_id:int,timeout=None):

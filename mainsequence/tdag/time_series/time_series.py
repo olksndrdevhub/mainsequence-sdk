@@ -745,7 +745,7 @@ class TimeSerieRebuildMethods(ABC):
     @classmethod
     @tracer.start_as_current_span("TS: load_from_pickle")
     def load_from_pickle(cls, pickle_path):
-        time_serie=load_from_pickle(pickle_path)
+        time_serie = load_from_pickle(pickle_path)
 
         return time_serie
 
@@ -1388,32 +1388,31 @@ def load_from_pickle(pickle_path):
     if os.path.isfile(prefixed_path):
         pickle_path = prefixed_path
 
-
     try:
         with open(pickle_path, 'rb') as handle:
             time_serie = cloudpickle.load(handle)
     except Exception as e:
         raise e
 
-    if isinstance(time_serie,APITimeSerie):
+    if isinstance(time_serie, APITimeSerie):
         return time_serie
+
     data_source = time_serie.load_data_source_from_pickle(pickle_path=pickle_path)
     time_serie.set_data_source(data_source=data_source)
     # verify pickle
     time_serie.verify_backend_git_hash_with_pickle()
-
     return time_serie
 
 class APITimeSerie:
 
-    PICKLE_PREFIFX="api-"
+    PICKLE_PREFIFX = "api-"
     @classmethod
-    def build_from_local_time_serie(cls,local_time_serie:"TimeSerieLocalUpdate"):
+    def build_from_local_time_serie(cls, local_time_serie: "TimeSerieLocalUpdate"):
         return cls(data_source_id=local_time_serie.remote_table["data_source"]["id"],
                    local_hash_id=local_time_serie.local_hash_id
                    )
 
-    def __init__(self, data_source_id:int, local_hash_id:str,data_source_local_lake:Union[None,DataSource]=None):
+    def __init__(self, data_source_id:int, local_hash_id:str, data_source_local_lake: Union[None,DataSource]=None):
         """
         A time serie is uniquely identified in tdag by  data_source_id and table_name
         :param data_source_id:

@@ -180,7 +180,7 @@ class TimeSerieHeadUpdateActor:
                                                set_dependencies_df=True,
                                                data_source_id=data_source_id,
                                                )
-            pickle_path = TimeSerie.get_pickle_path(local_hash_id,data_source_id)
+            pickle_path = TimeSerie.get_pickle_path(local_hash_id, data_source_id)
             if os.path.isfile(pickle_path) == True:
                 ts = TimeSerie.load_from_pickle(pickle_path=pickle_path)
             else:

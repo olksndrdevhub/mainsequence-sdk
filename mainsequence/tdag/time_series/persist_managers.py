@@ -1,11 +1,7 @@
 import pandas as pd
 import datetime
 from typing import Union, List,Dict
-
 import os
-
-
-
 from mainsequence.tdag.logconf import console_logger, create_logger_in_path
 
 from mainsequence.tdag_client import (DynamicTableHelpers, TimeSerieNode, TimeSerieLocalUpdate,
@@ -16,13 +12,6 @@ from mainsequence.tdag.logconf import get_tdag_logger
 from mainsequence.tdag_client.models import BACKEND_DETACHED, none_if_backend_detached
 
 logger = get_tdag_logger()
-
-
-
-
-
-
-
 
 class APIPersistManager:
 
@@ -35,11 +24,11 @@ class APIPersistManager:
 
     def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
                              less_or_equal=True,
-                             asset_symbols: Union[list, None] = None,execution_venue_symbols: Union[list, None] = None,
-                             columns: Union[list, None] = None,symbol_range_map:Union[dict, None] = None,):
-
-
-        filtered_data=TimeSerieLocalUpdate.get_data_between_dates_from_api(
+                             asset_symbols: Union[list, None] = None,
+                             execution_venue_symbols: Union[list, None] = None,
+                             columns: Union[list, None] = None,
+                             symbol_range_map: Union[dict, None] = None,):
+        filtered_data = TimeSerieLocalUpdate.get_data_between_dates_from_api(
                                                         local_hash_id=self.local_hash_id,
                                                         data_source_id=self.data_source_id, start_date=start_date,
                                                         end_date=end_date, great_or_equal=great_or_equal,
@@ -49,12 +38,16 @@ class APIPersistManager:
                                                         execution_venue_symbols=execution_venue_symbols,
                                                         symbol_range_map=symbol_range_map)
 
+        if len(filtered_data) == 0:
+            self.logger.warning(f"Data from {self.local_hash_id} is empty ({start_date} to {end_date} for assets {asset_symbols}) ")
+            return filtered_data
+
         #fix types
         local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
                                                   data_source_id=self.data_source_id
                                                   )
-        stc=local_metadata["remote_table"]["sourcetableconfiguration"]
-        filtered_data[stc["time_index_name"]]=pd.to_datetime(filtered_data[stc["time_index_name"]])
+        stc = local_metadata["remote_table"]["sourcetableconfiguration"]
+        filtered_data[stc["time_index_name"]] = pd.to_datetime(filtered_data[stc["time_index_name"]])
         for c, c_type in stc["column_dtypes_map"].items():
             if c!=stc["time_index_name"]:
                 if c_type=="object":
@@ -64,15 +57,8 @@ class APIPersistManager:
         return filtered_data
 
     def filter_by_assets_ranges(self, symbol_range_map: dict):
-
-
-
-        df=self.get_df_between_dates(start_date=None,end_date=None, symbol_range_map=symbol_range_map)
-
-
-
+        df = self.get_df_between_dates(start_date=None, end_date=None, symbol_range_map=symbol_range_map)
         return df
-
 
 class PersistManager:
     def __init__(self,data_source, local_hash_id: str, remote_table_hashed_name: Union[str, None],

@@ -241,7 +241,7 @@ class BaseObjectOrm:
     @classmethod
     def get(cls,*args,**kwargs):
 
-        instance=cls.filter(*args,**kwargs)
+        instance = cls.filter(*args, **kwargs)
 
         if len(instance)==0:
             raise DoesNotExist
