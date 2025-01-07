@@ -1385,8 +1385,12 @@ def load_from_pickle(pickle_path):
     directory = os.path.dirname(pickle_path)
     filename = os.path.basename(pickle_path)
     prefixed_path = os.path.join(directory, f"{APITimeSerie.PICKLE_PREFIFX }{filename}")
+    if os.path.isfile(prefixed_path) and os.path.isfile(pickle_path):
+        raise FileExistsError("Both default and API timeseries exist - cannot descide which to load")
+
     if os.path.isfile(prefixed_path):
         pickle_path = prefixed_path
+
 
     try:
         with open(pickle_path, 'rb') as handle:
@@ -2095,8 +2099,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
             if tmp_ts.shape[0] > 0:
                 self._execute_parallel_distributed_update(tmp_ts=tmp_ts,
-                                                          metadatas=metadatas,
-                                                          scheduler=self.scheduler)
+                                                          metadatas=metadatas)
 
 
         else:
@@ -2173,7 +2176,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
         futures_ = []
 
-        all_start_data = self.update_tracker.set_start_of_execution_batch(hash_id_list=tmp_ts.local_hash_id.to_list())
+        local_time_series_list = self.dependencies_df[
+            self.dependencies_df["source_class_name"] != "WrapperTimeSerie"
+            ][["local_hash_id", "data_source_id"]].values.tolist()
+        all_start_data = self.update_tracker.set_start_of_execution_batch(local_time_series_list=local_time_series_list)
 
         for counter, (uid, data) in enumerate(tmp_ts.iterrows()):
 
