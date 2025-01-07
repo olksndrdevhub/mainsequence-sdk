@@ -503,7 +503,7 @@ class Asset(AssetMixin,BaseObjectOrm):
     
     @classmethod
     def create_or_update_index_asset_from_portfolios(cls,*args,**kwargs)->"TargetPortfolioIndexAsset":
-        url = f"{cls.get_object_url()}/get_or_create_index_asset_from_portfolios/"
+        url = f"{cls.get_object_url()}/create_or_update_index_asset_from_portfolios/"
         payload = {"json": kwargs}
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
         if r.status_code in [200] == False:
