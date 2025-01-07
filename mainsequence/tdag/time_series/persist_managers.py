@@ -36,7 +36,7 @@ class APIPersistManager:
     def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
                              less_or_equal=True,
                              asset_symbols: Union[list, None] = None,execution_venue_symbols: Union[list, None] = None,
-                             columns: Union[list, None] = None):
+                             columns: Union[list, None] = None,symbol_range_map:Union[dict, None] = None,):
 
 
         filtered_data=TimeSerieLocalUpdate.get_data_between_dates_from_api(
@@ -46,7 +46,8 @@ class APIPersistManager:
                                                         less_or_equal=less_or_equal,
                                                         asset_symbols=asset_symbols,
                                                         columns=columns,
-                                                        execution_venue_symbols=execution_venue_symbols)
+                                                        execution_venue_symbols=execution_venue_symbols,
+                                                        symbol_range_map=symbol_range_map)
 
         #fix types
         local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
@@ -61,6 +62,16 @@ class APIPersistManager:
                 filtered_data[c]=filtered_data[c].astype(c_type)
         filtered_data=filtered_data.set_index(stc["index_names"])
         return filtered_data
+
+    def filter_by_assets_ranges(self, symbol_range_map: dict):
+
+
+
+        df=self.get_df_between_dates(start_date=None,end_date=None, symbol_range_map=symbol_range_map)
+
+
+
+        return df
 
 
 class PersistManager:

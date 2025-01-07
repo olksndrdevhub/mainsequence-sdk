@@ -863,9 +863,21 @@ class TimeSerieLocalUpdate(BaseObject):
                                         less_or_equal: bool,
                                         asset_symbols: list,
                                         columns: list,
-                                        execution_venue_symbols: list, ):
+                                        execution_venue_symbols: list,symbol_range_map:Union[None,dict] ):
         s = cls.build_session()
         url = cls.LOCAL_UPDATE_URL + f"/get_data_between_dates_from_remote/"
+
+        if symbol_range_map is not None:
+            for symbol, date_info in symbol_range_map.items():
+                # Convert start_date if present
+                if 'start_date' in date_info and isinstance(date_info['start_date'], datetime.datetime):
+                    date_info['start_date'] = int(date_info['start_date'].timestamp())
+
+                # Convert end_date if present
+                if 'end_date' in date_info and isinstance(date_info['end_date'], datetime.datetime):
+                    date_info['end_date'] = int(date_info['end_date'].timestamp())
+
+
         payload = {"json":{
             "local_hash_id": local_hash_id,
             "data_source_id": data_source_id,
@@ -877,6 +889,7 @@ class TimeSerieLocalUpdate(BaseObject):
             "columns": columns,
             "execution_venue_symbols": execution_venue_symbols,
             "offset": 0,  # Will increase in each loop
+            "symbol_range_map":symbol_range_map
         }}
         all_results = []
         while True:

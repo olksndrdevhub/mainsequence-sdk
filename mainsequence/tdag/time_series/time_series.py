@@ -1476,6 +1476,21 @@ class APITimeSerie:
 
         return filtered_data
 
+    def filter_by_assets_ranges(self, asset_ranges_map: dict):
+        """
+
+        Parameters
+        ----------
+        asset_ranges
+
+        Returns
+        -------
+
+        """
+        df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map)
+        return df
+
+
     @property
     def pickle_path(self):
         pp = data_source_dir_path(self.data_source_id)
