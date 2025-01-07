@@ -22,8 +22,8 @@ from mainsequence.tdag.config import (
     ogm
 )
 
-from mainsequence.tdag.time_series.persist_managers import PersistManager
-from mainsequence.tdag_client.models import none_if_backend_detached
+from mainsequence.tdag.time_series.persist_managers import PersistManager, DataLakePersistManager
+from mainsequence.tdag_client.models import none_if_backend_detached, DataSource
 from numpy.f2py.auxfuncs import isint1
 
 from pycares.errno import value
@@ -1413,15 +1413,19 @@ class APITimeSerie:
                    local_hash_id=local_time_serie.local_hash_id
                    )
 
-    def __init__(self, data_source_id:int, local_hash_id:str):
+    def __init__(self, data_source_id:int, local_hash_id:str,data_source_local_lake:Union[None,DataSource]=None):
         """
         A time serie is uniquely identified in tdag by  data_source_id and table_name
         :param data_source_id:
         :param table_name:
         """
+        if data_source_local_lake is not None:
+            assert data_source_local_lake.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE, "data_source_local_lake should be of type CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE"
         self.data_source_id = data_source_id
         self.local_hash_id = local_hash_id
+        self.data_source = data_source_local_lake
         self.local_persist_manager
+
 
     @property
     def local_persist_manager(self):
@@ -1443,9 +1447,19 @@ class APITimeSerie:
                                                 )
     def _set_local_persist_manager(self):
         from mainsequence.tdag.time_series.persist_managers import APIPersistManager
-
-        self._local_persist_manager = APIPersistManager(data_source_id=self.data_source_id,local_hash_id=self.local_hash_id,
-                                                      logger=self.logger)
+        if self.data_source is None:
+            self._local_persist_manager = APIPersistManager(data_source_id=self.data_source_id,local_hash_id=self.local_hash_id,
+                                                          logger=self.logger)
+        else:
+            local_metadata=TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
+            self._local_persist_manager = DataLakePersistManager(local_hash_id=self.local_hash_id,
+                                                                        remote_table_hashed_name=local_metadata["remote_table"]["hash_id"],
+                                                                        class_name=local_metadata["build_configuration"]["time_series_class_import_path"]["qualname"],
+                                                                        human_readable=f"Local API Lake for {self.local_hash_id}",
+                                                                        logger=self.logger,
+                                                                        local_metadata=local_metadata,
+                                                                        description=f"Local API Lake for {self.local_hash_id}",
+                                                                        data_source=self.data_source)
 
     def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
                              end_date: Union[datetime.datetime, None] = None,
@@ -1486,6 +1500,29 @@ class APITimeSerie:
             with open(path, 'wb') as handle:
                 cloudpickle.dump(self, handle)
         return path, path.replace(ogm.pickle_storage_path + "/", "")
+
+    def persist_data_to_local_lake(self, temp_df, update_tracker,
+                             latest_value: Union[None, datetime.datetime],
+                             overwrite=False) -> bool:
+        """
+        Helper series to  persist data to a local lake for reading purposes
+        :param temp_df:
+        :param update_tracker:
+        :param latest_value:
+        :param overwrite:
+        :return:
+        """
+        persisted = False
+        if temp_df.shape[0] > 0:
+            if overwrite == True:
+                self.logger.warning(f"Values will be overwritten assuming latest value of  {latest_value}")
+            self.local_persist_manager.persist_updated_data(temp_df=temp_df,
+                                                            update_tracker=update_tracker,
+                                                            historical_update_id=None,
+                                                            overwrite=overwrite)
+            persisted = True
+        return persisted
+
 
 class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):
     """
@@ -1688,8 +1725,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         pass
 
     def __repr__(self):
-
-        repr = self.__class__.__name__ + f" {os.environ['TDAG_ENDPOINT']}/local-time-series/details/?local_time_serie_id={self.local_hash_id}"
+        local_id=self.local_metadata["id"]
+        repr = self.__class__.__name__ + f" {os.environ['TDAG_ENDPOINT']}/local-time-series/details/?local_time_serie_id={local_id}"
         return repr
 
     def _get_target_time_index(self, idx):
