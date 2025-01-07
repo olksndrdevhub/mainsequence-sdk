@@ -146,16 +146,26 @@ class BaseTdagPydanticModel(BaseModel):
         # Set orm_class to the class itself
         cls.tdag_orm_class = cls.__name__
 
+def build_session(loaders):
+    from requests.adapters import HTTPAdapter, Retry
+    s = requests.Session()
+    s.headers.update(loaders.auth_headers)
+    retries = Retry(total=2, backoff_factor=2, )
+    s.mount('http://', HTTPAdapter(max_retries=retries))
+    return s
+
+session=build_session(loaders=loaders)
 
 class BaseObject:
     LOADERS = loaders
     @classmethod
     def build_session(cls):
-        from requests.adapters import HTTPAdapter, Retry
-        s = requests.Session()
-        s.headers.update(cls.LOADERS.auth_headers)
-        retries = Retry(total=2, backoff_factor=2, )
-        s.mount('http://', HTTPAdapter(max_retries=retries))
+        # from requests.adapters import HTTPAdapter, Retry
+        # s = requests.Session()
+        # s.headers.update(cls.LOADERS.auth_headers)
+        # retries = Retry(total=2, backoff_factor=2, )
+        # s.mount('http://', HTTPAdapter(max_retries=retries))
+        s=session
         return s
 
     @property

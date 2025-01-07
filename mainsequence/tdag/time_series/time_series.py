@@ -1455,14 +1455,35 @@ class APITimeSerie:
             ModelClass = getattr(models, ModelClass)
             pod_source = ModelClass(**pod_source)
             self.data_source = pod_source
+    def build_data_source_from_configuration(self,data_config):
+        from mainsequence.tdag_client import models as models
+        ModelClass =DynamicTableDataSource.get_class(data_config['data_type'])
+        pod_source = ModelClass.get(data_config["id"])
+        return pod_source
+
     def _set_local_persist_manager(self):
         from mainsequence.tdag.time_series.persist_managers import APIPersistManager
 
 
         self._verify_local_data_source()
+        local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
         if self.data_source is None:
-            self._local_persist_manager = APIPersistManager(data_source_id=self.data_source_id,local_hash_id=self.local_hash_id,
-                                                          logger=self.logger)
+            if isinstance(local_metadata["remote_table"]["data_source"],dict):
+                #data source is open use direct connection
+
+                self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=self.local_hash_id,
+                                                                                remote_table_hashed_name=local_metadata["remote_table"]["hash_id"],
+                                                                                class_name=local_metadata["build_configuration"]["time_series_class_import_path"]["qualname"],
+                                                                                human_readable=local_metadata["remote_table"]["human_readable"],
+                                                                                logger=self.logger,
+                                                                                local_metadata=local_metadata,
+                                                                                description="",
+                                                                                data_source= self.build_data_source_from_configuration(local_metadata["remote_table"]["data_source"])
+                                                                                )
+            else:
+
+                self._local_persist_manager = APIPersistManager(data_source_id=self.data_source_id,local_hash_id=self.local_hash_id,
+                                                              logger=self.logger)
         else:
             local_metadata=TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
             self._local_persist_manager = DataLakePersistManager(local_hash_id=self.local_hash_id,
@@ -2452,7 +2473,7 @@ class WrapperTimeSerie(TimeSerie):
             local_metadatas: Optional metadata dictionary.
         """
 
-        USE_THREADS = False
+        USE_THREADS = True
 
         super(TimeSerie, self).set_state_with_sessions(
             include_vam_client_objects=include_vam_client_objects,
