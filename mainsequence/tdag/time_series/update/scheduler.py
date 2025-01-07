@@ -3,6 +3,8 @@ import datetime
 import pytz
 import time
 
+from ray.util.client.common import ClientActorHandle
+
 from mainsequence.tdag_client import (Scheduler, TimeSerieLocalUpdate, SourceTableConfigurationDoesNotExist,
                                       LocalTimeSerieNode
                                       )
@@ -129,7 +131,6 @@ class RayUpdateManager:
 
 
 class TimeSerieHeadUpdateActor:
-    IS_DISTRIBUTED=False
     TRACE_ID = "NO_TRACE"
 
     def __init__(self, local_hash_id: str, data_source_id: int, scheduler: Scheduler, wait_for_update, debug,
@@ -264,13 +265,8 @@ class TimeSerieHeadUpdateActor:
                 error_on_update = True
         return error_on_update
 
-
-    def is_distributed(self):
-        return self.IS_DISTRIBUTED
-
 @ray.remote(num_cpus=1, )
 class TimeSerieHeadUpdateActorDist(TimeSerieHeadUpdateActor):
-    IS_DISTRIBUTED=True
     ...
 
 
@@ -641,12 +637,9 @@ class SchedulerUpdater:
                 self.logger.info(
                     f"{bcolors.WARNING}Killing and removing actor {active_uid} from scheduler{bcolors.ENDC}")
                 # 1 kill actor
-                try:
-                    if actors_map[active_uid]['actor_handle'].IS_DISTRIBUTED==True:
-                        ray.kill(actors_map[active_uid]['actor_handle'])
-                    
-                except Exception as e:
-                    raise e
+                if isinstance(actors_map[active_uid]['actor_handle'], ClientActorHandle):
+                    ray.kill(actors_map[active_uid]['actor_handle'])
+
                 uids_to_remove.append(active_uid)
                 # 3 remove ts from wait_list
                 if active_uid in wait_list.keys():
