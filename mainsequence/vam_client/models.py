@@ -935,6 +935,7 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
     build_purpose:str
     is_active: bool = False
     local_time_serie_id: int = Field(...,)
+    local_time_serie_hash_id: str = Field(...)
     local_signal_time_serie_id:int = Field(...,)
 
     builds_from_predictions: bool = False

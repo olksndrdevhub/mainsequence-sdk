@@ -74,6 +74,8 @@ def read_parquet_from_lake(
                         expr = field > value
                     elif operator == "<":
                         expr = field < value
+                    elif operator == "in":
+                        expr = field.isin(value)
                     else:
                         raise ValueError(f"Unsupported operator: {operator}")
 
@@ -162,22 +164,22 @@ class DataLakeInterface:
         # Add asset_symbols filter (OR condition across symbols)
         if asset_symbols:
             asset_symbol_filter = ('asset_symbol', 'in', tuple(asset_symbols))
-            filters.append(asset_symbol_filter)
+            filters.append((asset_symbol_filter))
 
         # Add time_index filter for start_date
         if start_date:
             start_date_op = '>=' if great_or_equal else '>'
             start_date_filter = ('time_index', start_date_op, start_date)
-            filters.append(start_date_filter)
+            filters.append((start_date_filter))
 
         # Add time_index filter for end_date
         if end_date:
             end_date_op = '<=' if less_or_equal else '<'
             end_date_filter = ('time_index', end_date_op, end_date)
-            filters.append(end_date_filter)
+            filters.append((end_date_filter))
 
         # Return filters as a hashable tuple of tuples
-        return tuple(filters)
+        return (tuple(filters),)
 
     def filter_by_assets_ranges(self,table_name:str,
                                 asset_ranges_map:dict,
@@ -379,7 +381,7 @@ class DataLakeInterface:
 
             data_set= pq.ParquetDataset(file_path, filesystem=s3)
         else:
-            data_set=pq.ParquetDataset(file_path)
+            data_set= ds.dataset(file_path, format="parquet", partitioning="hive")
         return data_set
 
     def write_to_parquet(self, data: pd.DataFrame, file_path: str, partition_cols: list, upsert: bool):

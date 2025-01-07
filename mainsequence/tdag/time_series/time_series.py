@@ -772,12 +772,11 @@ class TimeSerieRebuildMethods(ABC):
 
     @classmethod
     def rebuild_from_pickle_or_configuration(self,local_hash_id,data_source_id,
-                                             remote_table_hashed_name
+
                                              ):
         """
         :param local_hash_id:
         :param data_source_id:
-        :param remote_table_hashed_name:
         :return:
         """
         pickle_path = self.get_pickle_path(local_hash_id,
@@ -785,7 +784,6 @@ class TimeSerieRebuildMethods(ABC):
         data_source = self.load_data_source_from_pickle(pickle_path=pickle_path)
         if os.path.isfile(pickle_path) == False:
             ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
-                                                      remote_table_hashed_name=remote_table_hashed_name,
                                                       data_source=data_source
                                                       )
             ts.persist_to_pickle()
@@ -797,7 +795,6 @@ class TimeSerieRebuildMethods(ABC):
     @tracer.start_as_current_span("TS: Rebuild From Configuration")
     def rebuild_from_configuration(cls, local_hash_id,
                                    data_source: Union[int, object],
-                                   remote_table_hashed_name: Union[str, None],
 
                                    ):
         """
@@ -823,7 +820,7 @@ class TimeSerieRebuildMethods(ABC):
 
         persist_manager = PersistManager.get_from_data_type(local_hash_id=local_hash_id,
                                                             data_source=data_source,
-                                                            remote_table_hashed_name=remote_table_hashed_name)
+                                                            )
         try:
             time_serie_config = persist_manager.local_build_configuration
         except Exception as e:
@@ -1471,7 +1468,7 @@ class APITimeSerie:
                 #data source is open use direct connection
 
                 self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=self.local_hash_id,
-                                                                                remote_table_hashed_name=local_metadata["remote_table"]["hash_id"],
+
                                                                                 class_name=local_metadata["build_configuration"]["time_series_class_import_path"]["qualname"],
                                                                                 human_readable=local_metadata["remote_table"]["human_readable"],
                                                                                 logger=self.logger,
@@ -1486,7 +1483,7 @@ class APITimeSerie:
         else:
             local_metadata=TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
             self._local_persist_manager = DataLakePersistManager(local_hash_id=self.local_hash_id,
-                                                                        remote_table_hashed_name=local_metadata["remote_table"]["hash_id"],
+
                                                                         class_name=local_metadata["build_configuration"]["time_series_class_import_path"]["qualname"],
                                                                         human_readable=f"Local API Lake for {self.local_hash_id}",
                                                                         logger=self.logger,
@@ -1871,7 +1868,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             human_readable = None
 
         self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=hashed_name,
-                                                                        remote_table_hashed_name=remote_table_hashed_name,
+
                                                                         class_name=self.__class__.__name__,
                                                                         human_readable=human_readable,
                                                                         logger=self.logger,

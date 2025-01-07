@@ -61,7 +61,7 @@ class APIPersistManager:
         return df
 
 class PersistManager:
-    def __init__(self,data_source, local_hash_id: str, remote_table_hashed_name: Union[str, None],
+    def __init__(self,data_source, local_hash_id: str,
 
                  logger:Union[str,None]=None, description: Union[str,None]=None,
                  class_name: Union[str, None] = None,
@@ -76,7 +76,6 @@ class PersistManager:
             # query remote hash_id
             metadata = local_metadata["remote_table"]
 
-        self.remote_table_hashed_name = remote_table_hashed_name
         self.logger = logger if logger is not None else console_logger("persist_manager_logger",
                                                                        application_name="tdag")
         self.dth = DynamicTableHelpers(logger=logger)
@@ -113,21 +112,12 @@ class PersistManager:
             TimeSerieLocalUpdate.set_last_update_index_time(metadata=self.local_metadata)
         if meta_data is None or local_metadata is None:  # avoid calling 2 times the DB
             meta_data = {}
-            try:
-                local_metadata = {}  # set to empty in case not exist
-                local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
-                                                          data_source_id=self.data_source.id
-                                                          )
-                if len(local_metadata) == 0:
-                    raise LocalTimeSeriesDoesNotExist
-            except LocalTimeSeriesDoesNotExist:
-                # could be localmetadata is none but table could exist
-                try:
-                    meta_data = self.dth.get(hash_id=self.remote_table_hashed_name,
-                                             data_source__id=self.data_source.id
-                                             )
-                except DynamicTableDoesNotExist:
-                    pass
+
+            local_metadata = {}  # set to empty in case not exist
+            local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
+                                                      data_source_id=self.data_source.id
+                                                      )
+
 
         if len(local_metadata) != 0:
             self.local_build_configuration = local_metadata["build_configuration"]
@@ -135,14 +125,9 @@ class PersistManager:
             self.local_metadata = local_metadata
 
             # metadata should always exist
-            meta_data = local_metadata["remote_table"]
+            self.metadata = local_metadata["remote_table"]
 
-        if len(meta_data) != 0:
-            remote_build_configuration, remote_build_metadata = meta_data["build_configuration"], meta_data[
-                "build_meta_data"]
-            self.remote_build_configuration = remote_build_configuration
-            self.remote_build_metadata = remote_build_metadata
-            self.metadata = meta_data
+
 
     def depends_on_connect(self,new_ts:"TimeSerie",is_api:bool):
         """
@@ -161,8 +146,7 @@ class PersistManager:
                 human_readable = new_ts.local_persist_manager.metadata['human_readable']
             except KeyError:
                 human_readable = new_ts.human_readable
-            self.dth.depends_on_connect(source_hash_id=self.metadata["hash_id"],
-                                        target_hash_id=new_ts.remote_table_hashed_name,
+            self.dth.depends_on_connect(
 
                                         source_local_hash_id=self.local_metadata["local_hash_id"],
                                         target_local_hash_id=new_ts.local_hash_id,
@@ -304,10 +288,10 @@ class PersistManager:
             return 0
 
     def time_serie_exist(self):
-        return self.dth.time_serie_exist_in_db(self.remote_table_hashed_name)
+        if hasattr(self,"metadata"):
+            return True
+        return False
 
-    def metadata_registered_in_db(self):
-        return self.dth.get(hash_id=self.remote_table_hashed_name)
 
 
     def patch_build_configuration(self,local_configuration:dict,remote_configuration:dict,
@@ -324,21 +308,22 @@ class PersistManager:
 
 
 
-        kwargs = dict(hash_id=self.remote_table_hashed_name,
-                      build_configuration=remote_configuration, )
+        # kwargs = dict(hash_id=self.remote_table_hashed_name,
+        #               build_configuration=remote_configuration, )
 
 
         local_metadata_kwargs = dict(local_hash_id=self.local_hash_id,
                                build_configuration=local_configuration,
-                               remote_table__hash_id=self.remote_table_hashed_name)
+                              )
 
 
-        TimeSerieNode.patch_build_configuration(remote_table_patch=kwargs,
+        TimeSerieNode.patch_build_configuration(remote_table_patch={},
                                                 data_source_id=self.data_source.id,
                                                 build_meta_data=remote_build_metadata,
                                                 local_table_patch=local_metadata_kwargs)
 
-    def local_persist_exist_set_config(self, local_configuration:dict, remote_configuration:dict,data_source:dict,
+    def local_persist_exist_set_config(self,remote_table_hashed_name:str,
+                                       local_configuration:dict, remote_configuration:dict,data_source:dict,
                                        time_serie_source_code_git_hash:str, time_serie_source_code:str,
         remote_build_metadata:dict,
                                        ):
@@ -364,7 +349,7 @@ class PersistManager:
                 # table may not exist but
                 remote_build_metadata = remote_configuration["build_meta_data"] if "build_meta_data" in remote_configuration.keys() else {}
                 remote_configuration.pop("build_meta_data", None)
-                kwargs = dict(hash_id=self.remote_table_hashed_name,
+                kwargs = dict(hash_id=remote_table_hashed_name,
                               time_serie_source_code_git_hash=time_serie_source_code_git_hash,
                               time_serie_source_code=time_serie_source_code,
                               build_configuration=remote_configuration,
@@ -387,7 +372,7 @@ class PersistManager:
                 # self.delete_local_parquet()
 
             except Exception as e:
-                self.logger.exception(f"{self.remote_table_hashed_name} Could not set meta data in DB for P")
+                self.logger.exception(f"{remote_table_hashed_name} Could not set meta data in DB for P")
                 raise e
         # check if link to local update exists
 
@@ -455,12 +440,10 @@ class PersistManager:
         -------
 
         """
-        if self.remote_table_hashed_name!=self.local_hash_id:
 
+        if isinstance(temp_df.index,pd.MultiIndex)==True:
             assert temp_df.index.names==["time_index","asset_symbol"] or  temp_df.index.names==["time_index","asset_symbol","execution_venue_symbol"]
-        if isinstance(temp_df.index,pd.MultiIndex)==False:
-            # assert temp_df.index.name is not None
-            pass
+
 
     def update_details_exist(self):
         """
@@ -546,11 +529,13 @@ class PersistManager:
 
     #table dependes
 
-    def get_update_statistics(self, asset_symbols:list) -> [datetime.datetime,Dict[str, datetime.datetime]]:
+    def get_update_statistics(self, asset_symbols:list,
+                              remote_table_hash_id,
+                              ) -> [datetime.datetime,Dict[str, datetime.datetime]]:
         if BACKEND_DETACHED(): #todo this can be optimized by running stats per data lake
             return self._get_local_lake_update_statistics()
 
-        metadata = self.dth.get(hash_id=self.remote_table_hashed_name,data_source__id=self.data_source.id)
+        metadata = self.dth.get(hash_id=remote_table_hash_id,data_source__id=self.data_source.id)
 
         last_update_in_table, last_update_per_asset = None, None
         if "sourcetableconfiguration" in metadata.keys():
@@ -626,8 +611,8 @@ class PersistManager:
 
         return df
 
-    def get_earliest_value(self) -> datetime.datetime:
-        earliest_value = self.dth.get_earliest_value(hash_id=self.remote_table_hashed_name)
+    def get_earliest_value(self,remote_table_hash_id) -> datetime.datetime:
+        earliest_value = self.dth.get_earliest_value(hash_id=remote_table_hash_id)
         return earliest_value
 
     def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
@@ -657,7 +642,7 @@ class TimeScaleLocalPersistManager(PersistManager):
 
 
 
-    def get_full_source_data(self, engine="pandas"):
+    def get_full_source_data(self,remote_table_hash_id, engine="pandas"):
         """
         Returns full stored data, uses multiprocessing to achieve several queries by rows and speed
         :return:
@@ -666,7 +651,7 @@ class TimeScaleLocalPersistManager(PersistManager):
         from joblib import Parallel, delayed
         from tqdm import tqdm
 
-        metadata = self.dth.get_configuration(hash_id=self.remote_table_hashed_name)
+        metadata = self.dth.get_configuration(hash_id=remote_table_hash_id)
         earliest_obs = metadata["sourcetableconfiguration"]["last_time_index_value"]
         latest_value = metadata["sourcetableconfiguration"]["earliest_index_value"]
 
@@ -688,7 +673,7 @@ class TimeScaleLocalPersistManager(PersistManager):
             return tmp_data
 
         dfs = Parallel(n_jobs=10)(
-            delayed(get_data)(ranges, i, self.remote_table_hashed_name, engine) for i in tqdm(range(len(ranges) - 1)))
+            delayed(get_data)(ranges, i, remote_table_hash_id, engine) for i in tqdm(range(len(ranges) - 1)))
         dfs = pd.concat(dfs, axis=0)
         dfs = dfs.set_index(self.metadata["table_config"]["index_names"])
         return dfs
@@ -706,8 +691,9 @@ class TimeScaleLocalPersistManager(PersistManager):
                     status = self.dth.set_compression_policy(interval=interval, metadata=self.metadata)
         else:
             self.logger.warning("Retention policy couldnt be set as TS is not yet persisted")
-    def set_policy_for_descendants(self,policy,comp_type:str,exclude_ids:Union[list,None]=None,extend_to_classes=False):
-        self.dth.set_policy_for_descendants(hash_id=self.remote_table_hashed_name,pol_type=comp_type,policy=policy,
+    def set_policy_for_descendants(self,remote_table_hash_id:str,
+                                   policy,comp_type:str,exclude_ids:Union[list,None]=None,extend_to_classes=False):
+        self.dth.set_policy_for_descendants(hash_id=remote_table_hash_id,pol_type=comp_type,policy=policy,
                                             exclude_ids=exclude_ids,extend_to_classes=extend_to_classes)
 
 
@@ -746,8 +732,8 @@ class DataLakePersistManager(PersistManager):
         if self.already_run== True:
             return None
         if BACKEND_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            self.metadata = {"sourcetableconfiguration":None, "hash_id": self.remote_table_hashed_name,
-                            "table_name": self.remote_table_hashed_name
+            self.metadata = {"sourcetableconfiguration":None, "hash_id": ts.remote_table_hashed_name,
+                            "table_name":self.metadata["table_name"]
                             }
             self.local_metadata= {"local_hash_id":self.local_hash_id}
             last_update_in_table=None
@@ -766,7 +752,7 @@ class DataLakePersistManager(PersistManager):
                 return None
             if df.shape[0] == 0:
                 return None
-            self.dth.upsert_data_into_table(metadata={"table_name": self.remote_table_hashed_name}, local_metadata=None, data=df,
+            self.dth.upsert_data_into_table(metadata={"table_name": self.metadata["table_name"]}, local_metadata=None, data=df,
                                             logger=self.logger, overwrite=True, historical_update_id=None,
                                             data_source=self.data_source)
             #verify pickle exist
@@ -790,20 +776,20 @@ class DataLakePersistManager(PersistManager):
 
         self.already_run = already_run
 
-    def _get_local_lake_update_statistics(self):
+    def _get_local_lake_update_statistics(self,remote_table_hash_id):
         from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
         last_index_value, last_multiindex = DataLakeInterface(
             data_lake_source=self.data_source,
             logger=self.logger
         ).get_parquet_latest_value(
-            table_name=self.remote_table_hashed_name
+            table_name=remote_table_hash_id
         )
         return last_index_value, last_multiindex
 
-    def table_exist(self):
+    def table_exist(self,table_name):
         from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
         return DataLakeInterface(data_lake_source=self.data_source,
                                                               logger=self.logger).table_exist(
-            table_name=self.remote_table_hashed_name)
+            table_name=table_name)
