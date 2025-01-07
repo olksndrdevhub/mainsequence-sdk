@@ -533,7 +533,7 @@ class PersistManager:
                               remote_table_hash_id,
                               ) -> [datetime.datetime,Dict[str, datetime.datetime]]:
         if BACKEND_DETACHED(): #todo this can be optimized by running stats per data lake
-            return self._get_local_lake_update_statistics()
+            return self._get_local_lake_update_statistics(remote_table_hash_id=remote_table_hash_id)
 
         metadata = self.dth.get(hash_id=remote_table_hash_id,data_source__id=self.data_source.id)
 
@@ -733,11 +733,11 @@ class DataLakePersistManager(PersistManager):
             return None
         if BACKEND_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             self.metadata = {"sourcetableconfiguration":None, "hash_id": ts.remote_table_hashed_name,
-                            "table_name":self.metadata["table_name"]
+                            "table_name":ts.remote_table_hashed_name
                             }
             self.local_metadata= {"local_hash_id":self.local_hash_id}
             last_update_in_table=None
-            if self.table_exist():
+            if self.table_exist(table_name=ts.remote_table_hashed_name):
                 # check if table is complete and continue with earliest latest value to avoid data gaps
                 last_update_in_table, last_update_per_asset = ts.get_update_statistics()
                 if last_update_per_asset is not None:
@@ -752,7 +752,7 @@ class DataLakePersistManager(PersistManager):
                 return None
             if df.shape[0] == 0:
                 return None
-            self.dth.upsert_data_into_table(metadata={"table_name": self.metadata["table_name"]}, local_metadata=None, data=df,
+            self.dth.upsert_data_into_table(metadata={"table_name": ts.remote_table_hashed_name}, local_metadata=None, data=df,
                                             logger=self.logger, overwrite=True, historical_update_id=None,
                                             data_source=self.data_source)
             #verify pickle exist

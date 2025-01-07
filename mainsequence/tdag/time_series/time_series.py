@@ -772,7 +772,7 @@ class TimeSerieRebuildMethods(ABC):
 
     @classmethod
     def rebuild_from_pickle_or_configuration(self,local_hash_id,data_source_id,
-
+                                             graph_depth_limit=1
                                              ):
         """
         :param local_hash_id:
@@ -788,7 +788,9 @@ class TimeSerieRebuildMethods(ABC):
                                                       )
             ts.persist_to_pickle()
 
-        ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
+        ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path,
+                                                graph_depth_limit=graph_depth_limit
+                                                )
         return ts
 
     @classmethod
@@ -921,6 +923,8 @@ class TimeSerieRebuildMethods(ABC):
         -------
 
         """
+        if graph_depth_limit==-1:
+            graph_depth_limit=1e6
         if local_metadatas is not None:
             local_metadatas = None if len(local_metadatas) == 0 else local_metadatas
 
@@ -933,12 +937,7 @@ class TimeSerieRebuildMethods(ABC):
         if graph_depth_limit < minimum_required_depth_for_update and graph_depth == 0:
             graph_depth_limit = minimum_required_depth_for_update
             self.logger.warning(f"Graph depht limit overrided to {minimum_required_depth_for_update}")
-        if graph_depth <= graph_depth_limit:
-            local_metadata = local_metadatas[(self.local_hash_id,self.data_source.id)] if local_metadatas is not None else None
-            self._set_local_persist_manager(hashed_name=self.hashed_name,
-                                            remote_table_hashed_name=self.remote_table_hashed_name,
-                                            local_metadata=local_metadata
-                                            )
+
 
         serializer = ConfigSerializer()
         state = serializer.deserialize_pickle_state(state=state, data_source_id=self.data_source.id,
@@ -948,6 +947,16 @@ class TimeSerieRebuildMethods(ABC):
                                                     graph_depth=graph_depth + 1)
 
         self.__dict__.update(state)
+        if graph_depth <= graph_depth_limit:
+            local_metadata = local_metadatas[
+                (self.local_hash_id, self.data_source.id)] if local_metadatas is not None else None
+            self._set_local_persist_manager(hashed_name=self.hashed_name,
+                                            remote_table_hashed_name=self.remote_table_hashed_name,
+                                            local_metadata=local_metadata
+                                            )
+
+
+
         self.local_persist_manager.synchronize_metadata(meta_data=None, local_metadata=None)
 
     def get_minimum_required_depth_for_update(self):
@@ -1186,7 +1195,9 @@ class DataPersistanceMethods(ABC):
 
         """
 
-        last_update_in_table, last_update_per_asset = self.local_persist_manager.get_update_statistics(asset_symbols=asset_symbols)
+        last_update_in_table, last_update_per_asset = self.local_persist_manager.get_update_statistics(
+            remote_table_hash_id=self.remote_table_hashed_name,
+            asset_symbols=asset_symbols)
         return last_update_in_table, last_update_per_asset
 
     def get_earliest_value(self) -> datetime.datetime:
