@@ -54,7 +54,44 @@ def read_parquet_from_lake(
         s3_path, storage_options = self._get_storage_options(file_path)
         data = pd.read_parquet(s3_path, engine='pyarrow', storage_options=storage_options, **extra_kwargs)
     else:
-        data = pd.read_parquet(file_path, **extra_kwargs)
+        def parse_filters(filters):
+            """
+            Parse nested filter structure into a PyArrow expression.
+            """
+            combined_expression = None
+            for group in filters:
+                group_expression = None
+                for column, operator, value in group:
+                    field = ds.field(column)
+                    # Map operators to PyArrow expressions
+                    if operator == "=":
+                        expr = field == value
+                    elif operator == ">=":
+                        expr = field >= value
+                    elif operator == "<=":
+                        expr = field <= value
+                    elif operator == ">":
+                        expr = field > value
+                    elif operator == "<":
+                        expr = field < value
+                    else:
+                        raise ValueError(f"Unsupported operator: {operator}")
+
+                    group_expression = expr if group_expression is None else group_expression & expr
+
+                combined_expression = group_expression if combined_expression is None else combined_expression | group_expression
+
+            return combined_expression
+
+        filter_expression = parse_filters(filters) if filters else None
+
+        dataset = ds.dataset(file_path, format="parquet", partitioning="hive")
+        scanner = ds.Scanner.from_dataset(
+            dataset,
+            filter=filter_expression,
+        )
+
+        data = scanner.to_table().to_pandas()
 
     return data.sort_index()
 
@@ -171,11 +208,9 @@ class DataLakeInterface:
             for group in filters
         )
 
-        df_buffer = []
-        for filter in tqdm(filters):
-            df_buffer.append(self.query_datalake(table_name, filters=(filter,)))
+        data=self.query_datalake(table_name=table_name,filters=filters)
 
-        return pd.concat(df_buffer)
+        return data
 
     def get_file_path_for_table(self,table_name):
 
@@ -348,6 +383,7 @@ class DataLakeInterface:
         return data_set
 
     def write_to_parquet(self, data: pd.DataFrame, file_path: str, partition_cols: list, upsert: bool):
+        data[TIME_PARTITION] = data[TIME_PARTITION].astype('str')
         if self.s3_data_lake:
             # Write directly to S3
             s3_path, storage_options = self._get_storage_options(file_path)
@@ -359,9 +395,13 @@ class DataLakeInterface:
             if upsert:
                 self.upsert_to_parquet(new_data_table=data, file_path=file_path)
             else:
-                data.to_parquet(file_path, partition_cols=partition_cols, engine='pyarrow')
 
-    def upsert_to_parquet(self, new_data_table: pd.DataFrame, file_path: str):
+                data.to_parquet(file_path, partition_cols=partition_cols, engine='pyarrow',
+                                use_dictionary=False  # Disable dictionary encoding
+                                )
+
+    def upsert_to_parquet(self, new_data_table: pd.DataFrame,
+                          file_path: str):
         # Identify unique partitions
         unique_partitions = new_data_table[TIME_PARTITION].unique()
 
@@ -441,7 +481,10 @@ class DataLakeInterface:
 
             # Write a single parquet file inside the temp partition directory
             temp_file = os.path.join(temp_partition_path, "part-0.parquet")
-            pq.write_table(merged_data, temp_file)
+
+            pq.write_table(merged_data, temp_file,
+                           use_dictionary={TIME_PARTITION: False},  # <--- ensure string, no dictionary
+                           )
 
             # Replace old partition directory
             if os.path.exists(partition_path):
