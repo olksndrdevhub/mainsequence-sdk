@@ -308,8 +308,8 @@ class PersistManager:
 
 
 
-        # kwargs = dict(hash_id=self.remote_table_hashed_name,
-        #               build_configuration=remote_configuration, )
+        kwargs = dict(
+                      build_configuration=remote_configuration, )
 
 
         local_metadata_kwargs = dict(local_hash_id=self.local_hash_id,
@@ -317,7 +317,7 @@ class PersistManager:
                               )
 
 
-        TimeSerieNode.patch_build_configuration(remote_table_patch={},
+        TimeSerieNode.patch_build_configuration(remote_table_patch=kwargs,
                                                 data_source_id=self.data_source.id,
                                                 build_meta_data=remote_build_metadata,
                                                 local_table_patch=local_metadata_kwargs)

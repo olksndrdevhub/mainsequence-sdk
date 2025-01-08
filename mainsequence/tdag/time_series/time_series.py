@@ -938,6 +938,15 @@ class TimeSerieRebuildMethods(ABC):
             graph_depth_limit = minimum_required_depth_for_update
             self.logger.warning(f"Graph depht limit overrided to {minimum_required_depth_for_update}")
 
+        #if the data source is not local then the de-serialization needs to happend after setting the local persist manager
+        #to guranteed a proper patch in the back-end
+        if graph_depth <= graph_depth_limit and self.data_source.data_type != CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+            local_metadata = local_metadatas[
+                (self.local_hash_id, self.data_source.id)] if local_metadatas is not None else None
+            self._set_local_persist_manager(hashed_name=self.hashed_name,
+                                            remote_table_hashed_name=self.remote_table_hashed_name,
+                                            local_metadata=local_metadata
+                                            )
 
         serializer = ConfigSerializer()
         state = serializer.deserialize_pickle_state(state=state, data_source_id=self.data_source.id,
@@ -947,7 +956,8 @@ class TimeSerieRebuildMethods(ABC):
                                                     graph_depth=graph_depth + 1)
 
         self.__dict__.update(state)
-        if graph_depth <= graph_depth_limit:
+        # if the data source is  local then the de-serialization needs to happend before setting the local persist manager
+        if graph_depth <= graph_depth_limit and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             local_metadata = local_metadatas[
                 (self.local_hash_id, self.data_source.id)] if local_metadatas is not None else None
             self._set_local_persist_manager(hashed_name=self.hashed_name,
@@ -1901,6 +1911,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         time_serie_source_code_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
         time_serie_source_code = self.get_time_serie_source_code(self.__class__)
         remote_meta_exist, local_meta_exist = self._local_persist_manager.local_persist_exist_set_config(
+            remote_table_hashed_name=self.remote_table_hashed_name,
             local_configuration=self.local_initial_configuration,
             remote_configuration=self.remote_initial_configuration,
             remote_build_metadata=self.remote_build_metadata,

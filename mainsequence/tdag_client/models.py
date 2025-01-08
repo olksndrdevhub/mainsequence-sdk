@@ -298,7 +298,7 @@ class TimeSerieNode(BaseTdagPydanticModel,BaseObject):
             raise Exception(f"Error in request {r.text}")
 
     @classmethod
-    def depends_on_connect(cls, source_hash_id: str, target_hash_id: str, target_class_name: str,
+    def depends_on_connect(cls,  target_class_name: str,
                            source_local_hash_id: str,
                            target_local_hash_id: str,
                            source_data_source_id: id,
@@ -319,8 +319,7 @@ class TimeSerieNode(BaseTdagPydanticModel,BaseObject):
         """
         s = cls.build_session()
         url = cls.ROOT_URL + "/depends_on_connect/"
-        payload = dict(json={"source_hash_id": source_hash_id,
-                             "target_hash_id": target_hash_id, "target_class_name": target_class_name,
+        payload = dict(json={ "target_class_name": target_class_name,
                              "source_local_hash_id": source_local_hash_id, "target_local_hash_id": target_local_hash_id,
                              "target_human_readable": target_human_readable,
                              "source_data_source_id": source_data_source_id,
@@ -368,7 +367,7 @@ class TimeSerieNode(BaseTdagPydanticModel,BaseObject):
 
     @none_if_backend_detached
     @classmethod
-    def patch_build_configuration(cls, remote_table_patch: dict,
+    def patch_build_configuration(cls, remote_table_patch: Union[dict,None],
                                   build_meta_data: dict, data_source_id: int,
                                   local_table_patch: dict) -> "TimeSerieLocalUpdate":
         """
@@ -2012,7 +2011,7 @@ class DynamicTableHelpers:
                                          target_data_source_id=target_data_source_id,
                                          target_local_hash_id=target_local_hash_id)
 
-    def depends_on_connect(self,source_hash_id:str, target_hash_id:str,target_class_name:str,
+    def depends_on_connect(self, target_class_name:str,
                            source_local_hash_id:str,
                            target_local_hash_id:str,
                            source_data_source_id:id,
@@ -2020,7 +2019,7 @@ class DynamicTableHelpers:
                            target_human_readable:str):
 
 
-        TimeSerieNode.depends_on_connect(source_hash_id=source_hash_id, target_hash_id=target_hash_id,
+        TimeSerieNode.depends_on_connect(
                                          source_local_hash_id=source_local_hash_id,target_local_hash_id=target_local_hash_id,
                                          target_class_name=target_class_name,
                                          source_data_source_id=source_data_source_id,
