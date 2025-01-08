@@ -382,6 +382,14 @@ class DataLakeInterface:
         else:
             return os.path.exists(file_path)
 
+    def get_table_schema(self,table_name):
+        data_path = self.get_data_file_path_for_table(table_name)
+        if not self.table_exist(table_name):
+            return None
+
+        dataset = ds.dataset(data_path, format="parquet")
+        a=5
+
     def get_parquet_latest_value(self,table_name):
 
         data_path = self.get_data_file_path_for_table(table_name)

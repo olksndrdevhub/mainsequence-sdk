@@ -842,6 +842,7 @@ class TimeSerieRebuildMethods(ABC):
         time_serie_config["init_meta"] = {}
 
         re_build_ts = TimeSerieClass(**time_serie_config)
+        re_build_ts.local_persist_manager
 
         return re_build_ts
 
@@ -940,12 +941,12 @@ class TimeSerieRebuildMethods(ABC):
 
         #if the data source is not local then the de-serialization needs to happend after setting the local persist manager
         #to guranteed a proper patch in the back-end
-        if graph_depth <= graph_depth_limit and self.data_source.data_type != CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+        if graph_depth <= graph_depth_limit and self.data_source.data_type:
             local_metadata = local_metadatas[
                 (self.local_hash_id, self.data_source.id)] if local_metadatas is not None else None
             self._set_local_persist_manager(hashed_name=self.hashed_name,
                                             remote_table_hashed_name=self.remote_table_hashed_name,
-                                            local_metadata=local_metadata
+                                            local_metadata=local_metadata,verify_local_run=False,
                                             )
 
         serializer = ConfigSerializer()
@@ -956,16 +957,6 @@ class TimeSerieRebuildMethods(ABC):
                                                     graph_depth=graph_depth + 1)
 
         self.__dict__.update(state)
-        # if the data source is  local then the de-serialization needs to happend before setting the local persist manager
-        if graph_depth <= graph_depth_limit and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            local_metadata = local_metadatas[
-                (self.local_hash_id, self.data_source.id)] if local_metadatas is not None else None
-            self._set_local_persist_manager(hashed_name=self.hashed_name,
-                                            remote_table_hashed_name=self.remote_table_hashed_name,
-                                            local_metadata=local_metadata
-                                            )
-
-
 
         self.local_persist_manager.synchronize_metadata(meta_data=None, local_metadata=None)
 
@@ -1895,6 +1886,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def _set_local_persist_manager(self, hashed_name: str, remote_table_hashed_name: str,
                                    local_metadata: Union[None, dict] = None,
                                    time_serie_meta_build_configuration: Union[None, dict] = None,
+                                   verify_local_run=True,
                                    ) -> None:
         """
         Initializes the local persistence manager for the time series. It sets up
@@ -1922,9 +1914,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                                         logger=self.logger,
                                                                         local_metadata=local_metadata,
                                                                         description=self.get_html_description(),
-                                                                        data_source=self.data_source
+                                                                        data_source=self.data_source,
+
                                                                         )
-        if isinstance(self._local_persist_manager, DataLakePersistManager):
+        if isinstance(self._local_persist_manager, DataLakePersistManager) and verify_local_run:
             self._local_persist_manager.verify_if_already_run(self)
         self._verify_and_build_remote_objects()
 

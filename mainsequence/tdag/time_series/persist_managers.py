@@ -4,6 +4,7 @@ from typing import Union, List,Dict
 import os
 from mainsequence.tdag.logconf import console_logger, create_logger_in_path
 
+
 from mainsequence.tdag_client import (DynamicTableHelpers, TimeSerieNode, TimeSerieLocalUpdate,
                                       LocalTimeSeriesDoesNotExist, PodLocalLake,
                                       DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS, TimeSerie)
@@ -90,11 +91,12 @@ class PersistManager:
                                       class_name=class_name)
 
     @classmethod
-    def get_from_data_type(self,data_source:DynamicTableDataSource, *args, **kwargs):
+    def get_from_data_type(self,data_source:DynamicTableDataSource,*args, **kwargs):
 
         data_type = data_source.data_type
         if data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            return DataLakePersistManager(data_source=data_source,*args, **kwargs)
+            return DataLakePersistManager(data_source=data_source,
+                                         *args, **kwargs)
 
         elif data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
@@ -719,18 +721,21 @@ class DataLakePersistManager(PersistManager):
         Initializes the DataLakePersistManager with configuration from environment variables.
         """
         super().__init__(*args,**kwargs)
-        self.already_run = self.set_already_run(already_run=False)
+        self.set_already_run(already_run=False)
 
 
-    def verify_if_already_run(self, ts):
+
+    def verify_if_already_run(self,ts):
         """
         This method handles all the configuration and setup necessary when running a detached local data lake
         :param ts:
         :return:
         """
         from mainsequence.tdag_client.models import BACKEND_DETACHED
+        from mainsequence.tdag.time_series import WrapperTimeSerie
         if self.already_run== True:
             return None
+
         if BACKEND_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             self.metadata = {"sourcetableconfiguration":None, "hash_id": ts.remote_table_hashed_name,
                             "table_name":ts.remote_table_hashed_name
@@ -745,9 +750,14 @@ class DataLakePersistManager(PersistManager):
                                                                                 asset_symbols=None)
 
             self.logger.debug(f"Building local data lake from latest value  {last_update_in_table}")
-
+            if isinstance(ts,WrapperTimeSerie):
+                df = None
+                for _,sub_ts in ts.related_time_series.items():
+                    sub_ts.local_persist_manager #query the first run
+            else:
+                df = ts.update_series_from_source(latest_value=last_update_in_table)
             self.set_already_run(True)
-            df = ts.update_series_from_source(latest_value=last_update_in_table)
+
             if df is None:
                 return None
             if df.shape[0] == 0:
@@ -793,3 +803,9 @@ class DataLakePersistManager(PersistManager):
         return DataLakeInterface(data_lake_source=self.data_source,
                                                               logger=self.logger).table_exist(
             table_name=table_name)
+    def get_table_schema(self):
+        dli=DataLakeInterface(data_lake_source=self.data_source,
+                         logger=self.logger).table_exist(
+            table_name=table_name)
+        return dli.get_table_schema(table_name=table_name)
+
