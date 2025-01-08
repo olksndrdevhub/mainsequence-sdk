@@ -1504,20 +1504,20 @@ class APITimeSerie:
                                                                                 description="",
                                                                                 data_source= self.build_data_source_from_configuration(local_metadata["remote_table"]["data_source"])
                                                                                 )
-
         else:
 
-            table_exist_locally = self._local_persist_manager.table_exist(local_metadata["remote_table"]["hash_id"])
+
+            local_persist_manager_lake = DataLakePersistManager(local_hash_id=self.local_hash_id,
+
+                                                                        class_name=local_metadata["build_configuration"]["time_series_class_import_path"]["qualname"],
+                                                                        human_readable=f"Local API Lake for {self.local_hash_id}",
+                                                                        logger=self.logger,
+                                                                        local_metadata=local_metadata,
+                                                                        description=f"Local API Lake for {self.local_hash_id}",
+                                                                        data_source=self.data_source)
+            table_exist_locally = local_persist_manager_lake.table_exist(local_metadata["remote_table"]["hash_id"])
             if table_exist_locally:
-                self._local_persist_manager = DataLakePersistManager(local_hash_id=self.local_hash_id,
-
-                                                                            class_name=local_metadata["build_configuration"]["time_series_class_import_path"]["qualname"],
-                                                                            human_readable=f"Local API Lake for {self.local_hash_id}",
-                                                                            logger=self.logger,
-                                                                            local_metadata=local_metadata,
-                                                                            description=f"Local API Lake for {self.local_hash_id}",
-                                                                            data_source=self.data_source)
-
+                self._local_persist_manager=local_persist_manager_lake
 
 
     def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
