@@ -1,9 +1,9 @@
 import os
 from typing import Union, Literal
 from .models import (loaders, VAM_API_ENDPOINT, BaseObjectOrm, make_request, AccountMixin, AssetMixin,
-                     FutureUSDMMixin,BaseVamPydanticModel,DATE_FORMAT,
-                     Asset, AssetFutureUSDM, ExecutionVenue,AccountRiskFactors,
-                     DoesNotExist)
+                     FutureUSDMMixin, BaseVamPydanticModel, DATE_FORMAT,
+                     Asset, AssetFutureUSDM, ExecutionVenue, AccountRiskFactors,
+                     DoesNotExist, CurrencyPairMixin)
 import datetime
 import pandas as pd
 
@@ -22,11 +22,13 @@ class AlpacaBaseObject(BaseObjectOrm):
         "AlpacaAssetTrade": 'trade/spot',
         "AlpacaAccount": 'account',
         "AlpacaAsset": 'asset/spot',
+        "AlpacaCurrencyPair": 'asset/currency_pair',
     }
     ROOT_URL = VAM_API_ENDPOINT + "/alpaca"
+    ALPACA_CRYPTO_POSTFIX = "--c"
 
 
-class AlpacaAsset(AssetMixin, AlpacaBaseObject):
+class AlpacaAssetMixin(AssetMixin, AlpacaBaseObject):
     ticker: str
     asset_class: str
     exchange: str
@@ -39,6 +41,26 @@ class AlpacaAsset(AssetMixin, AlpacaBaseObject):
     def get_spot_reference_asset_symbol(self):
         return self.symbol
 
+    @property
+    def unique_symbol(self):
+        # alpaca cash equities is default case, if crypto add postfix
+        if self.asset_type == CONSTANTS.ASSET_TYPE_CASH_EQUITY:
+            return f"{self.symbol}"
+        else:
+            return f"{self.symbol}{AlpacaBaseObject.ALPACA_CRYPTO_POSTFIX}"
+
+    @staticmethod
+    def get_properties_from_unique_symbol(unique_symbol: str):
+        if unique_symbol.endswith(AlpacaBaseObject.ALPACA_CRYPTO_POSTFIX):
+            return {"symbol": unique_symbol.replace(AlpacaBaseObject.ALPACA_CRYPTO_POSTFIX, ""), "asset_type": CONSTANTS.ASSET_TYPE_CRYPTO_SPOT}
+
+        return {"symbol": unique_symbol, "asset_type": CONSTANTS.ASSET_TYPE_CASH_EQUITY}
+
+class AlpacaAsset(AlpacaAssetMixin):
+    pass
+
+class AlpacaCurrencyPair(CurrencyPairMixin, AlpacaAssetMixin):
+    pass
 
 class AlapaAccountRiskFactors(AccountRiskFactors):
     total_initial_margin: float

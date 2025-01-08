@@ -338,7 +338,7 @@ class ExecutionPositions(BaseObjectOrm,BaseVamPydanticModel):
 
     @property
     def symbol_asset_map(self):
-        return {p.asset.symbol: p.asset.id for p in self.positions}
+        return {p.asset.unique_symbol: p.asset.id for p in self.positions}
 
     @property
     def symbol_to_id_map(self):
@@ -410,13 +410,17 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
     name: str
     asset_type: str
     can_trade: bool
-    calendar:Union[Calendar,int]
+    calendar: Union[Calendar,int]
     execution_venue: Union["ExecutionVenue", int]
     delisted_datetime: Optional[datetime.datetime] = None
 
     @property
-    def unique_identifier(self):
+    def unique_symbol(self):
         return f"{self.symbol}"
+
+    @staticmethod
+    def get_properties_from_unique_symbol(unique_symbol: str):
+        return {"symbol": unique_symbol}
 
     @property
     def execution_venue_symbol(self):
@@ -1154,18 +1158,18 @@ class VirtualFund(BaseObjectOrm, BaseVamPydanticModel):
         if self.target_account.execution_venue.symbol == CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL:
             target_ev=CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL
             new_target_weights={}
-            for _,position in target_weights.items():
-                AssetClass=position.asset.__class__
-                asset,_=AssetClass.filter(symbol=position.asset.symbol,execution_venue__symbol=target_ev,
+            for _, position in target_weights.items():
+                AssetClass = position.asset.__class__
+                asset,_ = AssetClass.filter(symbol=position.asset.unique_symbol, execution_venue__symbol=target_ev,
                                         asset_type=position.asset.asset_type,
                                         )
-                asset=asset[0]
-                new_position=copy.deepcopy(position)
+                asset = asset[0]
+                new_position = copy.deepcopy(position)
                 new_position.asset=asset
-                new_target_weights[asset.id]=new_position
-                #todo create in DB an execution position
+                new_target_weights[asset.id] = new_position
+                # todo create in DB an execution position
         else:
-            new_target_weights=target_weights
+            new_target_weights = target_weights
 
         return new_target_weights
 

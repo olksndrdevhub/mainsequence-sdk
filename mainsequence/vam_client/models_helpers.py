@@ -20,17 +20,18 @@ def get_model_class(model_class:str):
 
     """
     #import inside to avouid circular reference
-    from .models_alpaca import AlpacaAsset
+    from .models_alpaca import AlpacaAsset, AlpacaCurrencyPair
     from .models_binance import BinanceAsset, BinanceAssetFutureUSDM,BinanceCurrencyPair
-    MODEL_CLASS_MAP={"AlpacaAsset":AlpacaAsset,
-                     "Asset":Asset,
-                     "AssetFutureUSDM":AssetFutureUSDM,
-                     "BinanceAsset":BinanceAsset,
-                     "BinanceAssetFutureUSDM":BinanceAssetFutureUSDM,
+    MODEL_CLASS_MAP={"AlpacaAsset": AlpacaAsset,
+                     "AlpacaCurrencyPair": AlpacaCurrencyPair,
+                     "Asset": Asset,
+                     "AssetFutureUSDM": AssetFutureUSDM,
+                     "BinanceAsset": BinanceAsset,
+                     "BinanceAssetFutureUSDM": BinanceAssetFutureUSDM,
                      "BinanceCurrencyPair": BinanceCurrencyPair,
-                     "IndexAsset":IndexAsset,
-                     "TargetPortfolioIndexAsset":TargetPortfolioIndexAsset,
-                     "Calendar":Calendar
+                     "IndexAsset": IndexAsset,
+                     "TargetPortfolioIndexAsset": TargetPortfolioIndexAsset,
+                     "Calendar": Calendar
                      }
 
     return MODEL_CLASS_MAP[model_class]
