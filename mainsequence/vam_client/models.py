@@ -414,6 +414,11 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
     execution_venue: Union["ExecutionVenue", int]
     delisted_datetime: Optional[datetime.datetime] = None
 
+
+    @property
+    def unique_identifier(self):
+        return f"{self.symbol}_{self.asset_type}_{self.execution_venue_symbol}"
+
     @property
     def unique_symbol(self):
         return f"{self.symbol}"
