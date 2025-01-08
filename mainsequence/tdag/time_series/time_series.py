@@ -734,9 +734,8 @@ class TimeSerieRebuildMethods(ABC):
                 self.flush_pickle()
 
                 rebuild_time_serie = TimeSerie.rebuild_from_configuration(local_hash_id=self.local_hash_id,
-                                                                   remote_table_hashed_name=self.remote_table_hashed_name,
-                                                                   data_source=self.data_source,
-                                                                   )
+                                                                          data_source=self.data_source,
+                )
                 rebuild_time_serie.persist_to_pickle()
             else:
                 # if no need to rebuild, just sync the metadata
