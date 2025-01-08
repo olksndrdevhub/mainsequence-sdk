@@ -750,13 +750,14 @@ class DataLakePersistManager(PersistManager):
                                                                                 asset_symbols=None)
 
             self.logger.debug(f"Building local data lake from latest value  {last_update_in_table}")
+            self.set_already_run(True) #set before the update to stop recurisivity
             if isinstance(ts,WrapperTimeSerie):
                 df = None
                 for _,sub_ts in ts.related_time_series.items():
                     sub_ts.local_persist_manager #query the first run
             else:
                 df = ts.update_series_from_source(latest_value=last_update_in_table)
-            self.set_already_run(True)
+
 
             if df is None:
                 return None
@@ -809,3 +810,9 @@ class DataLakePersistManager(PersistManager):
             table_name=table_name)
         return dli.get_table_schema(table_name=table_name)
 
+    def get_df_between_dates(self,time_serie:TimeSerie, *args,**kwargs):
+        if self.already_run ==False:
+            self.verify_if_already_run(time_serie)
+        filtered_data=super().get_df_between_dates( *args,**kwargs)
+
+        return filtered_data

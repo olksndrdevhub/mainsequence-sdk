@@ -841,7 +841,6 @@ class TimeSerieRebuildMethods(ABC):
         time_serie_config["init_meta"] = {}
 
         re_build_ts = TimeSerieClass(**time_serie_config)
-        re_build_ts.local_persist_manager
 
         return re_build_ts
 
@@ -1238,13 +1237,19 @@ class DataPersistanceMethods(ABC):
                              asset_symbols: Union[None, list] = None,
                              data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True,
                              ):
-
-        filtered_data = self.local_persist_manager.get_df_between_dates(start_date=start_date,
+        func = self.local_persist_manager.get_df_between_dates
+        sig = inspect.signature(func)
+        kwargs=dict(start_date=start_date,
                                                                         end_date=end_date,
                                                                         asset_symbols=asset_symbols,
                                                                         great_or_equal=great_or_equal,
                                                                         less_or_equal=less_or_equal,
-                                                                        )
+                    )
+        if 'time_serie' in sig.parameters:
+            kwargs["time_serie"] = self
+        filtered_data = self.local_persist_manager.get_df_between_dates(**kwargs)
+
+
         return filtered_data
 
     def get_persisted_ts(self):
