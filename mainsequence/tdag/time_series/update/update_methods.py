@@ -276,7 +276,7 @@ def get_or_pickle_ts_from_sessions(local_hash_id: str,data_source_id:int,
         if ts is None:
             ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
                                                       data_source=data_source_id,
-                                                      remote_table_hashed_name=remote_table_hashed_name)
+                                                      )
         if set_dependencies_df == True:
             ts.set_relation_tree()
 
