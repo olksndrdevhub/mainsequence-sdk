@@ -97,6 +97,83 @@ def read_parquet_from_lake(
 
     return data.sort_index()
 
+def get_max_per_asset_symbol_from_sidecars(file_path: str):
+    """
+    Walk through 'file_path', find each 'summary.json' sidecar file, and:
+      - If 'BY_ASSET_VENUE' exists and is non-empty, aggregate those 'max' values
+        in global_summary (shape {asset_symbol: {venue_symbol: GLOBAL_MAX}}).
+      - Independently track the sidecar's __GLOBAL__["max"] for fallback if needed.
+
+    Returns:
+        global_max, global_summary
+
+        Where:
+            global_max: the single highest time_index across all sidecars
+                        (from either BY_ASSET_VENUE or fallback to __GLOBAL__),
+                        as a UTC datetime.
+            global_summary: a dict of shape:
+              {
+                asset_symbol: {
+                  venue_symbol: GLOBAL_MAX_TIME_INDEX_AS_DATETIME
+                },
+                ...
+              }
+              or {} if no sidecar had BY_ASSET_VENUE data.
+    """
+    # This will hold the per-(asset_symbol, execution_venue_symbol) max
+    global_summary = {}
+    # Keep track of every sidecar's global max for fallback
+    sidecar_global_max_values = []
+
+    # Recursively walk through all subdirectories
+    for dirpath, dirnames, filenames in os.walk(file_path):
+        if "summary.json" not in filenames:
+            continue  # skip folders without a sidecar
+
+        sidecar_path = os.path.join(dirpath, "summary.json")
+        with open(sidecar_path, "r") as f:
+            # Load the sidecar file
+            partition_summary = json.load(f)
+
+        # 1) If "BY_ASSET_VENUE" is present and not empty, merge it into global_summary
+        if "BY_ASSET_VENUE" in partition_summary and partition_summary["BY_ASSET_VENUE"]:
+            by_asset_venue = partition_summary["BY_ASSET_VENUE"]
+            for asset_symbol, venues_dict in by_asset_venue.items():
+                if asset_symbol not in global_summary:
+                    global_summary[asset_symbol] = {}
+                for venue_symbol, time_stats in venues_dict.items():
+                    # Convert the 'max' value from timestamp to datetime
+                    partition_max = datetime.datetime.fromtimestamp(time_stats["max"],tz=pytz.utc)
+                    current_global_max = global_summary[asset_symbol].get(venue_symbol)
+                    if current_global_max is None or partition_max > current_global_max:
+                        global_summary[asset_symbol][venue_symbol] = partition_max
+
+        # 2) Also gather the sidecar's __GLOBAL__ max for fallback
+        if "__GLOBAL__" in partition_summary:
+            sidecar_max = partition_summary["__GLOBAL__"].get("max", None)
+            if sidecar_max is not None:
+                sidecar_global_max_values.append(datetime.datetime.fromtimestamp(sidecar_max,tz=pytz.utc))
+
+    # ---------------------------------------------------------------
+    # Compute the single global_max from the data we have
+    # ---------------------------------------------------------------
+    global_max = None
+
+    # (A) If global_summary is NOT empty, compute max by scanning all asset/venue
+    if global_summary:
+        for asset_symbol, venues_dict in global_summary.items():
+            for venue_symbol, max_value in venues_dict.items():
+                if global_max is None or max_value > global_max:
+                    global_max = max_value
+    else:
+        # (B) If global_summary is empty, fall back to the highest from __GLOBAL__ in sidecars
+        if sidecar_global_max_values:
+            global_max = max(sidecar_global_max_values)
+        else:
+            # No sidecars or none had __GLOBAL__ max
+            global_max = None  # or raise an exception, depending on your logic
+
+    return global_max, global_summary
 
 
 
@@ -214,6 +291,10 @@ class DataLakeInterface:
 
         return data
 
+    def get_data_file_path_for_table(self,table_name):
+        return self.get_file_path_for_table(table_name)+"/data"
+    def get_side_cars_path_for_table(self,table_name):
+        return self.get_file_path_for_table(table_name) + "/side_car"
     def get_file_path_for_table(self,table_name):
 
 
@@ -251,7 +332,7 @@ class DataLakeInterface:
             pd.DataFrame: The queried data.
         """
         self.logger.debug(f"Data Lake Read {table_name} ")
-        data = read_full_data(file_path=self.get_file_path_for_table(table_name=table_name),
+        data = read_full_data(file_path=self.get_data_file_path_for_table(table_name=table_name),
                               filters=filters,
         )
         return data
@@ -277,12 +358,17 @@ class DataLakeInterface:
         partition_cols = [TIME_PARTITION]
         data = data.sort_values(by=time_index_name)
         data.set_index(index_names, inplace=True)
-        self.write_to_parquet(data=data, partition_cols=partition_cols, file_path=file_path,
-                              upsert=self.table_exist(table_name)
+
+
+        data_path=self.get_data_file_path_for_table(table_name=table_name)
+        side_car_dir=self.get_side_cars_path_for_table(table_name=table_name)
+        os.makedirs(side_car_dir, exist_ok=True)
+        self.write_to_parquet(data=data, partition_cols=partition_cols, data_path=data_path,
+                              upsert=os.path.exists(data_path),time_index_name=time_index_name,
                               )
 
     def table_exist(self, table_name: str):
-        file_path = self.get_file_path_for_table(table_name=table_name)
+        file_path = self.get_data_file_path_for_table(table_name=table_name)
         s3_data_lake=False
         if s3_data_lake:
             bucket_name, object_key = file_path.split("/", 1)
@@ -298,51 +384,13 @@ class DataLakeInterface:
 
     def get_parquet_latest_value(self,table_name):
 
-        file_path = self.get_file_path_for_table(table_name)
+        data_path = self.get_data_file_path_for_table(table_name)
         if not self.table_exist(table_name):
             return None, None
-        self.logger.warning("IMPROVE SPEED READ FROM STATS")
-        data_set = self.get_parquet_data_set(file_path)
-        time_index_column_name = data_set.schema.pandas_metadata['index_columns'][0]
+        side_cars_path=self.get_side_cars_path_for_table(table_name=table_name)
+        last_index_value,last_multiindex=get_max_per_asset_symbol_from_sidecars(side_cars_path)
 
-        partitions = data_set.partitioning
-        time_partition = partitions.dictionaries[0]
-        partition_names = partitions.schema.names
 
-        time_partition = sorted(
-            time_partition.to_pylist(),
-            key=lambda x: (int(x.split('-W')[0]), int(x.split('-W')[1]))
-        )
-
-        filtered_dataset = read_parquet_from_lake(
-            file_path=file_path,
-            use_s3_if_available=False,
-            filters=[[(TIME_PARTITION, "=", time_partition[-1])]]
-        )
-        last_multiindex = {}
-        if "asset_symbol" in filtered_dataset.index.names:
-            # Get the latest index value for each asset and execution venue
-            last_multiindex = (
-                filtered_dataset.index
-                .to_frame(index=False)  # Convert index to DataFrame without resetting
-                .groupby(["asset_symbol", "execution_venue_symbol"], observed=True)
-                [time_index_column_name]
-                .max()
-            )
-            last_multiindex = {
-                asset: {ev: timestamp}
-                for (asset, ev), timestamp in last_multiindex.items()
-            }
-
-            # Get the latest time index value across all assets and execution venues
-            last_index_value = filtered_dataset.index.get_level_values('time_index').max()
-        else:
-            last_index_value = filtered_dataset.index.max()
-
-        if len(last_multiindex) == 0:
-            last_multiindex = None
-
-        assert last_index_value
         return last_index_value, last_multiindex
 
     def _create_base_path(self):
@@ -354,10 +402,10 @@ class DataLakeInterface:
 
     def get_file_path(self, data_lake_name: str, date_range_folder: str, table_hash: str):
         if self.s3_data_lake:
-            file_path = f"{self.bucket_name}/{data_lake_name.replace(' ', '_').lower()}/{date_range_folder}/{table_hash}.parquet"
+            file_path = f"{self.bucket_name}/{data_lake_name.replace(' ', '_').lower()}/{date_range_folder}/{table_hash}"
         else:
             file_path = os.path.join(self.base_path, data_lake_name, date_range_folder,
-                                     f"{table_hash}.parquet")
+                                     f"{table_hash}")
         return file_path
 
     def _get_storage_options(self, file_path):
@@ -384,23 +432,120 @@ class DataLakeInterface:
             data_set= ds.dataset(file_path, format="parquet", partitioning="hive")
         return data_set
 
-    def write_to_parquet(self, data: pd.DataFrame, file_path: str, partition_cols: list, upsert: bool):
+    def write_to_parquet(self, data: pd.DataFrame, data_path: str, partition_cols: list, upsert: bool,
+                         time_index_name:str):
+
+
+
+
         data[TIME_PARTITION] = data[TIME_PARTITION].astype('str')
         if self.s3_data_lake:
             # Write directly to S3
-            s3_path, storage_options = self._get_storage_options(file_path)
+            s3_path, storage_options = self._get_storage_options(data_path)
             data.to_parquet(s3_path, partition_cols=partition_cols, engine='pyarrow', storage_options=storage_options)
         else:
             # Local filesystem
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            os.makedirs(os.path.dirname(data_path), exist_ok=True)
 
             if upsert:
-                self.upsert_to_parquet(new_data_table=data, file_path=file_path)
+                self.upsert_to_parquet(new_data_table=data, file_path=data_path)
             else:
 
-                data.to_parquet(file_path, partition_cols=partition_cols, engine='pyarrow',
+                data.to_parquet(data_path, partition_cols=partition_cols, engine='pyarrow',
                                 use_dictionary=False  # Disable dictionary encoding
                                 )
+
+        self._build_sidecar_partition_summary_stats(data_path,time_index_name)
+
+    def _build_sidecar_partition_summary_stats(self,file_path,time_index_name):
+        """
+               Walks through the directory tree under `file_path`, finds folders of the form
+               TIME_PARTITION=..., and if they do NOT already contain a summary.json sidecar,
+               computes min/max of time_index grouped by (asset_symbol, execution_venue_symbol).
+               It then writes out a summary.json file into that partition folder.
+               """
+        import re
+        from pathlib import Path
+        # Pattern to detect a partition directory named TIME_PARTITION=XXXX...
+        partition_dir_pattern = re.compile(r"TIME_PARTITION=")
+
+        for (dirpath, dirnames, filenames) in os.walk(file_path):
+            # Check if this directory looks like a time-partitioned folder
+            if not partition_dir_pattern.search(dirpath):
+                continue  # skip folders that aren't named like TIME_PARTITION=...
+
+            sidecar_dir=Path(dirpath).parent.parent / "side_car" / Path(dirpath).stem
+            if os.path.isdir(sidecar_dir) ==True:
+
+                continue
+
+            os.makedirs(sidecar_dir, exist_ok=True)
+
+            # Optionally, check if there are any parquet files in this directory
+            # to confirm it's a valid partition folder
+            # For example:
+            parquet_files = [f for f in filenames if f.endswith(".parquet")]
+            if not parquet_files:
+                # If there are no parquet files here, skip
+                print(f"No parquet files in {dirpath}, skipping.")
+                continue
+
+            print(f"Processing partition folder: {dirpath}")
+
+            # 1. Read the partition data with Spark
+            #    (Spark can handle reading the entire directory if there are multiple .parquet files)
+            dataset = ds.dataset(dirpath, format="parquet")
+
+            # 2. Convert the entire partition into a single PyArrow Table,
+            #    then to a Pandas DataFrame
+            table = dataset.to_table()
+            df = table.to_pandas()
+
+            if df.empty:
+                print(f"Partition {dirpath} is empty, skipping summary.")
+                continue
+
+            # 3. Group by (asset_symbol, execution_venue_symbol) and compute min/max of time_index
+            self._build_partition_summary_sidecar(df=df,dirpath=sidecar_dir,time_index_name=time_index_name)
+
+    def _build_partition_summary_sidecar(self,df,dirpath,time_index_name):
+        is_multin_index=isinstance(df.index, pd.MultiIndex)
+        df=df.reset_index()
+        summary_dict = {"BY_ASSET_VENUE":{}}
+        if is_multin_index:
+            per_group_dict = {}
+
+            grouped = (
+
+                df.groupby(["asset_symbol", "execution_venue_symbol"])["time_index"]
+                .agg(["min", "max"])
+            )  # This returns a Pandas DataFrame with index=(asset_symbol, exec_venue) and columns=[min, max]
+
+            # 4. Convert the result into a nested dictionary structure:
+            #    { asset_symbol : { execution_venue_symbol : { "min": ..., "max": ... } } }
+
+            for (asset, venue), row in grouped.iterrows():
+                if asset not in per_group_dict:
+                    per_group_dict[asset] = {}
+                per_group_dict[asset][venue] = {
+                    "min": row["min"].timestamp(),
+                    "max": row["max"].timestamp()
+                }
+            summary_dict["BY_ASSET_VENUE"]=per_group_dict
+        #add to summary dict the global_max and global_min
+
+        global_min = df[time_index_name].min().timestamp()
+        global_max = df[time_index_name].max().timestamp()
+        summary_dict["__GLOBAL__"] = {
+            "min": global_min,
+            "max": global_max
+        }
+
+        # 5. Write out summary.json in the same directory
+        sidecar_path = os.path.join(dirpath, "summary.json")
+        with open(sidecar_path, "w") as f:
+            # default=str helps if min/max are Timestamp objects
+            json.dump(summary_dict, f)
 
     def upsert_to_parquet(self, new_data_table: pd.DataFrame,
                           file_path: str):

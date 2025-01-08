@@ -1517,7 +1517,9 @@ class APITimeSerie:
                                                                         data_source=self.data_source)
             table_exist_locally = local_persist_manager_lake.table_exist(local_metadata["remote_table"]["hash_id"])
             if table_exist_locally:
+                self.data_source_id=local_persist_manager_lake.data_source.id
                 self._local_persist_manager=local_persist_manager_lake
+                self._set_logger(local_hash_id=self.local_hash_id)
 
 
     def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
@@ -1590,10 +1592,27 @@ class APITimeSerie:
         if temp_df.shape[0] > 0:
             if overwrite == True:
                 self.logger.warning(f"Values will be overwritten assuming latest value of  {latest_value}")
-            self.local_persist_manager.persist_updated_data(temp_df=temp_df,
-                                                            update_tracker=update_tracker,
-                                                            historical_update_id=None,
-                                                            overwrite=overwrite)
+
+            if isinstance(self.local_persist_manager, DataLakePersistManager)==False:
+                local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
+                local_persist_manager = DataLakePersistManager(local_hash_id=self.local_hash_id,
+
+                                                                    class_name=local_metadata["build_configuration"][
+                                                                        "time_series_class_import_path"]["qualname"],
+                                                                    human_readable=f"Local API Lake for {self.local_hash_id}",
+                                                                    logger=self.logger,
+                                                                    local_metadata=local_metadata,
+                                                                    description=f"Local API Lake for {self.local_hash_id}",
+                                                                    data_source=self.data_source)
+                local_persist_manager.persist_updated_data(temp_df=temp_df,
+                                                                update_tracker=update_tracker,
+                                                                historical_update_id=None,
+                                                                overwrite=overwrite)
+            else:
+                self.local_persist_manager.persist_updated_data(temp_df=temp_df,
+                                                                update_tracker=update_tracker,
+                                                                historical_update_id=None,
+                                                                overwrite=overwrite)
             persisted = True
         return persisted
 
@@ -1858,7 +1877,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                               )
         return logger
 
-    def run(self, tdag_detached=True):
+    def run_local_update(self, tdag_detached=True):
         self.local_persist_manager
         return self.get_df_between_dates()
 
