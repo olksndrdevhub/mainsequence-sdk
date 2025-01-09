@@ -413,15 +413,8 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
     calendar: Union[Calendar,int]
     execution_venue: Union["ExecutionVenue", int]
     delisted_datetime: Optional[datetime.datetime] = None
-
-
-    @property
-    def unique_identifier(self):
-        return f"{self.symbol}_{self.asset_type}_{self.execution_venue_symbol}"
-
-    @property
-    def unique_symbol(self):
-        return f"{self.symbol}"
+    unique_identifier: str
+    unique_symbol: str
 
     @staticmethod
     def get_properties_from_unique_symbol(unique_symbol: str):
@@ -543,6 +536,7 @@ class TargetPortfolioIndexAsset(IndexAsset):
 class CurrencyPairMixin(AssetMixin, BaseVamPydanticModel):
     base_asset: Union[AssetMixin, int]
     quote_asset: Union[AssetMixin, int]
+
 class CurrencyPair(CurrencyPairMixin):
   pass
 
