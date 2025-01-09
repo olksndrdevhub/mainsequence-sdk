@@ -1290,9 +1290,11 @@ class DataPersistanceMethods(ABC):
                                            ])
         return last_update_in_table
 
-    def get_earliest_updated_asset_filter(self, asset_symbols:Union[list,None], last_update_per_asset:dict):
+    def get_earliest_updated_asset_filter(self, asset_symbols:Union[list],
+                                          last_update_per_asset:dict):
         if asset_symbols is not None:
-            last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values() if a in asset_symbols])
+            last_update_in_table = min(
+                [t for a in last_update_per_asset.values() for t in a.values() if a in asset_symbols])
         else:
             last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values()])
         return last_update_in_table
@@ -2451,6 +2453,7 @@ class WrapperTimeSerie(TimeSerie):
                 pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
                                                         data_source_id=data_source.id
                                                         )
+
                 state["related_time_series"][key] = load_from_pickle(pickle_path=pickle_path)
 
         self.__dict__.update(state)

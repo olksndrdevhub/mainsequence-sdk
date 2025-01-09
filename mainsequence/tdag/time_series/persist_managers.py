@@ -703,6 +703,9 @@ class TimeScaleLocalPersistManager(PersistManager):
     def delete_after_date(self, after_date: str):
         self.dth.delete_after_date(metadata=self.metadata, after_date=after_date)
 
+    def get_table_schema(self,table_name):
+        return self.metadata["sourcetableconfiguration"]["column_dtypes_map"]
+
 
 
 
@@ -796,6 +799,9 @@ class DataLakePersistManager(PersistManager):
         ).get_parquet_latest_value(
             table_name=remote_table_hash_id
         )
+        if last_multiindex is not None:
+            if len(last_multiindex)==0:
+                last_multiindex=None
         return last_index_value, last_multiindex
 
     def table_exist(self,table_name):
@@ -804,11 +810,13 @@ class DataLakePersistManager(PersistManager):
         return DataLakeInterface(data_lake_source=self.data_source,
                                                               logger=self.logger).table_exist(
             table_name=table_name)
-    def get_table_schema(self):
+    def get_table_schema(self,table_name):
+        from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         dli=DataLakeInterface(data_lake_source=self.data_source,
-                         logger=self.logger).table_exist(
-            table_name=table_name)
-        return dli.get_table_schema(table_name=table_name)
+                         logger=self.logger)
+        schema=dli.get_table_schema(table_name=table_name)
+        schema = {field.name: field.type for field in schema}
+        return schema
 
     def get_df_between_dates(self,time_serie:TimeSerie, *args,**kwargs):
         if self.already_run ==False:

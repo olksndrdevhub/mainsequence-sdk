@@ -13,6 +13,7 @@ import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import pyarrow as pa
 import pytz
+from scipy.ndimage import extrema
 from tqdm import tqdm
 import shutil
 from mainsequence.tdag_client.utils import set_types_in_table
@@ -97,33 +98,43 @@ def read_parquet_from_lake(
 
     return data.sort_index()
 
-def get_max_per_asset_symbol_from_sidecars(file_path: str):
+
+def get_extrema_per_asset_symbol_from_sidecars(file_path: str, extrema: str = "max"):
+    import operator
+
     """
     Walk through 'file_path', find each 'summary.json' sidecar file, and:
-      - If 'BY_ASSET_VENUE' exists and is non-empty, aggregate those 'max' values
-        in global_summary (shape {asset_symbol: {venue_symbol: GLOBAL_MAX}}).
-      - Independently track the sidecar's __GLOBAL__["max"] for fallback if needed.
+      - If 'BY_ASSET_VENUE' exists and is non-empty, aggregate those extrema
+        values in global_summary (shape {asset_symbol: {venue_symbol: GLOBAL_EXTREMA}}).
+      - Independently track the sidecar's __GLOBAL__[extrema] for fallback if needed.
+
+    Args:
+        file_path (str): Root directory to walk and find 'summary.json' sidecar files.
+        extrema (str, optional): Which value to compute, "max" or "min". Default is "max".
 
     Returns:
-        global_max, global_summary
+        global_extrema, global_summary
 
         Where:
-            global_max: the single highest time_index across all sidecars
-                        (from either BY_ASSET_VENUE or fallback to __GLOBAL__),
-                        as a UTC datetime.
+            global_extrema: the single highest/lowest time_index across all sidecars
+                            (from either BY_ASSET_VENUE or fallback to __GLOBAL__),
+                            as a UTC datetime (None if not found).
             global_summary: a dict of shape:
               {
                 asset_symbol: {
-                  venue_symbol: GLOBAL_MAX_TIME_INDEX_AS_DATETIME
+                  venue_symbol: GLOBAL_EXTREMA_TIME_INDEX_AS_DATETIME
                 },
                 ...
               }
               or {} if no sidecar had BY_ASSET_VENUE data.
     """
-    # This will hold the per-(asset_symbol, execution_venue_symbol) max
+    if extrema not in ("max", "min"):
+        raise ValueError("Parameter 'extrema' must be either 'max' or 'min'.")
+
+    # Decide which comparison operator and key to use
+    compare_func = operator.gt if extrema == "max" else operator.lt  # > for max, < for min
+    sidecar_extrema_values = []  # collects the sidecar-wide fallback extrema (from __GLOBAL__)
     global_summary = {}
-    # Keep track of every sidecar's global max for fallback
-    sidecar_global_max_values = []
 
     # Recursively walk through all subdirectories
     for dirpath, dirnames, filenames in os.walk(file_path):
@@ -132,7 +143,6 @@ def get_max_per_asset_symbol_from_sidecars(file_path: str):
 
         sidecar_path = os.path.join(dirpath, "summary.json")
         with open(sidecar_path, "r") as f:
-            # Load the sidecar file
             partition_summary = json.load(f)
 
         # 1) If "BY_ASSET_VENUE" is present and not empty, merge it into global_summary
@@ -142,38 +152,49 @@ def get_max_per_asset_symbol_from_sidecars(file_path: str):
                 if asset_symbol not in global_summary:
                     global_summary[asset_symbol] = {}
                 for venue_symbol, time_stats in venues_dict.items():
-                    # Convert the 'max' value from timestamp to datetime
-                    partition_max = datetime.datetime.fromtimestamp(time_stats["max"],tz=pytz.utc)
-                    current_global_max = global_summary[asset_symbol].get(venue_symbol)
-                    if current_global_max is None or partition_max > current_global_max:
-                        global_summary[asset_symbol][venue_symbol] = partition_max
+                    # Convert the 'extrema' value from timestamp to datetime
+                    # e.g., time_stats["max"] if extrema == "max"; or time_stats["min"] if extrema == "min"
+                    timestamp_value = time_stats.get(extrema)
+                    if timestamp_value is None:
+                        # If the sidecar doesn't have the requested key, skip
+                        continue
+                    partition_value = datetime.datetime.fromtimestamp(timestamp_value, tz=pytz.utc)
 
-        # 2) Also gather the sidecar's __GLOBAL__ max for fallback
+                    current_value = global_summary[asset_symbol].get(venue_symbol)
+                    # If there's no current value or partition_value is more extreme
+                    # (depending on 'max' or 'min'), update
+                    if current_value is None or compare_func(partition_value, current_value):
+                        global_summary[asset_symbol][venue_symbol] = partition_value
+
+        # 2) Also gather the sidecar's __GLOBAL__[extrema] for fallback
         if "__GLOBAL__" in partition_summary:
-            sidecar_max = partition_summary["__GLOBAL__"].get("max", None)
-            if sidecar_max is not None:
-                sidecar_global_max_values.append(datetime.datetime.fromtimestamp(sidecar_max,tz=pytz.utc))
+            sidecar_value = partition_summary["__GLOBAL__"].get(extrema, None)
+            if sidecar_value is not None:
+                sidecar_extrema_values.append(datetime.datetime.fromtimestamp(sidecar_value, tz=pytz.utc))
 
     # ---------------------------------------------------------------
-    # Compute the single global_max from the data we have
+    # Compute the single global_extrema from the data we have
     # ---------------------------------------------------------------
-    global_max = None
+    global_extrema = None
 
-    # (A) If global_summary is NOT empty, compute max by scanning all asset/venue
+    # (A) If global_summary is NOT empty, compute the extrema by scanning all asset/venue
     if global_summary:
         for asset_symbol, venues_dict in global_summary.items():
-            for venue_symbol, max_value in venues_dict.items():
-                if global_max is None or max_value > global_max:
-                    global_max = max_value
+            for venue_symbol, dt_value in venues_dict.items():
+                if global_extrema is None or compare_func(dt_value, global_extrema):
+                    global_extrema = dt_value
     else:
-        # (B) If global_summary is empty, fall back to the highest from __GLOBAL__ in sidecars
-        if sidecar_global_max_values:
-            global_max = max(sidecar_global_max_values)
+        # (B) If global_summary is empty, fall back to the single most extreme from __GLOBAL__
+        if sidecar_extrema_values:
+            # if extrema == "max", use max(); if extrema == "min", use min()
+            aggregator = max if extrema == "max" else min
+            global_extrema = aggregator(sidecar_extrema_values)
         else:
-            # No sidecars or none had __GLOBAL__ max
-            global_max = None  # or raise an exception, depending on your logic
+            # No sidecars or none had __GLOBAL__ 'extrema'
+            global_extrema = None  # or raise an exception, depending on your logic
 
-    return global_max, global_summary
+    return global_extrema, global_summary
+
 
 
 
@@ -388,7 +409,8 @@ class DataLakeInterface:
             return None
 
         dataset = ds.dataset(data_path, format="parquet")
-        a=5
+
+        return dataset.schema
 
     def get_parquet_latest_value(self,table_name):
 
@@ -396,10 +418,14 @@ class DataLakeInterface:
         if not self.table_exist(table_name):
             return None, None
         side_cars_path=self.get_side_cars_path_for_table(table_name=table_name)
-        last_index_value,last_multiindex=get_max_per_asset_symbol_from_sidecars(side_cars_path)
+        last_index_value,last_multiindex=get_extrema_per_asset_symbol_from_sidecars(side_cars_path,extrema="max")
 
 
         return last_index_value, last_multiindex
+    def get_lake_earliest_value(self,table_name):
+        global_min, asset_min = get_extrema_per_asset_symbol_from_sidecars(side_cars_path, extrema="min")
+
+        return global_min, asset_min
 
     def _create_base_path(self):
         if self.s3_data_lake:
