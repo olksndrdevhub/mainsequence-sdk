@@ -942,7 +942,7 @@ class TimeSerieRebuildMethods(ABC):
         if graph_depth <= graph_depth_limit and self.data_source.data_type:
             local_metadata = local_metadatas[
                 (self.local_hash_id, self.data_source.id)] if local_metadatas is not None else None
-            self._set_local_persist_manager(hashed_name=self.hashed_name,
+            self._set_local_persist_manager(local_hash_id=self.local_hash_id,
                                             remote_table_hashed_name=self.remote_table_hashed_name,
                                             local_metadata=local_metadata,verify_local_run=False,
                                             )
@@ -1196,7 +1196,7 @@ class DataPersistanceMethods(ABC):
 
         last_update_in_table, last_update_per_asset = self.local_persist_manager.get_update_statistics(
             remote_table_hash_id=self.remote_table_hashed_name,
-            asset_symbols=asset_symbols)
+            asset_symbols=asset_symbols,time_serie=self)
         return last_update_in_table, last_update_per_asset
 
     def get_earliest_value(self) -> datetime.datetime:
@@ -1493,7 +1493,6 @@ class APITimeSerie:
                 #data source is open use direct connection
 
                 self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=self.local_hash_id,
-
                                                                                 class_name=local_metadata["build_configuration"]["time_series_class_import_path"]["qualname"],
                                                                                 human_readable=local_metadata["remote_table"]["human_readable"],
                                                                                 logger=self.logger,
@@ -1505,7 +1504,6 @@ class APITimeSerie:
 
 
             local_persist_manager_lake = DataLakePersistManager(local_hash_id=self.local_hash_id,
-
                                                                         class_name=local_metadata["build_configuration"]["time_series_class_import_path"]["qualname"],
                                                                         human_readable=f"Local API Lake for {self.local_hash_id}",
                                                                         logger=self.logger,
@@ -1884,12 +1882,12 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             self._set_logger(local_hash_id=self.hashed_name)
         if hasattr(self, "_local_persist_manager") == False:
             self.logger.info(f"Setting local persist manager for {self.hash_id}")
-            self._set_local_persist_manager(hashed_name=self.hashed_name,
+            self._set_local_persist_manager(local_hash_id=self.local_hash_id,
                                             remote_table_hashed_name=self.remote_table_hashed_name
                                             )
         return self._local_persist_manager
 
-    def _set_local_persist_manager(self, hashed_name: str, remote_table_hashed_name: str,
+    def _set_local_persist_manager(self, local_hash_id: str, remote_table_hashed_name: str,
                                    local_metadata: Union[None, dict] = None,
                                    time_serie_meta_build_configuration: Union[None, dict] = None,
                                    verify_local_run=True,
@@ -1913,7 +1911,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         except:
             human_readable = None
 
-        self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=hashed_name,
+        self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=local_hash_id,
 
                                                                         class_name=self.__class__.__name__,
                                                                         human_readable=human_readable,

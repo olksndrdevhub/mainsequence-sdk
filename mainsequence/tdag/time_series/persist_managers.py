@@ -85,7 +85,7 @@ class PersistManager:
         self.human_readable = human_readable if human_readable is not None else local_hash_id
 
         self.class_name = class_name
-        if self.local_hash_id is not None:
+        if self.local_hash_id is not None and isinstance(self, DataLakePersistManager)==False:
             self.synchronize_metadata(meta_data=metadata,
                                       local_metadata=local_metadata,
                                       class_name=class_name)
@@ -532,10 +532,11 @@ class PersistManager:
     #table dependes
 
     def get_update_statistics(self, asset_symbols:list,
-                              remote_table_hash_id,
+                              remote_table_hash_id,time_serie,
                               ) -> [datetime.datetime,Dict[str, datetime.datetime]]:
         if BACKEND_DETACHED(): #todo this can be optimized by running stats per data lake
-            return self._get_local_lake_update_statistics(remote_table_hash_id=remote_table_hash_id)
+            return self._get_local_lake_update_statistics(remote_table_hash_id=remote_table_hash_id,
+                                                          time_serie=time_serie)
 
         metadata = self.dth.get(hash_id=remote_table_hash_id,data_source__id=self.data_source.id)
 
@@ -622,7 +623,9 @@ class PersistManager:
                              asset_symbols: Union[list, None] = None,
                              columns: Union[list, None] = None):
 
-        filtered_data = self.dth.get_data_by_time_index(metadata=self.metadata, start_date=start_date,
+        filtered_data = self.dth.get_data_by_time_index(metadata=self.metadata,
+
+                                                        start_date=start_date,
                                                         end_date=end_date, great_or_equal=great_or_equal,
                                                         less_or_equal=less_or_equal,
                                                         asset_symbols=asset_symbols,
@@ -725,8 +728,11 @@ class DataLakePersistManager(PersistManager):
         """
         super().__init__(*args,**kwargs)
         self.set_already_run(already_run=False)
+        self.set_is_introspecting(False)
 
 
+    def set_is_introspecting(self,is_introspecting):
+        self.is_introspecting = is_introspecting
 
     def verify_if_already_run(self,ts):
         """
@@ -736,10 +742,11 @@ class DataLakePersistManager(PersistManager):
         """
         from mainsequence.tdag_client.models import BACKEND_DETACHED
         from mainsequence.tdag.time_series import WrapperTimeSerie
-        if self.already_run== True:
+        if self.already_run== True or self.is_introspecting ==True:
             return None
 
         if BACKEND_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+            self.set_is_introspecting(True)
             self.metadata = {"sourcetableconfiguration":None, "hash_id": ts.remote_table_hashed_name,
                             "table_name":ts.remote_table_hashed_name
                             }
@@ -753,7 +760,7 @@ class DataLakePersistManager(PersistManager):
                                                                                 asset_symbols=None)
 
             self.logger.debug(f"Building local data lake from latest value  {last_update_in_table}")
-            self.set_already_run(True) #set before the update to stop recurisivity
+
             if isinstance(ts,WrapperTimeSerie):
                 df = None
                 for _,sub_ts in ts.related_time_series.items():
@@ -771,7 +778,7 @@ class DataLakePersistManager(PersistManager):
                                             data_source=self.data_source)
             #verify pickle exist
             ts.persist_to_pickle()
-
+            self.set_already_run(True)  # set before the update to stop recurisivity
 
 
 
@@ -790,9 +797,11 @@ class DataLakePersistManager(PersistManager):
 
         self.already_run = already_run
 
-    def _get_local_lake_update_statistics(self,remote_table_hash_id):
+    def _get_local_lake_update_statistics(self,remote_table_hash_id,time_serie):
         from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+        if self.already_run == False:
+            self.verify_if_already_run(time_serie)
         last_index_value, last_multiindex = DataLakeInterface(
             data_lake_source=self.data_source,
             logger=self.logger

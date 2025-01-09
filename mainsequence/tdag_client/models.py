@@ -1801,7 +1801,7 @@ class DynamicTableHelpers:
         return df
 
 
-    def get_data_by_time_index(self, metadata: dict,     data_source:object,
+    def get_data_by_time_index(self, metadata: Union[dict,str],     data_source:object,
                                start_date: Union[datetime.datetime, None] = None,
                                great_or_equal: bool = True, less_or_equal: bool = True,
                                end_date: Union[datetime.datetime, None] = None,

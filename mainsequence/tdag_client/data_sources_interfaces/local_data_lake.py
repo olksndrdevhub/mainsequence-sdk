@@ -13,7 +13,6 @@ import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import pyarrow as pa
 import pytz
-from scipy.ndimage import extrema
 from tqdm import tqdm
 import shutil
 from mainsequence.tdag_client.utils import set_types_in_table
@@ -45,7 +44,7 @@ def read_full_data(file_path, filters=None, use_s3_if_available=False, max_memor
 
 def read_parquet_from_lake(
         file_path: str,
-        use_s3_if_available: bool,
+        use_s3_if_available: bool=False,
         filters: Union[list,None]=None,
         s3_storage_options: Union[dict,None]=None,
 ):
@@ -132,7 +131,11 @@ def get_extrema_per_asset_symbol_from_sidecars(file_path: str, extrema: str = "m
         raise ValueError("Parameter 'extrema' must be either 'max' or 'min'.")
 
     # Decide which comparison operator and key to use
-    compare_func = operator.gt if extrema == "max" else operator.lt  # > for max, < for min
+    def is_more_extreme(new_val, old_val):
+        if extrema == "max":
+            return new_val > old_val
+        else:
+            return new_val < old_val
     sidecar_extrema_values = []  # collects the sidecar-wide fallback extrema (from __GLOBAL__)
     global_summary = {}
 
@@ -147,6 +150,8 @@ def get_extrema_per_asset_symbol_from_sidecars(file_path: str, extrema: str = "m
 
         # 1) If "BY_ASSET_VENUE" is present and not empty, merge it into global_summary
         if "BY_ASSET_VENUE" in partition_summary and partition_summary["BY_ASSET_VENUE"]:
+
+
             by_asset_venue = partition_summary["BY_ASSET_VENUE"]
             for asset_symbol, venues_dict in by_asset_venue.items():
                 if asset_symbol not in global_summary:
@@ -163,8 +168,10 @@ def get_extrema_per_asset_symbol_from_sidecars(file_path: str, extrema: str = "m
                     current_value = global_summary[asset_symbol].get(venue_symbol)
                     # If there's no current value or partition_value is more extreme
                     # (depending on 'max' or 'min'), update
-                    if current_value is None or compare_func(partition_value, current_value):
+                    if current_value is None or is_more_extreme(partition_value, current_value):
                         global_summary[asset_symbol][venue_symbol] = partition_value
+
+
 
         # 2) Also gather the sidecar's __GLOBAL__[extrema] for fallback
         if "__GLOBAL__" in partition_summary:
@@ -181,7 +188,7 @@ def get_extrema_per_asset_symbol_from_sidecars(file_path: str, extrema: str = "m
     if global_summary:
         for asset_symbol, venues_dict in global_summary.items():
             for venue_symbol, dt_value in venues_dict.items():
-                if global_extrema is None or compare_func(dt_value, global_extrema):
+                if global_extrema is None or is_more_extreme(dt_value, global_extrema):
                     global_extrema = dt_value
     else:
         # (B) If global_summary is empty, fall back to the single most extreme from __GLOBAL__
@@ -332,7 +339,7 @@ class DataLakeInterface:
 
     def query_datalake(
             self,
-            table_name:str, index_names=list,
+            table_name:str,
             filters: Union[list,None] = None,
 
     ) -> pd.DataFrame:
@@ -356,6 +363,7 @@ class DataLakeInterface:
         data = read_full_data(file_path=self.get_data_file_path_for_table(table_name=table_name),
                               filters=filters,
         )
+        data=data.sort_index(level=data.index.names[0])
         return data
 
     def persist_datalake(self, data: pd.DataFrame,overwrite:bool,table_name,time_index_name:str,
