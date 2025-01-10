@@ -1484,11 +1484,14 @@ class APITimeSerie:
 
 
         self._verify_local_data_source()
-        local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
+
         self._local_persist_manager = APIPersistManager(data_source_id=self.data_source_id,
                                                         local_hash_id=self.local_hash_id,
                                                         logger=self.logger)
+        local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
+        self.remote_table_hashed_name=local_metadata["remote_table"]["hash_id"]
         if self.data_source is None:
+
             if isinstance(local_metadata["remote_table"]["data_source"], dict):
                 #data source is open use direct connection
 
@@ -1504,7 +1507,7 @@ class APITimeSerie:
 
 
             local_persist_manager_lake = DataLakePersistManager(local_hash_id=self.local_hash_id,
-                                                                        class_name=local_metadata["build_configuration"]["time_series_class_import_path"]["qualname"],
+                                                                        class_name=self.__class__.__name__,
                                                                         human_readable=f"Local API Lake for {self.local_hash_id}",
                                                                         logger=self.logger,
                                                                         local_metadata=local_metadata,
@@ -1543,7 +1546,7 @@ class APITimeSerie:
         -------
 
         """
-        df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map)
+        df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map,time_serie=self)
         return df
 
 
@@ -1572,6 +1575,37 @@ class APITimeSerie:
                 cloudpickle.dump(self, handle)
         return path, path.replace(ogm.pickle_storage_path + "/", "")
 
+    def get_update_statistics(self, asset_symbols: Union[list, None] = None,
+                              ) -> datetime.datetime:
+        """
+        getts latest value directly from querying the DB,
+        args and kwargs are nedeed for datalake
+        Parameters
+        ----------
+        args :
+        kwargs :
+
+        Returns
+        -------
+
+        """
+
+        last_update_in_table, last_update_per_asset = self.local_persist_manager.get_update_statistics(
+            remote_table_hash_id=self.remote_table_hashed_name,
+            asset_symbols=asset_symbols, time_serie=self)
+        return last_update_in_table, last_update_per_asset
+    def get_earliest_updated_asset_filter(self, asset_symbols:Union[list],
+                                          last_update_per_asset:dict):
+        if asset_symbols is not None:
+            last_update_in_table = min(
+                [t for a in last_update_per_asset.values() for t in a.values() if a in asset_symbols])
+        else:
+            last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values()])
+        return last_update_in_table
+
+    def update_series_from_source(self, latest_value: Union[None, datetime.datetime], *args, **kwargs) -> pd.DataFrame:
+        self.logger.info("Not updating series")
+        pass
     def persist_data_to_local_lake(self, temp_df, update_tracker,
                              latest_value: Union[None, datetime.datetime],
                              overwrite=False) -> bool:

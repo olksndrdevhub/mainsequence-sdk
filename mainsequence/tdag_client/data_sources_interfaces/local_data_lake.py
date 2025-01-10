@@ -94,8 +94,8 @@ def read_parquet_from_lake(
         )
 
         data = scanner.to_table().to_pandas()
-
-    return data.sort_index()
+        data=data.sort_index(level=0)
+    return data
 
 
 def get_extrema_per_asset_symbol_from_sidecars(file_path: str, extrema: str = "max"):
@@ -477,9 +477,7 @@ class DataLakeInterface:
     def write_to_parquet(self, data: pd.DataFrame, data_path: str, partition_cols: list, upsert: bool,
                          time_index_name:str):
 
-
-
-
+        overwrite_carts=True
         data[TIME_PARTITION] = data[TIME_PARTITION].astype('str')
         if self.s3_data_lake:
             # Write directly to S3
@@ -491,15 +489,17 @@ class DataLakeInterface:
 
             if upsert:
                 self.upsert_to_parquet(new_data_table=data, file_path=data_path)
+                if data.shape[0]==0:
+                    overwrite_carts=False #todo this could be done per  partitioned
             else:
 
                 data.to_parquet(data_path, partition_cols=partition_cols, engine='pyarrow',
                                 use_dictionary=False  # Disable dictionary encoding
                                 )
 
-        self._build_sidecar_partition_summary_stats(data_path,time_index_name)
+        self._build_sidecar_partition_summary_stats(data_path,time_index_name,overwrite_carts)
 
-    def _build_sidecar_partition_summary_stats(self,file_path,time_index_name):
+    def _build_sidecar_partition_summary_stats(self,file_path,time_index_name,overwrite_carts=False):
         """
                Walks through the directory tree under `file_path`, finds folders of the form
                TIME_PARTITION=..., and if they do NOT already contain a summary.json sidecar,
@@ -517,7 +517,7 @@ class DataLakeInterface:
                 continue  # skip folders that aren't named like TIME_PARTITION=...
 
             sidecar_dir=Path(dirpath).parent.parent / "side_car" / Path(dirpath).stem
-            if os.path.isdir(sidecar_dir) ==True:
+            if os.path.isdir(sidecar_dir) ==True and overwrite_carts ==False:
 
                 continue
 
@@ -548,9 +548,10 @@ class DataLakeInterface:
                 continue
 
             # 3. Group by (asset_symbol, execution_venue_symbol) and compute min/max of time_index
-            self._build_partition_summary_sidecar(df=df,dirpath=sidecar_dir,time_index_name=time_index_name)
+            self._build_partition_summary_sidecar(df=df,dirpath=sidecar_dir,time_index_name=time_index_name,
+                                                  overwrite_carts=overwrite_carts)
 
-    def _build_partition_summary_sidecar(self,df,dirpath,time_index_name):
+    def _build_partition_summary_sidecar(self,df,dirpath,time_index_name,overwrite_carts):
         is_multin_index=isinstance(df.index, pd.MultiIndex)
         df=df.reset_index()
         summary_dict = {"BY_ASSET_VENUE":{}}
@@ -583,8 +584,11 @@ class DataLakeInterface:
             "max": global_max
         }
 
-        # 5. Write out summary.json in the same directory
         sidecar_path = os.path.join(dirpath, "summary.json")
+        if overwrite_carts and os.path.exists(sidecar_path):
+            os.remove(sidecar_path)
+        # 5. Write out summary.json in the same directory
+
         with open(sidecar_path, "w") as f:
             # default=str helps if min/max are Timestamp objects
             json.dump(summary_dict, f)

@@ -85,7 +85,7 @@ class PersistManager:
         self.human_readable = human_readable if human_readable is not None else local_hash_id
 
         self.class_name = class_name
-        if self.local_hash_id is not None and isinstance(self, DataLakePersistManager)==False:
+        if self.local_hash_id is not None:
             self.synchronize_metadata(meta_data=metadata,
                                       local_metadata=local_metadata,
                                       class_name=class_name)
@@ -109,6 +109,10 @@ class PersistManager:
         forces a synchronization between table and metadata
         :return:
         """
+        if BACKEND_DETACHED():
+            self.local_metadata=local_metadata
+            return None
+
         # start with remote metadata
         if set_last_index_value == True:
             TimeSerieLocalUpdate.set_last_update_index_time(metadata=self.local_metadata)
@@ -399,7 +403,7 @@ class PersistManager:
             local_build_configuration, local_build_metadata = self.local_build_configuration, self.local_build_metadata
         if local_build_configuration is None:
             local_table_exist=False
-            local_update = TimeSerieLocalUpdate.filter(local_hash_id=self.local_hash_id,
+            local_update = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
                                                        remote_table__data_source__id=self.data_source.id)
             if len(local_update) == 0:
                 local_build_metadata = local_configuration[
@@ -430,6 +434,12 @@ class PersistManager:
             else:
                 local_metadata=local_update
             self.local_metadata=local_metadata
+            self.local_build_configuration = local_metadata["build_configuration"]
+            self.local_build_metadata = local_metadata["build_meta_data"]
+
+            # metadata should always exist
+            self.metadata = local_metadata["remote_table"]
+
         return   local_table_exist
     def _verify_insertion_format(self,temp_df):
         """
@@ -602,12 +612,13 @@ class PersistManager:
 
         return persisted_df
 
-    def filter_by_assets_ranges(self, asset_ranges_map: dict):
-
-        if self.metadata["sourcetableconfiguration"] is not None:
-            assert "asset_symbol" in self.metadata["sourcetableconfiguration"][
-                "index_names"], "Table does not contain asset_symbol column"
-
+    def filter_by_assets_ranges(self, asset_ranges_map: dict,time_serie):
+        if BACKEND_DETACHED ==False:
+            if self.metadata["sourcetableconfiguration"] is not None:
+                assert "asset_symbol" in self.metadata["sourcetableconfiguration"][
+                    "index_names"], "Table does not contain asset_symbol column"
+        else:
+            self.verify_if_already_run(time_serie)
         df = self.dth.filter_by_assets_ranges(metadata=self.metadata, asset_ranges_map=asset_ranges_map,
                                               data_source=self.data_source)
 
