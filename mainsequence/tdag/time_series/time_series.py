@@ -1401,7 +1401,7 @@ def load_from_pickle(pickle_path):
     filename = os.path.basename(pickle_path)
     prefixed_path = os.path.join(directory, f"{APITimeSerie.PICKLE_PREFIFX }{filename}")
     if os.path.isfile(prefixed_path) and os.path.isfile(pickle_path):
-        raise FileExistsError("Both default and API timeseries exist - cannot descide which to load")
+        raise FileExistsError("Both default and API timeseries pickle exist - cannot decide which to load")
 
     if os.path.isfile(prefixed_path):
         pickle_path = prefixed_path
@@ -2257,11 +2257,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         for counter, (uid, data) in enumerate(tmp_ts.iterrows()):
 
             local_hash_id = data['local_hash_id']
-            start_update_data = all_start_data[local_hash_id]
+            data_source_id = data['data_source_id']
+            start_update_data = all_start_data[(local_hash_id, data_source_id)]
             if start_update_data.must_update == False:
                 continue
             kwargs_update = dict(local_hash_id=local_hash_id,
-
                                  execution_start=start_update_date,
                                  telemetry_carrier=telemetry_carrier,
                                  local_metadatas=metadatas,
@@ -2269,12 +2269,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
                                  )
 
-            update_details = self.update_details_tree[local_hash_id]
+            update_details = self.update_details_tree[(local_hash_id, data_source_id)]
             num_cpus = update_details['distributed_num_cpus']
 
             p = self.update_actor_manager.launch_update_task(task_options={"num_cpus": num_cpus,
                                                                            "name": local_hash_id,
-
                                                                            "max_retries": 0},
                                                              kwargs_update=kwargs_update
                                                              )

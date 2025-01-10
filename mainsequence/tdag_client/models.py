@@ -856,6 +856,7 @@ class TimeSerieLocalUpdate(BaseObject):
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
         return r.json()
+
     @classmethod
     def set_ogm_dependencies_linked(cls,hash_id,data_source_id):
         s = cls.build_session()
@@ -1807,11 +1808,10 @@ class DynamicTableHelpers:
                                end_date: Union[datetime.datetime, None] = None,
                                columns: Union[list, None] = None,
                                asset_symbols:Union[list,None]=None,
-
                                ):
 
         if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-            df= TimeScaleInterface.direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
+            df = TimeScaleInterface.direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
             start_date = start_date, great_or_equal = great_or_equal,
             less_or_equal = less_or_equal, end_date = end_date, columns = columns, asset_symbols=asset_symbols)
             df = set_types_in_table(df, metadata["sourcetableconfiguration"]["column_dtypes_map"])

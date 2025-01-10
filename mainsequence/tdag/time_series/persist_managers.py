@@ -613,12 +613,13 @@ class PersistManager:
         return persisted_df
 
     def filter_by_assets_ranges(self, asset_ranges_map: dict,time_serie):
-        if BACKEND_DETACHED ==False:
+        if BACKEND_DETACHED == False:
             if self.metadata["sourcetableconfiguration"] is not None:
                 assert "asset_symbol" in self.metadata["sourcetableconfiguration"][
                     "index_names"], "Table does not contain asset_symbol column"
         else:
-            self.verify_if_already_run(time_serie)
+            if isinstance(self, DataLakePersistManager):
+                self.verify_if_already_run(time_serie)
         df = self.dth.filter_by_assets_ranges(metadata=self.metadata, asset_ranges_map=asset_ranges_map,
                                               data_source=self.data_source)
 
