@@ -121,7 +121,7 @@ class PersistManager:
 
             local_metadata = {}  # set to empty in case not exist
             local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
-                                                      data_source_id=self.data_source.id
+                                                      remote_table__data_source__id=self.data_source.id
                                                       )
 
 

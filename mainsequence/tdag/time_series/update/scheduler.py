@@ -16,124 +16,25 @@ import ray
 import pandas as pd
 from mainsequence.tdag.time_series.time_series import DependencyUpdateError, TimeSerie
 import gc
-from mainsequence.tdag.logconf import get_tdag_logger, create_logger_in_path
+from mainsequence.tdag.logconf import  create_logger_in_path
 
 from contextlib import contextmanager
 from mainsequence.tdag_client import LocalDiskSourceLake, DynamicTableDataSource
 
-logger = get_tdag_logger()
-TDAG_RAY_CLUSTER_ADDRESS = os.getenv("TDAG_RAY_CLUSTER_ADDRESS")
-NAMESPACE = "time_series_update"
+
+
 
 USE_PICKLE = os.environ.get('TDAG_USE_PICKLE', True)
 USE_PICKLE = USE_PICKLE in ["True", "true", True]
 
 
-class RayUpdateManager:
 
-    def __init__(self, scheduler_uid,
-                 skip_health_check=False,
-                 local_mode=False):
-
-        self.scheduler_uid = scheduler_uid
-
-        if skip_health_check == False:
-            self.is_node_healthy = self.check_node_is_healthy_in_ip()
-            if self.is_node_healthy:
-                self.verify_ray_is_initialized(local_mode)
-
-    # Node health interactions
-
-    def verify_ray_is_initialized(self, local_mode=False):
-        from mainsequence import tdag
-        import os
-        from mainsequence.tdag.config import Configuration
-        if ray.is_initialized() == False:
-            self.check_node_is_healthy_in_ip()
-            ray_address = TDAG_RAY_CLUSTER_ADDRESS
-            env_vars = {
-                "RAY_PROFILING": "0", "RAY_event_stats": "0",
-                "RAY_BACKEND_LOG_LEVEL": "error",
-            }
-
-            for c in Configuration.OBLIGATORY_ENV_VARIABLES:
-                env_vars[c] = os.environ.get(c)
-
-            extra_ray_env = os.getenv("EXTRA_RAY_ENV_VARIABLES")
-            if extra_ray_env:
-                for env_key in extra_ray_env.split(","):
-                    env_val = os.environ.get(env_key)
-                    assert env_val, f"{env_key} is not set"
-                    env_vars[env_key] = env_val
-
-            kwargs = dict(address=ray_address,
-                          namespace=NAMESPACE,
-                          local_mode=local_mode,
-                          # log_to_driver=False,
-                          runtime_env={"env_vars": env_vars,
-                                       "py_modules": [tdag]
-                                       },
-                          )  # Todo add ray cluster configuration
-
-            ray.init(**kwargs)
-
-    def shutdown_manager(self):
-        if ray.is_initialized() == True:
-            ray.shutdown()
-
-    def check_node_is_healthy_in_ip(self) -> bool:
-        return True  # todo get function out oof experimental
-        healthy = False
-        api_address = configuration.conf.distributed_config["ray"]["head_node_ip"]
-        try:
-            all_nodes = list_nodes()
-        except ConnectionError:
-            return False
-
-        for n in list_nodes():
-            if api_address == n["node_ip"] and n["state"] == "ALIVE":
-                healthy = True
-        return healthy
-
-    # misc helpers
-    def get_results_from_futures_list(self, futures: list) -> list:
-        """
-        should be a list of futures objects ray.remote()
-        Args:
-            futures ():
-
-        Returns:
-
-        """
-        ready, unready = ray.wait(futures, num_returns=1)
-        tasks_with_errors = []
-        while unready:
-            # logger.debug(ready)
-            # logger.debug(unready)
-            try:
-                ray.get(ready)
-            except Exception as e:
-                logger.error(e)
-                tasks_with_errors.append(ready)
-            ready, unready = ray.wait(unready, num_returns=1)
-
-        return tasks_with_errors
-
-    # launch methods helpers to work with Actors
-    def launch_update_task(self, kwargs_update: dict, task_options: dict):
-        # update_remote_from_hash_id(**kwargs_update)
-        # return  None
-        future = update_remote_from_hash_id.options(**task_options).remote(**kwargs_update)
-        return future
-
-    def launch_update_task_in_process(self, kwargs_update: dict, task_options: dict):
-        update_remote_from_hash_id_local(**kwargs_update)
 
 
 class TimeSerieHeadUpdateActor:
     TRACE_ID = "NO_TRACE"
 
-    def __init__(self, local_hash_id: str, data_source_id: int, scheduler: Scheduler, wait_for_update, debug,
+    def __init__(self, local_hash_id: str, data_source_id: int, scheduler: Scheduler,  debug,
                  update_tree, update_extra_kwargs, remote_table_hashed_name: str,
 
                  ):
@@ -143,7 +44,6 @@ class TimeSerieHeadUpdateActor:
         ----------
         hash_id :
         scheduler :
-        wait_for_update :
         debug :
         update_tree :
         update_extra_kwargs :
@@ -154,7 +54,6 @@ class TimeSerieHeadUpdateActor:
                                         data_source_id=data_source_id,
                                         scheduler=scheduler)
         self.scheduler = scheduler
-        self.wait_for_update = wait_for_update
 
         self.update_extra_kwargs = update_extra_kwargs
         self.local_hash_id = local_hash_id
@@ -206,7 +105,7 @@ class TimeSerieHeadUpdateActor:
         return ts
 
     def run_one_step_update(self, force_update=False,
-                            force_next_start_of_minute=False, update_only_tree=False, ):
+                            update_only_tree=False, ):
         """
         Main update Method for a time serie Head
         Returns
@@ -217,52 +116,16 @@ class TimeSerieHeadUpdateActor:
         from mainsequence.tdag.config import configuration
         from .utils import UpdateInterface
         error_on_update = False
-        tracer_instrumentator = TracerInstrumentator(
-            configuration.configuration["instrumentation_config"]["grafana_agent_host"])
-        tracer = tracer_instrumentator.build_tracer("tdag_head_distributed", __name__)
-        with tracer.start_as_current_span(f"Scheduler TS Head Update ") as span:
-            span.set_attribute("time_serie_local_hash_id", self.local_hash_id)
-            span.set_attribute("remote_table_hashed_name", self.remote_table_hashed_name)
-            span.set_attribute("head_scheduler", self.scheduler.name)
-
-            try:
-                all_metadatas, state_data = self.ts.pre_update_setting_routines(update_tree=self.update_tree,
-                                                                                set_time_serie_queue_status=True,
-                                                                                scheduler=self.scheduler)  # set scheduler before wait to use waiting time
-                # build udpate Tracker
-                update_tracker = UpdateInterface(head_hash=self.local_hash_id, trace_id=self.TRACE_ID,
-                                                 logger=self.ts.logger,
-                                                 state_data=state_data, debug=self.debug,
-                                                 )
-                self.ts.update_tracker = update_tracker
-
-                if self.wait_for_update == True and force_update == False:
-                    SchedulerUpdater.wait_for_update_time(local_hash_id=self.local_hash_id,
-                                                          data_source_id=self.ts.data_source.id,
-                                                          logger=self.ts.logger,
-                                                          force_next_start_of_minute=force_next_start_of_minute)
 
 
+        try:
+            self.ts.run(debug_mode=self.debug,update_tree=self.update_tree,update_only_tree=update_only_tree,
+                        force_update=force_update,remote_scheduler=self.scheduler
 
-                error_on_update = self.ts.update(debug_mode=self.debug, raise_exceptions=True,force_update=force_update,
-                                                 update_tree=self.update_tree, update_only_tree=update_only_tree,
-                                                 metadatas=all_metadatas, update_tracker=self.ts.update_tracker,
-                                                 )
+                        )
+        except Exception as e:
 
-                
-
-                del self.ts.update_tracker
-                gc.collect()
-
-            except TimeoutError:
-                self.ts.logger.error("TimeoutError Error on update")
-                error_on_update = True
-            except DependencyUpdateError as e:
-                self.ts.logger.error("DependecyError on update")
-                error_on_update = True
-            except Exception as e:
-                self.ts.logger.exception(e)
-                error_on_update = True
+            error_on_update = True
         return error_on_update
 
 @ray.remote(num_cpus=1, )
@@ -410,7 +273,7 @@ class SchedulerUpdater:
     @classmethod
     def debug_schedule_ts(cls, time_serie_hash_id: str,
                           data_source_id: int,
-                          debug: bool, update_tree: bool, wait_for_update=True,
+                          debug: bool, update_tree: bool,
                           raise_exception_on_error: bool = True,
                           break_after_one_update=True, force_update=False, run_head_in_main_process=False,
                           update_extra_kwargs=None, update_only_tree=False, name_suffix=None,
@@ -432,7 +295,6 @@ class SchedulerUpdater:
             updater.start(debug=debug, update_tree=update_tree, break_after_one_update=break_after_one_update,
                           run_head_in_main_process=run_head_in_main_process,
                           raise_exception_on_error=raise_exception_on_error,
-                          wait_for_update=wait_for_update,
                           update_extra_kwargs=update_extra_kwargs,
                           force_update=force_update, update_only_tree=update_only_tree,
                           )
@@ -613,7 +475,7 @@ class SchedulerUpdater:
         return new_wait_list, actors_map
 
     def _build_scheduler_actors_if_not_exist(self, actors_map: dict, wait_list: dict, update_tree: bool,
-                                             wait_for_update: bool, debug: bool, update_extra_kwargs: dict,
+                                             debug: bool, update_extra_kwargs: dict,
                                              running_distributed_heads: bool, first_launch: bool,
                                              ):
         """
@@ -669,7 +531,7 @@ class SchedulerUpdater:
                                       data_source_id=local_to_remote[uid]["updates_to"].data_source_id,
                                       scheduler=self.node_scheduler,
 
-                                      wait_for_update=wait_for_update, debug=debug, update_tree=update_tree,
+                                      debug=debug, update_tree=update_tree,
                                       update_extra_kwargs=update_extra_kwargs,
                                       )
 
@@ -783,7 +645,6 @@ class SchedulerUpdater:
 
 
     def start(self, debug=False, update_tree: Union[bool, dict] = True, break_after_one_update=False,
-              wait_for_update=True,
               raise_exception_on_error=False,
               update_extra_kwargs: Union[None, dict] = None, run_head_in_main_process=False, force_update=False,
               sequential_update=False, update_only_tree=False, api_port: Union[int, None] = None,
@@ -799,9 +660,6 @@ class SchedulerUpdater:
                 If True, updates the tree of dependent tasks.
             break_after_one_update : bool, optional
                 If True, the process stops after the first update cycle. Defaults to False.
-            wait_for_update : bool, optional
-                If True, waits for the next update according to the update schedule
-                before proceeding. Defaults to True.
             raise_exception_on_error : bool, optional
                 If True, raises an exception on encountering an error during execution.
                 Otherwise, errors are handled silently. Defaults to False.
@@ -823,35 +681,13 @@ class SchedulerUpdater:
                 Defaults to None.
         """
 
-        import threading
         from mainsequence.tdag_client import CONSTANTS as TDAG_CONSTANTS
         self._debug_mode = debug
         self._api_port = api_port
 
         # ---------------------------------------------------------
-        # 1. Spawn a daemon thread that calls the heartbeat method
-        #    every 30 seconds
-        # ---------------------------------------------------------
-        self.stop_heart_beat=False
-        run_interval=TDAG_CONSTANTS.SCHEDULER_HEART_BEAT_FREQUENCY_SECONDS
-        def _heartbeat_runner():
-            """
-            Runs forever (until the main thread ends),
-            calling _scheduler_heart_beat_patch every 30 seconds.
-            """
-            while True:
-                self._scheduler_heart_beat_patch()
-                # Sleep in a loop so that if we ever decide to
-                # add a cancellation event, we can check it in smaller intervals
-                for _ in range(run_interval):
-                    # could check for a stop event here if not daemon
-                    if  self.stop_heart_beat == True:
-                        return None
-                    time.sleep(1)
 
-
-        heartbeat_thread = threading.Thread(target=_heartbeat_runner, daemon=True)
-        heartbeat_thread.start()
+        self.node_scheduler.start_heart_beat()
 
         update_extra_kwargs = {} if update_extra_kwargs is None else update_extra_kwargs
         if debug ==False:
@@ -887,7 +723,7 @@ class SchedulerUpdater:
                 # requery DB looking for new TS added to scheduler
                 actors_map, target_ts, wait_list = self._build_scheduler_actors_if_not_exist(
                     actors_map=actors_map, update_tree=update_tree,
-                    wait_for_update=wait_for_update, debug=debug,
+                    debug=debug,
                     update_extra_kwargs=update_extra_kwargs,
                     running_distributed_heads=running_distributed_heads,
                     wait_list=wait_list,
@@ -927,17 +763,17 @@ class SchedulerUpdater:
         except KeyboardInterrupt as ki:
             self.node_scheduler.patch(is_running=False, running_process_pid=0, )
             self._clear_idle_scheduled_tree(node_scheduler=self.node_scheduler)
-            self.stop_heart_beat = True
+            self.node_scheduler.stop_heart_beat()
             raise KeyboardInterrupt
         except Exception as e:
             self.node_scheduler.patch(is_running=False, running_process_pid=0, )
             self.logger.exception(e)
-            self.stop_heart_beat = True
+            self.node_scheduler.stop_heart_beat()
             self._clear_idle_scheduled_tree(node_scheduler=self.node_scheduler)
             time.sleep(60)
 
             if raise_exception_on_error == True:
                 raise e
-        self.stop_heart_beat = True
+        self.node_scheduler.stop_heart_beat()
 
         self.logger.info("Scheduler is stopping")

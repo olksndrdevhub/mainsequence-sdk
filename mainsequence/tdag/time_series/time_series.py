@@ -661,6 +661,51 @@ class GraphNodeMethods(ABC):
     def is_local_relation_tree_set(self):
         return self.local_persist_manager.local_metadata["ogm_dependencies_linked"]
 
+
+    def get_update_map(self,dependecy_map:Union[dict,None]=None):
+        """
+        Obtain all local time_series in the dependency graph by introspecting the code
+        :return:
+        """
+        members = self.__dict__
+        dependecy_map={} if dependecy_map is None else dependecy_map
+        for key, value in members.items():
+            try:
+                if "related_time_series" in key:  # this is necessary for WrapperTimeSeries
+                    # add to tree
+                    assert isinstance(value, dict)
+
+                    for tm_ts in value.values():
+                        if isinstance(tm_ts, dict):
+                            pickle_path = self.get_pickle_path(local_hash_id=tm_ts["local_hash_id"])
+                            dependecy_map[(tm_ts["local_hash_id"],tm_ts["local_hash_id"])]={"is_pickle":True,"ts":pickle_path}
+
+                        else:
+                            is_api = isinstance(tm_ts, APITimeSerie)
+                            dependecy_map[(tm_ts.local_hash_id,tm_ts.data_source_id)]={"is_pickle":False,"ts":tm_ts}
+                            tm_ts.get_update_map(dependecy_map)
+
+                if isinstance(value, TimeSerie):
+                    value.local_persist_manager  # before connection call local persist manager to garantee ts is created
+                    dependecy_map[(value.local_hash_id,value.data_source_id)]={"is_pickle":False,"ts":value}
+                    value.get_update_map(dependecy_map)
+                if isinstance(value, APITimeSerie):
+                    value.local_persist_manager  # before conne
+                    dependecy_map[(value.local_hash_id,value.data_source_id)] = {"is_pickle": False, "ts": value}
+
+
+                if isinstance(value, dict):
+                    if "is_time_serie_pickled" in value.keys():
+                        pickle_path = self.get_pickle_path(local_hash_id=value["local_hash_id"])
+                        dependecy_map[(value.local_hash_id,value.data_source_id)] = {"is_pickle": True, "ts": pickle_path}
+
+                    if "is_api_time_serie_pickled" in value.keys():
+                        is_api = isinstance(tm_ts, APITimeSerie)
+                        dependecy_map[(value.local_hash_id,value.data_source_id)] = {"is_pickle": False, "ts": tm_ts}
+                        tm_ts.get_update_map(dependecy_map)
+            except Exception as e:
+                raise e
+        return dependecy_map
     def set_relation_tree(self):
         """
         Sets relationhsip in the DB
@@ -680,7 +725,7 @@ class GraphNodeMethods(ABC):
                         elif isinstance(value, dict):
                             for tm_ts in value.values():
                                 if isinstance(tm_ts, dict):
-                                    pickle_path = self.get_pickle_path(local_hash_id=tm_ts["hash_id"])
+                                    pickle_path = self.get_pickle_path(local_hash_id=tm_ts["local_hash_id"])
                                     new_ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
                                     new_ts.local_persist_manager  # before connection call local persist manager to garantee ts is created
                                     self.local_persist_manager.depends_on_connect(new_ts)
@@ -1028,7 +1073,7 @@ class TimeSerieRebuildMethods(ABC):
     @tracer.start_as_current_span("TS: Update")
     def update(self, update_tracker: object, debug_mode: bool,
                raise_exceptions=True, update_tree=False, start_update_data: Union[StartUpdateDataInfo, None] = None,
-               metadatas: Union[dict, None] = None, update_only_tree=False, force_update=False
+               metadatas: Union[dict, None] = None, update_only_tree=False, force_update=False,use_state_for_update=False
                ):
         """
         Main update method for time series that interacts with Graph node. Time series should be updated through this
@@ -1064,6 +1109,7 @@ class TimeSerieRebuildMethods(ABC):
                 self.update_local(update_tree=update_tree, debug_mode=debug_mode,
                                   overwrite_latest_value=latest_value, metadatas=metadatas,
                                   update_tracker=update_tracker, update_only_tree=update_only_tree,
+                                  use_state_for_update=use_state_for_update,
                                   )
 
                 update_tracker.set_end_of_execution(local_hash_id=self.local_hash_id,data_source_id=self.data_source.id,
@@ -1909,7 +1955,106 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def run_local_update(self, tdag_detached=True):
         self.local_persist_manager
         return self.get_df_between_dates()
+    def run(self,debug_mode:bool,*,update_tree:bool=True,force_update:bool=False,
+            update_only_tree:bool=False,remote_scheduler:Union[object,None]=None):
+        """
 
+        Args:
+            debug_mode:
+            update_tree:
+            force_update:
+            update_only_tree:
+            remote_scheduler:
+
+        Returns:
+
+        """
+        from mainsequence.tdag.instrumentation import TracerInstrumentator
+        from mainsequence.tdag.config import configuration
+        from mainsequence.tdag.time_series.update.utils import UpdateInterface
+        from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
+        from mainsequence.tdag_client import Scheduler
+        import gc
+        if update_tree ==True:
+            update_only_tree = False
+
+        #set tracing
+        tracer_instrumentator = TracerInstrumentator(
+            configuration.configuration["instrumentation_config"]["grafana_agent_host"])
+        tracer = tracer_instrumentator.build_tracer("tdag_head_distributed", __name__)
+        error_on_update= None
+        # 1 Create Scheduler for this time serie
+
+        if remote_scheduler == None:
+            name_prefix = "DEBUG_" if debug_mode else ""
+            scheduler = Scheduler.build_and_assign_to_ts(
+                scheduler_name=f"{name_prefix}{self.local_hash_id}_{self.data_source.id}",
+                local_hash_id_list=[(self.local_hash_id, self.data_source.id)],
+                remove_from_other_schedulers=True,
+                running_in_debug_mode=debug_mode
+
+            )
+            scheduler.start_heart_beat()
+        else:
+            scheduler = remote_scheduler
+        error_to_raise=None
+        with tracer.start_as_current_span(f"Scheduler TS Head Update ") as span:
+
+
+            span.set_attribute("time_serie_local_hash_id", self.local_hash_id)
+            span.set_attribute("remote_table_hashed_name", self.remote_table_hashed_name)
+            span.set_attribute("head_scheduler", scheduler.name)
+            # 2 add actor manager for distributed
+            distributed_actor_manager = RayUpdateManager(scheduler_uid=scheduler.uid,
+                                                         skip_health_check=True
+                                                         )
+            try:
+                local_metadatas, state_data = self.pre_update_setting_routines(scheduler=scheduler,
+                                                                               set_time_serie_queue_status=False,
+                                                                               update_tree=update_tree)
+                self.set_actor_manager(actor_manager=distributed_actor_manager)
+                self.logger.info("state set with dependencies metadatas")
+
+                # 3 build update tracker
+                update_tracker = UpdateInterface(head_hash=self.local_hash_id, trace_id=None,
+                                                 logger=self.logger,
+                                                 state_data=state_data, debug=debug_mode,
+                                                 )
+                self.update_tracker=update_tracker
+                if force_update == False:
+                    SchedulerUpdater.wait_for_update_time(local_hash_id=self.local_hash_id,
+                                                          data_source_id=self.data_source.id,
+                                                          logger=self.logger,
+                                                          force_next_start_of_minute=False)
+                error_on_update = self.update(debug_mode=debug_mode, raise_exceptions=True, force_update=force_update,
+                                                 update_tree=update_tree, update_only_tree=update_only_tree,
+                                                 metadatas=local_metadatas, update_tracker=self.update_tracker,
+                                              use_state_for_update=True
+                                                 )
+                del self.update_tracker
+                gc.collect()
+            except TimeoutError as te:
+                self.logger.error("TimeoutError Error on update")
+                error_to_raise= te
+            except DependencyUpdateError as de:
+                self.logger.error("DependecyError on update")
+                error_to_raise= de
+            except Exception as e:
+                self.logger.exception(e)
+                error_to_raise=e
+
+        if remote_scheduler ==None:
+            scheduler.stop_heart_beat()
+        if error_to_raise != None:
+            raise error_to_raise
+
+
+
+
+
+
+    
+    
     @property
     def local_persist_manager(self):
         if hasattr(self, "logger") == False:
@@ -2142,17 +2287,20 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         return local_metadatas, state_data
 
     @tracer.start_as_current_span("Verify time series tree update")
-    def _verify_tree_is_updated(self, metadatas, debug_mode):
+    def _verify_tree_is_updated(self, metadatas:dict, debug_mode:bool,
+                                use_state_for_update:bool=False
+                                ):
         """
-        \
-        Args:
 
-            update_tree_kwargs: (dict) with general configartion that will be passed to the tree
-            parallel_mode:
+        Args:
+            metadatas:
+            debug_mode:
+            use_state_for_update: timeseries will be collected from code introspection
 
         Returns:
 
         """
+
 
         # build tree
         if self.is_local_relation_tree_set == False:
@@ -2163,6 +2311,9 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
         else:
             self.logger.info("Tree is not updated as is_local_relation_tree_set== True")
+        update_map={}
+        if use_state_for_update == True:
+            update_map = self.get_update_map()
 
         if debug_mode == False:
             tmp_ts = self.dependencies_df.copy()
@@ -2176,6 +2327,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
 
         else:
+
+
             updated_uids = []
             if self.dependencies_df.shape[0] > 0:
                 unique_priorities = self.dependencies_df["update_priority"].unique().tolist()
@@ -2196,28 +2349,35 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
                     # update on the same process
 
-                    for ts_row in tmp_ts.iterrows():
+                    for row,ts_row in tmp_ts.iterrows():
+
+                        if   (ts_row["local_hash_id"],ts_row["data_source_id"]) in update_map.keys():
+                            ts=update_map[ (ts_row["local_hash_id"],ts_row["data_source_id"])]
+                        else:
+
+                            try:
+                                pickle_path = self.get_pickle_path(ts_row["local_hash_id"],
+                                                                   data_source_id=ts_row["data_source_id"])
+                                data_source = self.load_data_source_from_pickle(pickle_path=pickle_path)
+                                if os.path.isfile(pickle_path) == False:
+                                    ts = TimeSerie.rebuild_from_configuration(local_hash_id=ts_row["local_hash_id"],
+                                                                              data_source=data_source
+                                                                              )
+                                    ts.persist_to_pickle()
+
+                                ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
+                            except Exception as e:
+                                self.logger.exception(f"Error updating dependencie {ts.local_hash_id} when loading pickle")
+                                raise e
+
                         try:
-                            pickle_path = self.get_pickle_path(ts_row[1]["local_hash_id"],
-                                                               data_source_id=ts_row[1]["data_source_id"])
-                            data_source = self.load_data_source_from_pickle(pickle_path=pickle_path)
-                            if os.path.isfile(pickle_path) == False:
-                                ts = TimeSerie.rebuild_from_configuration(local_hash_id=ts_row[1]["local_hash_id"],
-                                                                          remote_table_hashed_name=ts_row[1][
-                                                                              "remote_table_hash_id"],
-                                                                          data_source=data_source
-                                                                          )
-                                ts.persist_to_pickle()
-
-                            ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
-
-                            self.update_tracker.set_start_of_execution(local_hash_id=ts_row[1]["local_hash_id"],
-                                                                       data_source_id=ts_row[1]["data_source_id"]
+                            self.update_tracker.set_start_of_execution(local_hash_id=ts_row["local_hash_id"],
+                                                                       data_source_id=ts_row["data_source_id"]
                                                                        )
                             error_on_last_update = ts.update(debug_mode=debug_mode,
                                                              raise_exceptions=True, update_tree=False,
                                                              start_update_data=all_start_data[
-                                                                 (ts_row[1]["local_hash_id"],ts_row[1]["data_source_id"])],
+                                                                 (ts_row["local_hash_id"],ts_row["data_source_id"])],
                                                              update_tracker=self.update_tracker
                                                              )
 
@@ -2318,7 +2478,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def update_local(self, update_tree, update_tracker: object, debug_mode: bool,
                      metadatas: Union[None, dict] = None,
                      overwrite_latest_value: Union[datetime.datetime, None] = None, update_only_tree: bool = False,
-
+                     use_state_for_update:bool=False,
                      *args, **kwargs) -> bool:
 
         from mainsequence.tdag.instrumentation.utils import Status, StatusCode
@@ -2327,6 +2487,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
             self._verify_tree_is_updated(debug_mode=debug_mode,
                                          metadatas=metadatas,
+                                         use_state_for_update=use_state_for_update,
                                          )
             update_only_tree == True
             if update_only_tree == True:

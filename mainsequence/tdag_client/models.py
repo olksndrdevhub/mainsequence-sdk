@@ -409,8 +409,9 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
     pre_loads_in_tree: Optional[List[str]]=None  # Assuming this is a list of strings
     in_active_tree: Optional[List[LocalTimeSerieNode]  ]=None  # Assuming this is a list of strings
     schedules_to: Optional[List[LocalTimeSerieNode]]=None
-
-
+    #for heartbeat
+    _stop_heart_beat:bool=False
+    _executor:Optional[object]=None
     @classmethod
     @property
     def ROOT_URL(cls):
@@ -489,7 +490,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
 
     @classmethod
     def build_and_assign_to_ts(cls, scheduler_name: str, local_hash_id_list: list, delink_all_ts=False,
-                               remove_from_other_schedulers=True):
+                               remove_from_other_schedulers=True,**kwargs):
 
         if BACKEND_DETACHED() == True:
             raise Exception("TDAG is detached")
@@ -501,7 +502,8 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
             "scheduler_name": scheduler_name,
             "delink_all_ts": delink_all_ts,
             "hash_id_list": local_hash_id_list,
-            "remove_from_other_schedulers": remove_from_other_schedulers
+            "remove_from_other_schedulers": remove_from_other_schedulers,
+            "scheduler_kwargs":kwargs
         })
         r = make_request(s=s,loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
         if r.status_code != 201:
@@ -539,6 +541,66 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
             if self.api_address == get_network_ip() and is_process_running(self.running_process_pid) == True:
                 return True
         return False
+
+    def _heart_beat_patch(self):
+        from mainsequence.tdag_client.utils import get_network_ip
+        import os
+        try:
+            scheduler = self.patch(is_running=True,
+                                                  running_process_pid=os.getpid(),
+                                                  running_in_debug_mode=self.running_in_debug_mode,
+                                                  last_heart_beat=datetime.datetime.utcnow().replace(
+                                                      tzinfo=pytz.utc).timestamp(),
+                                                  )
+            for field, value in scheduler.__dict__.items():
+                setattr(self, field, value)
+        except Exception as e:
+            logger.error(e)
+    def _heartbeat_runner(self,run_interval):
+        """
+        Runs forever (until the main thread ends),
+        calling _scheduler_heart_beat_patch every 30 seconds.
+        """
+        logger.info("Heartbeat thread started with interval = %d seconds", run_interval)
+
+        while  True:
+
+            self._heart_beat_patch()
+            # Sleep in a loop so that if we ever decide to
+            # add a cancellation event, we can check it in smaller intervals
+            for _ in range(run_interval):
+                # could check for a stop event here if not daemon
+                if self._stop_heart_beat == True:
+                    return
+                time.sleep(1)
+    def start_heart_beat(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        if self._executor is None:
+            self._executor = ThreadPoolExecutor(max_workers=1)
+        run_interval = CONSTANTS.SCHEDULER_HEART_BEAT_FREQUENCY_SECONDS
+
+        self._heartbeat_future = self._executor.submit(self._heartbeat_runner, run_interval)
+
+    def stop_heart_beat(self):
+        """
+        Stop the heartbeat gracefully.
+        """
+        # Signal the runner loop to exit
+        self._stop_heart_beat = True
+
+        # Optionally wait for the future to complete
+        if self._heartbeat_future:
+            logger.info("Waiting for the heartbeat thread to finish...")
+            self._heartbeat_future.result()  # or .cancel() if you prefer
+
+        # Shut down the executor if no longer needed
+        if self._executor:
+            self._executor.shutdown(wait=True)
+            self._executor = None
+
+        logger.info("Heartbeat thread stopped.")
+
 
 
 
