@@ -1858,7 +1858,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
 
         if pod_source == None:
-            print("using pod default data source")
             if POD_DEFAULT_DATA_SOURCE.related_resource is None:
                 raise Exception("This Pod does not have a default data source")
             return POD_DEFAULT_DATA_SOURCE
@@ -1884,7 +1883,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         :return:
         """
         if data_source is None:
-            
             self._data_source = self.get_data_source_from_orm()
         else:
             self._data_source = data_source
@@ -1937,7 +1935,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
     def _set_logger(self, local_hash_id):
         if hasattr(self, "logger") == False:
-
             self.logger = create_logger_in_path(logger_name=f"{self.data_source.id}_{local_hash_id}", application_name="tdag",
                                                 logger_file=f'{ogm.get_logging_path()}/{self.data_source.id}/{local_hash_id}.log',
                                                 local_hash_id=local_hash_id, data_source_id=self.data_source.id

@@ -35,7 +35,7 @@ def startup():
         }
 
     kwargs["uid"] = app.state.scheduler_uid
-    p = Process(target=SchedulerUpdater.start_from_uid,kwargs=kwargs,name=new_scheduler.name)
+    p = Process(target=SchedulerUpdater.start_from_uid, kwargs=kwargs,name=new_scheduler.name)
     p.start()
 
     app.state_scheduler_process_pip = p.pid
