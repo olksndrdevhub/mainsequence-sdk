@@ -1535,7 +1535,7 @@ class APITimeSerie:
                                                         local_hash_id=self.local_hash_id,
                                                         logger=self.logger)
         local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
-        self.remote_table_hashed_name=local_metadata["remote_table"]["hash_id"]
+        self.remote_table_hashed_name = local_metadata["remote_table"]["hash_id"]
         if self.data_source is None:
 
             if isinstance(local_metadata["remote_table"]["data_source"], dict):
