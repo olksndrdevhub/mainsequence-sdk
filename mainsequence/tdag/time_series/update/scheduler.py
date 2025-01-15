@@ -10,6 +10,7 @@ from mainsequence.tdag_client import (Scheduler, TimeSerieLocalUpdate, SourceTab
                                       )
 from .update_methods import (get_or_pickle_ts_from_sessions, update_remote_from_hash_id,
                              update_remote_from_hash_id_local)
+from .ray_manager import RayUpdateManager
 from mainsequence.tdag.config import bcolors
 from typing import Union, List
 import ray
@@ -393,7 +394,7 @@ class SchedulerUpdater:
             # will automatically block execution
             force_next_update = actor_handle.run_one_step_update(force_update=force_update,
                                                                  update_only_tree=update_only_tree,
-                                                                 force_next_start_of_minute=force_next_start_of_minute)
+            )
             task_handle = None
             actors_map[uid_to_wait]["force_next_update"] = force_next_update
         actors_map[uid_to_wait]["task_handle"] = task_handle

@@ -412,6 +412,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
     #for heartbeat
     _stop_heart_beat:bool=False
     _executor:Optional[object]=None
+
     @classmethod
     @property
     def ROOT_URL(cls):
@@ -573,6 +574,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
                 if self._stop_heart_beat == True:
                     return
                 time.sleep(1)
+
     def start_heart_beat(self):
         from concurrent.futures import ThreadPoolExecutor
 
@@ -590,7 +592,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
         self._stop_heart_beat = True
 
         # Optionally wait for the future to complete
-        if self._heartbeat_future:
+        if hasattr(self, "heartbeat_future") and self._heartbeat_future:
             logger.info("Waiting for the heartbeat thread to finish...")
             self._heartbeat_future.result()  # or .cancel() if you prefer
 
