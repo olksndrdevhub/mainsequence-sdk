@@ -1681,7 +1681,7 @@ class DynamicTableHelpers:
         :param hash_id:
         :type hash_id:
         :return:
-        :rtype:
+        :rtype:i
         """
         r, j = self.get_rest(hash_id=hash_id,class_name=None)
         if len(r) == 0:
@@ -1924,7 +1924,8 @@ class DynamicTableHelpers:
 
                           )  is not None else (metadata, data))
 
-
+        duplicates_exist = serialized_data_frame.duplicated(subset=index_names).any()
+        assert not duplicates_exist, f"Duplicates found in columns: {index_names}"
         local_metadata = self._insert_data_into_table(serialized_data_frame=data, metadata=metadata,
                                                    local_metadata=local_metadata,
                                                    overwrite=overwrite, time_index_name=time_index_name,

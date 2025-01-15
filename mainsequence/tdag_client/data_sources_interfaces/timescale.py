@@ -212,8 +212,7 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
 
         # Drop indexes before insertion
 
-    duplicates_exist = serialized_data_frame.duplicated(subset=index_names).any()
-    assert not duplicates_exist, f"Duplicates found in columns: {index_names}"
+   
 
     # do not drop indices this is only done on inception
     # if serialized_data_frame.shape[0] > 1000000:
