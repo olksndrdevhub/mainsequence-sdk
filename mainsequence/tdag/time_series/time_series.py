@@ -738,11 +738,11 @@ class GraphNodeMethods(ABC):
 
                     if isinstance(value, TimeSerie):
                         value.local_persist_manager  # before connection call local persist manager to garantee ts is created
-                        self.local_persist_manager.depends_on_connect(value,is_api=False)
+                        self.local_persist_manager.depends_on_connect(value, is_api=False)
                         value.set_relation_tree()
                     if isinstance(value, APITimeSerie):
                         value.local_persist_manager  # before conne
-                        self.local_persist_manager.depends_on_connect(value,is_api=True)
+                        self.local_persist_manager.depends_on_connect(value, is_api=True)
 
                     if isinstance(value, dict):
                         if "is_time_serie_pickled" in value.keys():
