@@ -1642,7 +1642,7 @@ class DynamicTableHelpers:
 
         return data_frame, column_index_names, index_names, column_dtypes_map, time_index_name
 
-    def _insert_data_into_hash_id(self, serialized_data_frame: pd.DataFrame, metadata,local_metadata:dict,
+    def _insert_data_into_table(self, serialized_data_frame: pd.DataFrame, metadata,local_metadata:dict,
                                   overwrite: bool, time_index_name:str,index_names:list,
                                   historical_update_id:Union[None,int],data_source:DynamicTableDataSource,
                                 logger:object,
@@ -1831,7 +1831,7 @@ class DynamicTableHelpers:
                           )  is not None else (metadata, data))
 
 
-        local_metadata = self._insert_data_into_hash_id(serialized_data_frame=data, metadata=metadata,
+        local_metadata = self._insert_data_into_table(serialized_data_frame=data, metadata=metadata,
                                                    local_metadata=local_metadata,
                                                    overwrite=overwrite, time_index_name=time_index_name,
                                                    index_names=index_names,
