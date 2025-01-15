@@ -8,9 +8,6 @@ from mainsequence.tdag.config import bcolors, configuration
 from typing import Union
 from mainsequence.tdag.instrumentation import tracer
 import ray
-from kombu.mixins import ConsumerMixin
-from kombu import Connection
-from kombu import Exchange, Queue
 from mainsequence.tdag_client import CONSTANTS
 
 from mainsequence.tdag.time_series import TimeSerie
@@ -26,7 +23,7 @@ EXECUTION_HEAD_WEIGHT = float(os.environ.get('EXECUTION_HEAD_WEIGHT', 60 * 60 * 
 def update_remote_from_hash_id_local(
                                execution_start: datetime.datetime, telemetry_carrier: str,
                                start_update_data: dict,
-                               local_hash_id: str,
+                               local_hash_id: str,data_source_id:int,
                                local_metadatas: Union[dict, None],
 
                                ):
@@ -64,7 +61,7 @@ def update_remote_from_hash_id_local(
             update_tree=False,
             execution_start=execution_start,
             update=True,
-
+            data_source_id=data_source_id,
             start_update_data=start_update_data,
             local_metadatas=local_metadatas,
 
@@ -94,39 +91,20 @@ def update_with_session(session, time_serie, update_tree,
 
 
 
-class TimeSerieUpdateConsumer(ConsumerMixin):
-    executor = ThreadPoolExecutor(max_workers=1)  # Initialize a thread pool with 1 worker
-    @classmethod
-    def start_consumer(cls, *args,**kwargs):
+class TimeSerieUpdater:
 
-        url = os.environ.get("TDAG_RABBIT_MQ_URL")
-        if not url:
-            raise Exception("TDAG_RABBIT_MQ_URL environment variable is not set.")
-
-
-
-        with Connection(url) as conn:
-
-            worker = cls(connection=conn,*args,**kwargs)
-            worker.run()
-
-
-
-    def __init__(self, connection, time_serie: TimeSerie,    start_update_data: StartUpdateDataInfo, update_tree: bool,
-                           execution_start: datetime.datetime,              ):
-        self.connection = connection
+    def __init__(self,time_serie: TimeSerie, start_update_data: StartUpdateDataInfo, update_tree: bool,
+                 execution_start: datetime.datetime, ):
         self.time_serie=time_serie
         self.start_update_data=start_update_data
         self.update_tree=update_tree
         self.execution_start=execution_start
-        self.dependencies_status={}
-
-        self._set_dependencies_status()
-        self.update_finished=TimeSerieUpdateConsumer.executor.submit(self._do_step_update)
 
 
 
-    def _set_dependencies_status(self):
+
+
+    def check_if_dependencies_are_updated(self,time_out_of_request:int):
         """
 
         Args:
@@ -135,30 +113,18 @@ class TimeSerieUpdateConsumer(ConsumerMixin):
         Returns:dependencies_updates,raise_error_from_childs
 
         """
-        if len(self.start_update_data.direct_dependencies_hash_id) == 0:
+        if len(self.start_update_data.direct_dependencies_ids) == 0:
             return None
-        # always query first the status of dependencies
-        dependencies_update_details = LocalTimeSerieUpdateDetails.filter(
-            related_table__local_hash_id__in=self.start_update_data.direct_dependencies_hash_id)
+        # Filter and use timeout
+        dependencies_update_details = LocalTimeSerieUpdate.verify_if_direct_dependencies_are_updated(
+            id=time_serie.local_metadata["id"],time_out=time_out_of_request,
+        )
 
-        dependencies_status={}
-        for dep in dependencies_update_details:
 
-            CONSTANTS.UPDATE_SUCCESS_STATE
-            dependencies_status["related_table__local_hash_id"]=dep
+        return dependencies_update_details["updated"], dependencies_update_details["error_on_update_dependencies"]
 
-        # self.dependencies_status=dependencies_status
 
-    def _check_if_dependencies_are_updated(self):
-
-        updated,error_on_update=True,False
-        updates=[]
-        for local_hash_id,details in self.dependencies_status.items():
-            if details["error_on_last_update"]==True:
-                return False,True
-            updates.append(details["active_update_status"]==CONSTANTS.UPDATE_SUCCESS_STATE)
-        return all(updates),error_on_update
-    def _do_step_update(self)->bool:
+    def do_step_update(self)->bool:
 
 
 
@@ -166,13 +132,16 @@ class TimeSerieUpdateConsumer(ConsumerMixin):
         from .utils import UpdateInterface
         import logging
 
-        ignore_timeout = configuration.configuration["time_series_config"]["ignore_update_timeout"]
-
-
-
-        are_dependencies_updated,error_on_dependencies=self._check_if_dependencies_are_updated()
 
         ts_update_details = self.time_serie.update_details
+        ignore_timeout = configuration.configuration["time_series_config"]["ignore_update_timeout"]
+        execution_timeout_seconds = ts_update_details['execution_timeout_seconds'] if ts_update_details[
+                                                                                          'execution_timeout_seconds'] > 0 else EXECUTION_HEAD_WEIGHT
+
+        time_out_of_request=min(execution_timeout_seconds,60*5)
+        are_dependencies_updated,error_on_dependencies=self.check_if_dependencies_are_updated(time_out_of_request)
+
+
         update_tracker = UpdateInterface(head_hash=None, trace_id=None,
                                          logger=self.time_serie.logger,
                                          state_data=None, debug=False)
@@ -251,18 +220,11 @@ class TimeSerieUpdateConsumer(ConsumerMixin):
             self.dependencies_status[body["related_table__local_hash_id"]]=body
             self.time_serie.logger.debug(f'dependency {body["related_table__local_hash_id"]} updated')
 
-    def on_iteration(self):
-        """
-        This method runs every iteration of the consumer loop.
-        You can use this to monitor the thread and stop the consumer if necessary.
-        """
-
 
 
 
 @tracer.start_as_current_span(" get_or_pickle_ts_from_sessions")
 def get_or_pickle_ts_from_sessions(local_hash_id: str,data_source_id:int,
-                                   remote_table_hashed_name: Union[str, None],
                                    set_dependencies_df=False,
                                    ts: Union[object, None] = None,
                                    return_ts=False
@@ -311,7 +273,8 @@ def get_or_pickle_ts(hash_id: str, update_priority: int, scheduler_uid: str,
 
 
 @tracer.start_as_current_span("Rebuild with session")
-def rebuild_with_session(local_hash_id, update_tree, execution_start: Union[datetime.datetime, None],
+def rebuild_with_session(local_hash_id:str,data_source_id:int,
+                         update_tree:bool, execution_start: Union[datetime.datetime, None],
 
                          update=True,
                          local_metadatas: Union[dict, None] = None,
@@ -336,16 +299,17 @@ def rebuild_with_session(local_hash_id, update_tree, execution_start: Union[date
     USE_PICKLE = True
     if USE_PICKLE == False:
         ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
-                                                  remote_table_hashed_name=None
+                                                  data_source=data_source_id
 
                                                   )
         pickle_path = None
     else:
         _ = get_or_pickle_ts_from_sessions(local_hash_id=local_hash_id,
-                                           remote_table_hashed_name=None
+                                           data_source_id=data_source_id,
                                            )
-        # hash_id=local_metadatas[local_hash_id]['remote_table']['hash_id']
-        pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id)
+        pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
+                                                data_source_id=data_source_id,
+                                                )
         ts = TimeSerie.load_from_pickle(pickle_path=pickle_path)
         ts.set_state_with_sessions(include_vam_client_objects=False,
                                    graph_depth_limit=0.0,
@@ -353,7 +317,7 @@ def rebuild_with_session(local_hash_id, update_tree, execution_start: Union[date
                                    local_metadatas=local_metadatas,
                                    )
 
-    ts.logger.info(f'{ts.hashed_name} loaded and ready to update')
+    ts.logger.info(f'{ts.local_hash_id} {data_source_id} loaded and ready to update')
     # graph_node = ts.graph_node
     # graph_node.set_update_pid(process_pid)
 
@@ -361,11 +325,11 @@ def rebuild_with_session(local_hash_id, update_tree, execution_start: Union[date
 
         try:
             assert execution_start is not None
-            ts = TimeSerieUpdateConsumer.start_consumer(time_serie=ts, update_tree=update_tree,
-
+            ts = TimeSerieUpdater(time_serie=ts, update_tree=update_tree,
                                 execution_start=execution_start,
                                 start_update_data=start_update_data
                                 )
+            ts.do_step_update()
         except Exception as e:
             ts.logger.exception(f'{e} ')
 

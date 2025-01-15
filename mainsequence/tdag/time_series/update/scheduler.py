@@ -8,8 +8,8 @@ from ray.util.client.common import ClientActorHandle
 from mainsequence.tdag_client import (Scheduler, TimeSerieLocalUpdate, SourceTableConfigurationDoesNotExist,
                                       LocalTimeSerieNode, SchedulerDoesNotExist
                                       )
-from .update_methods import (get_or_pickle_ts_from_sessions, update_remote_from_hash_id,
-                             update_remote_from_hash_id_local)
+from .update_methods import (get_or_pickle_ts_from_sessions,
+                             )
 from .utils import get_time_to_wait_from_hash_id
 from .ray_manager import RayUpdateManager
 from mainsequence.tdag.config import bcolors

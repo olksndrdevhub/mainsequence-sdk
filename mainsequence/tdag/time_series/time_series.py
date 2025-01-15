@@ -2285,6 +2285,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         local_metadatas = {(m["local_hash_id"],m["remote_table"]["data_source"]["id"]): m for m in local_metadatas}
 
         self.scheduler = scheduler
+        for key, v in local_metadatas.items():
+            v["localtimeserieupdatedetails"]["run_configuration"]=v["run_configuration"]
         self.update_details_tree = {key: v["localtimeserieupdatedetails"] for key, v in local_metadatas.items()}
         return local_metadatas, state_data
 
@@ -2421,23 +2423,24 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                  telemetry_carrier=telemetry_carrier,
                                  local_metadatas=metadatas,
                                  start_update_data=start_update_data,
+                                 data_source_id=data_source_id
 
                                  )
 
             update_details = self.update_details_tree[(local_hash_id, data_source_id)]
-            num_cpus = update_details['distributed_num_cpus']
+            num_cpus = update_details["run_configuration"]["required_cpus"]
 
-            p = self.update_actor_manager.launch_update_task(task_options={"num_cpus": num_cpus,
-                                                                           "name": local_hash_id,
-                                                                           "max_retries": 0},
-                                                             kwargs_update=kwargs_update
-                                                             )
-            # p = self.update_actor_manager.launch_update_task_in_process(task_options={"num_cpus": num_cpus,
-            #                                                                "name": local_hash_id,
-            #
-            #                                                                "max_retries": 0},
-            #                                                  kwargs_update=kwargs_update
-            #                                                  )
+            task_kwargs=dict(task_options={"num_cpus": num_cpus,
+                                                                            "name": f"{local_hash_id}_{data_source_id}",
+
+                                                                           "max_retries": update_details["run_configuration"]["retry_on_error"]},
+                                                             kwargs_update=kwargs_update)
+
+            # p = self.update_actor_manager.launch_update_task(**task_kwargs   )
+
+            p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
+            raise Exception("this is a debug block")
+
             futures_.append(p)
 
             # are_dependencies_updated, all_dependencies_nodes, pending_nodes, error_on_dependencies = self.update_tracker.get_pending_update_nodes(

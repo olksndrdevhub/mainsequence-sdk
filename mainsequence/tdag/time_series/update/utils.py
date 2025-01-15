@@ -145,7 +145,7 @@ class UpdateInterface:
                 must_update = False
 
             start_data["must_update"] = must_update
-            start_data["direct_dependencies_hash_id"] = self.state_data[lts]["direct_dependencies_hash_id"]
+            start_data["direct_dependencies_ids"] = self.state_data[lts]["direct_dependencies_ids"]
             new_starts[lts] = StartUpdateDataInfo(**start_data)
 
 
@@ -168,7 +168,7 @@ class UpdateInterface:
 
         must_update = self._assert_next_update(local_hash_id=local_hash_id,data_source_id=data_source_id)
         start_update_data["must_update"] = must_update
-        start_update_data["direct_dependencies_hash_id"] = self.state_data[(local_hash_id,data_source_id)]["direct_dependencies_hash_id"]
+        start_update_data["direct_dependencies_ids"] = self.state_data[(local_hash_id,data_source_id)]["direct_dependencies_ids"]
 
 
         self._patch_update(hash_id=local_hash_id,
