@@ -20,6 +20,9 @@ from typing import Optional, List, Dict, Any
 from .data_sources_interfaces.local_data_lake import DataLakeInterface
 from .data_sources_interfaces import timescale as TimeScaleInterface
 from functools import wraps
+import math
+import gzip
+import base64
 
 _default_data_source = None  # Module-level cache
 BACKEND_DETACHED=lambda : os.environ.get('BACKEND_DETACHED',"false").lower()=="true"
@@ -941,7 +944,7 @@ class TimeSerieLocalUpdate(BaseObject):
                                         symbol_range_map: Union[None,dict]
     ):
         s = cls.build_session()
-        url = cls.LOCAL_UPDATE_URL + f"/get_data_between_dates_from_remote/"
+        url = cls.LOCAL_UPDATE_URL + f"/insert_data_into_table/"
 
         symbol_range_map = copy.deepcopy(symbol_range_map)
         if symbol_range_map is not None:
@@ -992,9 +995,83 @@ class TimeSerieLocalUpdate(BaseObject):
 
         return pd.DataFrame(all_results)
 
+    @classmethod
+    def post_data_frame_in_chunks(cls,
+                                        serialized_data_frame: pd.DataFrame, logger:object,
+                                        chunk_size: int = 50_000,
+                                        local_metadata: dict = None,
+                                        data_source: str = None,
+                                        index_names: list = None,
+                                        time_index_name: str = 'timestamp',
+                                        overwrite: bool = False,
+                                        JSON_COMPRESSED_PREFIX: str = "base64-gzip",
+                                        session: requests.Session = None
 
+                                    ):
+        """
+            Sends a large DataFrame to a Django backend in multiple chunks.
 
+            :param serialized_data_frame: The DataFrame to upload.
+            :param url: The endpoint URL (e.g. https://yourapi.com/upload-chunk/).
+            :param chunk_size: Number of rows per chunk.
+            :param local_metadata: General metadata dict you want to send with each chunk.
+            :param data_source: Additional info about the source of the data.
+            :param index_names: Index columns in the DataFrame.
+            :param time_index_name: The column name used for time indexing.
+            :param overwrite: Boolean indicating whether existing data should be overwritten.
+            :param JSON_COMPRESSED_PREFIX: String indicating the compression scheme in your JSON payload.
+            :param session: Optional requests.Session() for connection reuse.
+            """
+        s = cls.build_session()
+        url = cls.LOCAL_UPDATE_URL + f"/{local_metadata['id']}/insert_data_into_table/"
+        total_rows = len(serialized_data_frame)
+        total_chunks = math.ceil(total_rows / chunk_size)
+        logger.info(f"Starting upload of {total_rows} rows in {total_chunks} chunk(s).")
+        for i in range(total_chunks):
+            start_idx = i * chunk_size
+            end_idx = min((i + 1) * chunk_size, total_rows)
 
+            # Slice the DataFrame for the current chunk
+            chunk_df = serialized_data_frame.iloc[start_idx:end_idx]
+
+            # Compute grouped_dates for this chunk
+            chunk_stats = {"_GLOBAL_":{"max":chunk_df[time_index_name].max().timestamp(),
+                                       "min":chunk_df[time_index_name].min().timestamp()}}
+            if len(index_names) > 1:
+                grouped_dates = chunk_df.groupby(["asset_symbol", "execution_venue_symbol"])[
+                    time_index_name].agg(
+                    ["min", "max"])
+                chunk_stats["_PER_ASSET_"] = {
+                    row["asset_symbol"]: {row["execution_venue_symbol"]:{"max": row["max"].timestamp(),
+                                                                         "min":row["min"].timestamp(),
+                                                                         }}
+                    for _, row in grouped_dates.reset_index().iterrows()
+                }
+
+            # Convert the chunk to JSON
+            chunk_json_str = chunk_df.to_json(orient="records", date_format="iso")
+
+            # (Optional) Compress JSON using gzip then base64-encode
+            compressed = gzip.compress(chunk_json_str.encode('utf-8'))
+            compressed_b64 = base64.b64encode(compressed).decode('utf-8')
+
+            payload = dict(json={
+                "data": compressed_b64,  # compressed JSON data
+                "chunk_stats": chunk_stats,
+                "overwrite": overwrite,
+                "chunk_index": i,
+                "total_chunks": total_chunks,
+            })
+            try:
+                r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url,time_out=60*15)
+                response.raise_for_status()  # Raise if 4xx/5xx
+                logger.info(f"Chunk {i + 1}/{total_chunks} uploaded successfully.")
+            except requests.exceptions.RequestException as e:
+                logger(f"Error uploading chunk {i + 1}/{total_chunks}: {e}")
+                # Optionally, you could retry or break here
+                raise e
+            if r.status_code!=200:
+                raise Exception(r.text)
 
 class TimeSerie(BaseObject):
     """
@@ -1679,22 +1756,37 @@ class DynamicTableHelpers:
             data_lake_interface.persist_datalake(serialized_data_frame, overwrite=True,
                                                  time_index_name=time_index_name, index_names=index_names,
                                                  table_name=metadata["table_name"])
-        elif data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+        elif isinstance(data_source.related_resource,int) or True==True:
+            #Do API insertion
+            TimeSerieLocalUpdate.post_data_frame_in_chunks(serialized_data_frame=serialized_data_frame,
+                                                           logger=self.logger,
+                                                           local_metadata=local_metadata,
+                                                           data_source=data_source,
+                                                           index_names=index_names,
+                                                           time_index_name=time_index_name,
+                                                           overwrite=overwrite,
+                                                           )
 
-            TimeScaleInterface.process_and_update_table(
-                serialized_data_frame=serialized_data_frame,
-                metadata=metadata,
-                grouped_dates=grouped_dates,
-                data_source=data_source,
-                index_names=index_names,
-                time_index_name=time_index_name,
-                overwrite=overwrite,
-                JSON_COMPRESSED_PREFIX=JSON_COMPRESSED_PREFIX,
-                logger=self.logger
-            )
 
-        if BACKEND_DETACHED() == True:
-            return None
+        else:
+            if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+
+                TimeScaleInterface.process_and_update_table(
+                    serialized_data_frame=serialized_data_frame,
+                    metadata=metadata,
+                    grouped_dates=grouped_dates,
+                    data_source=data_source,
+                    index_names=index_names,
+                    time_index_name=time_index_name,
+                    overwrite=overwrite,
+                    JSON_COMPRESSED_PREFIX=JSON_COMPRESSED_PREFIX,
+                    logger=self.logger
+                )
+
+            if BACKEND_DETACHED() == True:
+                return None
+            else:
+                raise NotImplementedError
 
         r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(max_per_asset_symbol=max_per_asset_symbol,
                                                                  last_time_index_value=last_time_index_value,
