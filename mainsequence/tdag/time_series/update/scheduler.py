@@ -608,8 +608,8 @@ class SchedulerUpdater:
                                  )
 
                 if len(ts_updating) == 0:
-                    self._scheduler_heart_beat_patch()
                     time.sleep(30)
+
                 ready, unready = ray.wait([actor_details["task_handle"] for actor_details in actors_map.values()
                                            if actor_details["task_handle"] is not None
                                            ], timeout=60,
