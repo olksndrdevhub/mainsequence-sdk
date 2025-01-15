@@ -2289,7 +2289,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         return local_metadatas, state_data
 
     @tracer.start_as_current_span("Verify time series tree update")
-    def _verify_tree_is_updated(self, metadatas:dict, debug_mode:bool,
+    def _verify_tree_is_updated(self, metadatas: dict, debug_mode:bool,
                                 use_state_for_update:bool=False
                                 ):
         """
@@ -2302,8 +2302,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         Returns:
 
         """
-
-
         # build tree
         if self.is_local_relation_tree_set == False:
             start_tree_relationship_update_time = time.time()
@@ -2313,7 +2311,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
         else:
             self.logger.info("Tree is not updated as is_local_relation_tree_set== True")
-        update_map={}
+
+        update_map = {}
         if use_state_for_update == True:
             update_map = self.get_update_map()
 
@@ -2326,11 +2325,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             if tmp_ts.shape[0] > 0:
                 self._execute_parallel_distributed_update(tmp_ts=tmp_ts,
                                                           metadatas=metadatas)
-
-
         else:
-
-
             updated_uids = []
             if self.dependencies_df.shape[0] > 0:
                 unique_priorities = self.dependencies_df["update_priority"].unique().tolist()
@@ -2342,7 +2337,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 all_start_data = self.update_tracker.set_start_of_execution_batch(local_time_series_list=local_time_series_list)
                 for prioriity in unique_priorities:
                     # get hierarchies ids
-
                     tmp_ts = self.dependencies_df[self.dependencies_df["update_priority"] == prioriity].sort_values(
                         "number_of_upstreams", ascending=False).copy()
 
@@ -2350,13 +2344,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                     tmp_ts = tmp_ts[~tmp_ts.index.isin(updated_uids)]
 
                     # update on the same process
+                    for row, ts_row in tmp_ts.iterrows():
 
-                    for row,ts_row in tmp_ts.iterrows():
-
-                        if   (ts_row["local_hash_id"],ts_row["data_source_id"]) in update_map.keys():
-                            ts=update_map[ (ts_row["local_hash_id"],ts_row["data_source_id"])]
+                        if (ts_row["local_hash_id"], ts_row["data_source_id"]) in update_map.keys():
+                            ts = update_map[(ts_row["local_hash_id"], ts_row["data_source_id"])]["ts"]
                         else:
-
                             try:
                                 pickle_path = self.get_pickle_path(ts_row["local_hash_id"],
                                                                    data_source_id=ts_row["data_source_id"])
@@ -2377,9 +2369,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                                        data_source_id=ts_row["data_source_id"]
                                                                        )
                             error_on_last_update = ts.update(debug_mode=debug_mode,
-                                                             raise_exceptions=True, update_tree=False,
+                                                             raise_exceptions=True,
+                                                             update_tree=False,
                                                              start_update_data=all_start_data[
-                                                                 (ts_row["local_hash_id"],ts_row["data_source_id"])],
+                                                                 (ts_row["local_hash_id"], ts_row["data_source_id"])],
                                                              update_tracker=self.update_tracker
                                                              )
 
