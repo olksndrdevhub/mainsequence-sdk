@@ -44,11 +44,9 @@ def read_yaml(path):
 
     return read
 
-def write_yaml(path,dict_file):
+def write_yaml(path, dict_file):
     with open(path, 'w') as f:
-        data = yaml.dump(dict_file, f,default_flow_style=False,sort_keys=False)
-
-
+        data = yaml.dump(dict_file, f, default_flow_style=False,sort_keys=False)
 
 def write_key_to_yaml (key,key_dict,path):
     try:

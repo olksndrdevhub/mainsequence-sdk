@@ -1952,8 +1952,9 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def run_local_update(self, tdag_detached=True):
         self.local_persist_manager
         return self.get_df_between_dates()
-    def run(self,debug_mode:bool,*,update_tree:bool=True,force_update:bool=False,
-            update_only_tree:bool=False,remote_scheduler:Union[object,None]=None):
+
+    def run(self, debug_mode:bool, *, update_tree:bool=True, force_update:bool=False,
+            update_only_tree:bool=False, remote_scheduler:Union[object,None]=None):
         """
 
         Args:
@@ -1972,10 +1973,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
         from mainsequence.tdag_client import Scheduler
         import gc
-        if update_tree ==True:
+        if update_tree:
             update_only_tree = False
 
-        #set tracing
+        # set tracing
         tracer_instrumentator = TracerInstrumentator(
             configuration.configuration["instrumentation_config"]["grafana_agent_host"])
         tracer = tracer_instrumentator.build_tracer("tdag_head_distributed", __name__)
@@ -1994,13 +1995,13 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             scheduler.start_heart_beat()
         else:
             scheduler = remote_scheduler
-        error_to_raise=None
+
+        error_to_raise = None
         with tracer.start_as_current_span(f"Scheduler TS Head Update ") as span:
-
-
             span.set_attribute("time_serie_local_hash_id", self.local_hash_id)
             span.set_attribute("remote_table_hashed_name", self.remote_table_hashed_name)
             span.set_attribute("head_scheduler", scheduler.name)
+
             # 2 add actor manager for distributed
             distributed_actor_manager = RayUpdateManager(scheduler_uid=scheduler.uid,
                                                          skip_health_check=True
@@ -2017,30 +2018,34 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                  logger=self.logger,
                                                  state_data=state_data, debug=debug_mode,
                                                  )
-                self.update_tracker=update_tracker
+                self.update_tracker = update_tracker
                 if force_update == False:
                     wait_for_update_time(local_hash_id=self.local_hash_id,
                                                           data_source_id=self.data_source.id,
                                                           logger=self.logger,
                                                           force_next_start_of_minute=False)
-                error_on_update = self.update(debug_mode=debug_mode, raise_exceptions=True, force_update=force_update,
-                                                 update_tree=update_tree, update_only_tree=update_only_tree,
-                                                 metadatas=local_metadatas, update_tracker=self.update_tracker,
+                error_on_update = self.update(debug_mode=debug_mode,
+                                              raise_exceptions=True,
+                                              force_update=force_update,
+                                              update_tree=update_tree,
+                                              update_only_tree=update_only_tree,
+                                              metadatas=local_metadatas,
+                                              update_tracker=self.update_tracker,
                                               use_state_for_update=True
-                                                 )
+                )
                 del self.update_tracker
                 gc.collect()
             except TimeoutError as te:
                 self.logger.error("TimeoutError Error on update")
-                error_to_raise= te
+                error_to_raise = te
             except DependencyUpdateError as de:
                 self.logger.error("DependecyError on update")
-                error_to_raise= de
+                error_to_raise = de
             except Exception as e:
                 self.logger.exception(e)
-                error_to_raise=e
+                error_to_raise = e
 
-        if remote_scheduler ==None:
+        if remote_scheduler == None:
             scheduler.stop_heart_beat()
         if error_to_raise != None:
             raise error_to_raise
@@ -2284,7 +2289,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         return local_metadatas, state_data
 
     @tracer.start_as_current_span("Verify time series tree update")
-    def _verify_tree_is_updated(self, metadatas:dict, debug_mode:bool,
+    def _verify_tree_is_updated(self, metadatas: dict, debug_mode:bool,
                                 use_state_for_update:bool=False
                                 ):
         """
@@ -2297,8 +2302,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         Returns:
 
         """
-
-
         # build tree
         if self.is_local_relation_tree_set == False:
             start_tree_relationship_update_time = time.time()
@@ -2308,7 +2311,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
         else:
             self.logger.info("Tree is not updated as is_local_relation_tree_set== True")
-        update_map={}
+
+        update_map = {}
         if use_state_for_update == True:
             update_map = self.get_update_map()
 
@@ -2321,11 +2325,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             if tmp_ts.shape[0] > 0:
                 self._execute_parallel_distributed_update(tmp_ts=tmp_ts,
                                                           metadatas=metadatas)
-
-
         else:
-
-
             updated_uids = []
             if self.dependencies_df.shape[0] > 0:
                 unique_priorities = self.dependencies_df["update_priority"].unique().tolist()
@@ -2337,7 +2337,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 all_start_data = self.update_tracker.set_start_of_execution_batch(local_time_series_list=local_time_series_list)
                 for prioriity in unique_priorities:
                     # get hierarchies ids
-
                     tmp_ts = self.dependencies_df[self.dependencies_df["update_priority"] == prioriity].sort_values(
                         "number_of_upstreams", ascending=False).copy()
 
@@ -2345,13 +2344,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                     tmp_ts = tmp_ts[~tmp_ts.index.isin(updated_uids)]
 
                     # update on the same process
+                    for row, ts_row in tmp_ts.iterrows():
 
-                    for row,ts_row in tmp_ts.iterrows():
-
-                        if   (ts_row["local_hash_id"],ts_row["data_source_id"]) in update_map.keys():
-                            ts=update_map[ (ts_row["local_hash_id"],ts_row["data_source_id"])]
+                        if (ts_row["local_hash_id"], ts_row["data_source_id"]) in update_map.keys():
+                            ts = update_map[(ts_row["local_hash_id"], ts_row["data_source_id"])]["ts"]
                         else:
-
                             try:
                                 pickle_path = self.get_pickle_path(ts_row["local_hash_id"],
                                                                    data_source_id=ts_row["data_source_id"])
@@ -2372,9 +2369,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                                        data_source_id=ts_row["data_source_id"]
                                                                        )
                             error_on_last_update = ts.update(debug_mode=debug_mode,
-                                                             raise_exceptions=True, update_tree=False,
+                                                             raise_exceptions=True,
+                                                             update_tree=False,
                                                              start_update_data=all_start_data[
-                                                                 (ts_row["local_hash_id"],ts_row["data_source_id"])],
+                                                                 (ts_row["local_hash_id"], ts_row["data_source_id"])],
                                                              update_tracker=self.update_tracker
                                                              )
 

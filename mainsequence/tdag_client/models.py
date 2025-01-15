@@ -1967,6 +1967,8 @@ class DynamicTableHelpers:
                                ):
 
         if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+            if metadata['sourcetableconfiguration'] is None:
+                return pd.DataFrame()
             df = TimeScaleInterface.direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
             start_date = start_date, great_or_equal = great_or_equal,
             less_or_equal = less_or_equal, end_date = end_date, columns = columns, asset_symbols=asset_symbols)
@@ -2029,12 +2031,9 @@ class DynamicTableHelpers:
         r = self.make_request(r_type="PATCH", url=url,payload=payload)
         if r.status_code != 200:
             raise Exception(f"{metadata['hash_id']} : {r.text}")
+
     def set_policy_for_descendants(self,hash_id,policy,pol_type,exclude_ids,extend_to_classes):
-
-        r=TimeSerieNode.set_policy_for_descendants(hash_id,policy,pol_type,exclude_ids,extend_to_classes)
-
-
-
+        r = TimeSerieNode.set_policy_for_descendants(hash_id,policy,pol_type,exclude_ids,extend_to_classes)
 
     def build_or_update_update_details(self, metadata, *args, **kwargs):
 
