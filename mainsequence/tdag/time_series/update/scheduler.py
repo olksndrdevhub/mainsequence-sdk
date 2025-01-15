@@ -499,7 +499,7 @@ class SchedulerUpdater:
 
         return task_hex_to_uid, wait_list
 
-    
+
 
     def start(self, debug=False, update_tree: Union[bool, dict] = True, break_after_one_update=False,
               raise_exception_on_error=False,
