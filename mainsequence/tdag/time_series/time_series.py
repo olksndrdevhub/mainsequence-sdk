@@ -1968,7 +1968,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         """
         from mainsequence.tdag.instrumentation import TracerInstrumentator
         from mainsequence.tdag.config import configuration
-        from mainsequence.tdag.time_series.update.utils import UpdateInterface
+        from mainsequence.tdag.time_series.update.utils import UpdateInterface, wait_for_update_time
         from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
         from mainsequence.tdag_client import Scheduler
         import gc
@@ -2019,7 +2019,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                  )
                 self.update_tracker=update_tracker
                 if force_update == False:
-                    SchedulerUpdater.wait_for_update_time(local_hash_id=self.local_hash_id,
+                    wait_for_update_time(local_hash_id=self.local_hash_id,
                                                           data_source_id=self.data_source.id,
                                                           logger=self.logger,
                                                           force_next_start_of_minute=False)
