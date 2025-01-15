@@ -12,4 +12,4 @@ try:
     POD_DEFAULT_DATA_SOURCE = DynamicTableDataSource.get_default_data_source_for_token()
 except Exception as e:
     POD_DEFAULT_DATA_SOURCE = None
-    logger.warning(f"Could not set default data source {e}")
+    logger.exception(f"Could not set default data source {e}")

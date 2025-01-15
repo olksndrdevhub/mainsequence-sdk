@@ -1174,8 +1174,8 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
 
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
-        data=r.json()
-        DataClass=cls.get_class(data["data_type"])
+        data = r.json()
+        DataClass = cls.get_class(data["data_type"])
 
         _default_data_source = DataClass(**r.json())
         return _default_data_source
