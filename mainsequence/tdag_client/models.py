@@ -1064,10 +1064,10 @@ class TimeSerieLocalUpdate(BaseObject):
             })
             try:
                 r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url,time_out=60*15)
-                response.raise_for_status()  # Raise if 4xx/5xx
+                r.raise_for_status()  # Raise if 4xx/5xx
                 logger.info(f"Chunk {i + 1}/{total_chunks} uploaded successfully.")
             except requests.exceptions.RequestException as e:
-                logger(f"Error uploading chunk {i + 1}/{total_chunks}: {e}")
+                logger.exception(f"Error uploading chunk {i + 1}/{total_chunks}: {e}")
                 # Optionally, you could retry or break here
                 raise e
             if r.status_code!=200:
