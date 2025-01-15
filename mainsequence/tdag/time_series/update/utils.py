@@ -6,8 +6,45 @@ import datetime
 import pytz
 import logging
 from mainsequence.tdag.logconf import get_tdag_logger
-
+import time
+import pandas as pd
 logger = get_tdag_logger()
+
+
+def wait_for_update_time(local_hash_id, data_source_id, logger, force_next_start_of_minute=False):
+    time_to_wait, next_update = get_time_to_wait_from_hash_id(local_hash_id=local_hash_id,
+                                                                               data_source_id=data_source_id)
+    if time_to_wait > 0 and force_next_start_of_minute == False:
+
+        logger.info(f"Scheduler Waiting for ts update time at {next_update} {time_to_wait}")
+        time.sleep(time_to_wait)
+    else:
+        time_to_wait = max(0, 60 - datetime.datetime.now(pytz.utc).second)
+        logger.info(f"Scheduler Waiting for ts update at start of minute")
+        time.sleep(time_to_wait)
+    if force_next_start_of_minute == True:
+        logger.info(f"Forcing Next Udpdate at start of minte")
+def get_node_time_to_wait(local_metadata):
+
+    next_update = local_metadata["localtimeserieupdatedetails"]["next_update"]
+    time_to_wait = 0.0
+    if next_update is not None:
+        time_to_wait = (pd.to_datetime(next_update) - datetime.datetime.now(pytz.utc)).total_seconds()
+        time_to_wait = max(0, time_to_wait)
+    return time_to_wait, next_update
+def get_time_to_wait_from_hash_id(local_hash_id: str,data_source_id:int):
+    from mainsequence.tdag_client import DynamicTableHelpers, TimeSerieLocalUpdate
+    dth = DynamicTableHelpers()
+    local_metadata = TimeSerieLocalUpdate.get(local_hash_id=local_hash_id,
+                                              data_source_id=data_source_id
+                                              )
+    time_to_wait, next_update = get_node_time_to_wait(local_metadata=local_metadata)
+
+    if next_update is None:
+        next_update = datetime.datetime(1985, 1, 1).replace(tzinfo=pytz.utc)
+    else:
+        next_update = dth.request_to_datetime(next_update)
+    return time_to_wait, next_update
 
 class UpdateInterface:
     """

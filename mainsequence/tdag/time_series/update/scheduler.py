@@ -6,10 +6,11 @@ import time
 from ray.util.client.common import ClientActorHandle
 
 from mainsequence.tdag_client import (Scheduler, TimeSerieLocalUpdate, SourceTableConfigurationDoesNotExist,
-                                      LocalTimeSerieNode
+                                      LocalTimeSerieNode, SchedulerDoesNotExist
                                       )
 from .update_methods import (get_or_pickle_ts_from_sessions, update_remote_from_hash_id,
                              update_remote_from_hash_id_local)
+from .utils import get_time_to_wait_from_hash_id
 from .ray_manager import RayUpdateManager
 from mainsequence.tdag.config import bcolors
 from typing import Union, List
@@ -169,105 +170,6 @@ def set_data_source(pod_source=None, tdag_detached=False, override_all: bool = F
 
 
 
-class LocalDataLakeScheduler:
-    @staticmethod
-    def setup_datalake(
-            datalake_end="2024-09-01 00:00:00",
-            datalake_name="Data Lake",
-            datalake_start="2022-08-01 00:00:00",
-            nodes_to_get_from_db="",
-            persist_logs_to_file=False,
-            use_s3_if_available=True,
-            specific_file_name="datalake_configuration.yaml",
-            output_dir=None
-    ):
-        """
-        Sets up the data lake configuration by creating a YAML file with the provided parameters.
-
-        Parameters:
-        - datalake_end (str): The end date of the data lake.
-        - datalake_name (str): The name of the data lake.
-        - datalake_start (str): The start date of the data lake.
-        - nodes_to_get_from_db (str): Nodes to retrieve from the database.
-        - persist_logs_to_file (bool): Whether to persist logs to a file.
-        - use_s3_if_available (bool): Whether to use S3 if available.
-        - specific_file_name (str): The name of the YAML configuration file.
-        - output_dir (str): The directory where the YAML file will be saved.
-
-        Returns:
-        - str: The path to the created YAML configuration file.
-        """
-        import tempfile
-
-        # Use the system's temporary directory if no output directory is specified
-        if output_dir is None:
-            output_dir = tempfile.gettempdir()
-
-        # Ensure the output directory exists
-        os.makedirs(output_dir, exist_ok=True)
-
-        # YAML content for the data lake configuration
-        import textwrap
-        yaml_content = textwrap.dedent(f"""\
-               datalake_end: {datalake_end}
-               datalake_name: {datalake_name}
-               datalake_start: {datalake_start}
-               nodes_to_get_from_db: {nodes_to_get_from_db}
-               persist_logs_to_file: {str(persist_logs_to_file).lower()}
-               use_s3_if_available: {str(use_s3_if_available).lower()}
-           """)
-
-        # Full path to the YAML configuration file
-        yaml_file_path = os.path.join(output_dir, specific_file_name)
-
-        # Write the YAML content to the file
-        with open(yaml_file_path, 'w') as yaml_file:
-            yaml_file.write(yaml_content)
-
-        print(f"YAML configuration file created at: {yaml_file_path}")
-
-        return yaml_file_path
-
-    @staticmethod
-    def local_datalake_run(
-            head_ts: TimeSerie,
-            nodes_to_get_from_db=Union[List[str], None],
-    ) -> pd.DataFrame:
-        """
-                Execute a full data tree run to retrieve the portfolio data with specified end node hashes. Utilized the
-                local data lake, which greatly increases the speed due to not storing the node results in TSORM.
-
-                Args:
-
-                Returns:
-                    A DataFrame containing the portfolio weights calculated up to the specified end nodes.
-                """
-        self.logger = create_logger_in_path(logger_name="scheduler_data_lake" + head_ts.local_hash_id,
-                                            logger_file=f"{logging_folder}/schedulers/{head_ts.local_hash_id}.log",
-                                            scheduler_name=scheduler.name
-
-                                            )
-        if nodes_to_get_from_db is None:
-            logger.debug("Automatically inferring datalake nodes")
-            head_ts.set_dependencies_df()
-            nodes_to_get_from_db = find_ts_recursively(head_ts,
-                                                       nodes_to_get_from_db)
-            nodes_to_get_from_db = list(set([ts.local_hash_id for ts in nodes_to_get_from_db]))
-        if not nodes_to_get_from_db:  # Handle the case where no nodes are found
-            logger.warning(f" No Ts find with {nodes_to_get_from_db} data lake cant start  with empty origin node")
-            return pd.DataFrame()
-
-        self.logger.debug(f"TS data will be stored in data lake for: {nodes_to_get_from_db}")
-        # TODO
-        # for all nodes in ts, check if new data in remote tables is needed and update it before
-        start_time = time.time()
-        logger.debug("Start data run")
-        df = head_ts.get_df_between_dates(start_date=None)
-        minutes, seconds = divmod(elapsed_time, 60)
-        self.logger.info(f"Run finished full data run in {int(minutes)} minutes and {seconds:.2f} seconds.")
-        return df
-
-
 class SchedulerUpdater:
     ACTOR_WAIT_LIMIT = 80  # seconds to wait before sending task to get scheduled
 
@@ -289,10 +191,11 @@ class SchedulerUpdater:
 
                                                           )
 
-        logger.info(f"Scheduler ID {new_scheduler.name}")
+
         try:
 
             updater = cls(scheduler=new_scheduler)
+            updater.logger.info(f"Scheduler ID {new_scheduler.name}")
             updater.start(debug=debug, update_tree=update_tree, break_after_one_update=break_after_one_update,
                           run_head_in_main_process=run_head_in_main_process,
                           raise_exception_on_error=raise_exception_on_error,
@@ -329,45 +232,11 @@ class SchedulerUpdater:
 
                                             )
 
-    @staticmethod
-    def get_time_to_wait_from_hash_id(local_hash_id: str,data_source_id:int):
-        from mainsequence.tdag_client import DynamicTableHelpers
-        dth = DynamicTableHelpers()
-        local_metadata = TimeSerieLocalUpdate.get(local_hash_id=local_hash_id,
-                                                  data_source_id=data_source_id
-                                                  )
-        time_to_wait, next_update = SchedulerUpdater._get_node_time_to_wait(local_metadata=local_metadata)
 
-        if next_update is None:
-            next_update = datetime.datetime(1985, 1, 1).replace(tzinfo=pytz.utc)
-        else:
-            next_update = dth.request_to_datetime(next_update)
-        return time_to_wait, next_update
 
-    @staticmethod
-    def _get_node_time_to_wait(local_metadata):
 
-        next_update = local_metadata["localtimeserieupdatedetails"]["next_update"]
-        time_to_wait = 0.0
-        if next_update is not None:
-            time_to_wait = (pd.to_datetime(next_update) - datetime.datetime.now(pytz.utc)).total_seconds()
-            time_to_wait = max(0, time_to_wait)
-        return time_to_wait, next_update
 
-    @staticmethod
-    def wait_for_update_time(local_hash_id, data_source_id, logger, force_next_start_of_minute=False):
 
-        time_to_wait, next_update = SchedulerUpdater.get_time_to_wait_from_hash_id(local_hash_id=local_hash_id, data_source_id=data_source_id)
-        if time_to_wait > 0 and force_next_start_of_minute == False:
-
-            logger.info(f"Scheduler Waiting for ts update time at {next_update} {time_to_wait}")
-            time.sleep(time_to_wait)
-        else:
-            time_to_wait = max(0, 60 - datetime.datetime.now(pytz.utc).second)
-            logger.info(f"Scheduler Waiting for ts update at start of minute")
-            time.sleep(time_to_wait)
-        if force_next_start_of_minute == True:
-            logger.info(f"Forcing Next Udpdate at start of minte")
 
     def _clear_idle_scheduled_tree(self, *args, **kwargs):
         pass
@@ -547,7 +416,7 @@ class SchedulerUpdater:
                                                   )
             if first_launch == True and running_distributed_heads == True:
                 time.sleep(30)
-            _, nu = SchedulerUpdater.get_time_to_wait_from_hash_id(local_hash_id=head_ts.hash_id,data_source_id=head_ts.data_source_id)
+            _, nu = get_time_to_wait_from_hash_id(local_hash_id=head_ts.hash_id,data_source_id=head_ts.data_source_id)
             wait_list[uid] = {"next_update": nu,
                                   "remote_table_hashed_name": local_to_remote[uid]["updates_to"].hash_id,
                                   "data_source_id": local_to_remote[uid]["updates_to"].data_source_id,
@@ -572,7 +441,7 @@ class SchedulerUpdater:
         error_in_request = True
         while error_in_request == True:
             try:
-                _, next_update = SchedulerUpdater.get_time_to_wait_from_hash_id(
+                _, next_update = get_time_to_wait_from_hash_id(
                     local_hash_id=local_hash_id,data_source_id=data_source_id)
                 error_in_request = False
             except Exception as e:
@@ -631,19 +500,6 @@ class SchedulerUpdater:
         return task_hex_to_uid, wait_list
 
     
-
-    def _scheduler_heart_beat_patch(self):
-        from mainsequence.tdag_client.utils import get_network_ip
-        try:
-            scheduler=self.node_scheduler.patch(is_running=True,
-                                      running_process_pid=os.getpid(),
-                                      running_in_debug_mode=self._debug_mode,
-                                      last_heart_beat=datetime.datetime.utcnow().replace(tzinfo=pytz.utc).timestamp(),
-                                      )
-            self.node_scheduler = scheduler
-        except Exception as e:
-            logger.error(e)
-
 
     def start(self, debug=False, update_tree: Union[bool, dict] = True, break_after_one_update=False,
               raise_exception_on_error=False,
