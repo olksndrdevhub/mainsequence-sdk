@@ -1952,8 +1952,9 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def run_local_update(self, tdag_detached=True):
         self.local_persist_manager
         return self.get_df_between_dates()
-    def run(self,debug_mode:bool,*,update_tree:bool=True,force_update:bool=False,
-            update_only_tree:bool=False,remote_scheduler:Union[object,None]=None):
+
+    def run(self, debug_mode:bool, *, update_tree:bool=True, force_update:bool=False,
+            update_only_tree:bool=False, remote_scheduler:Union[object,None]=None):
         """
 
         Args:
@@ -1972,10 +1973,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
         from mainsequence.tdag_client import Scheduler
         import gc
-        if update_tree ==True:
+        if update_tree:
             update_only_tree = False
 
-        #set tracing
+        # set tracing
         tracer_instrumentator = TracerInstrumentator(
             configuration.configuration["instrumentation_config"]["grafana_agent_host"])
         tracer = tracer_instrumentator.build_tracer("tdag_head_distributed", __name__)
@@ -1994,13 +1995,13 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             scheduler.start_heart_beat()
         else:
             scheduler = remote_scheduler
-        error_to_raise=None
+
+        error_to_raise = None
         with tracer.start_as_current_span(f"Scheduler TS Head Update ") as span:
-
-
             span.set_attribute("time_serie_local_hash_id", self.local_hash_id)
             span.set_attribute("remote_table_hashed_name", self.remote_table_hashed_name)
             span.set_attribute("head_scheduler", scheduler.name)
+
             # 2 add actor manager for distributed
             distributed_actor_manager = RayUpdateManager(scheduler_uid=scheduler.uid,
                                                          skip_health_check=True
@@ -2017,30 +2018,34 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                  logger=self.logger,
                                                  state_data=state_data, debug=debug_mode,
                                                  )
-                self.update_tracker=update_tracker
+                self.update_tracker = update_tracker
                 if force_update == False:
                     wait_for_update_time(local_hash_id=self.local_hash_id,
                                                           data_source_id=self.data_source.id,
                                                           logger=self.logger,
                                                           force_next_start_of_minute=False)
-                error_on_update = self.update(debug_mode=debug_mode, raise_exceptions=True, force_update=force_update,
-                                                 update_tree=update_tree, update_only_tree=update_only_tree,
-                                                 metadatas=local_metadatas, update_tracker=self.update_tracker,
+                error_on_update = self.update(debug_mode=debug_mode,
+                                              raise_exceptions=True,
+                                              force_update=force_update,
+                                              update_tree=update_tree,
+                                              update_only_tree=update_only_tree,
+                                              metadatas=local_metadatas,
+                                              update_tracker=self.update_tracker,
                                               use_state_for_update=True
-                                                 )
+                )
                 del self.update_tracker
                 gc.collect()
             except TimeoutError as te:
                 self.logger.error("TimeoutError Error on update")
-                error_to_raise= te
+                error_to_raise = te
             except DependencyUpdateError as de:
                 self.logger.error("DependecyError on update")
-                error_to_raise= de
+                error_to_raise = de
             except Exception as e:
                 self.logger.exception(e)
-                error_to_raise=e
+                error_to_raise = e
 
-        if remote_scheduler ==None:
+        if remote_scheduler == None:
             scheduler.stop_heart_beat()
         if error_to_raise != None:
             raise error_to_raise
