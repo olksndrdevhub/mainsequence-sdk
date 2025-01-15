@@ -1064,7 +1064,7 @@ class TimeSerieLocalUpdate(BaseObject):
             })
             try:
                 r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url,time_out=60*15)
-                response.raise_for_status()  # Raise if 4xx/5xx
+                r.raise_for_status()  # Raise if 4xx/5xx
                 logger.info(f"Chunk {i + 1}/{total_chunks} uploaded successfully.")
             except requests.exceptions.RequestException as e:
                 logger.exception(f"Error uploading chunk {i + 1}/{total_chunks}: {e}")
@@ -1924,7 +1924,7 @@ class DynamicTableHelpers:
 
                           )  is not None else (metadata, data))
 
-        duplicates_exist = serialized_data_frame.duplicated(subset=index_names).any()
+        duplicates_exist = data.duplicated(subset=index_names).any()
         assert not duplicates_exist, f"Duplicates found in columns: {index_names}"
         local_metadata = self._insert_data_into_table(serialized_data_frame=data, metadata=metadata,
                                                    local_metadata=local_metadata,
