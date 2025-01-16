@@ -41,7 +41,6 @@ def update_remote_from_hash_id_local(
     Returns:
 
     """
-    from mainsequence.tdag.time_series.update.update_methods import rebuild_with_session
     from mainsequence.tdag.instrumentation import SpanKind, TraceContextTextMapPropagator, TracerInstrumentator
     import psutil
     import gc

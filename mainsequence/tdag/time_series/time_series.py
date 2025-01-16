@@ -801,8 +801,18 @@ class TimeSerieRebuildMethods(ABC):
 
     @classmethod
     def rebuild_and_set_from_local_hash_id(cls,local_hash_id,data_source_id,set_dependencies_df:bool=False,
-                                           graph_depth_limit=1
+                                           graph_depth_limit=1,
                                            ):
+        """
+
+        :param local_hash_id:
+        :param data_source_id:
+        :param set_dependencies_df:
+        :param graph_depth_limit:
+        :param local_metadatas:
+        :return:
+        """
+        local_metadatas = None
         pickle_path = ogm.get_ts_pickle_path(local_hash_id=local_hash_id)
         if os.path.isfile(pickle_path) == False or os.stat(pickle_path).st_size == 0:
             # rebuild time serie and pickle
@@ -813,8 +823,12 @@ class TimeSerieRebuildMethods(ABC):
                 ts.set_relation_tree()
 
             ts.logger.info(f"ts {local_hash_id} pickled ")
+
+
+
         ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path,
-                                                graph_depth_limit=graph_depth_limit
+                                                graph_depth_limit=graph_depth_limit,
+                                                local_metadatas=local_metadatas
                                                 )
         return ts, pickle_path
 
@@ -823,12 +837,14 @@ class TimeSerieRebuildMethods(ABC):
         self.set_data_source(data_source=data_source)
 
     @classmethod
-    def load_and_set_from_pickle(cls, pickle_path, graph_depth_limit=1, ):
+    def load_and_set_from_pickle(cls, pickle_path, graph_depth_limit=1,
+                                 local_metadatas:Union[dict,None]=None
+                                 ):
         ts = cls.load_from_pickle(pickle_path)
         ts.set_state_with_sessions(
             graph_depth=0,
             graph_depth_limit=graph_depth_limit,
-            include_vam_client_objects=False)
+            include_vam_client_objects=False,local_metadatas=local_metadatas)
         return ts
 
 

@@ -8,8 +8,7 @@ from ray.util.client.common import ClientActorHandle
 from mainsequence.tdag_client import (Scheduler, TimeSerieLocalUpdate, SourceTableConfigurationDoesNotExist,
                                       LocalTimeSerieNode, SchedulerDoesNotExist
                                       )
-from .update_methods import (get_or_pickle_ts_from_sessions,
-                             )
+
 from .utils import get_time_to_wait_from_hash_id
 from .ray_manager import RayUpdateManager
 from mainsequence.tdag.config import bcolors
@@ -76,31 +75,8 @@ class TimeSerieHeadUpdateActor:
                                                       data_source=data_source_id,
                                                       )
         else:
-            _ = get_or_pickle_ts_from_sessions(local_hash_id=local_hash_id,
-                                               remote_table_hashed_name=remote_table_hashed_name,
-                                               set_dependencies_df=True,
-                                               data_source_id=data_source_id,
-                                               )
-            pickle_path = TimeSerie.get_pickle_path(local_hash_id, data_source_id)
-            if os.path.isfile(pickle_path) == True:
-                ts = TimeSerie.load_from_pickle(pickle_path=pickle_path)
-            else:
-                ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
-                                                          remote_table_hashed_name=remote_table_hashed_name,
-                                                          data_source=data_source_id,
-                                                          )
-
-            local_metadatas, state_data = ts.pre_update_setting_routines(scheduler=scheduler,
-                                                                         set_time_serie_queue_status=False,
-                                                                         update_tree=self.update_tree)
-
-            ts.set_state_with_sessions(
-                graph_depth=0,
-                graph_depth_limit=0,
-                include_vam_client_objects=False,
-                local_metadatas=local_metadatas
-            )
-            ts.logger.info("state set with dependencies metadatas")
+            ts, pickle_path=rebuild_and_set_from_local_hash_id(local_hash_id=local_hash_id,data_source_id=data_source_id,
+                                                               graph_depth_limit=0)
 
         ts.set_actor_manager(actor_manager=distributed_actor_manager)
 
