@@ -23,7 +23,7 @@ from mainsequence.tdag.config import (
 )
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager, DataLakePersistManager
-from mainsequence.tdag_client.models import none_if_backend_detached, DataSource
+from mainsequence.tdag_client.models import none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate
 from numpy.f2py.auxfuncs import isint1
 
 from pycares.errno import value
@@ -40,7 +40,6 @@ from mainsequence.tdag_client import TimeSerieLocalUpdate, LocalTimeSerieUpdateD
 from enum import Enum
 from functools import wraps
 from mainsequence.tdag.config import bcolors
-from mainsequence.tdag.time_series.update.models import StartUpdateDataInfo
 from mainsequence.tdag.logconf import get_tdag_logger
 
 logger = get_tdag_logger()
@@ -1084,7 +1083,7 @@ class TimeSerieRebuildMethods(ABC):
 
     @tracer.start_as_current_span("TS: Update")
     def update(self, update_tracker: object, debug_mode: bool,
-               raise_exceptions=True, update_tree=False, start_update_data: Union[StartUpdateDataInfo, None] = None,
+               raise_exceptions=True, update_tree=False,
                metadatas: Union[dict, None] = None, update_only_tree=False, force_update=False,use_state_for_update=False
                ):
         """
@@ -1098,11 +1097,12 @@ class TimeSerieRebuildMethods(ABC):
         :return:
         """
 
-        if start_update_data is None:
-            start_update_data = update_tracker.set_start_of_execution(local_hash_id=self.local_hash_id,
-                                                                      data_source_id=self.data_source.id)
 
-        latest_value, must_update = start_update_data.last_time_index_value, start_update_data.must_update
+        local_time_serie_historical_update = update_tracker.set_start_of_execution(local_hash_id=self.local_hash_id,
+                                                                  local_time_serie_id=self.local_metadata["id"],
+                                                                  data_source_id=self.data_source.id)
+
+        latest_value, must_update = local_time_serie_historical_update.last_time_index_value, local_time_serie_historical_update.must_update
 
         error_on_last_update = False
 
@@ -1124,7 +1124,7 @@ class TimeSerieRebuildMethods(ABC):
                                   use_state_for_update=use_state_for_update,
                                   )
 
-                update_tracker.set_end_of_execution(local_hash_id=self.local_hash_id,data_source_id=self.data_source.id,
+                update_tracker.set_end_of_execution(local_time_serie_id=self.local_metadata["id"],
                                                     error_on_update=error_on_last_update)
 
             except Exception as e:
@@ -1134,7 +1134,7 @@ class TimeSerieRebuildMethods(ABC):
 
                 logging.shutdown()
                 if raise_exceptions is True:
-                    update_tracker.set_end_of_execution(local_hash_id=self.local_hash_id,data_source_id=self.data_source.id,
+                    update_tracker.set_end_of_execution(local_time_serie_id=self.local_metadata["id"],
                                                         error_on_update=error_on_last_update)
 
 
@@ -1145,7 +1145,7 @@ class TimeSerieRebuildMethods(ABC):
         else:
 
             self.logger.info("Already updated, waiting until next update time")
-            update_tracker.set_end_of_execution(local_hash_id=self.local_hash_id,data_source_id=self.data_source.id,
+            update_tracker.set_end_of_execution(local_time_serie_id=self.local_metadata["id"],
                                                 error_on_update=error_on_last_update)
         self._run_post_update_routines(error_on_last_update=error_on_last_update)
         # close all logging handlers
@@ -2034,6 +2034,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 update_tracker = UpdateInterface(head_hash=self.local_hash_id, trace_id=None,
                                                  logger=self.logger,
                                                  state_data=state_data, debug=debug_mode,
+                                                 scheduler_uid=scheduler.uid
                                                  )
                 self.update_tracker = update_tracker
                 if force_update == False:
@@ -2353,7 +2354,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 local_time_series_list = self.dependencies_df[
                     self.dependencies_df["source_class_name"] != "WrapperTimeSerie"
                     ][["local_hash_id", "data_source_id"]].values.tolist()
-                all_start_data = self.update_tracker.set_start_of_execution_batch(local_time_series_list=local_time_series_list)
                 for prioriity in unique_priorities:
                     # get hierarchies ids
                     tmp_ts = self.dependencies_df[self.dependencies_df["update_priority"] == prioriity].sort_values(
@@ -2385,8 +2385,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                             error_on_last_update = ts.update(debug_mode=debug_mode,
                                                              raise_exceptions=True,
                                                              update_tree=False,
-                                                             start_update_data=all_start_data[
-                                                                 (ts_row["local_hash_id"], ts_row["data_source_id"])],
                                                              update_tracker=self.update_tracker
                                                              )
 
@@ -2406,37 +2404,33 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                              metadatas: Union[dict, None],
                                              ):
 
+
+
         telemetry_carrier = tracer_instrumentator.get_telemetry_carrier()
 
         pre_loaded_ts = [t.hash_id for t in self.scheduler.pre_loads_in_tree]
-        tmp_ts = tmp_ts.sort_values(["update_priority", "number_of_upstreams"], ascending=[False, False])
+        tmp_ts = tmp_ts.sort_values(["update_priority", "number_of_upstreams"], ascending=[True, False])
         pre_load_df = tmp_ts[tmp_ts["local_hash_id"].isin(pre_loaded_ts)].copy()
         tmp_ts = tmp_ts[~tmp_ts["local_hash_id"].isin(pre_loaded_ts)].copy()
         tmp_ts = pd.concat([pre_load_df, tmp_ts], axis=0)
 
-        start_update_date = datetime.datetime.now(pytz.utc)
 
         futures_ = []
 
         local_time_series_list = self.dependencies_df[
             self.dependencies_df["source_class_name"] != "WrapperTimeSerie"
             ][["local_hash_id", "data_source_id"]].values.tolist()
-        all_start_data = self.update_tracker.set_start_of_execution_batch(local_time_series_list=local_time_series_list)
 
         for counter, (uid, data) in enumerate(tmp_ts.iterrows()):
 
             local_hash_id = data['local_hash_id']
             data_source_id = data['data_source_id']
-            start_update_data = all_start_data[(local_hash_id, data_source_id)]
-            if start_update_data.must_update == False:
-                continue
-            kwargs_update = dict(local_hash_id=local_hash_id,
-                                 execution_start=start_update_date,
-                                 telemetry_carrier=telemetry_carrier,
-                                 local_metadatas=metadatas,
-                                 start_update_data=start_update_data,
-                                 data_source_id=data_source_id
 
+
+            kwargs_update = dict(local_hash_id=local_hash_id,
+                                 telemetry_carrier=telemetry_carrier,
+                                 data_source_id=data_source_id,
+                                scheduler_uid=self.scheduler.uid
                                  )
 
             update_details = self.update_details_tree[(local_hash_id, data_source_id)]

@@ -1,13 +1,14 @@
 import socket
 from typing import Union
-from mainsequence.tdag.time_series.update.models import StartUpdateDataInfo
-from mainsequence.tdag_client import DynamicTableHelpers
+from mainsequence.tdag_client import DynamicTableHelpers,TimeSerieLocalUpdate
 import datetime
 import pytz
 import logging
 from mainsequence.tdag.logconf import get_tdag_logger
 import time
 import pandas as pd
+from mainsequence.tdag_client.models import LocalTimeSeriesHistoricalUpdate
+
 logger = get_tdag_logger()
 
 
@@ -52,7 +53,7 @@ class UpdateInterface:
     """
 
     def __init__(self, trace_id: Union[str, None], head_hash: Union[str, None],
-                 logger: logging.Logger,
+                 logger: logging.Logger,scheduler_uid:str,
                  state_data: Union[str, None], debug=False):
         self.debug = debug
         self.trace_id = trace_id
@@ -64,7 +65,10 @@ class UpdateInterface:
 
 
         self.state_data = state_data
+        self.scheduler_uid=scheduler_uid
         self.dth = DynamicTableHelpers()
+
+        self.last_historical_update={}
 
     def _patch_update(self, hash_id,data_source_id:int, update_kwargs: dict):
         update_kwargs["hash_id"] = hash_id
@@ -118,81 +122,41 @@ class UpdateInterface:
 
 
 
-    def _build_new_update_for_hash_id(self, local_hash_id: str,data_source_id:int):
+    def _build_new_update_for_time_serie(self, local_hash_id: str,data_source_id:int,local_time_serie_id:int):
         try:
-            new_update = dict(update_time_start=datetime.datetime.now(pytz.utc),
-                              update_time_end=None,
-                              update_completed=False,
-                              error_on_update=False,
-                              last_time_index_value=self.state_data[(local_hash_id,data_source_id)]['last_time_index_value'],
-                              data_source_id=data_source_id,
+            new_update = dict(
+                              active_update_scheduler_uid=self.scheduler_uid,
                               )
+
+            update_datails=TimeSerieLocalUpdate.set_start_of_execution(local_time_serie_id=local_time_serie_id,**new_update)
+
+            self.last_historical_update[local_time_serie_id] = update_datails
         except Exception as e:
             raise e
-        return new_update
-
-    def set_start_of_execution_batch(self, local_time_series_list: list)->list[StartUpdateDataInfo]:
-        new_starts, all_starts = {}, {}
-
-        for lts in local_time_series_list:
-            all_starts[(lts[0], lts[1])] = self._build_new_update_for_hash_id(local_hash_id=lts[0], data_source_id=lts[1])
-        in_update_queue = self.get_ts_in_update_queue(hash_id_list=local_time_series_list)
-        to_place_in_queue = []
-        for lts, start_data in all_starts.items():
-            must_update = self._assert_next_update(local_hash_id=lts[0],data_source_id=lts[1])
-            if lts in in_update_queue:
-                # do not update TS that are in queue already () updated by other task
-                must_update = False
-
-            start_data["must_update"] = must_update
-            start_data["direct_dependencies_ids"] = self.state_data[lts]["direct_dependencies_ids"]
-            new_starts[lts] = StartUpdateDataInfo(**start_data)
-
-
-            if must_update == False:
-                start_data['update_completed'] = True
-                self.set_end_of_execution(local_hash_id=lts[0],data_source_id=lts[1], error_on_update=False)
-            else:
-                to_place_in_queue.append(lts)
+        return update_datails
 
 
 
-        self.updating_in_tree = list(set([(c[0],c[1]) for c in local_time_series_list]) - set([(c[0],c[1]) for c in in_update_queue]))
+    def set_start_of_execution(self, local_hash_id: str,data_source_id:id,
+                               local_time_serie_id:int
+                               )->LocalTimeSeriesHistoricalUpdate:
 
-        return new_starts
-
-    def set_start_of_execution(self, local_hash_id: str,data_source_id:id)->StartUpdateDataInfo:
-
-        start_update_data = self._build_new_update_for_hash_id(local_hash_id=local_hash_id,data_source_id=data_source_id)
-
-
-        must_update = self._assert_next_update(local_hash_id=local_hash_id,data_source_id=data_source_id)
-        start_update_data["must_update"] = must_update
-        start_update_data["direct_dependencies_ids"] = self.state_data[(local_hash_id,data_source_id)]["direct_dependencies_ids"]
+        historical_update = self._build_new_update_for_time_serie(local_hash_id=local_hash_id,
+                                                                  local_time_serie_id=local_time_serie_id,
+                                                                  data_source_id=data_source_id)
 
 
-        self._patch_update(hash_id=local_hash_id,
-                           data_source_id=data_source_id,
-                           update_kwargs=dict(active_update_status="U"))
-
-        return StartUpdateDataInfo(**start_update_data)
-
-    def set_end_of_execution(self, local_hash_id: str,
-                             data_source_id:int,
-                             error_on_update=False, error_message=""):
-
-        if error_on_update == True:
-            self.logger.error(f" UPDATE TRACKER ERROR IN: Setting end of execution {local_hash_id}  {error_message}")
 
 
-        active_update_status = "S" if error_on_update == False else "E"
-        self._patch_update(hash_id=local_hash_id,
-                           data_source_id=data_source_id,
-                           update_kwargs=dict(active_update_status=active_update_status,
-                                                               active_update=False,
-                                                               error_on_last_update=error_on_update,
-                                                               update_time_end=datetime.datetime.now(pytz.utc)
-                                                               ))
+        return historical_update
+
+    def set_end_of_execution(self, local_time_serie_id: str,
+                             error_on_update=False,):
+
+        TimeSerieLocalUpdate.set_end_of_execution(local_time_serie_id=local_time_serie_id,
+                                                  historical_update_id=self.last_historical_update[local_time_serie_id].id,
+                                                  error_on_update=error_on_update)
+
 
 
 

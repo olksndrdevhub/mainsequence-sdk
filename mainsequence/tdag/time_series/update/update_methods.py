@@ -8,22 +8,21 @@ from mainsequence.tdag.config import bcolors, configuration
 from typing import Union
 from mainsequence.tdag.instrumentation import tracer
 import ray
-from mainsequence.tdag_client import CONSTANTS
+from mainsequence.tdag_client import CONSTANTS,TimeSerieLocalUpdate
 
 from mainsequence.tdag.time_series import TimeSerie
-from .models import StartUpdateDataInfo
 from concurrent.futures import ThreadPoolExecutor
 from mainsequence.tdag.logconf import get_tdag_logger
+from mainsequence.tdag_client.models import LocalTimeSeriesHistoricalUpdate
 
 logger = get_tdag_logger()
 
 
 
 def update_remote_from_hash_id_local(
-                               execution_start: datetime.datetime, telemetry_carrier: str,
-                               start_update_data: dict,
+                         telemetry_carrier: str,
+scheduler_uid:str,
                                local_hash_id: str,data_source_id:int,
-                               local_metadatas: Union[dict, None],
 
                                ):
     """
@@ -61,12 +60,9 @@ def update_remote_from_hash_id_local(
         ts.logger.info(f'{ts.local_hash_id} {data_source_id} loaded and ready to update')
 
         try:
-            assert execution_start is not None
-            ts_updater = TimeSerieUpdater(time_serie=ts, update_tree=False,
-                                  execution_start=execution_start,
-                                  start_update_data=start_update_data
-                                  )
-            ts_updater.do_step_update()
+
+            ts_updater = TimeSerieUpdater(time_serie=ts, update_tree=False   )
+            ts_updater.do_step_update(scheduler_uid)
         except Exception as e:
             ts.logger.exception(f'{e} ')
         
@@ -94,14 +90,12 @@ def update_remote_from_hash_id(*args,**kwargs  ):
 class TimeSerieUpdater:
 
 
-    def __init__(self,time_serie: TimeSerie, start_update_data: StartUpdateDataInfo, update_tree: bool,
-                 execution_start: datetime.datetime, ):
+    def __init__(self,time_serie: TimeSerie,  update_tree: bool,
+               ):
         self.time_serie=time_serie
-        self.start_update_data=start_update_data
         self.update_tree=update_tree
-        self.execution_start=execution_start
 
-    def check_if_dependencies_are_updated(self,time_out_of_request:int):
+    def _check_if_dependencies_are_updated(self):
         """
 
         Args:
@@ -110,17 +104,16 @@ class TimeSerieUpdater:
         Returns:dependencies_updates,raise_error_from_childs
 
         """
-        if len(self.start_update_data.direct_dependencies_ids) == 0:
-            return True,False
+
+
         # Filter and use timeout
-        dependencies_update_details = LocalTimeSerieUpdate.verify_if_direct_dependencies_are_updated(
-            id=time_serie.local_metadata["id"],time_out=time_out_of_request,
-        )
+        dependencies_update_details = TimeSerieLocalUpdate.verify_if_direct_dependencies_are_updated(
+            id=self.time_serie.local_metadata["id"]        )
 
 
         return dependencies_update_details["updated"], dependencies_update_details["error_on_update_dependencies"]
 
-    def do_step_update(self)->bool:
+    def do_step_update(self,scheduler_uid)->bool:
 
         from mainsequence.tdag import configuration
         from .utils import UpdateInterface
@@ -132,10 +125,10 @@ class TimeSerieUpdater:
         execution_timeout_seconds = self.time_serie.run_configuration['execution_time_out_seconds']
 
         time_out_of_request=min(execution_timeout_seconds,60*5)
-        are_dependencies_updated,error_on_dependencies=self.check_if_dependencies_are_updated(time_out_of_request)
+        are_dependencies_updated,error_on_dependencies=self._check_if_dependencies_are_updated()
 
 
-        update_tracker = UpdateInterface(head_hash=None, trace_id=None,
+        update_tracker = UpdateInterface(head_hash=None, trace_id=None,scheduler_uid=scheduler_uid,
                                          logger=self.time_serie.logger,
                                          state_data=None, debug=False)
 
@@ -145,20 +138,20 @@ class TimeSerieUpdater:
             while are_dependencies_updated == False:
                 # verify_scheduler is not stale
 
-                time.sleep(.1)
+                time.sleep(.25)
 
             
                 passed_seconds = (datetime.datetime.utcnow().replace(tzinfo=pytz.utc) - self.execution_start).total_seconds()
                 if  self.time_serie.source_table_configuration is None or ignore_timeout == True:
-                    execution_timeout_seconds = passed_seconds + 10
+                    execution_timeout_seconds =60*60*5 #max 5 hours running
                 if passed_seconds > execution_timeout_seconds:
                     next_rebalances =  self.time_serie.next_rebalances if hasattr( self.time_serie, "next_rebalances") else None
                     error_message = f"{bcolors.OKCYAN}Head time Serie timeout exceeded {execution_timeout_seconds} pending: {next_rebalances}{bcolors.ENDC}"
                     self.time_serie.logger.error(error_message)
 
-                    update_tracker.set_end_of_execution(local_hash_id= self.time_serie.hashed_name, error_on_update=True,
-                                                        data_source_id=self.time_serie.data_source.id,
-                                                        error_message=error_message
+                    update_tracker.set_end_of_execution(error_on_update=True,
+                                                        local_time_serie_id= self.time_serie.local_metadata["id"],
+
                                                         )
                     logging.shutdown()
                     self.should_stop = True
@@ -166,9 +159,9 @@ class TimeSerieUpdater:
                 if error_on_dependencies == True:  # or active_updates==0:
                     error_message = f"{bcolors.OKCYAN}Error on Dependencies Update not started{bcolors.ENDC}"
                     self.time_serie.logger.error(error_message)
-                    update_tracker.set_end_of_execution(local_hash_id= self.time_serie.hashed_name, error_on_update=True,
-                                                        data_source_id=self.time_serie.data_source.id,
-                                                        error_message=error_message
+                    update_tracker.set_end_of_execution(error_on_update=True,
+                                                        local_time_serie_id=self.time_serie.local_metadata["id"],
+
                                                         )
                     logging.shutdown()
                     self.should_stop = True
@@ -176,9 +169,8 @@ class TimeSerieUpdater:
                 are_dependencies_updates, error_on_dependencies = self._check_if_dependencies_are_updated()
 
         self.time_serie.update( raise_exceptions=True, update_tree=self.update_tree,
-                          start_update_data=self.start_update_data, update_tracker=update_tracker,
+                             update_tracker=update_tracker,
                                 debug_mode=False
-
                           )
         self.should_stop = True
 

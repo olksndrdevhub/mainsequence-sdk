@@ -702,6 +702,23 @@ def get_chunk_stats(chunk_df,time_index_name,index_names):
         }
     return chunk_stats,grouped_dates
 
+class LocalTimeSeriesHistoricalUpdate(BaseTdagPydanticModel, BaseObject):
+    id: Optional[int]=None
+    related_table: int  # Assuming you're using the ID of the related table
+    update_time_start: datetime.datetime
+    update_time_end: Optional[datetime.datetime] = None
+    error_on_update: bool = False
+    trace_id: Optional[str] = Field(default=None, max_length=255)
+    updated_by_user: Optional[int] = None  # Assuming you're using the ID of the user
+    must_update:bool
+    direct_dependencies_ids:List[int]
+    last_time_index_value:Optional[datetime.datetime] = None
+
+    @classmethod
+    @property
+    def ROOT_URL(cls):
+        return None
+
 class TimeSerieLocalUpdate(BaseObject):
     ROOT_URL = get_time_serie_local_update_url(TDAG_ENDPOINT)
     LOCAL_UPDATE_URL=get_time_serie_local_update_table_url(TDAG_ENDPOINT)
@@ -752,26 +769,28 @@ class TimeSerieLocalUpdate(BaseObject):
         return all_metadatas
     
     @classmethod
-    def set_start_of_execution(cls, metadata, **kwargs):
+    def set_start_of_execution(cls, local_time_serie_id, **kwargs):
         s = cls.build_session()
         base_url = cls.LOCAL_UPDATE_URL
 
         payload = {"json": kwargs}
         # r = self.s.patch(, **payload)
-        url = f"{base_url}/{metadata['id']}/set_start_of_execution/"
+        url = f"{base_url}/{local_time_serie_id}/set_start_of_execution/"
         r = make_request(s=s, loaders=cls.LOADERS,r_type="PATCH", url=url, payload=payload)
         if r.status_code != 201:
             raise Exception(f"Error in request {r.text}")
         result = r.json()
         if result["last_time_index_value"] is not None:
-            result["last_time_index_value"] = self.request_to_datetime(result["last_time_index_value"])
-        return result
+            result["last_time_index_value"]=datetime.datetime.fromtimestamp(result["last_time_index_value"]).replace(tzinfo=pytz.utc)
+        return LocalTimeSeriesHistoricalUpdate(**result)
 
     @classmethod
-    def set_end_of_execution(cls, metadata,timeout=None, **kwargs):
+    def set_end_of_execution(cls, local_time_serie_id:int,
+                             historical_update_id:int,
+                             timeout=None, **kwargs):
         s = cls.build_session()
-        url = cls.LOCAL_UPDATE_URL + f"/{metadata['id']}/set_end_of_execution/"
-
+        url = cls.LOCAL_UPDATE_URL + f"/{local_time_serie_id}/set_end_of_execution/"
+        kwargs.update(dict(historical_update_id=historical_update_id))
         payload = {"json": kwargs}
         # r = self.s.patch(, **payload)
         r = make_request(s=s, loaders=cls.LOADERS,r_type="PATCH", url=url, payload=payload,time_out=timeout)
@@ -949,10 +968,10 @@ class TimeSerieLocalUpdate(BaseObject):
         return r
 
     @classmethod
-    def verify_if_direct_dependencies_are_updated(cls,id,time_out):
+    def verify_if_direct_dependencies_are_updated(cls,id):
 
         s = cls.build_session()
-        url = cls.LOCAL_UPDATE_URL + f"/{id}/insert_data_into_table/?time_out={time_out}"
+        url = cls.LOCAL_UPDATE_URL + f"/{id}/verify_if_direct_dependencies_are_updated/"
         r = make_request(s=s, loaders=None,r_type="GET", url=url)
         if r.status_code != 200:
             raise Exception(f"Error in request: {r.text}")
@@ -1760,14 +1779,13 @@ class DynamicTableHelpers:
         -------
 
         """
-        last_time_index_value = serialized_data_frame[time_index_name].max().timestamp()
         global_stats,grouped_dates = get_chunk_stats(chunk_df=serialized_data_frame,
                                                              index_names=index_names,
                                                              time_index_name=time_index_name)
 
 
 
-        call_end_of_execution = False
+        call_end_of_execution = True
         if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             data_lake_interface=DataLakeInterface(data_lake_source=data_source,logger=logger,)
             data_lake_interface.persist_datalake(serialized_data_frame, overwrite=True,
@@ -1827,10 +1845,7 @@ class DynamicTableHelpers:
             raise e
        
 
-        if call_end_of_execution == True:
-            #todo: fix the historical update_id
-            self.TimeSerieLocalUpdate.set_end_of_execution(metadata=local_metadata,error_on_update=False,
-                                      historical_update_id=historical_update_id)
+
 
     
         return result

@@ -602,10 +602,7 @@ class PersistManager:
         logger=self.logger
         )
 
-        if update_tracker is not None:
-            update_tracker.set_end_of_execution(local_hash_id=self.local_hash_id,
-            data_source_id=self.data_source.id,
-            error_on_update=False)
+
 
 
 
