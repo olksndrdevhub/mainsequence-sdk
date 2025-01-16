@@ -801,7 +801,7 @@ class TimeSerieLocalUpdate(BaseObject):
 
     @classmethod
     def set_last_update_index_time_from_update_stats(cls, metadata,
-                                                     last_time_index_value:float,
+                                                     last_time_index_value:float,max_per_asset_symbol,
                                                      timeout=None):
         s = cls.build_session()
         url = cls.LOCAL_UPDATE_URL + f"/{metadata['id']}/set_last_update_index_time_from_update_stats/"
