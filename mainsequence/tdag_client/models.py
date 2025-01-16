@@ -685,7 +685,22 @@ class  LocalTimeSerieUpdateDetails(BaseObject):
         instance = [i for i in r.json()]
         return instance
 
+def get_chunk_stats(chunk_df,time_index_name):
+    chunk_stats = {"_GLOBAL_": {"max": chunk_df[time_index_name].max().timestamp(),
+                                "min": chunk_df[time_index_name].min().timestamp()}}
 
+    grouped_dates=None
+    if len(index_names) > 1:
+        grouped_dates = chunk_df.groupby(["asset_symbol", "execution_venue_symbol"])[
+            time_index_name].agg(
+            ["min", "max"])
+        chunk_stats["_PER_ASSET_"] = {
+            row["asset_symbol"]: {row["execution_venue_symbol"]: {"max": row["max"].timestamp(),
+                                                                  "min": row["min"].timestamp(),
+                                                                  }}
+            for _, row in grouped_dates.reset_index().iterrows()
+        }
+    return chunk_stats,grouped_dates
 
 class TimeSerieLocalUpdate(BaseObject):
     ROOT_URL = get_time_serie_local_update_url(TDAG_ENDPOINT)
@@ -1045,18 +1060,7 @@ class TimeSerieLocalUpdate(BaseObject):
             chunk_df = serialized_data_frame.iloc[start_idx:end_idx]
 
             # Compute grouped_dates for this chunk
-            chunk_stats = {"_GLOBAL_":{"max":chunk_df[time_index_name].max().timestamp(),
-                                       "min":chunk_df[time_index_name].min().timestamp()}}
-            if len(index_names) > 1:
-                grouped_dates = chunk_df.groupby(["asset_symbol", "execution_venue_symbol"])[
-                    time_index_name].agg(
-                    ["min", "max"])
-                chunk_stats["_PER_ASSET_"] = {
-                    row["asset_symbol"]: {row["execution_venue_symbol"]:{"max": row["max"].timestamp(),
-                                                                         "min":row["min"].timestamp(),
-                                                                         }}
-                    for _, row in grouped_dates.reset_index().iterrows()
-                }
+            chunk_stats,_ = get_chunk_stats(chunk_df=chunk_df,index_names=index_names)
 
             # Convert the chunk to JSON
             chunk_json_str = chunk_df.to_json(orient="records", date_format="iso")
@@ -1749,16 +1753,9 @@ class DynamicTableHelpers:
 
         """
         last_time_index_value = serialized_data_frame[time_index_name].max().timestamp()
-        max_per_asset_symbol = None
-        grouped_dates = None
-        if len(index_names) > 1:
-            grouped_dates = serialized_data_frame.groupby(["asset_symbol", "execution_venue_symbol"])[
-                time_index_name].agg(
-                ["min", "max"])
-            max_per_asset_symbol = {
-                row["asset_symbol"]: {row["execution_venue_symbol"]: row["max"].timestamp()}
-                for _, row in grouped_dates.reset_index().iterrows()
-            }
+        max_per_asset_symbol,grouped_dates = get_chunk_stats(chunk_df=chunk_df,index_names=index_names)
+
+
 
         call_end_of_execution = False
         if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
@@ -1799,7 +1796,7 @@ class DynamicTableHelpers:
                 raise NotImplementedError
 
         r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(max_per_asset_symbol=max_per_asset_symbol,
-                                                                 last_time_index_value=last_time_index_value,
+                                        
                                                                                    metadata=local_metadata,
 
                                                                  )

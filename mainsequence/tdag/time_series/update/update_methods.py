@@ -16,7 +16,6 @@ from concurrent.futures import ThreadPoolExecutor
 from mainsequence.tdag.logconf import get_tdag_logger
 
 logger = get_tdag_logger()
-EXECUTION_HEAD_WEIGHT = float(os.environ.get('EXECUTION_HEAD_WEIGHT', 60 * 60 * 8))
 
 
 
@@ -130,8 +129,7 @@ class TimeSerieUpdater:
 
         ts_update_details = self.time_serie.update_details
         ignore_timeout = configuration.configuration["time_series_config"]["ignore_update_timeout"]
-        execution_timeout_seconds = ts_update_details['execution_timeout_seconds'] if ts_update_details[
-                                                                                          'execution_timeout_seconds'] > 0 else EXECUTION_HEAD_WEIGHT
+        execution_timeout_seconds = self.time_serie.run_configuration['execution_time_out_seconds']
 
         time_out_of_request=min(execution_timeout_seconds,60*5)
         are_dependencies_updated,error_on_dependencies=self.check_if_dependencies_are_updated(time_out_of_request)
@@ -179,6 +177,7 @@ class TimeSerieUpdater:
 
         self.time_serie.update( raise_exceptions=True, update_tree=self.update_tree,
                           start_update_data=self.start_update_data, update_tracker=update_tracker,
+                                debug_mode=False
 
                           )
         self.should_stop = True

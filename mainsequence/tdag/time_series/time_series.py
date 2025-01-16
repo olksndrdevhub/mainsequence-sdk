@@ -813,7 +813,7 @@ class TimeSerieRebuildMethods(ABC):
         :return:
         """
         local_metadatas = None
-        pickle_path = ogm.get_ts_pickle_path(local_hash_id=local_hash_id)
+        pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,data_source_id=data_source_id)
         if os.path.isfile(pickle_path) == False or os.stat(pickle_path).st_size == 0:
             # rebuild time serie and pickle
             ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
@@ -822,6 +822,7 @@ class TimeSerieRebuildMethods(ABC):
             if set_dependencies_df == True:
                 ts.set_relation_tree()
 
+            ts.persist_to_pickle()
             ts.logger.info(f"ts {local_hash_id} pickled ")
 
 
@@ -1193,6 +1194,11 @@ class DataPersistanceMethods(ABC):
     @property
     def update_details(self):
         return self.local_persist_manager.update_details
+
+    @property
+    def run_configuration(self):
+        return self.local_persist_manager.run_configuration
+
 
     @none_if_backend_detached
     @property
@@ -2445,7 +2451,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             # p = self.update_actor_manager.launch_update_task(**task_kwargs   )
 
             p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
-            raise Exception("this is a debug block")
+            continue
 
             futures_.append(p)
 

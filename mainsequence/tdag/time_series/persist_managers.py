@@ -240,6 +240,13 @@ class PersistManager:
         if "localtimeserieupdatedetails" in self.local_metadata.keys():
             return self.local_metadata['localtimeserieupdatedetails']
         return None
+
+    @property
+    def run_configuration(self):
+
+        return self.local_metadata['run_configuration']
+
+
     @property
     def source_table_configuration(self):
         if "sourcetableconfiguration" in self.metadata.keys():
