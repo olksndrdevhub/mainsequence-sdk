@@ -685,7 +685,7 @@ class  LocalTimeSerieUpdateDetails(BaseObject):
         instance = [i for i in r.json()]
         return instance
 
-def get_chunk_stats(chunk_df,time_index_name):
+def get_chunk_stats(chunk_df,time_index_name,index_names):
     chunk_stats = {"_GLOBAL_": {"max": chunk_df[time_index_name].max().timestamp(),
                                 "min": chunk_df[time_index_name].min().timestamp()}}
 
@@ -801,7 +801,6 @@ class TimeSerieLocalUpdate(BaseObject):
 
     @classmethod
     def set_last_update_index_time_from_update_stats(cls, metadata,
-                                                     max_per_asset_symbol:dict,
                                                      last_time_index_value:float,
                                                      timeout=None):
         s = cls.build_session()
@@ -1060,7 +1059,8 @@ class TimeSerieLocalUpdate(BaseObject):
             chunk_df = serialized_data_frame.iloc[start_idx:end_idx]
 
             # Compute grouped_dates for this chunk
-            chunk_stats,_ = get_chunk_stats(chunk_df=chunk_df,index_names=index_names)
+            chunk_stats,_ = get_chunk_stats(chunk_df=chunk_df,index_names=index_names,
+                                            time_index_name=time_index_name)
 
             # Convert the chunk to JSON
             chunk_json_str = chunk_df.to_json(orient="records", date_format="iso")
@@ -1753,7 +1753,9 @@ class DynamicTableHelpers:
 
         """
         last_time_index_value = serialized_data_frame[time_index_name].max().timestamp()
-        max_per_asset_symbol,grouped_dates = get_chunk_stats(chunk_df=chunk_df,index_names=index_names)
+        max_per_asset_symbol,grouped_dates = get_chunk_stats(chunk_df=serialized_data_frame,
+                                                             index_names=index_names,
+                                                             time_index_name=time_index_name)
 
 
 
@@ -1795,8 +1797,13 @@ class DynamicTableHelpers:
             else:
                 raise NotImplementedError
 
+        min_d, last_time_index_value = chunk_stats["_GLOBAL_"]["min"], chunk_stats["_GLOBAL_"]["max"]
+        max_per_asset_symbol = None
+        if metadata.is_multi_index:
+            max_per_asset_symbol = {k: {ev: ev_dict["max"] for ev, ev_dict in v.items()} for k, v in
+                                    chunk_stats["_PER_ASSET_"].items()}
         r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(max_per_asset_symbol=max_per_asset_symbol,
-                                        
+                                                                                    last_time_index_value=last_time_index_value,
                                                                                    metadata=local_metadata,
 
                                                                  )
