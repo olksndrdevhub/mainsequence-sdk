@@ -1260,7 +1260,7 @@ class LocalDiskSourceLake(DynamicTableDataSource):
         return cls(**r.json())
 
 class TimeScaleDBDataSource(DynamicTableDataSource):
-    related_resource: TimeScaleDB
+    related_resource: Union[TimeScaleDB,int]
     data_type: str = CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB
 
     def get_connection_uri(self):
