@@ -2442,10 +2442,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                                            "max_retries": update_details["run_configuration"]["retry_on_error"]},
                                                              kwargs_update=kwargs_update)
 
-            # p = self.update_actor_manager.launch_update_task(**task_kwargs   )
+            p = self.update_actor_manager.launch_update_task(**task_kwargs   )
 
-            p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
-            continue
+            # p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
+            # continue
 
             futures_.append(p)
 
