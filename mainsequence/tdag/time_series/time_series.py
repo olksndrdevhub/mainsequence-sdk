@@ -677,8 +677,8 @@ class GraphNodeMethods(ABC):
 
                     for tm_ts in value.values():
                         if isinstance(tm_ts, dict):
-                            pickle_path = self.get_pickle_path(local_hash_id=tm_ts["local_hash_id"])
-                            dependecy_map[(tm_ts["local_hash_id"],tm_ts["local_hash_id"])]={"is_pickle":True,"ts":pickle_path}
+                            pickle_path = self.get_pickle_path(local_hash_id=tm_ts["data_source_id"])
+                            dependecy_map[(tm_ts["local_hash_id"],tm_ts["data_source_id"])]={"is_pickle":True,"ts":pickle_path}
 
                         else:
                             is_api = isinstance(tm_ts, APITimeSerie)
@@ -725,8 +725,8 @@ class GraphNodeMethods(ABC):
                         elif isinstance(value, dict):
                             for tm_ts in value.values():
                                 if isinstance(tm_ts, dict):
-                                    pickle_path = self.get_pickle_path(local_hash_id=tm_ts["local_hash_id"])
-                                    new_ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
+                                    new_ts=self.load_and_set_from_hash_id(local_hash_id=tm_ts["local_hash_id"],data_source_id=tm_ts["data_source_id"])
+
                                     new_ts.local_persist_manager  # before connection call local persist manager to garantee ts is created
                                     self.local_persist_manager.depends_on_connect(new_ts)
                                     new_ts.set_relation_tree()
@@ -746,8 +746,7 @@ class GraphNodeMethods(ABC):
 
                     if isinstance(value, dict):
                         if "is_time_serie_pickled" in value.keys():
-                            pickle_path = self.get_pickle_path(local_hash_id=value["local_hash_id"],data_source_id=value["data_source_id"])
-                            new_ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
+                            new_ts=self.load_and_set_from_hash_id(local_hash_id=value["local_hash_id"],data_source_id=value["data_source_id"])
                             new_ts.local_persist_manager  # before connection call local persist manager to garantee ts is created
                             self.local_persist_manager.depends_on_connect(new_ts)
                             new_ts.set_relation_tree()
@@ -800,6 +799,25 @@ class TimeSerieRebuildMethods(ABC):
             data_source = cloudpickle.load(handle)
         return data_source
 
+    @classmethod
+    def rebuild_and_set_from_local_hash_id(cls,local_hash_id,data_source_id,set_dependencies_df:bool=False,
+                                           graph_depth_limit=1
+                                           ):
+        pickle_path = ogm.get_ts_pickle_path(local_hash_id=local_hash_id)
+        if os.path.isfile(pickle_path) == False or os.stat(pickle_path).st_size == 0:
+            # rebuild time serie and pickle
+            ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
+                                                      data_source=data_source_id,
+                                                      )
+            if set_dependencies_df == True:
+                ts.set_relation_tree()
+
+            ts.logger.info(f"ts {local_hash_id} pickled ")
+        ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path,
+                                                graph_depth_limit=graph_depth_limit
+                                                )
+        return ts, pickle_path
+
     def set_data_source_from_pickle_path(self, pikle_path):
         data_source = self.load_data_source_from_pickle(pikle_path)
         self.set_data_source(data_source=data_source)
@@ -813,29 +831,6 @@ class TimeSerieRebuildMethods(ABC):
             include_vam_client_objects=False)
         return ts
 
-
-    @classmethod
-    def rebuild_from_pickle_or_configuration(self,local_hash_id,data_source_id,
-                                             graph_depth_limit=1
-                                             ):
-        """
-        :param local_hash_id:
-        :param data_source_id:
-        :return:
-        """
-        pickle_path = self.get_pickle_path(local_hash_id,
-                                           data_source_id=data_source_id)
-        data_source = self.load_data_source_from_pickle(pickle_path=pickle_path)
-        if os.path.isfile(pickle_path) == False:
-            ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
-                                                      data_source=data_source
-                                                      )
-            ts.persist_to_pickle()
-
-        ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path,
-                                                graph_depth_limit=graph_depth_limit
-                                                )
-        return ts
 
     @classmethod
     @tracer.start_as_current_span("TS: Rebuild From Configuration")
@@ -2352,16 +2347,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                             ts = update_map[(ts_row["local_hash_id"], ts_row["data_source_id"])]["ts"]
                         else:
                             try:
-                                pickle_path = self.get_pickle_path(ts_row["local_hash_id"],
-                                                                   data_source_id=ts_row["data_source_id"])
-                                data_source = self.load_data_source_from_pickle(pickle_path=pickle_path)
-                                if os.path.isfile(pickle_path) == False:
-                                    ts = TimeSerie.rebuild_from_configuration(local_hash_id=ts_row["local_hash_id"],
-                                                                              data_source=data_source
-                                                                              )
-                                    ts.persist_to_pickle()
 
-                                ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path)
+                                ts, _=self.rebuild_and_set_from_local_hash_id(local_hash_id=ts_row["local_hash_id"],
+                                                                        data_source_id=ts_row["data_source_id"]
+                                                                        )
+
                             except Exception as e:
                                 self.logger.exception(f"Error updating dependencie {ts.local_hash_id} when loading pickle")
                                 raise e

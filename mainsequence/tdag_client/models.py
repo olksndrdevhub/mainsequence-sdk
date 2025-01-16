@@ -935,6 +935,16 @@ class TimeSerieLocalUpdate(BaseObject):
         return r
 
     @classmethod
+    def verify_if_direct_dependencies_are_updated(cls,id,time_out):
+
+        s = cls.build_session()
+        url = cls.LOCAL_UPDATE_URL + f"/{id}/insert_data_into_table/?time_out={time_out}"
+        r = make_request(s=s, loaders=None,r_type="GET", url=url)
+        if r.status_code != 200:
+            raise Exception(f"Error in request: {r.text}")
+        return r.json()
+
+    @classmethod
     def get_data_between_dates_from_api(cls, local_hash_id:str, data_source_id:int, start_date: datetime.datetime,
                                         end_date: datetime.datetime, great_or_equal: bool,
                                         less_or_equal: bool,
