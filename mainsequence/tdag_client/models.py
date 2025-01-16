@@ -1799,7 +1799,7 @@ class DynamicTableHelpers:
 
         min_d, last_time_index_value = global_stats["_GLOBAL_"]["min"], global_stats["_GLOBAL_"]["max"]
         max_per_asset_symbol = None
-        if metadata.is_multi_index:
+        if len(index_names)>1:
             max_per_asset_symbol = {k: {ev: ev_dict["max"] for ev, ev_dict in v.items()} for k, v in
                                     global_stats["_PER_ASSET_"].items()}
         r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(max_per_asset_symbol=max_per_asset_symbol,
