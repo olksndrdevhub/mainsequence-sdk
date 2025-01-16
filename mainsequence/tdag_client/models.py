@@ -1753,7 +1753,7 @@ class DynamicTableHelpers:
 
         """
         last_time_index_value = serialized_data_frame[time_index_name].max().timestamp()
-        max_per_asset_symbol,grouped_dates = get_chunk_stats(chunk_df=serialized_data_frame,
+        global_stats,grouped_dates = get_chunk_stats(chunk_df=serialized_data_frame,
                                                              index_names=index_names,
                                                              time_index_name=time_index_name)
 
@@ -1797,11 +1797,11 @@ class DynamicTableHelpers:
             else:
                 raise NotImplementedError
 
-        min_d, last_time_index_value = chunk_stats["_GLOBAL_"]["min"], chunk_stats["_GLOBAL_"]["max"]
+        min_d, last_time_index_value = global_stats["_GLOBAL_"]["min"], global_stats["_GLOBAL_"]["max"]
         max_per_asset_symbol = None
         if metadata.is_multi_index:
             max_per_asset_symbol = {k: {ev: ev_dict["max"] for ev, ev_dict in v.items()} for k, v in
-                                    chunk_stats["_PER_ASSET_"].items()}
+                                    global_stats["_PER_ASSET_"].items()}
         r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(max_per_asset_symbol=max_per_asset_symbol,
                                                                                     last_time_index_value=last_time_index_value,
                                                                                    metadata=local_metadata,
