@@ -642,7 +642,7 @@ class PersistManager:
                              asset_symbols: Union[list, None] = None,
                              columns: Union[list, None] = None):
 
-        filtered_data = self.dth.get_data_by_time_index(metadata=self.metadata,
+        filtered_data = self.dth.get_data_by_time_index(local_metadata=self.local_metadata,
 
                                                         start_date=start_date,
                                                         end_date=end_date, great_or_equal=great_or_equal,

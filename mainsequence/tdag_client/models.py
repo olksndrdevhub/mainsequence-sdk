@@ -968,7 +968,7 @@ class TimeSerieLocalUpdate(BaseObject):
                                         symbol_range_map: Union[None,dict]
     ):
         s = cls.build_session()
-        url = cls.LOCAL_UPDATE_URL + f"/insert_data_into_table/"
+        url = cls.LOCAL_UPDATE_URL + f"/get_data_between_dates_from_remote/"
 
         symbol_range_map = copy.deepcopy(symbol_range_map)
         if symbol_range_map is not None:
@@ -1263,7 +1263,15 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
     related_resource: Union[TimeScaleDB,int]
     data_type: str = CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB
 
+    @property
+    def has_direct_connection(self):
+        if isinstance(self.related_resource, int):
+            return False
+        return True
+
     def get_connection_uri(self):
+        if self.has_direct_connection== False:
+            raise Exception("This Data source does not have direct access")
         password = self.related_resource.password  # Decrypt password if necessary
         return f"postgresql://{self.related_resource.database_user}:{password}@{self.related_resource.host}:{self.related_resource.port}/{self.related_resource.database_name}"
 
@@ -1765,7 +1773,12 @@ class DynamicTableHelpers:
             data_lake_interface.persist_datalake(serialized_data_frame, overwrite=True,
                                                  time_index_name=time_index_name, index_names=index_names,
                                                  table_name=metadata["table_name"])
-        elif isinstance(data_source.related_resource,int) or True==True:
+
+
+
+        elif isinstance(data_source.related_resource,int):
+
+            print("IMPLEMENT DIRECT INSERTION !!!!!!")
             #Do API insertion
             TimeSerieLocalUpdate.post_data_frame_in_chunks(serialized_data_frame=serialized_data_frame,
                                                            logger=self.logger,
@@ -1973,21 +1986,50 @@ class DynamicTableHelpers:
         return df
 
 
-    def get_data_by_time_index(self, metadata: Union[dict,str],     data_source:object,
+    def get_data_by_time_index(self, local_metadata: Union[dict,str],     data_source:object,
                                start_date: Union[datetime.datetime, None] = None,
                                great_or_equal: bool = True, less_or_equal: bool = True,
                                end_date: Union[datetime.datetime, None] = None,
                                columns: Union[list, None] = None,
                                asset_symbols:Union[list,None]=None,
+                               execution_venue_symbols:Union[list,None]=None
                                ):
-
+        metadata=local_metadata["remote_table"]
         if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             if metadata['sourcetableconfiguration'] is None:
                 return pd.DataFrame()
-            df = TimeScaleInterface.direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
-            start_date = start_date, great_or_equal = great_or_equal,
-            less_or_equal = less_or_equal, end_date = end_date, columns = columns, asset_symbols=asset_symbols)
-            df = set_types_in_table(df, metadata["sourcetableconfiguration"]["column_dtypes_map"])
+
+            #Todo FIX!!!!
+            print("!!!!!!!!!!!!!CHANGE SO ITS CAN SWITCHES TO DIRECT CONNECTION !!!!!!!!!!!!1")
+            if data_source.has_direct_connection==True:
+                df = TimeScaleInterface.direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
+                start_date = start_date, great_or_equal = great_or_equal,
+                less_or_equal = less_or_equal, end_date = end_date, columns = columns, asset_symbols=asset_symbols)
+                df = set_types_in_table(df, metadata["sourcetableconfiguration"]["column_dtypes_map"])
+            else:
+                df=TimeSerieLocalUpdate.get_data_between_dates_from_api(
+                    local_hash_id=local_metadata["local_hash_id"],
+                    data_source_id=metadata["data_source"]["id"], start_date=start_date,
+                    end_date=end_date, great_or_equal=great_or_equal,
+                    less_or_equal=less_or_equal,
+                    asset_symbols=asset_symbols,
+                    columns=columns,
+                    execution_venue_symbols=execution_venue_symbols,
+                    symbol_range_map=None)
+                if len(df) == 0:
+                    self.logger.warning(
+                        f"Data from {local_metadata['local_hash_id']} is empty ({start_date} to {end_date} for assets {asset_symbols}) ")
+                    return filtered_data
+                stc = local_metadata["remote_table"]["sourcetableconfiguration"]
+                df[stc["time_index_name"]] = pd.to_datetime(df[stc["time_index_name"]])
+                for c, c_type in stc["column_dtypes_map"].items():
+                    if c != stc["time_index_name"]:
+                        if c_type == "object":
+                            c_type = "str"
+                        df[c] = df[c].astype(c_type)
+                df = df.set_index(stc["index_names"])
+
+
         elif data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             data_lake_interface = DataLakeInterface(data_lake_source=data_source, logger=self.logger)
             filters = data_lake_interface.build_time_and_symbol_filter(start_date=start_date,
