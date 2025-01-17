@@ -130,6 +130,9 @@ def set_data_source(pod_source=None, tdag_detached=False, override_all: bool = F
 
         try:
             yield pod_source
+        except Exception as e:
+
+            raise
         finally:
             # Restore the original environment variables
             if pod_source is None: return
@@ -140,8 +143,10 @@ def set_data_source(pod_source=None, tdag_detached=False, override_all: bool = F
                     os.environ[key] = value
     else:
         # default data source for pod
-        yield DynamicTableDataSource.get_default_data_source_for_token()
-
+        try:
+            yield DynamicTableDataSource.get_default_data_source_for_token()
+        except Exception as e:
+            raise
 
 
 
