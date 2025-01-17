@@ -872,6 +872,16 @@ class ExecutionVenue(BaseObjectOrm,BaseVamPydanticModel):
     def unique_identifier(self):
         return f"{self.symbol}"
 
+
+
+
+class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
+    data_source_id: int = Field(..., description="Unique identifier for the data source")
+    local_hash_id: str = Field(..., max_length=64, description="Local hash ID of the data source")
+    data_source_description: Optional[str] = Field(None, description="Descriptions of the data source")
+    table_name: str = Field(..., max_length=64, description="Name of the associated table")
+
+
 class BarFrequency(str, Enum):
     one_m = "1m"
     five_m = "5m"
@@ -879,11 +889,8 @@ class BarFrequency(str, Enum):
     one_w = "1w"
     one_month ="1mo"
 
-class HistoricalBarsSource(BaseObjectOrm, BaseVamPydanticModel):
+class HistoricalBarsSource(TDAGAPIDataSource):
     execution_venue: int
-    data_source_id: int
-    local_hash_id: str
-    table_name: str
     bar_frequency_id: BarFrequency
 
     @classmethod
