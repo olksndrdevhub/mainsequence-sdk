@@ -1485,6 +1485,9 @@ def load_from_pickle(pickle_path):
     time_serie.verify_backend_git_hash_with_pickle()
     return time_serie
 
+
+
+
 class APITimeSerie:
 
     PICKLE_PREFIFX = "api-"
@@ -1493,6 +1496,19 @@ class APITimeSerie:
         return cls(data_source_id=local_time_serie.remote_table["data_source"]["id"],
                    local_hash_id=local_time_serie.local_hash_id
                    )
+    @classmethod
+    def build_from_unique_identifier(cls,unique_identifier:str):
+        """
+
+        :param vam_source_name:
+        :return:
+        """
+        from mainsequence.vam_client import TDAGAPIDataSource
+        tdag_api_data_source=TDAGAPIDataSource.get(unique_identifier=unique_identifier)
+        ts=cls(data_source_id=tdag_api_data_source.data_source_id,
+                   local_hash_id=tdag_api_data_source.local_hash_id
+                   )
+        return ts
 
     def __init__(self, data_source_id:int, local_hash_id:str, data_source_local_lake: Union[None,DataSource]=None):
         """

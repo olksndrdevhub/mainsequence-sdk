@@ -882,6 +882,7 @@ class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
     table_name: str = Field(..., max_length=64, description="Name of the associated table")
 
 
+
 class BarFrequency(str, Enum):
     one_m = "1m"
     five_m = "5m"
