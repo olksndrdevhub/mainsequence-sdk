@@ -895,7 +895,7 @@ class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
         return url
 
     def __str__(self):
-        return self.class_name()
+        return self.class_name() +f"{self.unique_identifier}"
 
 
 class HistoricalBarsSource(TDAGAPIDataSource):
