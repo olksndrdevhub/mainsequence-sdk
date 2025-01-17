@@ -1792,11 +1792,11 @@ class DynamicTableHelpers:
                                                  time_index_name=time_index_name, index_names=index_names,
                                                  table_name=metadata["table_name"])
 
+        if BACKEND_DETACHED() == True:
+            return None
 
+        elif data_source.has_direct_connection==False:
 
-        elif isinstance(data_source.related_resource,int):
-
-            print("IMPLEMENT DIRECT INSERTION !!!!!!")
             #Do API insertion
             TimeSerieLocalUpdate.post_data_frame_in_chunks(serialized_data_frame=serialized_data_frame,
                                                            logger=self.logger,
@@ -1823,10 +1823,8 @@ class DynamicTableHelpers:
                     logger=self.logger
                 )
 
-            if BACKEND_DETACHED() == True:
-                return None
-            else:
-                raise NotImplementedError
+
+
 
         min_d, last_time_index_value = global_stats["_GLOBAL_"]["min"], global_stats["_GLOBAL_"]["max"]
         max_per_asset_symbol = None
@@ -1843,11 +1841,7 @@ class DynamicTableHelpers:
         except Exception as e:
 
             raise e
-       
 
-
-
-    
         return result
 
 
@@ -2014,8 +2008,6 @@ class DynamicTableHelpers:
             if metadata['sourcetableconfiguration'] is None:
                 return pd.DataFrame()
 
-            #Todo FIX!!!!
-            print("!!!!!!!!!!!!!CHANGE SO ITS CAN SWITCHES TO DIRECT CONNECTION !!!!!!!!!!!!1")
             if data_source.has_direct_connection==True:
                 df = TimeScaleInterface.direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
                 start_date = start_date, great_or_equal = great_or_equal,
