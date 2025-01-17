@@ -148,6 +148,7 @@ class BaseObjectOrm:
         "TargetPortfolioIndexAsset":"target_portfolio_index_asset",
 
         "HistoricalBarsSource":"historical-bars-source",
+        "TDAGAPIDataSource": "tdag-api-data-source",
 
     }
     ROOT_URL = VAM_API_ENDPOINT
@@ -873,26 +874,20 @@ class ExecutionVenue(BaseObjectOrm,BaseVamPydanticModel):
         return f"{self.symbol}"
 
 
-
-
-class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
-    data_source_id: int = Field(..., description="Unique identifier for the data source")
-    local_hash_id: str = Field(..., max_length=64, description="Local hash ID of the data source")
-    data_source_description: Optional[str] = Field(None, description="Descriptions of the data source")
-    table_name: str = Field(..., max_length=64, description="Name of the associated table")
-
-
-
-class BarFrequency(str, Enum):
+class DataFrequency(str, Enum):
     one_m = "1m"
     five_m = "5m"
     one_d = "1d"
     one_w = "1w"
     one_month ="1mo"
 
-class HistoricalBarsSource(TDAGAPIDataSource):
-    execution_venue: int
-    bar_frequency_id: BarFrequency
+class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
+    unique_identifier: str = Field(..., description="Unique identifier for the api")
+    data_source_id: int = Field(..., description="Unique identifier for the data source")
+    local_hash_id: str = Field(..., max_length=64, description="Local hash ID of the data source")
+    data_source_description: Optional[str] = Field(None, description="Descriptions of the data source")
+    table_name: str = Field(..., max_length=64, description="Name of the associated table")
+    data_frequency_id: str = DataFrequency
 
     @classmethod
     def get_object_url(cls):
@@ -902,6 +897,9 @@ class HistoricalBarsSource(TDAGAPIDataSource):
     def __str__(self):
         return self.class_name()
 
+
+class HistoricalBarsSource(TDAGAPIDataSource):
+    execution_venue: int
 
 
 class Trade(BaseObjectOrm):

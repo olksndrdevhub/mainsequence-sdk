@@ -173,18 +173,48 @@ class LazyConstants(dict):
     """
     Class Method to load constants only once they are called. this minimizes the calls to the API
     """
-    CONSTANTS_METHOD=lambda self: get_constants()
+    CONSTANTS_METHOD = lambda self: get_constants()
+
+    def __init__(self):
+        self._initialized = False
 
     def __getattr__(self, key):
-        CONSTANTS = self.CONSTANTS_METHOD()
-        for tmp_key, value in CONSTANTS.items():
-            self.__dict__[tmp_key] = value
-            setattr(self, tmp_key, value)
-
+        if not self._initialized:
+            self._load_constants()
         return self.__dict__[key]
+
+    def _load_constants(self):
+        # 1) call the method that returns your top-level dict
+        raw_data = self.CONSTANTS_METHOD()
+        # 2) Convert nested dicts to an "object" style
+        nested = self.to_attr_dict(raw_data)
+        # 3) Dump everything into self.__dict__ so it's dot-accessible
+        for k, v in nested.items():
+            self.__dict__[k] = v
+        self._initialized = True
+
+    def to_attr_dict(self, data):
+        """
+        Recursively convert a Python dict into an object that allows dot-notation access.
+        Non-dict values (e.g., int, str, list) are returned as-is; dicts become _AttrDict.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        class _AttrDict(dict):
+            def __getattr__(self, name):
+                return self[name]
+
+            def __setattr__(self, name, value):
+                self[name] = value
+
+        out = _AttrDict()
+        for k, v in data.items():
+            out[k] = self.to_attr_dict(v)  # recursively transform
+        return out
+    
 class BinanceLazyConstants(LazyConstants):
     CONSTANTS_METHOD = lambda self: get_binance_constants()
-
 
 if 'CONSTANTS' not in locals():
     CONSTANTS = LazyConstants()
