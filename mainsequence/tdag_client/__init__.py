@@ -2,6 +2,7 @@ from .models import  ( DynamicTableHelpers, ContinuousAggregateMultiIndex,reques
 LocalTimeSeriesDoesNotExist,DynamicTableDoesNotExist,SourceTableConfigurationDoesNotExist,ChatYamls,SignalYamls,LocalTimeSerieUpdateDetails,
     JSON_COMPRESSED_PREFIX,Scheduler ,SchedulerDoesNotExist, TimeSerieNode,TimeSerie,TimeSerieLocalUpdate,
 DynamicTableDataSource,LocalDiskSourceLake,LocalTimeSerieNode,PodLocalLake,TimeScaleDBDataSource,
+BACKEND_DETACHED,
                        ChatObject)
 
 from .utils import CONSTANTS, get_tdag_client_logger

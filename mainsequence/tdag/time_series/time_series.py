@@ -1200,12 +1200,10 @@ class DataPersistanceMethods(ABC):
         return self.local_persist_manager.run_configuration
 
 
-    @none_if_backend_detached
     @property
     def metadata(self):
         return self.local_persist_manager.metadata
 
-    @none_if_backend_detached
     @property
     def local_metadata(self):
         return self.local_persist_manager.local_metadata

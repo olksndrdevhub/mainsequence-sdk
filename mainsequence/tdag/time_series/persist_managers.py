@@ -766,7 +766,7 @@ class DataLakePersistManager(PersistManager):
             self.metadata = {"sourcetableconfiguration":None, "hash_id": ts.remote_table_hashed_name,
                             "table_name":ts.remote_table_hashed_name
                             }
-            self.local_metadata= {"local_hash_id":self.local_hash_id}
+            self.local_metadata= {"local_hash_id":self.local_hash_id,"remote_table":self.metadata}
             last_update_in_table=None
             if self.table_exist(table_name=ts.remote_table_hashed_name):
                 # check if table is complete and continue with earliest latest value to avoid data gaps
