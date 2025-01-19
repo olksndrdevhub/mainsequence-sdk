@@ -70,6 +70,9 @@ class Configuration:
         self.configuration = read_yaml(TDAG_CONFIG_PATH)
 
     def _assert_env_variables(self):
+        do_not_check= os.environ.get("DO_NOT_CHECK_TDAG","false").lower()=="true"
+        if do_not_check== True:
+            return None
         for ob_var in self.OBLIGATORY_ENV_VARIABLES:
             assert ob_var in os.environ, f"{ob_var} not in environment variables"
 
