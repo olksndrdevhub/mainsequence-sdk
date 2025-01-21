@@ -1502,8 +1502,8 @@ class APITimeSerie:
         :return:
         """
         from mainsequence.vam_client import TDAGAPIDataSource
-        tdag_api_data_source=TDAGAPIDataSource.get(unique_identifier=unique_identifier)
-        ts=cls(data_source_id=tdag_api_data_source.data_source_id,
+        tdag_api_data_source = TDAGAPIDataSource.get(unique_identifier=unique_identifier)
+        ts = cls(data_source_id=tdag_api_data_source.data_source_id,
                    local_hash_id=tdag_api_data_source.local_hash_id
                    )
         return ts
@@ -2394,6 +2394,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
                         try:
                             self.update_tracker.set_start_of_execution(local_hash_id=ts_row["local_hash_id"],
+                                                                      local_time_serie_id=self.local_metadata["id"],
                                                                        data_source_id=ts_row["data_source_id"]
                                                                        )
                             error_on_last_update = ts.update(debug_mode=debug_mode,

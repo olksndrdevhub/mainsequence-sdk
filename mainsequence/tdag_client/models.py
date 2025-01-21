@@ -1972,8 +1972,11 @@ class DynamicTableHelpers:
 
         return local_metadata
 
-    def filter_by_assets_ranges(self,metadata: dict,
-                                asset_ranges_map:dict,data_source:object
+    def filter_by_assets_ranges(self,
+                                metadata: dict,
+                                asset_ranges_map:dict,
+                                data_source:object,
+                                local_hash_id: str
     ):
         table_name=metadata["table_name"]
         if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
@@ -1986,9 +1989,30 @@ class DynamicTableHelpers:
         elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             index_names = metadata["sourcetableconfiguration"]["index_names"]
             column_types = metadata["sourcetableconfiguration"]["column_dtypes_map"]
-            df = TimeScaleInterface.filter_by_assets_ranges(table_name=table_name, asset_ranges_map=asset_ranges_map, index_names=index_names,
-                                    data_source=data_source, column_types=column_types
-                                    )
+
+            if data_source.has_direct_connection:
+                df = TimeScaleInterface.filter_by_assets_ranges(
+                    table_name=table_name,
+                    asset_ranges_map=asset_ranges_map,
+                    index_names=index_names,
+                    data_source=data_source,
+                    column_types=column_types
+                )
+            else:
+                df = TimeSerieLocalUpdate.get_data_between_dates_from_api(
+                    local_hash_id=local_hash_id,
+                    data_source_id=data_source.id,
+                    start_date=None,
+                    end_date=None,
+                    great_or_equal=True,
+                    less_or_equal=True,
+                    asset_symbols=None,
+                    columns=None,
+                    execution_venue_symbols=None,
+                    symbol_range_map=asset_ranges_map,  # <-- key for applying ranges
+                )
+
+
         else:
             raise NotImplementedError
 
