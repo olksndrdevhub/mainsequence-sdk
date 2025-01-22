@@ -1456,7 +1456,6 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
                 less_or_equal=less_or_equal,
                 columns=columns,
                 asset_symbols=asset_symbols,
-                execution_venue_symbols=execution_venue_symbols,
             )
             df = set_types_in_table(df, stc["column_dtypes_map"])
             return df
