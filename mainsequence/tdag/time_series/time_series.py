@@ -1103,7 +1103,7 @@ class TimeSerieRebuildMethods(ABC):
                                                                   data_source_id=self.data_source.id)
 
         latest_value, must_update = local_time_serie_historical_update.last_time_index_value, local_time_serie_historical_update.must_update
-
+        update_statistics = local_time_serie_historical_update.update_statistics
         error_on_last_update = False
 
         if force_update == True:
@@ -1121,7 +1121,7 @@ class TimeSerieRebuildMethods(ABC):
                 self.update_local(update_tree=update_tree, debug_mode=debug_mode,
                                   overwrite_latest_value=latest_value, metadatas=metadatas,
                                   update_tracker=update_tracker, update_only_tree=update_only_tree,
-                                  use_state_for_update=use_state_for_update,
+                                  use_state_for_update=use_state_for_update, update_statistics=update_statistics
                                   )
 
                 update_tracker.set_end_of_execution(local_time_serie_id=self.local_metadata["id"],
@@ -1300,17 +1300,17 @@ class DataPersistanceMethods(ABC):
                              ):
         func = self.local_persist_manager.get_df_between_dates
         sig = inspect.signature(func)
-        kwargs=dict(start_date=start_date,
-                                                                        end_date=end_date,
-                                                                        asset_symbols=asset_symbols,
-                                                                        great_or_equal=great_or_equal,
-                                                                        less_or_equal=less_or_equal,
-                    )
+        kwargs = dict(
+            start_date=start_date,
+            end_date=end_date,
+            asset_symbols=asset_symbols,
+            great_or_equal=great_or_equal,
+            less_or_equal=less_or_equal,
+        )
         if 'time_serie' in sig.parameters:
             kwargs["time_serie"] = self
+
         filtered_data = self.local_persist_manager.get_df_between_dates(**kwargs)
-
-
         return filtered_data
 
     def get_persisted_ts(self):
@@ -1334,21 +1334,18 @@ class DataPersistanceMethods(ABC):
         return pandas_df
 
 
-    def get_latest_update_by_assets_filter(self,asset_symbols:Union[list,None], last_update_per_asset:dict):
+    def get_latest_update_by_assets_filter(self, asset_symbols:Union[list,None], last_update_per_asset:dict):
         """
         Gets the latest update from a symbol list
         :param asset_symbols:
         :return:
         """
         if asset_symbols is not None:
-            last_update_in_table = np.max([np.max(list(i.values()))
-                                           for asset_symbol, i in last_update_per_asset.items()
-                                           if asset_symbol in asset_symbols
+            last_update_in_table = np.max([timestamp for unique_identifier, timestamp in last_update_per_asset.items()
+                                           if unique_identifier in asset_symbols
                                            ])
         else:
-            last_update_in_table = np.max([np.max(list(i.values()))
-                                           for i in list(last_update_per_asset.values())
-                                           ])
+            last_update_in_table = np.max(last_update_per_asset.values)
         return last_update_in_table
 
     def get_earliest_updated_asset_filter(self, asset_symbols:Union[list],
@@ -1376,9 +1373,7 @@ class DataPersistanceMethods(ABC):
 
         """
 
-        last_update_in_table, last_update_per_asset= self.get_update_statistics(asset_symbols=asset_symbols,
-
-                                                         )
+        last_update_in_table, last_update_per_asset = self.get_update_statistics(asset_symbols=asset_symbols)
         if last_update_in_table is None and last_update_per_asset is None:
             return None
         if asset_symbols is not None and last_update_per_asset is not None:
@@ -1386,7 +1381,6 @@ class DataPersistanceMethods(ABC):
                 last_update_in_table = self.get_latest_update_by_assets_filter(asset_symbols=asset_symbols,
                                                                               last_update_per_asset=last_update_per_asset
                                                                               )
-
 
         last_observation = self.get_df_between_dates(
             start_date=last_update_in_table, great_or_equal=True,
@@ -1413,13 +1407,11 @@ class DataPersistanceMethods(ABC):
         self.local_persist_manager.flush_local_persisted(flush_only_time_series=flush_only_time_series)
 
     @tracer.start_as_current_span("TS: Persist Data")
-    def persist_updated_data(self, temp_df, update_tracker,
-                             latest_value: Union[None, datetime.datetime],
-                             overwrite=False) -> bool:
+    def persist_updated_data(self, temp_df, update_tracker, overwrite=False) -> bool:
         persisted = False
         if temp_df.shape[0] > 0:
             if overwrite == True:
-                self.logger.warning(f"Values will be overwritten assuming latest value of  {latest_value}")
+                self.logger.warning(f"Values will be overwritten")
             self.local_persist_manager.persist_updated_data(temp_df=temp_df,
                                                             update_tracker=update_tracker,
                                                             historical_update_id=None,
@@ -2497,7 +2489,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def update_local(self, update_tree, update_tracker: object, debug_mode: bool,
                      metadatas: Union[None, dict] = None,
                      overwrite_latest_value: Union[datetime.datetime, None] = None, update_only_tree: bool = False,
-                     use_state_for_update:bool=False,
+                     use_state_for_update:bool=False, update_statistics=None,
                      *args, **kwargs) -> bool:
 
         from mainsequence.tdag.instrumentation.utils import Status, StatusCode
@@ -2528,9 +2520,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 latest_value = overwrite_latest_value
 
                 self.logger.info(f'Updating Local Time Series for  {self}  since {latest_value}')
-                temp_df = self.update_series_from_source(latest_value=latest_value,
-
-                                                         **kwargs)
+                temp_df = self.update_series_from_source(update_statistics=update_statistics, **kwargs)
 
                 if temp_df.shape[0] == 0:
                     # concatenate empty
@@ -2545,16 +2535,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                             {temp_df}""")
                 self.logger.info(f'Persisting Time Series for  {self}  since {latest_value} ')
 
-
-
-
             else:
-                latest_value, last_multiindex = self.get_update_statistics()
-                if latest_value is None:
+                if not update_statistics:
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
 
-                temp_df = self.update_series_from_source(latest_value=latest_value,
-                                                         **kwargs)
+                temp_df = self.update_series_from_source(update_statistics=update_statistics, **kwargs)
                 for col, ddtype in temp_df.dtypes.items():
                     if "datetime64" in str(ddtype):
                         self.logger.info(f"WARNING DATETIME TYPE IN {self}")
@@ -2566,7 +2551,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 overwrite = True if overwrite_latest_value is not None else False
                 persisted = self.persist_updated_data(temp_df,
                                                       update_tracker=update_tracker,
-                                                      latest_value=latest_value, overwrite=overwrite)
+                                                      overwrite=overwrite)
 
                 update_span.set_status(Status(StatusCode.OK))
             except Exception as e:
@@ -2580,7 +2565,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def _run_post_update_routines(self, error_on_last_update: bool):
         pass
 
-    def update_series_from_source(self, latest_value: Union[None, datetime.datetime], *args, **kwargs) -> pd.DataFrame:
+    def update_series_from_source(self, update_statistics: Union[None, datetime.datetime], *args, **kwargs) -> pd.DataFrame:
         """
         This method performs all the necessary logic to update our time series. The method should always return a DataFrame with the following characteristics:
 

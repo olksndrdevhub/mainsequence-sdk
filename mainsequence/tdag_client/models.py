@@ -691,16 +691,92 @@ def get_chunk_stats(chunk_df,time_index_name,index_names):
 
     grouped_dates = None
     if len(index_names) > 1:
-        grouped_dates = chunk_df.groupby(["asset_symbol", "execution_venue_symbol"])[
+        grouped_dates = chunk_df.groupby(["unique_identifier"])[
             time_index_name].agg(
             ["min", "max"])
         chunk_stats["_PER_ASSET_"] = {
-            row["asset_symbol"]: {row["execution_venue_symbol"]: {"max": row["max"].timestamp(),
-                                                                  "min": row["min"].timestamp(),
-                                                                  }}
+            row["unique_identifier"]: {
+                "max": row["max"].timestamp(),
+                "min": row["min"].timestamp(),
+            }
             for _, row in grouped_dates.reset_index().iterrows()
         }
     return chunk_stats, grouped_dates
+
+class DataUpdates(BaseTdagPydanticModel):
+    """
+    TODO WIP Helper function to work with the table updates
+    """
+    update_statistics: Optional[Dict[str, Any]]
+
+    def get_min_latest_value(self, init_fallback_date: datetime=None):
+        if not self.update_statistics:
+            return init_fallback_date
+        return min(self.update_statistics.values())
+
+    def get_max_latest_value(self, init_fallback_date: datetime=None):
+        if not self.update_statistics:
+            return init_fallback_date
+        return min(self.update_statistics.values())
+
+    def asset_identifier(self):
+        return list(self.update_statistics.keys())
+
+    def update_assets(self, asset_list: list, init_fallback_date: datetime=None):
+        new_update_statistics = {}
+        for a in asset_list:
+            unique_identifier = a.unique_identifier
+            if self.update_statistics and unique_identifier in self.update_statistics:
+                new_update_statistics[unique_identifier] = self.update_statistics[unique_identifier]
+            else:
+                if init_fallback_date is None: raise ValueError("No initial start date for new assets defined")
+                new_update_statistics[a] = init_fallback_date
+        return DataUpdates(update_statistics=new_update_statistics)
+
+    def is_empty(self):
+        return self.update_statistics is None or len(self.update_statistics) == 0
+
+    def __getitem__(self, key: str) -> Any:
+        if self.update_statistics is None:
+            raise KeyError(f"{key} not found (update_statistics is None).")
+        return self.update_statistics[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if self.update_statistics is None:
+            self.update_statistics = {}
+        self.update_statistics[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        if not self.update_statistics or key not in self.update_statistics:
+            raise KeyError(f"{key} not found in update_statistics.")
+        del self.update_statistics[key]
+
+    def __iter__(self):
+        """Iterate over keys."""
+        if self.update_statistics is None:
+            return iter([])
+        return iter(self.update_statistics)
+
+    def __len__(self) -> int:
+        if not self.update_statistics:
+            return 0
+        return len(self.update_statistics)
+
+    def keys(self):
+        if not self.update_statistics:
+            return []
+        return self.update_statistics.keys()
+
+    def values(self):
+        if not self.update_statistics:
+            return []
+        return self.update_statistics.values()
+
+    def items(self):
+        if not self.update_statistics:
+            return []
+        return self.update_statistics.items()
+
 
 class LocalTimeSeriesHistoricalUpdate(BaseTdagPydanticModel, BaseObject):
     id: Optional[int]=None
@@ -713,6 +789,7 @@ class LocalTimeSeriesHistoricalUpdate(BaseTdagPydanticModel, BaseObject):
     must_update:bool
     direct_dependencies_ids:List[int]
     last_time_index_value:Optional[datetime.datetime] = None
+    update_statistics: DataUpdates
 
     @classmethod
     @property
@@ -782,6 +859,9 @@ class TimeSerieLocalUpdate(BaseObject):
         result = r.json()
         if result["last_time_index_value"] is not None:
             result["last_time_index_value"]=datetime.datetime.fromtimestamp(result["last_time_index_value"]).replace(tzinfo=pytz.utc)
+
+        result['update_statistics'] = {k: request_to_datetime(v) for k,v in result['update_statistics'].items()}
+        result['update_statistics'] = DataUpdates(update_statistics=result['update_statistics'])
         return LocalTimeSeriesHistoricalUpdate(**result)
 
     @classmethod
@@ -1469,7 +1549,6 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
                 less_or_equal=less_or_equal,
                 asset_symbols=asset_symbols,
                 columns=columns,
-                execution_venue_symbols=execution_venue_symbols,
                 symbol_range_map=None,  # pass a custom map if needed
             )
             if len(df) == 0:
@@ -1995,9 +2074,7 @@ class DynamicTableHelpers:
         max_per_asset_symbol = None
         if len(index_names) > 1:
             max_per_asset_symbol = {
-                k: {
-                    ev: ev_dict["max"] for ev, ev_dict in v.items()
-                } for k, v in global_stats["_PER_ASSET_"].items()
+                unique_identifier: stats["max"] for unique_identifier, stats in global_stats["_PER_ASSET_"].items()
             }
         r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(
             max_per_asset_symbol=max_per_asset_symbol,
@@ -2084,15 +2161,18 @@ class DynamicTableHelpers:
             except AlreadyExist:
                 source_configuration = metadata["sourcetableconfiguration"]
                 if not overwrite:
+                    raise NotImplementedError("TODO Needs to remove values per asset")
                     # Filter the data based on time_index_name and last_time_index_value
                     data = data[
                         data[time_index_name] > self.request_to_datetime(source_configuration['last_time_index_value'])
                         ]
         return metadata, data
 
-    def upsert_data_into_table(self, metadata:dict,local_metadata:dict,
-                            historical_update_id:Union[int,None],
-                               data: pd.DataFrame, overwrite: bool,
+    def upsert_data_into_table(self, metadata:dict,
+                               local_metadata:dict,
+                               historical_update_id:Union[int,None],
+                               data: pd.DataFrame,
+                               overwrite: bool,
                                data_source:DynamicTableDataSource,
                                logger=logger
                                ):
@@ -2113,6 +2193,7 @@ class DynamicTableHelpers:
 
         data, column_index_names, index_names, column_dtypes_map, time_index_name = self._break_pandas_dataframe(
             data)
+
         #overwrite data origina data frame to release memory
         if not data[time_index_name].is_monotonic_increasing:
             data = data.sort_values(time_index_name)
@@ -2163,7 +2244,6 @@ class DynamicTableHelpers:
             end_date: Union[datetime.datetime, None] = None,
             columns: Union[list, None] = None,
             asset_symbols:Union[list,None]=None,
-            execution_venue_symbols:Union[list,None]=None
     ):
         return data_source.get_data_by_time_index(
             local_metadata=local_metadata,
@@ -2173,7 +2253,6 @@ class DynamicTableHelpers:
             less_or_equal=less_or_equal,
             columns=columns,
             asset_symbols=asset_symbols,
-            execution_venue_symbols=execution_venue_symbols,
             logger=self.logger
         )
 

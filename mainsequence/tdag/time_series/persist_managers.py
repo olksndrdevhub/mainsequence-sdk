@@ -567,7 +567,7 @@ class PersistManager:
                 if metadata['sourcetableconfiguration']['multi_index_stats'] is not None:
                     last_update_per_asset = metadata['sourcetableconfiguration']['multi_index_stats']['max_per_asset_symbol']
                     if last_update_per_asset is not None:
-                        last_update_per_asset = {symbol:{ev:self.dth.request_to_datetime(v) for ev,v in ev_dict.items()} for symbol,ev_dict in last_update_per_asset.items()}
+                        last_update_per_asset = {unique_identifier: self.dth.request_to_datetime(v) for unique_identifier, v in last_update_per_asset.items()}
 
         if asset_symbols is not None and last_update_per_asset is not None:
             last_update_per_asset = {asset: value for asset, value in last_update_per_asset.items() if asset in asset_symbols}
@@ -640,9 +640,9 @@ class PersistManager:
                              columns: Union[list, None] = None):
 
         filtered_data = self.dth.get_data_by_time_index(local_metadata=self.local_metadata,
-
                                                         start_date=start_date,
-                                                        end_date=end_date, great_or_equal=great_or_equal,
+                                                        end_date=end_date,
+                                                        great_or_equal=great_or_equal,
                                                         less_or_equal=less_or_equal,
                                                         asset_symbols=asset_symbols,
                                                         columns=columns,

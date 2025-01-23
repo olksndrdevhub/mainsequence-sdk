@@ -151,7 +151,7 @@ def direct_data_from_db(metadata: dict, connection_uri: str,
 
     if asset_symbols:
         helper_symbol = "','"
-        where_clauses.append(f"asset_symbol IN ('{helper_symbol.join(asset_symbols)}')")
+        where_clauses.append(f"unique_identifier IN ('{helper_symbol.join(asset_symbols)}')")
 
     # Combine WHERE clauses
     where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
@@ -230,16 +230,14 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
 
                     if len(index_names) > 1:
 
-                        grouped_dates = grouped_dates.reset_index(level="execution_venue_symbol").rename(
-                            columns={"min": "start_time", "max": "end_time"})
+                        grouped_dates = grouped_dates.rename(columns={"min": "start_time", "max": "end_time"})
                         grouped_dates = grouped_dates.reset_index()
                         grouped_dates = grouped_dates.to_dict("records")
 
                         # Build the DELETE query
                         delete_conditions = []
                         for item in grouped_dates:
-                            asset_symbol = item['asset_symbol']
-                            execution_venue_symbol = item['execution_venue_symbol']
+                            asset_symbol = item['unique_identifier']
                             start_time = item['start_time']
                             end_time = item['end_time']
 
@@ -249,11 +247,10 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
 
                             # Escape single quotes
                             asset_symbol = asset_symbol.replace("'", "''")
-                            execution_venue_symbol = execution_venue_symbol.replace("'", "''")
 
                             # Build the condition string
                             condition = f"({time_index_name} >= '{start_time_str}' AND {time_index_name} <= '{end_time_str}' " \
-                                        f"AND asset_symbol = '{asset_symbol}' AND execution_venue_symbol = '{execution_venue_symbol}')"
+                                        f"AND unique_identifier = '{asset_symbol}')"
                             delete_conditions.append(condition)
 
                         # Combine all conditions using OR

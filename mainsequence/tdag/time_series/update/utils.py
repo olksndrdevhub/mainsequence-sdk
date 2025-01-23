@@ -128,7 +128,7 @@ class UpdateInterface:
                               active_update_scheduler_uid=self.scheduler_uid,
                               )
 
-            update_datails=TimeSerieLocalUpdate.set_start_of_execution(local_time_serie_id=local_time_serie_id,**new_update)
+            update_datails = TimeSerieLocalUpdate.set_start_of_execution(local_time_serie_id=local_time_serie_id,**new_update)
 
             self.last_historical_update[local_time_serie_id] = update_datails
         except Exception as e:
