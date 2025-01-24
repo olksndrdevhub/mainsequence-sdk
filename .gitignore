@@ -133,3 +133,5 @@ dmypy.json
 docs/_build
 live_to_production.yml
 copy_configs
+
+./idea/

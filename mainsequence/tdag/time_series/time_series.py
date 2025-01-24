@@ -799,7 +799,7 @@ class TimeSerieRebuildMethods(ABC):
         return data_source
 
     @classmethod
-    def rebuild_and_set_from_local_hash_id(cls, local_hash_id, data_source_id, set_dependencies_df: bool = False,
+    def rebuild_and_set_from_id(cls, local_hash_id:int,data_source_id:int, set_dependencies_df: bool = False,
                                            graph_depth_limit=1,
                                            ):
         """
@@ -812,11 +812,14 @@ class TimeSerieRebuildMethods(ABC):
         :return:
         """
         local_metadatas = None
-        pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id, data_source_id=data_source_id)
+        pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
+                                                data_source_id=data_source_id,
+                                                )
         if os.path.isfile(pickle_path) == False or os.stat(pickle_path).st_size == 0:
             # rebuild time serie and pickle
             ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
                                                       data_source=data_source_id,
+
                                                       )
             if set_dependencies_df == True:
                 ts.set_relation_tree()
@@ -847,7 +850,7 @@ class TimeSerieRebuildMethods(ABC):
 
     @classmethod
     @tracer.start_as_current_span("TS: Rebuild From Configuration")
-    def rebuild_from_configuration(cls, local_hash_id,
+    def rebuild_from_configuration(cls, local_hash_id:str,
                                    data_source: Union[int, object],
 
                                    ):
@@ -861,11 +864,11 @@ class TimeSerieRebuildMethods(ABC):
         import importlib
         from mainsequence.tdag.time_series.persist_managers import PersistManager
 
-        tracer_instrumentator.append_attribute_to_current_span("time_serie_hash_id", local_hash_id)
+        tracer_instrumentator.append_attribute_to_current_span("local_hash_id", local_hash_id)
 
         if isinstance(data_source, int):
-            pickle_path = cls.get_pickle_path(local_hash_id,
-                                              data_source_id=data_source)
+            pickle_path = cls.get_pickle_path(data_source_id=data_source,
+                                              local_hash_id=local_hash_id)
             if os.path.isfile(pickle_path) == False:
                 data_source = DynamicTableDataSource.get(id=data_source)
                 data_source.persist_to_pickle(data_source_pickle_path(data_source.id))
@@ -911,18 +914,19 @@ class TimeSerieRebuildMethods(ABC):
         return state
 
     @classmethod
-    def get_pickle_path(cls, local_hash_id, data_source_id: int):
+    def get_pickle_path(cls, local_hash_id: str,data_source_id: int):
         return f"{ogm.pickle_storage_path}/{data_source_id}/{local_hash_id}.pickle"
 
     @classmethod
-    def load_and_set_from_hash_id(cls, local_hash_id, data_source_id: int):
-        path = cls.get_pickle_path(local_hash_id=local_hash_id, data_source_id=data_source_id)
+    def load_and_set_from_hash_id(cls,  local_hash_id: int,data_source_id: int):
+        path = cls.get_pickle_path(local_hash_id=local_hash_id,data_source_id=data_source_id)
         ts = cls.load_and_set_from_pickle(pickle_path=path)
         return ts
 
     @property
     def pickle_path(self):
         pp = data_source_dir_path(self.data_source.id)
+
         path = f"{pp}/{self.local_hash_id}.pickle"
         return path
 
@@ -1078,7 +1082,7 @@ class TimeSerieRebuildMethods(ABC):
     @tracer.start_as_current_span("TS: Update")
     def update(self, update_tracker: object, debug_mode: bool,
                raise_exceptions=True, update_tree=False,
-               metadatas: Union[dict, None] = None, update_only_tree=False, force_update=False,
+               local_time_series_map: Union[dict, None] = None, update_only_tree=False, force_update=False,
                use_state_for_update=False
                ):
         """
@@ -1112,7 +1116,7 @@ class TimeSerieRebuildMethods(ABC):
                     update_on_batches = True
 
                 self.update_local(update_tree=update_tree, debug_mode=debug_mode,
-                                  overwrite_latest_value=latest_value, metadatas=metadatas,
+                                  overwrite_latest_value=latest_value, local_time_series_map=local_time_series_map,
                                   update_tracker=update_tracker, update_only_tree=update_only_tree,
                                   use_state_for_update=use_state_for_update, update_statistics=update_statistics
                                   )
@@ -2019,7 +2023,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                          skip_health_check=True
                                                          )
             try:
-                local_metadatas, state_data = self.pre_update_setting_routines(scheduler=scheduler,
+                local_time_series_map, state_data = self.pre_update_setting_routines(scheduler=scheduler,
                                                                                set_time_serie_queue_status=False,
                                                                                update_tree=update_tree)
                 self.set_actor_manager(actor_manager=distributed_actor_manager)
@@ -2042,7 +2046,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                               force_update=force_update,
                                               update_tree=update_tree,
                                               update_only_tree=update_only_tree,
-                                              metadatas=local_metadatas,
+                                              local_time_series_map=local_time_series_map,
                                               update_tracker=self.update_tracker,
                                               use_state_for_update=True
                                               )
@@ -2231,7 +2235,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         self.dependencies_df = depth_df.copy()
 
         if depth_df.shape[0] > 0:
-            self.dependencies_df = self.depth_df[self.depth_df["local_hash_id"] != self.hashed_name].copy()
+            self.dependencies_df = self.depth_df[self.depth_df["local_time_serie_id"] != self.local_persist_manager.local_metadata.id].copy()
 
     def pre_update_setting_routines(self, scheduler, set_time_serie_queue_status: bool, update_tree: True,
                                     metadata: Union[dict, None] = None, local_metadata: Union[dict, None] = None
@@ -2259,21 +2263,20 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
             self.logger.info("Setting dependencies in scheduler active_tree")
             # only set once
-            all_hash_id_in_tree = []
+            all_local_time_series_in_tree = []
 
             if self.depth_df.shape[0] > 0:
-                all_hash_id_in_tree = self.depth_df["local_hash_id"].to_list()
+                all_local_time_series_in_tree = self.depth_df["local_time_serie_id"].to_list()
                 if update_tree == True:
-                    scheduler.in_active_tree_connect(hash_id_list=all_hash_id_in_tree + [self.local_hash_id])
+                    scheduler.in_active_tree_connect(local_time_series_ids=all_local_time_series_in_tree + [self.local_persist_manager.local_metadata.id])
 
         depth_df = self.depth_df.copy()
         # set active tree connections
         all_hash_id_in_tree = []
 
         if self.depth_df.shape[0] > 0:
-            all_hash_id_in_tree = depth_df[["local_hash_id", "data_source_id"]].to_dict("records")
-            assert depth_df.groupby("local_hash_id").count().max().max() < 2
-        all_hash_id_in_tree.append({"local_hash_id": self.local_hash_id, "data_source_id": self.data_source.id})
+            all_local_time_series_in_tree = depth_df[["local_time_serie_id"]].to_dict("records")
+        all_local_time_series_in_tree.append({"local_time_serie_id":self.local_persist_manager.local_metadata.id})
 
         update_details_batch = dict(error_on_last_update=False,
                                     active_update_scheduler_uid=scheduler.uid)
@@ -2294,7 +2297,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         return local_metadatas, state_data
 
     @tracer.start_as_current_span("Verify time series tree update")
-    def _verify_tree_is_updated(self, metadatas: dict, debug_mode: bool,
+    def _verify_tree_is_updated(self, local_time_series_map: Dict[int,LocalTimeSerie], debug_mode: bool,
                                 use_state_for_update: bool = False
                                 ):
         """
@@ -2329,7 +2332,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
             if tmp_ts.shape[0] > 0:
                 self._execute_parallel_distributed_update(tmp_ts=tmp_ts,
-                                                          metadatas=metadatas)
+                                                          local_time_series_map=local_time_series_map,
+                                                          )
         else:
             updated_uids = []
             if self.dependencies_df.shape[0] > 0:
@@ -2388,45 +2392,49 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
     @tracer.start_as_current_span("Execute distributed parallel update")
     def _execute_parallel_distributed_update(self, tmp_ts: pd.DataFrame,
+                                             local_time_series_map:Dict[int,LocalTimeSerie]
                                              ):
 
         telemetry_carrier = tracer_instrumentator.get_telemetry_carrier()
 
         pre_loaded_ts = [t.hash_id for t in self.scheduler.pre_loads_in_tree]
         tmp_ts = tmp_ts.sort_values(["update_priority", "number_of_upstreams"], ascending=[True, False])
-        pre_load_df = tmp_ts[tmp_ts["local_hash_id"].isin(pre_loaded_ts)].copy()
-        tmp_ts = tmp_ts[~tmp_ts["local_hash_id"].isin(pre_loaded_ts)].copy()
+        pre_load_df = tmp_ts[tmp_ts["local_time_serie_id"].isin(pre_loaded_ts)].copy()
+        tmp_ts = tmp_ts[~tmp_ts["local_time_serie_id"].isin(pre_loaded_ts)].copy()
         tmp_ts = pd.concat([pre_load_df, tmp_ts], axis=0)
 
         futures_ = []
 
         local_time_series_list = self.dependencies_df[
             self.dependencies_df["source_class_name"] != "WrapperTimeSerie"
-            ][["local_hash_id", "data_source_id"]].values.tolist()
+            ]["local_time_serie_id"].values.tolist()
 
         for counter, (uid, data) in enumerate(tmp_ts.iterrows()):
-            local_hash_id = data['local_hash_id']
+            local_time_serie_id = data['local_time_serie_id']
             data_source_id = data['data_source_id']
+            local_hash_id=data['local_hash_id']
 
-            kwargs_update = dict(local_hash_id=local_hash_id,
-                                 telemetry_carrier=telemetry_carrier,
+            kwargs_update = dict(local_time_serie_id=local_time_serie_id,
+                                 local_hash_id=local_hash_id,
                                  data_source_id=data_source_id,
+                                 telemetry_carrier=telemetry_carrier,
                                  scheduler_uid=self.scheduler.uid
                                  )
 
-            update_details = self.update_details_tree[(local_hash_id, data_source_id)]
-            num_cpus = update_details["run_configuration"]["required_cpus"]
+            update_details = self.update_details_tree[local_time_serie_id]
+            run_configuration=local_time_series_map[local_time_serie_id].run_configuration
+            num_cpus = run_configuration.required_cpus
 
             task_kwargs = dict(task_options={"num_cpus": num_cpus,
-                                             "name": f"{local_hash_id}_{data_source_id}",
+                                             "name": f"local_time_serie_id_{local_time_serie_id}",
 
-                                             "max_retries": update_details["run_configuration"]["retry_on_error"]},
+                                             "max_retries": run_configuration.retry_on_error},
                                kwargs_update=kwargs_update)
 
-            p = self.update_actor_manager.launch_update_task(**task_kwargs)
+            # p = self.update_actor_manager.launch_update_task(**task_kwargs)
 
-            # p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
-            # continue
+            p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
+            continue
 
             futures_.append(p)
 
@@ -2459,7 +2467,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
     @tracer.start_as_current_span("TimeSerie.update_local")
     def update_local(self, update_tree, update_tracker: object, debug_mode: bool,
-                     metadatas: Union[None, dict] = None,
+                     local_time_series_map: Union[None, dict] = None,
                      overwrite_latest_value: Union[datetime.datetime, None] = None, update_only_tree: bool = False,
                      use_state_for_update: bool = False, update_statistics=None,
                      *args, **kwargs) -> bool:
@@ -2469,7 +2477,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         if update_tree == True:
 
             self._verify_tree_is_updated(debug_mode=debug_mode,
-                                         metadatas=metadatas,
+                                         local_time_series_map=local_time_series_map,
                                          use_state_for_update=use_state_for_update,
                                          )
             update_only_tree == True

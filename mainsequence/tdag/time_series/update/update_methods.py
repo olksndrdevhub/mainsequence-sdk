@@ -22,7 +22,8 @@ from mainsequence.tdag_client.models import LocalTimeSeriesHistoricalUpdate
 def update_remote_from_hash_id_local(
                          telemetry_carrier: str,
 scheduler_uid:str,
-                               local_hash_id: str,data_source_id:int,
+                               local_time_serie_id: int,data_source_id:int,
+local_hash_id:str,
 
                                ):
     """
@@ -51,11 +52,11 @@ scheduler_uid:str,
 
     with tracer.start_as_current_span(f"Distributed Task : Main Time Serie Update", context=ctx,
                                       kind=SpanKind(4)) as span:
-        span.set_attribute("time_serie_hash_id", local_hash_id)
+        span.set_attribute("local_hash_id", local_hash_id)
 
-        ts, pickle_path = TimeSerie.rebuild_and_set_from_local_hash_id(
-            local_hash_id=local_hash_id,graph_depth_limit=0,
+        ts, pickle_path = TimeSerie.rebuild_and_set_from_id(
             data_source_id=data_source_id,
+            local_hash_id=local_hash_id,graph_depth_limit=0,
         )
         ts.logger.info(f'{ts.local_hash_id} {data_source_id} loaded and ready to update')
 

@@ -59,7 +59,9 @@ class APIPersistManager:
         return df
 
 class PersistManager:
-    def __init__(self,data_source, local_hash_id: str,
+    def __init__(self,
+                 data_source,
+                 local_hash_id: int,
 
                  description: Union[str, None] = None,
                  class_name: Union[str, None] = None,
@@ -117,7 +119,7 @@ class PersistManager:
 
             local_metadata = {}  # set to empty in case not exist
             local_metadata = LocalTimeSerie.get(local_hash_id=self.local_hash_id,
-                                                      remote_table__data_source__id=self.data_source.id
+                                                remote_table__data_source__id=self.data_source.id
                                                       )
 
 
@@ -225,9 +227,7 @@ class PersistManager:
 
     def set_ogm_dependencies_linked(self):
 
-        TimeSerieLocalUpdate.set_ogm_dependencies_linked(hash_id=self.local_hash_id,
-                                                         data_source_id=self.data_source.id
-                                                         )
+        self.local_metadata.set_ogm_dependencies_linked()
 
     @property
     def update_details(self):
@@ -257,7 +257,7 @@ class PersistManager:
 
         """
 
-        self.metadata = self.dth.patch(metadata=self.metadata, time_serie_source_code_git_hash=git_hash_id,
+        self.metadata = DynamicTableMetaData.patch(metadata=self.metadata, time_serie_source_code_git_hash=git_hash_id,
                             time_serie_source_code=source_code,)
 
     

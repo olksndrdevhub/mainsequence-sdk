@@ -276,58 +276,7 @@ class TimeSerieNode(BaseTdagPydanticModel,BaseObject):
         depth_df = pd.DataFrame(r.json())
         return depth_df
 
-    @classmethod
-    def depends_on_connect_remote_table(cls, source_hash_id: str,
-                           source_local_hash_id: str,
-                           source_data_source_id: id,
-                           target_data_source_id: id,
-                           target_local_hash_id: str):
-        """
 
-        """
-        s = cls.build_session()
-        url = cls.ROOT_URL + "/depends_on_connect_remote_table/"
-        payload = dict(json={"source_hash_id": source_hash_id,
-                             "source_local_hash_id": source_local_hash_id,
-                             "source_data_source_id": source_data_source_id,
-                             "target_data_source_id":target_data_source_id,
-                             "target_local_hash_id": target_local_hash_id,
-                             })
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
-            raise Exception(f"Error in request {r.text}")
-
-    @classmethod
-    def depends_on_connect(cls,  target_class_name: str,
-                           source_local_hash_id: str,
-                           target_local_hash_id: str,
-                           source_data_source_id: id,
-                           target_data_source_id: id,
-                           target_human_readable: str):
-        """
-        Connects and build relationship
-        Parameters
-        ----------
-        source_hash_id :
-        target_hash_id :
-        target_class_name :
-        target_human_readable :
-
-        Returns
-        -------
-
-        """
-        s = cls.build_session()
-        url = cls.ROOT_URL + "/depends_on_connect/"
-        payload = dict(json={ "target_class_name": target_class_name,
-                             "source_local_hash_id": source_local_hash_id, "target_local_hash_id": target_local_hash_id,
-                             "target_human_readable": target_human_readable,
-                             "source_data_source_id": source_data_source_id,
-                             "target_data_source_id": target_data_source_id,
-                             })
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
-            raise Exception(f"Error in request {r.text}")
 
     @classmethod
     def set_policy_for_descendants(cls, hash_id, policy, pol_type, exclude_ids, extend_to_classes):
@@ -774,11 +723,10 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
             raise Exception(f"Error in request {r.text}")
         return [cls(**i) for i in r.json()]
 
-    @classmethod
-    def set_ogm_dependencies_linked(cls, hash_id, data_source_id):
-        s = cls.build_session()
-        url = cls.get_root_url() + f"/{hash_id}/set_ogm_dependencies_linked?data_source_id={data_source_id}"
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, )
+    def set_ogm_dependencies_linked(self):
+        s = self.build_session()
+        url = self.get_node_methods_url() + f"/{self.id}/set_ogm_dependencies_linked"
+        r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, )
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
 
@@ -948,24 +896,32 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
         r = r.json()
-        r["source_table_config_map"] = {int(k): SourceTableConfiguration(**v) for k, v in r["source_table_config_map"].items()}
+        r["source_table_config_map"] = {int(k): SourceTableConfiguration(**v) if v is not None else v for k, v in r["source_table_config_map"].items()}
         r["state_data"] = {int(k): LocalTimeSerieUpdateDetails(**v) for k, v in r["state_data"].items()}
         r["all_index_stats"] = {int(k): v for k, v in r["all_index_stats"].items()}
         r["local_metadatas"]=[LocalTimeSerie(**v) for v in r["local_metadatas"]]
 
         return r
 
-    def depends_on_connect_remote_table(self, source_hash_id: str,
+    @classmethod
+    def depends_on_connect_remote_table(cls, source_hash_id: str,
                                         source_local_hash_id: str,
                                         source_data_source_id: id,
                                         target_data_source_id: id,
                                         target_local_hash_id: str):
-        TimeSerieNode.depends_on_connect_remote_table(source_hash_id=source_hash_id,
-                                                      source_local_hash_id=source_local_hash_id,
-                                                      source_data_source_id=source_data_source_id,
-                                                      target_data_source_id=target_data_source_id,
-                                                      target_local_hash_id=target_local_hash_id)
+        s = cls.build_session()
+        url = get_ts_node_url(TDAG_ENDPOINT)  + "/depends_on_connect_remote_table/"
+        payload = dict(json={"source_hash_id": source_hash_id,
+                             "source_local_hash_id": source_local_hash_id,
+                             "source_data_source_id": source_data_source_id,
+                             "target_data_source_id": target_data_source_id,
+                             "target_local_hash_id": target_local_hash_id,
+                             })
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
+        if r.status_code != 201:
+            raise Exception(f"Error in request {r.text}")
 
+    @classmethod
     def depends_on_connect(self, target_class_name: str,
                            source_local_hash_id: str,
                            target_local_hash_id: str,
@@ -973,12 +929,17 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                            target_data_source_id: id,
                            target_human_readable: str):
 
-        TimeSerieNode.depends_on_connect(
-            source_local_hash_id=source_local_hash_id, target_local_hash_id=target_local_hash_id,
-            target_class_name=target_class_name,
-            source_data_source_id=source_data_source_id,
-            target_data_source_id=target_data_source_id,
-            target_human_readable=target_human_readable)
+        s = self.build_session()
+        url = get_ts_node_url(TDAG_ENDPOINT) + "/depends_on_connect/"
+        payload = dict(json={"target_class_name": target_class_name,
+                             "source_local_hash_id": source_local_hash_id, "target_local_hash_id": target_local_hash_id,
+                             "target_human_readable": target_human_readable,
+                             "source_data_source_id": source_data_source_id,
+                             "target_data_source_id": target_data_source_id,
+                             })
+        r = make_request(s=s, loaders=self.LOADERS, r_type="POST", url=url, payload=payload)
+        if r.status_code != 201:
+            raise Exception(f"Error in request {r.text}")
 
 class Scheduler(BaseTdagPydanticModel,BaseObject):
     uid: str
@@ -1096,13 +1057,13 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
         scheduler = cls(**r.json())
         return scheduler
 
-    def in_active_tree_connect(self,hash_id_list:list):
+    def in_active_tree_connect(self,local_time_series_ids:list):
         if BACKEND_DETACHED() == True:
-            self.in_active_tree=hash_id_list
+            self.in_active_tree=local_time_series_ids
             return None
         s = self.build_session()
         url = self.ROOT_URL + f"/{self.uid}/in_active_tree_connect/"
-        payload = dict(json={"hash_id_list": hash_id_list})
+        payload = dict(json={"local_time_series_ids": local_time_series_ids})
         r = make_request(s=s, loaders=self.LOADERS,r_type="PATCH", url=url, payload=payload)
         if r.status_code != 201:
             raise Exception(f"Error in request {r.text}")
@@ -1188,8 +1149,8 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
         logger.info("Heartbeat thread stopped.")
 
 
-    def patch(self,time_out, *args, **kwargs):
-        url = self.ROOT_URL + f"/{self.id}/"
+    def patch(self,time_out=None, *args, **kwargs):
+        url = self.ROOT_URL + f"/{self.uid}/"
         payload = {"json": serialize_to_json(kwargs)}
         s = self.build_session()
         r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload,time_out=time_out)
