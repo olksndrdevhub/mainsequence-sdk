@@ -2194,7 +2194,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         :param kwargs:
         :return:
         """
-
+        global logger
         kwargs, init_meta = self._sanitize_init_meta(kwargs=kwargs)
         config_serializer = ConfigSerializer()
 
@@ -2209,13 +2209,12 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         remote_hashed_name = remote_hashed_name.lower()
 
         self.set_data_source()
-        self._set_logger(local_hash_id=local_hashed_name)
-
+        logger.bind(local_hash_id=local_hashed_name)
         for m in post_init_log_messages:
-            self.logger.warning(m)
+            logger.warning(m)
 
         if len(remote_hashed_name) > 60:
-            self.logger.error(f"hashed name {remote_hashed_name} is to long {len(remote_hashed_name)} limit i 60 ")
+            logger.error(f"hashed name {remote_hashed_name} is to long {len(remote_hashed_name)} limit i 60 ")
             raise AssertionError
         self.hashed_name = local_hashed_name
         self.remote_table_hashed_name = remote_hashed_name
@@ -2229,7 +2228,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         self.remote_build_metadata = self.sanitize_default_build_metadata(kwargs.get("build_meta_data", None))
         self.init_meta = init_meta
 
-        self.logger.debug(f"local/remote {self.hashed_name}/{self.remote_table_hashed_name}")
+        logger.debug(f"local/remote {self.hashed_name}/{self.remote_table_hashed_name}")
 
     def set_update_uses_parallel(self, value):
         self.local_persist_manager.set_meta("update_uses_parallel", value)
