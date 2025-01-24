@@ -689,7 +689,7 @@ def get_chunk_stats(chunk_df,time_index_name,index_names):
     chunk_stats = {"_GLOBAL_": {"max": chunk_df[time_index_name].max().timestamp(),
                                 "min": chunk_df[time_index_name].min().timestamp()}}
 
-    grouped_dates=None
+    grouped_dates = None
     if len(index_names) > 1:
         grouped_dates = chunk_df.groupby(["asset_symbol", "execution_venue_symbol"])[
             time_index_name].agg(
@@ -700,7 +700,7 @@ def get_chunk_stats(chunk_df,time_index_name,index_names):
                                                                   }}
             for _, row in grouped_dates.reset_index().iterrows()
         }
-    return chunk_stats,grouped_dates
+    return chunk_stats, grouped_dates
 
 class LocalTimeSeriesHistoricalUpdate(BaseTdagPydanticModel, BaseObject):
     id: Optional[int]=None
@@ -1278,6 +1278,68 @@ class LocalDiskSourceLake(DynamicTableDataSource):
             raise Exception(f"Error in request {r.text}")
         return cls(**r.json())
 
+    def _insert_data_into_table(
+            self,
+            serialized_data_frame: pd.DataFrame,
+            metadata,
+            time_index_name: str,
+            index_names: list,
+            logger: object,
+            *args,
+            **kwargs,
+    ):
+
+        data_lake_interface = DataLakeInterface(data_lake_source=self, logger=logger)
+        data_lake_interface.persist_datalake(
+            serialized_data_frame,
+            overwrite=True,
+            time_index_name=time_index_name, index_names=index_names,
+            table_name=metadata["table_name"]
+        )
+
+    def filter_by_assets_ranges(
+        self,
+        asset_ranges_map: dict,
+        metadata: dict,
+        *args,
+        **kwargs
+    ):
+        table_name = metadata["table_name"]
+        data_lake_interface = DataLakeInterface(data_lake_source=self, logger=logger)
+        df = data_lake_interface.filter_by_assets_ranges(
+            table_name=table_name,
+            asset_ranges_map=asset_ranges_map,
+        )
+        return df
+
+    def get_data_by_time_index(
+        self,
+        local_metadata: dict,
+        start_date: Optional[datetime.datetime] = None,
+        end_date: Optional[datetime.datetime] = None,
+        great_or_equal: bool = True,
+        less_or_equal: bool = True,
+        columns: Optional[List[str]] = None,
+        asset_symbols: Optional[List[str]] = None,
+        execution_venue_symbols: Optional[List[str]] = None,
+        logger: Optional[object] = None,
+    ) -> pd.DataFrame:
+
+        metadata = local_metadata["remote_table"]
+        table_name = metadata["table_name"]
+        data_lake_interface = DataLakeInterface(data_lake_source=self, logger=logger)
+
+        filters = data_lake_interface.build_time_and_symbol_filter(
+            start_date=start_date,
+            end_date=end_date,
+            great_or_equal=great_or_equal,
+            less_or_equal=less_or_equal,
+            asset_symbols=asset_symbols,
+        )
+
+        df = data_lake_interface.query_datalake(filters=filters, table_name=table_name)
+        return df
+
 class TimeScaleDBDataSource(DynamicTableDataSource):
     related_resource: Union[TimeScaleDB,int]
     data_type: str = CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB
@@ -1293,6 +1355,139 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
             raise Exception("This Data source does not have direct access")
         password = self.related_resource.password  # Decrypt password if necessary
         return f"postgresql://{self.related_resource.database_user}:{password}@{self.related_resource.host}:{self.related_resource.port}/{self.related_resource.database_name}"
+
+    def _insert_data_into_table(
+            self,
+            serialized_data_frame: pd.DataFrame,
+            metadata,
+            local_metadata: dict,
+            overwrite: bool,
+            time_index_name: str,
+            index_names: list,
+            grouped_dates: dict,
+            logger: object,
+            *args,
+            **kwargs,
+    ):
+        if BACKEND_DETACHED() == True:
+            return None
+
+        if not self.has_direct_connection:
+            # Do API insertion
+            TimeSerieLocalUpdate.post_data_frame_in_chunks(
+                serialized_data_frame=serialized_data_frame,
+                logger=logger,
+                local_metadata=local_metadata,
+                data_source=self,
+                index_names=index_names,
+                time_index_name=time_index_name,
+                overwrite=overwrite,
+            )
+        else:
+            TimeScaleInterface.process_and_update_table(
+                serialized_data_frame=serialized_data_frame,
+                metadata=metadata,
+                grouped_dates=grouped_dates,
+                data_source=self,
+                index_names=index_names,
+                time_index_name=time_index_name,
+                overwrite=overwrite,
+                JSON_COMPRESSED_PREFIX=JSON_COMPRESSED_PREFIX,
+                logger=logger
+            )
+
+    def filter_by_assets_ranges(
+            self,
+            asset_ranges_map: dict,
+            metadata: dict,
+            local_hash_id: str,
+            *args,
+            **kwargs
+    ):
+        table_name = metadata["table_name"]
+        index_names = metadata["sourcetableconfiguration"]["index_names"]
+        column_types = metadata["sourcetableconfiguration"]["column_dtypes_map"]
+        if self.has_direct_connection:
+            df = TimeScaleInterface.filter_by_assets_ranges(
+                table_name=table_name,
+                asset_ranges_map=asset_ranges_map,
+                index_names=index_names,
+                data_source=self,
+                column_types=column_types
+            )
+        else:
+            df = TimeSerieLocalUpdate.get_data_between_dates_from_api(
+                local_hash_id=local_hash_id,
+                data_source_id=self.id,
+                start_date=None,
+                end_date=None,
+                great_or_equal=True,
+                less_or_equal=True,
+                asset_symbols=None,
+                columns=None,
+                execution_venue_symbols=None,
+                symbol_range_map=asset_ranges_map,  # <-- key for applying ranges
+            )
+        return df
+
+    def get_data_by_time_index(
+        self,
+        local_metadata: dict,
+        start_date: Optional[datetime.datetime] = None,
+        end_date: Optional[datetime.datetime] = None,
+        great_or_equal: bool = True,
+        less_or_equal: bool = True,
+        columns: Optional[List[str]] = None,
+        asset_symbols: Optional[List[str]] = None,
+        execution_venue_symbols: Optional[List[str]] = None,
+        logger: Optional[object] = None,
+    ) -> pd.DataFrame:
+
+        metadata = local_metadata["remote_table"]  # e.g. from your usage
+        stc = metadata["sourcetableconfiguration"]
+
+        if self.has_direct_connection:
+            df = TimeScaleInterface.direct_data_from_db(
+                metadata=metadata,
+                connection_uri=self.get_connection_uri(),
+                start_date=start_date,
+                end_date=end_date,
+                great_or_equal=great_or_equal,
+                less_or_equal=less_or_equal,
+                columns=columns,
+                asset_symbols=asset_symbols,
+            )
+            df = set_types_in_table(df, stc["column_dtypes_map"])
+            return df
+        else:
+            df = TimeSerieLocalUpdate.get_data_between_dates_from_api(
+                local_hash_id=local_metadata["local_hash_id"],
+                data_source_id=metadata["data_source"]["id"],
+                start_date=start_date,
+                end_date=end_date,
+                great_or_equal=great_or_equal,
+                less_or_equal=less_or_equal,
+                asset_symbols=asset_symbols,
+                columns=columns,
+                execution_venue_symbols=execution_venue_symbols,
+                symbol_range_map=None,  # pass a custom map if needed
+            )
+            if len(df) == 0:
+                if logger:
+                    logger.warning(
+                        f"No data returned from remote API for {local_metadata['local_hash_id']}"
+                    )
+                return df
+
+            stc = local_metadata["remote_table"]["sourcetableconfiguration"]
+            df[stc["time_index_name"]] = pd.to_datetime(df[stc["time_index_name"]])
+            for c, c_type in stc["column_dtypes_map"].items():
+                if c != stc["time_index_name"]:
+                    if c_type == "object":
+                        c_type = "str"
+                    df[c] = df[c].astype(c_type)
+            df = df.set_index(stc["index_names"])
+            return df
 
 class BaseYamlModel(BaseTdagPydanticModel,BaseObject):
 
@@ -1762,84 +1957,56 @@ class DynamicTableHelpers:
 
         return data_frame, column_index_names, index_names, column_dtypes_map, time_index_name
 
-    def _insert_data_into_table(self, serialized_data_frame: pd.DataFrame, metadata,local_metadata:dict,
-                                  overwrite: bool, time_index_name:str,index_names:list,
-                                  historical_update_id:Union[None,int],data_source:DynamicTableDataSource,
-                                logger:object,
-                                  ) -> dict:#LocalMetaData
-        """
+    def _insert_data_into_table(
+            self,
+            serialized_data_frame: pd.DataFrame,
+            metadata,local_metadata:dict,
+            overwrite: bool,
+            time_index_name:str,
+            index_names:list,
+            historical_update_id:Union[None,int],
+            data_source:DynamicTableDataSource,
+            logger:object,
+     ) -> dict:
+        global_stats, grouped_dates = get_chunk_stats(
+            chunk_df=serialized_data_frame,
+            index_names=index_names,
+            time_index_name=time_index_name
+        )
 
-        Parameters
-        ----------
-        serialzied_data_frame :
-        metadata :
-        index_stats :
+        data_source._insert_data_into_table(
+            serialized_data_frame=serialized_data_frame,
+            metadata=metadata,
+            local_metadata=local_metadata,
+            overwrite=overwrite,
+            time_index_name=time_index_name,
+            index_names=index_names,
+            historical_update_id=historical_update_id,
+            logger=logger,
+            global_stats=global_stats,
+            grouped_dates=grouped_dates
+        )
 
-        Returns local_meta_data
-        -------
-
-        """
-        global_stats,grouped_dates = get_chunk_stats(chunk_df=serialized_data_frame,
-                                                             index_names=index_names,
-                                                             time_index_name=time_index_name)
-
-
-
-        call_end_of_execution = True
-        if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            data_lake_interface=DataLakeInterface(data_lake_source=data_source,logger=logger,)
-            data_lake_interface.persist_datalake(serialized_data_frame, overwrite=True,
-                                                 time_index_name=time_index_name, index_names=index_names,
-                                                 table_name=metadata["table_name"])
-
+        call_end_of_execution = True # TODO needed?
         if BACKEND_DETACHED() == True:
             return None
 
-        elif data_source.has_direct_connection==False:
-
-            #Do API insertion
-            TimeSerieLocalUpdate.post_data_frame_in_chunks(serialized_data_frame=serialized_data_frame,
-                                                           logger=self.logger,
-                                                           local_metadata=local_metadata,
-                                                           data_source=data_source,
-                                                           index_names=index_names,
-                                                           time_index_name=time_index_name,
-                                                           overwrite=overwrite,
-                                                           )
-
-
-        else:
-            if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-
-                TimeScaleInterface.process_and_update_table(
-                    serialized_data_frame=serialized_data_frame,
-                    metadata=metadata,
-                    grouped_dates=grouped_dates,
-                    data_source=data_source,
-                    index_names=index_names,
-                    time_index_name=time_index_name,
-                    overwrite=overwrite,
-                    JSON_COMPRESSED_PREFIX=JSON_COMPRESSED_PREFIX,
-                    logger=self.logger
-                )
-
-
-
-
         min_d, last_time_index_value = global_stats["_GLOBAL_"]["min"], global_stats["_GLOBAL_"]["max"]
         max_per_asset_symbol = None
-        if len(index_names)>1:
-            max_per_asset_symbol = {k: {ev: ev_dict["max"] for ev, ev_dict in v.items()} for k, v in
-                                    global_stats["_PER_ASSET_"].items()}
-        r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(max_per_asset_symbol=max_per_asset_symbol,
-                                                                                    last_time_index_value=last_time_index_value,
-                                                                                   metadata=local_metadata,
-
-                                                                 )
+        if len(index_names) > 1:
+            max_per_asset_symbol = {
+                k: {
+                    ev: ev_dict["max"] for ev, ev_dict in v.items()
+                } for k, v in global_stats["_PER_ASSET_"].items()
+            }
+        r = self.TimeSerieLocalUpdate.set_last_update_index_time_from_update_stats(
+            max_per_asset_symbol=max_per_asset_symbol,
+            last_time_index_value=last_time_index_value,
+            metadata=local_metadata,
+        )
         try:
-            result=r.json()
+            result = r.json()
         except Exception as e:
-
             raise e
 
         return result
@@ -1972,85 +2139,43 @@ class DynamicTableHelpers:
 
         return local_metadata
 
-    def filter_by_assets_ranges(self,metadata: dict,
-                                asset_ranges_map:dict,data_source:object
+    def filter_by_assets_ranges(self,
+                                metadata: dict,
+                                asset_ranges_map:dict,
+                                data_source:object,
+                                local_hash_id: str
     ):
-        table_name=metadata["table_name"]
-        if data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-
-            data_lake_interface = DataLakeInterface(data_lake_source=data_source, logger=logger, )
-            df = data_lake_interface.filter_by_assets_ranges(table_name=table_name,
-                                                 asset_ranges_map=asset_ranges_map,
-                                                 )
-
-        elif data_source.data_type==CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-            index_names = metadata["sourcetableconfiguration"]["index_names"]
-            column_types = metadata["sourcetableconfiguration"]["column_dtypes_map"]
-            df = TimeScaleInterface.filter_by_assets_ranges(table_name=table_name, asset_ranges_map=asset_ranges_map, index_names=index_names,
-                                    data_source=data_source, column_types=column_types
-                                    )
-        else:
-            raise NotImplementedError
-
+        df = data_source.filter_by_assets_ranges(
+            metadata=metadata,
+            asset_ranges_map=asset_ranges_map,
+            data_source=data_source,
+            local_hash_id=local_hash_id,
+        )
         return df
 
-
-    def get_data_by_time_index(self, local_metadata: Union[dict,str],     data_source:object,
-                               start_date: Union[datetime.datetime, None] = None,
-                               great_or_equal: bool = True, less_or_equal: bool = True,
-                               end_date: Union[datetime.datetime, None] = None,
-                               columns: Union[list, None] = None,
-                               asset_symbols:Union[list,None]=None,
-                               execution_venue_symbols:Union[list,None]=None
-                               ):
-        metadata=local_metadata["remote_table"]
-        if data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-            if metadata['sourcetableconfiguration'] is None:
-                return pd.DataFrame()
-
-            if data_source.has_direct_connection==True:
-                df = TimeScaleInterface.direct_data_from_db(metadata=metadata, connection_uri=data_source.get_connection_uri(),
-                start_date = start_date, great_or_equal = great_or_equal,
-                less_or_equal = less_or_equal, end_date = end_date, columns = columns, asset_symbols=asset_symbols)
-                df = set_types_in_table(df, metadata["sourcetableconfiguration"]["column_dtypes_map"])
-            else:
-                df=TimeSerieLocalUpdate.get_data_between_dates_from_api(
-                    local_hash_id=local_metadata["local_hash_id"],
-                    data_source_id=metadata["data_source"]["id"], start_date=start_date,
-                    end_date=end_date, great_or_equal=great_or_equal,
-                    less_or_equal=less_or_equal,
-                    asset_symbols=asset_symbols,
-                    columns=columns,
-                    execution_venue_symbols=execution_venue_symbols,
-                    symbol_range_map=None)
-                if len(df) == 0:
-                    self.logger.warning(
-                        f"Data from {local_metadata['local_hash_id']} is empty ({start_date} to {end_date} for assets {asset_symbols}) ")
-                    return filtered_data
-                stc = local_metadata["remote_table"]["sourcetableconfiguration"]
-                df[stc["time_index_name"]] = pd.to_datetime(df[stc["time_index_name"]])
-                for c, c_type in stc["column_dtypes_map"].items():
-                    if c != stc["time_index_name"]:
-                        if c_type == "object":
-                            c_type = "str"
-                        df[c] = df[c].astype(c_type)
-                df = df.set_index(stc["index_names"])
-
-
-        elif data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            data_lake_interface = DataLakeInterface(data_lake_source=data_source, logger=self.logger)
-            filters = data_lake_interface.build_time_and_symbol_filter(start_date=start_date,
-                                                                       great_or_equal=great_or_equal,
-                                                                       less_or_equal=less_or_equal,
-                                                                       end_date=end_date,
-                                                                       asset_symbols=asset_symbols)
-            df = data_lake_interface.query_datalake(filters=filters, table_name=metadata["table_name"])
-        else:
-            raise NotImplementedError
-
-
-        return df
-
+    def get_data_by_time_index(
+            self,
+            local_metadata: Union[dict,str],
+            data_source:object,
+            start_date: Union[datetime.datetime, None] = None,
+            great_or_equal: bool = True,
+            less_or_equal: bool = True,
+            end_date: Union[datetime.datetime, None] = None,
+            columns: Union[list, None] = None,
+            asset_symbols:Union[list,None]=None,
+            execution_venue_symbols:Union[list,None]=None
+    ):
+        return data_source.get_data_by_time_index(
+            local_metadata=local_metadata,
+            start_date=start_date,
+            end_date=end_date,
+            great_or_equal=great_or_equal,
+            less_or_equal=less_or_equal,
+            columns=columns,
+            asset_symbols=asset_symbols,
+            execution_venue_symbols=execution_venue_symbols,
+            logger=self.logger
+        )
 
     def time_serie_exist_in_db(self, hash_id):
         """

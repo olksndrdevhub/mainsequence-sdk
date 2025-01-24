@@ -625,7 +625,7 @@ class PersistManager:
             if isinstance(self, DataLakePersistManager):
                 self.verify_if_already_run(time_serie)
         df = self.dth.filter_by_assets_ranges(metadata=self.metadata, asset_ranges_map=asset_ranges_map,
-                                              data_source=self.data_source)
+                                              data_source=self.data_source, local_hash_id=time_serie.local_hash_id)
 
 
         return df
