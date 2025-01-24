@@ -594,7 +594,7 @@ class PersistManager:
         """
 
         self.local_metadata = self.dth.upsert_data_into_table(
-            metadata=self.metadata,
+            metadata=self.local_metadata["remote_table"],
             local_metadata=self.local_metadata,
             data=temp_df,
             historical_update_id=historical_update_id,
