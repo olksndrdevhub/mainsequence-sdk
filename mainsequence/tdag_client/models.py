@@ -955,6 +955,31 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
 
         return r
 
+    def depends_on_connect_remote_table(self, source_hash_id: str,
+                                        source_local_hash_id: str,
+                                        source_data_source_id: id,
+                                        target_data_source_id: id,
+                                        target_local_hash_id: str):
+        TimeSerieNode.depends_on_connect_remote_table(source_hash_id=source_hash_id,
+                                                      source_local_hash_id=source_local_hash_id,
+                                                      source_data_source_id=source_data_source_id,
+                                                      target_data_source_id=target_data_source_id,
+                                                      target_local_hash_id=target_local_hash_id)
+
+    def depends_on_connect(self, target_class_name: str,
+                           source_local_hash_id: str,
+                           target_local_hash_id: str,
+                           source_data_source_id: id,
+                           target_data_source_id: id,
+                           target_human_readable: str):
+
+        TimeSerieNode.depends_on_connect(
+            source_local_hash_id=source_local_hash_id, target_local_hash_id=target_local_hash_id,
+            target_class_name=target_class_name,
+            source_data_source_id=source_data_source_id,
+            target_data_source_id=target_data_source_id,
+            target_human_readable=target_human_readable)
+
 class Scheduler(BaseTdagPydanticModel,BaseObject):
     uid: str
     name: str
@@ -2435,38 +2460,8 @@ class DynamicTableHelpers:
         results=self._build_table_response(data=results,source_table_config=base_table_config)
 
         return results
-    # def batch_set_end_of_execution(self,update_map:dict):
-    #     base_url = self.root_url
-    #
-    #     payload = {"json": {"update_map":update_map}}
-    #     r = self.make_request(r_type="PATCH",url=f"{base_url}/batch_set_end_of_execution/", payload=payload)
-    #     if r.status_code != 200:
-    #         raise Exception(f"Error in request ")
-    def depends_on_connect_remote_table(self, source_hash_id: str,
-                           source_local_hash_id: str,
-                           source_data_source_id: id,
-                           target_data_source_id: id,
-                           target_local_hash_id: str):
-        TimeSerieNode.depends_on_connect_remote_table(source_hash_id=source_hash_id,
-                                         source_local_hash_id=source_local_hash_id,
-                                         source_data_source_id=source_data_source_id,
-                                         target_data_source_id=target_data_source_id,
-                                         target_local_hash_id=target_local_hash_id)
-
-    def depends_on_connect(self, target_class_name:str,
-                           source_local_hash_id:str,
-                           target_local_hash_id:str,
-                           source_data_source_id:id,
-                            target_data_source_id:id,
-                           target_human_readable:str):
 
 
-        TimeSerieNode.depends_on_connect(
-                                         source_local_hash_id=source_local_hash_id,target_local_hash_id=target_local_hash_id,
-                                         target_class_name=target_class_name,
-                                         source_data_source_id=source_data_source_id,
-                                         target_data_source_id=target_data_source_id,
-                           target_human_readable=target_human_readable)
 
 
     def rename_data_table(self,source_hash_id:str,target_hash_id:str):
