@@ -412,7 +412,7 @@ def process_and_update_table(
     # Handle overwrite and decompress chunks if required
     recompress = False
     if overwrite:
-        url = f"{base_url}/{metadata['id']}/decompress_chunks/"
+        url = f"{base_url}/{metadata.id}/decompress_chunks/"
         from ..models import BaseObject
         s = BaseObject.build_session()
 
@@ -436,19 +436,19 @@ def process_and_update_table(
             recompress = True
 
     # Check if the table is empty
-    table_is_empty = metadata["sourcetableconfiguration"]["last_time_index_value"] is None
+    table_is_empty = metadata.sourcetableconfiguration.last_time_index_value is None
 
     # Update the table
     direct_table_update(
         serialized_data_frame=serialized_data_frame,
         grouped_dates=grouped_dates,
         time_series_orm_db_connection=data_source.get_connection_uri(),
-        table_name=metadata["table_name"],
+        table_name=metadata.table_name,
         overwrite=overwrite,
         index_names=index_names,
         time_index_name=time_index_name,
         table_is_empty=table_is_empty,
-        table_index_names=metadata["table_index_names"],
+        table_index_names=metadata.table_index_names,
     )
 
     # Recompress if needed

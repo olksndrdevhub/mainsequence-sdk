@@ -1556,7 +1556,6 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
             return None
 
         if not self.has_direct_connection :
-            logger.warning("REMOVE CONDITION!!!")
             # Do API insertion
             LocalTimeSerie.post_data_frame_in_chunks(
                 serialized_data_frame=serialized_data_frame,
@@ -1588,9 +1587,9 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
             *args,
             **kwargs
     ):
-        table_name = metadata["table_name"]
-        index_names = metadata["sourcetableconfiguration"]["index_names"]
-        column_types = metadata["sourcetableconfiguration"]["column_dtypes_map"]
+        table_name = metadata.table_name
+        index_names = metadata.sourcetableconfiguration.index_names
+        column_types = metadata.sourcetableconfiguration.column_dtypes_map
         if self.has_direct_connection:
             df = TimeScaleInterface.filter_by_assets_ranges(
                 table_name=table_name,
@@ -2221,13 +2220,13 @@ class DynamicTableHelpers:
 
 
         global_stats, grouped_dates = get_chunk_stats(
-            chunk_df=serialized_data_frame,
+            chunk_df=data,
             index_names=index_names,
             time_index_name=time_index_name
         )
 
         data_source._insert_data_into_table(
-            serialized_data_frame=serialized_data_frame,
+            serialized_data_frame=data,
             metadata=metadata,
             local_metadata=local_metadata,
             overwrite=overwrite,
