@@ -540,7 +540,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                 raise Exception(r.text)
         data = r.json()
 
-        return cls(**data["metadata"])
+        return cls(**data)
 
     @classmethod
     def add_tags(cls, local_metadata, tags: list, timeout=None):
@@ -597,8 +597,8 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         if result["last_time_index_value"] is not None:
             result["last_time_index_value"] = datetime.datetime.fromtimestamp(result["last_time_index_value"]).replace(
                 tzinfo=pytz.utc)
-
-        result['update_statistics'] = {k: request_to_datetime(v) for k, v in result['update_statistics'].items()}
+        if result['update_statistics'] is not None:
+            result['update_statistics'] = {k: request_to_datetime(v) for k, v in result['update_statistics'].items()}
         result['update_statistics'] = DataUpdates(update_statistics=result['update_statistics'])
         return LocalTimeSeriesHistoricalUpdate(**result)
 
@@ -743,7 +743,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         if r.status_code != 201:
             raise Exception(f"Error in request {r.text}")
         instance = cls(**r.json())
-        return r.json()
+        return instance
 
     @classmethod
     def get(cls, *args, **kwargs):

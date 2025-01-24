@@ -61,7 +61,7 @@ class APIPersistManager:
 class PersistManager:
     def __init__(self,data_source, local_hash_id: str,
 
-
+                 description: Union[str, None] = None,
                  class_name: Union[str, None] = None,
                  human_readable: Union[str, None] = None, metadata: Union[dict, None] = None,
                  local_metadata: Union[dict, None] = None
@@ -73,7 +73,7 @@ class PersistManager:
         if local_metadata is not None and metadata is None:
             # query remote hash_id
             metadata = local_metadata["remote_table"]
-
+        self.description=description
         self.logger = logger
 
 
@@ -411,7 +411,7 @@ class PersistManager:
                 local_configuration.pop("build_meta_data", None)
                 metadata_kwargs=dict(local_hash_id=self.local_hash_id,
                               build_configuration=local_configuration,
-                              remote_table__hash_id=self.metadata['hash_id'],
+                              remote_table__hash_id=self.metadata.hash_id,
                                      description=self.description,
                                      data_source_id=self.data_source.id
                                      )

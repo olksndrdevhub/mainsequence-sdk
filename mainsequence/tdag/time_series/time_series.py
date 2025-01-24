@@ -2388,7 +2388,6 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
     @tracer.start_as_current_span("Execute distributed parallel update")
     def _execute_parallel_distributed_update(self, tmp_ts: pd.DataFrame,
-                                             metadatas: Union[dict, None],
                                              ):
 
         telemetry_carrier = tracer_instrumentator.get_telemetry_carrier()
