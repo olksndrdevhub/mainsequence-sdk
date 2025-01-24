@@ -5,12 +5,11 @@ import os
 from mainsequence.logconf import logger
 
 
-from mainsequence.tdag_client import (DynamicTableHelpers, TimeSerieNode, TimeSerieLocalUpdate,
+from mainsequence.tdag_client import (  LocalTimeSerie,
                                       LocalTimeSeriesDoesNotExist, PodLocalLake,
-                                      DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS, TimeSerie)
+                                      DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS, DynamicTableMetaData)
 
-from mainsequence.tdag_client.models import BACKEND_DETACHED, none_if_backend_detached
-
+from mainsequence.tdag_client.models import BACKEND_DETACHED, none_if_backend_detached, DynamicTableHelpers
 
 
 class APIPersistManager:
@@ -62,7 +61,7 @@ class APIPersistManager:
 class PersistManager:
     def __init__(self,data_source, local_hash_id: str,
 
-                 logger:Union[str,None]=None, description: Union[str,None]=None,
+
                  class_name: Union[str, None] = None,
                  human_readable: Union[str, None] = None, metadata: Union[dict, None] = None,
                  local_metadata: Union[dict, None] = None
@@ -70,14 +69,13 @@ class PersistManager:
                  ):
         self.data_source = data_source
         self.local_hash_id = local_hash_id
-        self.description = description or ""
+
         if local_metadata is not None and metadata is None:
             # query remote hash_id
             metadata = local_metadata["remote_table"]
 
-        self.logger = logger if logger is not None else console_logger("persist_manager_logger",
-                                                                       application_name="tdag")
-        self.dth = DynamicTableHelpers(logger=logger)
+        self.logger = logger
+
 
         self.table_model_loaded = False
         self.human_readable = human_readable if human_readable is not None else local_hash_id
@@ -118,18 +116,18 @@ class PersistManager:
             meta_data = {}
 
             local_metadata = {}  # set to empty in case not exist
-            local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
+            local_metadata = LocalTimeSerie.get(local_hash_id=self.local_hash_id,
                                                       remote_table__data_source__id=self.data_source.id
                                                       )
 
 
-        if len(local_metadata) != 0:
-            self.local_build_configuration = local_metadata["build_configuration"]
-            self.local_build_metadata = local_metadata["build_meta_data"]
+        if local_metadata is not None:
+            self.local_build_configuration = local_metadata.build_configuration
+            self.local_build_metadata = local_metadata.build_meta_data
             self.local_metadata = local_metadata
 
             # metadata should always exist
-            self.metadata = local_metadata["remote_table"]
+            self.metadata = local_metadata.remote_table
 
 
 
@@ -222,9 +220,7 @@ class PersistManager:
         return depth_df
 
     def get_all_dependencies_update_priority(self):
-        depth_df = TimeSerieLocalUpdate.get_all_dependencies_update_priority(hash_id=self.local_hash_id,
-                                                                             data_source_id=self.data_source.id
-                                                                             )
+        depth_df = self.local_metadata.get_all_dependencies_update_priority()
         return depth_df
 
     def set_ogm_dependencies_linked(self):
@@ -235,9 +231,8 @@ class PersistManager:
 
     @property
     def update_details(self):
-        if "localtimeserieupdatedetails" in self.local_metadata.keys():
-            return self.local_metadata['localtimeserieupdatedetails']
-        return None
+
+        return self.local_metadata.localtimeserieupdatedetails
 
     @property
     def run_configuration(self):
@@ -377,7 +372,7 @@ class PersistManager:
 
 
                 # kwargs["source_class_name"]=self.class_name
-                self.metadata = self.dth.create(metadata_kwargs=kwargs)
+                self.metadata = DynamicTableMetaData.create(metadata_kwargs=kwargs)
 
                 #todo: after creating metadata always delete local parquet manager even if not exist
                 # self.delete_local_parquet()
@@ -408,9 +403,9 @@ class PersistManager:
             local_build_configuration, local_build_metadata = self.local_build_configuration, self.local_build_metadata
         if local_build_configuration is None:
             local_table_exist=False
-            local_update = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
+            local_update = LocalTimeSerie.get(local_hash_id=self.local_hash_id,
                                                        remote_table__data_source__id=self.data_source.id)
-            if len(local_update) == 0:
+            if local_update is None:
                 local_build_metadata = local_configuration[
                     "build_meta_data"] if "build_meta_data" in local_configuration.keys() else {}
                 local_configuration.pop("build_meta_data", None)
@@ -429,21 +424,21 @@ class PersistManager:
                                "data_source_id" : self.data_source.id
                                }
 
-                local_metadata = TimeSerieLocalUpdate.create(metadata_kwargs=metadata_kwargs,
+                local_metadata = LocalTimeSerie.create(metadata_kwargs=metadata_kwargs,
                                                              node_kwargs=node_kwargs,
 
                                               )
-                self.local_build_configuration = local_metadata["build_configuration"]
-                self.local_build_metadata = local_metadata["build_meta_data"]
+                self.local_build_configuration = local_metadata.build_configuration
+                self.local_build_metadata = local_metadata.build_meta_data
                 self.local_metadata = local_metadata
             else:
                 local_metadata=local_update
             self.local_metadata=local_metadata
-            self.local_build_configuration = local_metadata["build_configuration"]
-            self.local_build_metadata = local_metadata["build_meta_data"]
+            self.local_build_configuration = local_metadata.build_configuration
+            self.local_build_metadata = local_metadata.build_meta_data
 
             # metadata should always exist
-            self.metadata = local_metadata["remote_table"]
+            self.metadata = local_metadata.remote_table
 
         return   local_table_exist
     def _verify_insertion_format(self,temp_df):
@@ -462,15 +457,7 @@ class PersistManager:
             assert temp_df.index.names==["time_index","asset_symbol"] or  temp_df.index.names==["time_index","asset_symbol","execution_venue_symbol"]
 
 
-    def update_details_exist(self):
-        """
 
-        Returns
-        -------
-
-        """
-        exist= TimeSerieLocalUpdate.update_details_exist(local_metadata=self.local_metadata)
-        return exist
     def build_update_details(self,source_class_name):
         """
 
@@ -591,16 +578,14 @@ class PersistManager:
 
         """
 
-        self.local_metadata = self.dth.upsert_data_into_table(
-            metadata=self.local_metadata["remote_table"],
+        self.local_metadata = DynamicTableHelpers.upsert_data_into_table(
+            metadata=self.local_metadata.remote_table,
             local_metadata=self.local_metadata,
             data=temp_df,
             historical_update_id=historical_update_id,
             overwrite=overwrite,data_source=self.data_source,
-        logger=self.logger
+
         )
-
-
 
 
 
@@ -841,7 +826,7 @@ class DataLakePersistManager(PersistManager):
         schema = {field.name: field.type for field in schema}
         return schema
 
-    def get_df_between_dates(self,time_serie:TimeSerie, *args,**kwargs):
+    def get_df_between_dates(self,time_serie:"TimeSerie", *args,**kwargs):
         if self.already_run ==False:
             self.verify_if_already_run(time_serie)
         filtered_data=super().get_df_between_dates( *args,**kwargs)

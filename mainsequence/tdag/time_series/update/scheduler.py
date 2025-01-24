@@ -5,8 +5,8 @@ import time
 
 from ray.util.client.common import ClientActorHandle
 
-from mainsequence.tdag_client import (Scheduler, TimeSerieLocalUpdate, SourceTableConfigurationDoesNotExist,
-                                      LocalTimeSerieNode, SchedulerDoesNotExist
+from mainsequence.tdag_client import (Scheduler, SourceTableConfigurationDoesNotExist,
+                                      LocalTimeSerie, SchedulerDoesNotExist
                                       )
 
 from .utils import get_time_to_wait_from_hash_id

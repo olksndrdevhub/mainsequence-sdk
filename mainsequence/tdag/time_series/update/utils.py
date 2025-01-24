@@ -1,6 +1,6 @@
 import socket
 from typing import Union
-from mainsequence.tdag_client import DynamicTableHelpers,TimeSerieLocalUpdate
+from mainsequence.tdag_client import LocalTimeSerie
 import datetime
 import pytz
 import logging
@@ -60,14 +60,11 @@ class UpdateInterface:
         self.head_hash = head_hash
         self.updating_in_tree = []
         self.logger=logger
-        if state_data is not None:
-            state_data = self._sanitize_state_date(state_data=state_data)
+
 
 
         self.state_data = state_data
         self.scheduler_uid=scheduler_uid
-        self.dth = DynamicTableHelpers()
-
         self.last_historical_update={}
 
     def _patch_update(self, hash_id,data_source_id:int, update_kwargs: dict):
@@ -122,33 +119,7 @@ class UpdateInterface:
 
 
 
-    def _build_new_update_for_time_serie(self, local_hash_id: str,data_source_id:int,local_time_serie_id:int):
-        try:
-            new_update = dict(
-                              active_update_scheduler_uid=self.scheduler_uid,
-                              )
 
-            update_datails = TimeSerieLocalUpdate.set_start_of_execution(local_time_serie_id=local_time_serie_id,**new_update)
-
-            self.last_historical_update[local_time_serie_id] = update_datails
-        except Exception as e:
-            raise e
-        return update_datails
-
-
-
-    def set_start_of_execution(self, local_hash_id: str,data_source_id:id,
-                               local_time_serie_id:int
-                               )->LocalTimeSeriesHistoricalUpdate:
-
-        historical_update = self._build_new_update_for_time_serie(local_hash_id=local_hash_id,
-                                                                  local_time_serie_id=local_time_serie_id,
-                                                                  data_source_id=data_source_id)
-
-
-
-
-        return historical_update
 
     def set_end_of_execution(self, local_time_serie_id: str,
                              error_on_update=False,):

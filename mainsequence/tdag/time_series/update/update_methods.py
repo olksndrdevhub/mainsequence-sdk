@@ -8,7 +8,7 @@ from mainsequence.tdag.config import bcolors, configuration
 from typing import Union
 from mainsequence.tdag.instrumentation import tracer
 import ray
-from mainsequence.tdag_client import CONSTANTS,TimeSerieLocalUpdate
+from mainsequence.tdag_client import CONSTANTS,LocalTimeSerie
 
 from mainsequence.tdag.time_series import TimeSerie
 from concurrent.futures import ThreadPoolExecutor
