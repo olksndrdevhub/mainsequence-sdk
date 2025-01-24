@@ -448,7 +448,7 @@ def process_and_update_table(
         index_names=index_names,
         time_index_name=time_index_name,
         table_is_empty=table_is_empty,
-        table_index_names=metadata.table_index_names,
+        table_index_names=metadata.sourcetableconfiguration.index_names,
     )
 
     # Recompress if needed
