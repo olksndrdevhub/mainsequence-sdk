@@ -237,7 +237,7 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
                         # Build the DELETE query
                         delete_conditions = []
                         for item in grouped_dates:
-                            asset_symbol = item['unique_identifier']
+                            unique_identifier = item['unique_identifier']
                             start_time = item['start_time']
                             end_time = item['end_time']
 
@@ -246,11 +246,11 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
                             end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S%z')
 
                             # Escape single quotes
-                            asset_symbol = asset_symbol.replace("'", "''")
+                            unique_identifier = unique_identifier.replace("'", "''")
 
                             # Build the condition string
                             condition = f"({time_index_name} >= '{start_time_str}' AND {time_index_name} <= '{end_time_str}' " \
-                                        f"AND unique_identifier = '{asset_symbol}')"
+                                        f"AND unique_identifier = '{unique_identifier}')"
                             delete_conditions.append(condition)
 
                         # Combine all conditions using OR
@@ -392,8 +392,8 @@ def process_and_update_table(
     Returns:
         None
     """
-    if "asset_symbol" in serialized_data_frame.columns:
-        serialized_data_frame['asset_symbol'] = serialized_data_frame['asset_symbol'].astype(str)
+    if "unique_identifier" in serialized_data_frame.columns:
+        serialized_data_frame['unique_identifier'] = serialized_data_frame['unique_identifier'].astype(str)
 
     TDAG_ENDPOINT = f"{os.environ.get('TDAG_ENDPOINT')}"
     base_url = TDAG_ENDPOINT + "/orm/api/dynamic_table" #metadata.get("root_url")

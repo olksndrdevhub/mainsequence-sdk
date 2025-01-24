@@ -729,8 +729,8 @@ class DataUpdates(BaseTdagPydanticModel):
             if self.update_statistics and unique_identifier in self.update_statistics:
                 new_update_statistics[unique_identifier] = self.update_statistics[unique_identifier]
             else:
-                if init_fallback_date is None: raise ValueError("No initial start date for new assets defined")
-                new_update_statistics[a] = init_fallback_date
+                if init_fallback_date is None: raise ValueError(f"No initial start date for {a.unique_identifier} assets defined")
+                new_update_statistics[a.unique_identifier] = init_fallback_date
         return DataUpdates(update_statistics=new_update_statistics)
 
     def is_empty(self):
@@ -1183,7 +1183,7 @@ class TimeSerieLocalUpdate(BaseObject):
                 logger.exception(f"Error uploading chunk {i + 1}/{total_chunks}: {e}")
                 # Optionally, you could retry or break here
                 raise e
-            if r.status_code!=200:
+            if r.status_code not in [200,204]:
                 raise Exception(r.text)
 
 class TimeSerie(BaseObject):
@@ -1452,7 +1452,8 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
         if BACKEND_DETACHED() == True:
             return None
 
-        if not self.has_direct_connection:
+        if not self.has_direct_connection :
+            logger.warning("REMOVE CONDITION!!!")
             # Do API insertion
             TimeSerieLocalUpdate.post_data_frame_in_chunks(
                 serialized_data_frame=serialized_data_frame,
@@ -2046,7 +2047,7 @@ class DynamicTableHelpers:
             historical_update_id:Union[None,int],
             data_source:DynamicTableDataSource,
             logger:object,
-     ) -> dict:
+    ) -> dict:
         global_stats, grouped_dates = get_chunk_stats(
             chunk_df=serialized_data_frame,
             index_names=index_names,
@@ -2066,7 +2067,6 @@ class DynamicTableHelpers:
             grouped_dates=grouped_dates
         )
 
-        call_end_of_execution = True # TODO needed?
         if BACKEND_DETACHED() == True:
             return None
 
@@ -2089,15 +2089,6 @@ class DynamicTableHelpers:
         return result
 
 
-
-    # def set_last_update_index_time(self,metadata,timeout=None):
-    #     base_url = self.root_url
-    #     url=f"{base_url}/{metadata['id']}/set_last_update_index_time/"
-    #     # r = self.s.get()
-    #     r = self.make_request(r_type="GET", url=url,timeout=timeout)
-    #     if r.status_code != 200:
-    #         raise Exception(f"{metadata['hash_id']}{r.text}")
-    #     return r
 
     def filter_by_hash_id(self, hash_id_list: list):
 

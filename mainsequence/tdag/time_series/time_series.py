@@ -23,7 +23,9 @@ from mainsequence.tdag.config import (
 )
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager, DataLakePersistManager
-from mainsequence.tdag_client.models import none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate
+from mainsequence.tdag_client.models import (none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate,
+DataUpdates
+                                             )
 from numpy.f2py.auxfuncs import isint1
 
 from pycares.errno import value
@@ -2515,7 +2517,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 latest_value = overwrite_latest_value
 
                 self.logger.info(f'Updating Local Time Series for  {self}  since {latest_value}')
-                temp_df = self.update_series_from_source(update_statistics=update_statistics, **kwargs)
+                temp_df = self.update_series_from_source(update_statistics=update_statistics)
 
                 if temp_df.shape[0] == 0:
                     # concatenate empty
@@ -2534,7 +2536,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 if not update_statistics:
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
 
-                temp_df = self.update_series_from_source(update_statistics=update_statistics, **kwargs)
+                temp_df = self.update_series_from_source(update_statistics=update_statistics)
                 for col, ddtype in temp_df.dtypes.items():
                     if "datetime64" in str(ddtype):
                         self.logger.info(f"WARNING DATETIME TYPE IN {self}")
@@ -2560,23 +2562,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     def _run_post_update_routines(self, error_on_last_update: bool):
         pass
 
-    def update_series_from_source(self, update_statistics: Union[None, datetime.datetime], *args, **kwargs) -> pd.DataFrame:
+    def update_series_from_source(self, update_statistics: DataUpdates,) -> pd.DataFrame:
         """
-        This method performs all the necessary logic to update our time series. The method should always return a DataFrame with the following characteristics:
-
-        1) A unidimensional index where the index is of the type `DatetimeIndex` and the dates are in `pytz.utc`.
-        2) A multidimensional index that should always have 3 dimensions: `time_index` (with the same characteristics as before), `asset_symbol`, and `execution_venue_symbol`.
-
-        Parameters
-        ----------
-        latest_value
-        args
-        kwargs
-
-        Returns
-        -------
 
         """
+
 
         raise NotImplementedError
 
