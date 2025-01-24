@@ -2,23 +2,21 @@ import pandas as pd
 import datetime
 from typing import Union, List,Dict
 import os
-from mainsequence.tdag.logconf import console_logger, create_logger_in_path
+from mainsequence.logconf import logger
 
 
 from mainsequence.tdag_client import (DynamicTableHelpers, TimeSerieNode, TimeSerieLocalUpdate,
                                       LocalTimeSeriesDoesNotExist, PodLocalLake,
                                       DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS, TimeSerie)
 
-from mainsequence.tdag.logconf import get_tdag_logger
 from mainsequence.tdag_client.models import BACKEND_DETACHED, none_if_backend_detached
 
-logger = get_tdag_logger()
+
 
 class APIPersistManager:
 
     def __init__(self,data_source_id:int,local_hash_id:str,logger):
-        self.logger = logger if logger is not None else console_logger("persist_manager_logger",
-                                                                       application_name="tdag")
+        self.logger = logger if logger is not None else logger
         self.dth = DynamicTableHelpers(logger=logger)
         self.data_source_id = data_source_id
         self.local_hash_id = local_hash_id

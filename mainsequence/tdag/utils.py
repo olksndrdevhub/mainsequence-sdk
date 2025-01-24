@@ -3,9 +3,7 @@ import yaml
 import hashlib
 import json
 import socket
-from mainsequence.tdag.logconf import get_tdag_logger
-
-logger = get_tdag_logger()
+from mainsequence.logconf import logger
 #maitenance
 
 

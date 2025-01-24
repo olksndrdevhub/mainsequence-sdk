@@ -12,10 +12,10 @@ from mainsequence.tdag_client import CONSTANTS,TimeSerieLocalUpdate
 
 from mainsequence.tdag.time_series import TimeSerie
 from concurrent.futures import ThreadPoolExecutor
-from mainsequence.tdag.logconf import get_tdag_logger
+from mainsequence.logconf import logger
 from mainsequence.tdag_client.models import LocalTimeSeriesHistoricalUpdate
 
-logger = get_tdag_logger()
+
 
 
 

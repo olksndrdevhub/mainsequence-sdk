@@ -7,7 +7,7 @@ nav:
   - Key Concepts: key_concepts/
 
 
-repo_url: https://github.com/Main-Sequence-Client-Side/tdag
+repo_url: https://github.com/mainsequence-sdk/mainsequence-sdk
 edit_uri: edit/main/docs/
 
 theme:

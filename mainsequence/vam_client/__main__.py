@@ -4,13 +4,12 @@ import sqlite3
 import json
 
 from mainsequence.vam_client.models import ExecutionVenue
-from mainsequence.vam_client.utils import build_assets_for_venue, get_venue_from_symbol, get_mainsequence.vam_client_logger
+from mainsequence.vam_client.utils import  get_venue_from_symbol
 # Constants
 from .local_vault import (DATABASE_FILE,load_key,generate_key,
 validate_secrets,encrypt_secrets,decrypt_secrets
                           )
 
-logger = get_mainsequence.vam_client_logger()
 
 class ClientApp:
 

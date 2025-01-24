@@ -1,9 +1,8 @@
-from mainsequence.tdag.logconf import get_tdag_logger
+from mainsequence.logconf import logger
 import ray
 import os
 from .update_methods import (update_remote_from_hash_id,
                              update_remote_from_hash_id_local)
-logger = get_tdag_logger()
 TDAG_RAY_CLUSTER_ADDRESS = os.getenv("TDAG_RAY_CLUSTER_ADDRESS")
 NAMESPACE = "time_series_update"
 class RayUpdateManager:

@@ -1,11 +1,9 @@
 import os
-import logging
 from pathlib import Path
 from enum import Enum
 from .utils import read_key_from_yaml, write_yaml, read_yaml
-from mainsequence.tdag.logconf import get_tdag_logger
 
-logger = get_tdag_logger()
+
 
 
 DEFAULT_RETENTION_POLICY = dict(scheduler_name="default", retention_policy_time="90 days")
@@ -80,8 +78,6 @@ class Configuration:
         config = {
             "time_series_config": {
                 "ignore_update_timeout": False,
-                "logs_destination":"logstash",
-                "logs_destination_configuration":{"host":"localhost","port":5005}
 
             },
             "instrumentation_config": {
@@ -93,20 +89,8 @@ class Configuration:
 
 configuration = Configuration()
 
-LOG_LEVELS = {
-    'CRITICAL': logging.CRITICAL,
-    'ERROR': logging.ERROR,
-    'WARNING': logging.WARNING,
-    'INFO': logging.INFO,
-    'DEBUG': logging.DEBUG,
-    'NOTSET': logging.NOTSET,
-}
-
-if TDAG_CONFIG_PATH is not None:
-    logging_folder = TDAG_DATA_PATH + "/logs"
 
 
-    LOG_LEVEL = LOG_LEVELS[os.getenv("LOG_LEVEL", "DEBUG")]
 
 class TimeSeriesOGM:
     def __init__(self):
@@ -127,13 +111,6 @@ class TimeSeriesOGM:
         self.verify_exist(target_path=target_path)
         return target_path
 
-    @staticmethod
-    def get_logging_path():
-        return f"{logging_folder}/time_series"
-
-    @staticmethod
-    def logging_folder():
-        return logging_folder
 
     @property
     def temp_folder(self):
