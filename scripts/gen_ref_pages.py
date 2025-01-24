@@ -5,7 +5,7 @@ from pathlib import Path
 import mkdocs_gen_files
 
 nav = mkdocs_gen_files.Nav()
-project_name="tdag"
+project_name="mainsequence"
 
 prefix=[project_name]
 

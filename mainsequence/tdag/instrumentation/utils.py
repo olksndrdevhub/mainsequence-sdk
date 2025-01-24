@@ -22,9 +22,8 @@ ConsoleSpanExporter
 from opentelemetry.trace.propagation.tracecontext import \
     TraceContextTextMapPropagator
 from typing import Union
-from mainsequence.tdag.config import bcolors, logging_folder
-from mainsequence.tdag.logconf import create_logger_in_path
-
+from mainsequence.tdag.config import bcolors
+from mainsequence.logconf import logger
 
 def is_port_in_use(port: int,agent_host:str) -> bool:
     import socket
@@ -39,8 +38,7 @@ class TracerInstrumentator():
        """
     def __init__(self,agent_host:Union[str,None]):
         
-        self.logger = create_logger_in_path(logger_file=f"{logging_folder}/tracer_instrumentator.log",
-                                          logger_name="tracer_instrumentator")
+        self.logger = logger
         self.agent_host = agent_host
         if agent_host is not None:
             self.logger.debug(f"{bcolors.WARNING}*****SETTING TRACES, TO REMOVE tracing set grafan agent {agent_host} to None {bcolors.ENDC}")

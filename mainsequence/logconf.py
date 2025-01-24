@@ -6,12 +6,7 @@ import structlog
 from typing import Union
 from structlog.dev import ConsoleRenderer
 
-def console_logger(logger_name,application_name,**metadata):
-    """
-    Mockup logger
-    """
-    return create_logger_in_path(logger_name,application_name=application_name,logger_file=None,**metadata)
-    return logger
+
 
 def extract_from_record(_, __, event_dict):
     """
@@ -58,11 +53,14 @@ class CustomConsoleRenderer(ConsoleRenderer):
 
 
 
-def create_logger_in_path(logger_name, logger_file:Union[str,None],application_name:str="tdag", **metadata):
+def build_application_logger(application_name:str="ms-sdk",
+                      logger_file:Union[str,None]=None,
+                      **metadata):
     """
     Create a logger that logs to console and file in JSON format.
     """
     # Ensure the directory for the log file exists
+    logger_name="tdag"
     logger = logging.getLogger(logger_name)
     # if logger.hasHandlers():
     #     logger = structlog.get_logger(logger_name)
@@ -88,7 +86,8 @@ def create_logger_in_path(logger_name, logger_file:Union[str,None],application_n
     if logger_file is not None:
         ensure_dir(logger_file)
 
-        handlers.update({"file": {
+        handlers.update(
+            {"file": {
             "class": "logging.handlers.RotatingFileHandler",
             "formatter": "plain",
             "level": os.getenv("LOG_LEVEL_FILE", "DEBUG"),
@@ -96,7 +95,9 @@ def create_logger_in_path(logger_name, logger_file:Union[str,None],application_n
             "mode": "a",
             "maxBytes": 5 * 1024 * 1024,  # Rotate after 5 MB
             "backupCount": 5,  # Keep up to 5 backup files
-        }})
+        }}
+
+        )
 
     logging_config = {
         "version": 1,
@@ -158,13 +159,6 @@ def create_logger_in_path(logger_name, logger_file:Union[str,None],application_n
     return logger
 
 
-def get_tdag_logger():
-    # Check if the logger with the name 'virtualfundbuilder' already exists
-    logger = logging.getLogger('tdag')
 
-    # If the logger doesn't have any handlers, create it using the custom function
-    if not logger.hasHandlers():
-        logger_file = os.environ.get('VFB_LOGS_PATH', os.path.join(os.path.expanduser("~"), "tdag/logs"))
-        logger = create_logger_in_path(logger_name="tdag", logger_file=logger_file, application_name="tdag")
 
-    return logger
+logger=build_application_logger()

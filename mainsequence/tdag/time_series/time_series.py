@@ -17,7 +17,7 @@ import importlib
 import cloudpickle
 from pathlib import Path
 from mainsequence.tdag.instrumentation import tracer, tracer_instrumentator
-from mainsequence.tdag.logconf import create_logger_in_path
+from mainsequence.logconf import logger
 from mainsequence.tdag.config import (
     ogm
 )
@@ -40,9 +40,9 @@ from mainsequence.tdag_client import TimeSerieLocalUpdate, LocalTimeSerieUpdateD
 from enum import Enum
 from functools import wraps
 from mainsequence.tdag.config import bcolors
-from mainsequence.tdag.logconf import get_tdag_logger
+from mainsequence.logconf import logger
 
-logger = get_tdag_logger()
+
 
 
 def serialize_model_list(value):
@@ -1524,14 +1524,17 @@ class APITimeSerie:
         return self._local_persist_manager
     def set_relation_tree(self):
         pass #do nothing  for API Time Series
-    def _set_logger(self, local_hash_id):
-        if hasattr(self, "logger") == False:
 
-            self.logger = create_logger_in_path(logger_name=f"{self.data_source_id}_{self.local_hash_id}", application_name="tdag",
-                                                logger_file=f'{ogm.get_logging_path()}/{self.data_source_id}/{self.local_hash_id}.log',
-                                                local_hash_id=self.local_hash_id, data_source_id=self.data_source_id,
-                                                api_time_series=True,
-                                                )
+    @property
+    def logger(self):
+        global logger
+        logger=logger.bind(local_hash_id=self.local_hash_id,
+                    local_hash_id_data_source=self.data_source_id,
+                    api_time_series=True,
+                    )
+
+        return logger
+
     def _verify_local_data_source(self):
         pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
         if pod_source != None:
@@ -1586,7 +1589,6 @@ class APITimeSerie:
             if table_exist_locally:
                 self.data_source_id=local_persist_manager_lake.data_source.id
                 self._local_persist_manager=local_persist_manager_lake
-                self._set_logger(local_hash_id=self.local_hash_id)
 
 
     def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
@@ -1956,21 +1958,15 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             init_meta = {}
         return kwargs, init_meta
 
-    def _set_logger(self, local_hash_id):
-        if hasattr(self, "logger") == False:
-            self.logger = create_logger_in_path(logger_name=f"{self.data_source.id}_{local_hash_id}", application_name="tdag",
-                                                logger_file=f'{ogm.get_logging_path()}/{self.data_source.id}/{local_hash_id}.log',
-                                                local_hash_id=local_hash_id, data_source_id=self.data_source.id
-                                                )
-    @staticmethod
-    def get_logger_from_context(logger_context:dict):
-        local_hash_id = logger_context['local_hash_id']
-        data_source_id =logger_context['data_source_id']
-        logger=create_logger_in_path(logger_name=f"{local_hash_id}_{data_source_id}", application_name="tdag",
-                              logger_file=f'{ogm.get_logging_path()}/{data_source_id}/{local_hash_id}.log',
-                              local_hash_id=local_hash_id, data_source_id=data_source_id
-                              )
+    @property
+    def logger(self):
+        global logger
+        logger=logger.bind(local_hash_id=self.local_hash_id,
+                    local_hash_id_data_source=self.data_source_id,
+                    api_time_series=False,
+                    )
         return logger
+
 
     def run_local_update(self, tdag_detached=True):
         self.local_persist_manager

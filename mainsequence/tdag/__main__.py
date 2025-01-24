@@ -14,12 +14,8 @@ class TDAGApp:
                                 table_index_names:dict,time_series_orm_db_connection:str):
         from mainsequence.tdag_client.utils import recreate_indexes
         from mainsequence.tdag import ogm
-        from mainsequence.tdag.logconf import create_logger_in_path
 
-        logger=create_logger_in_path(logger_name="tdag_main", application_name="tdag",
-                              logger_file=f'{ogm.get_logging_path()}/{table_name}.log',
-                              table_name=table_name
-                              )
+
 
         logger.info(f"creating indices for table in  {table_name}")
         try:

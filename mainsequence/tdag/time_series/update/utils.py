@@ -4,12 +4,12 @@ from mainsequence.tdag_client import DynamicTableHelpers,TimeSerieLocalUpdate
 import datetime
 import pytz
 import logging
-from mainsequence.tdag.logconf import get_tdag_logger
+from mainsequence.logconf import logger
 import time
 import pandas as pd
 from mainsequence.tdag_client.models import LocalTimeSeriesHistoricalUpdate
 
-logger = get_tdag_logger()
+
 
 
 def wait_for_update_time(local_hash_id, data_source_id, logger, force_next_start_of_minute=False):

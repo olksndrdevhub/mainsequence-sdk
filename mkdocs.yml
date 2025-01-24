@@ -1,18 +1,18 @@
-site_name: TDAG
+site_name: Main Sequence SDK
 nav:
   - Home: index.md
   - About: about.md
-  - Tutorial: tutorial/
+  - Getting Started: getting_started/
   - Code Reference: reference/
   - Key Concepts: key_concepts/
 
 
-repo_url: https://github.com/Main-Sequence-Client-Side/tdag
+repo_url: https://github.com/mainsequence-sdk/mainsequence-sdk
 edit_uri: edit/main/docs/
 
 theme:
   name: "material"
-  logo: "img/logo.svg"
+  logo: "img/logo.png"
   favicon: "img/favico.ico" # Optional: Add a favicon
   palette:
     scheme: slate  # This makes dark mode the default scheme

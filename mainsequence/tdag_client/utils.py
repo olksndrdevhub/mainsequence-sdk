@@ -21,7 +21,7 @@ import psutil
 import socket
 import logging
 import subprocess
-from mainsequence.tdag.logconf import create_logger_in_path
+from mainsequence.logconf import logger
 from urllib.parse import urlparse, unquote
 from typing import Dict
 
@@ -35,13 +35,8 @@ DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 
 def get_tdag_client_logger():
-    # Check if the logger with the name 'virtualfundbuilder' already exists
-    logger = logging.getLogger('mainsequence.vam_client')
+    global logger
 
-    # If the logger doesn't have any handlers, create it using the custom function
-    if not logger.hasHandlers():
-        logger_file = os.environ.get('VFB_LOGS_PATH', os.path.join(os.path.expanduser("~"), "virtualfundbuilder/logs"))
-        logger = create_logger_in_path(logger_name="mainsequence.vam_client", logger_file=logger_file, application_name="mainsequence.vam_client")
 
     return logger
 

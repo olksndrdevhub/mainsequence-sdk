@@ -17,7 +17,7 @@ import ray
 import pandas as pd
 from mainsequence.tdag.time_series.time_series import DependencyUpdateError, TimeSerie
 import gc
-from mainsequence.tdag.logconf import  create_logger_in_path
+from mainsequence.logconf import  logger
 
 from contextlib import contextmanager
 from mainsequence.tdag_client import LocalDiskSourceLake, DynamicTableDataSource
@@ -204,14 +204,10 @@ class SchedulerUpdater:
     def __init__(self, scheduler: Scheduler):
 
         from mainsequence.tdag.config import logging_folder
-
+        global logger
         self.node_scheduler = scheduler
-
-        self.logger = create_logger_in_path(logger_name="scheduler_" + self.node_scheduler.uid,
-                                            logger_file=f"{logging_folder}/schedulers/{self.node_scheduler.uid}.log",
-                                            scheduler_name=scheduler.name
-
-                                            )
+        logger=logger.bind(   scheduler_name=scheduler.name)
+        self.logger = logger
 
 
 
