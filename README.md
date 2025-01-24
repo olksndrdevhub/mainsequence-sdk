@@ -46,9 +46,8 @@ This allows seamless integration of asset valuation within the broader financial
 
 ## Explore More
 
-To get started with the SDK and explore practical examples, check out our:
+To get started with the SDK and explore practical examples, check out our Documentation:
 
-- 📖 **[TDAG Tutorial](tdag/tutorial/getting_started/Introduction_part1.md)** – Start with the TDAG Tutorial if you are looking to build customized portfolios.
-- 📂 **[Example Repository](https://github.com/mainsequence/sdk-examples)** – Find practical examples and workflows to kickstart your journey with the SDK.
+- 📖 **[Main Sequence SDK docs](www.docs.main-sequence-sdk.main-sequence.io)** – Start with the TDAG Tutorial if you are looking to build customized portfolios.
 
 ---
