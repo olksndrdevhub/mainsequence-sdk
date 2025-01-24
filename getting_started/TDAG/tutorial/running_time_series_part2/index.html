@@ -1,0 +1,1008 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<link href="../Introduction_part1/" rel="prev"/>
+<link href="../tdag_explorer_part3/" rel="next"/>
+<link href="../../../../img/favico.ico" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.5.44" name="generator"/>
+<title>Part 2: Running Pipelines - Main Sequence SDK</title>
+<link href="../../../../assets/stylesheets/main.0253249f.min.css" rel="stylesheet"/>
+<link href="../../../../assets/stylesheets/palette.06af60db.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../../../assets/_mkdocstrings.css" rel="stylesheet"/>
+<link href="../../../../stylesheets/custom.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="indigo" data-md-color-primary="indigo" data-md-color-scheme="slate" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#part-2-running-pipelines">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header md-header--shadow" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="Main Sequence SDK" class="md-header__button md-logo" data-md-component="logo" href="../../../.." title="Main Sequence SDK">
+<img alt="logo" src="../../../../img/logo.png"/>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            Main Sequence SDK
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Part 2: Running Pipelines
+            
+          </span>
+</div>
+</div>
+</div>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Main-Sequence-Client-Side/tdag" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="Main Sequence SDK" class="md-nav__button md-logo" data-md-component="logo" href="../../../.." title="Main Sequence SDK">
+<img alt="logo" src="../../../../img/logo.png"/>
+</a>
+    Main Sequence SDK
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Main-Sequence-Client-Side/tdag" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../..">
+<span class="md-ellipsis">
+    Home
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../about/">
+<span class="md-ellipsis">
+    About
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    Getting Started
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+<span class="md-ellipsis">
+    TDAG
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_3_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_1">
+<span class="md-nav__icon md-icon"></span>
+            TDAG
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../">
+<span class="md-ellipsis">
+    Welcome to TDAG
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3_1_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_2" id="__nav_3_1_2_label" tabindex="0">
+<span class="md-ellipsis">
+    Tutorial
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_3_1_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_2">
+<span class="md-nav__icon md-icon"></span>
+            Tutorial
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../Introduction_part1/">
+<span class="md-ellipsis">
+    Part 1: TimeSeries
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    Part 2: Running Pipelines
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    Part 2: Running Pipelines
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#running-with-tdag-schedulers">
+<span class="md-ellipsis">
+      Running with TDAG Schedulers
+    </span>
+</a>
+<nav aria-label="Running with TDAG Schedulers" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#scheduler-in-debug-mode">
+<span class="md-ellipsis">
+      Scheduler in debug mode
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#scheduler-in-live-mode">
+<span class="md-ellipsis">
+      Scheduler in live mode
+    </span>
+</a>
+<nav aria-label="Scheduler in live mode" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#scheduler-in-live-mode-graph">
+<span class="md-ellipsis">
+      Scheduler in live mode graph
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#scheduler-in-debug-mode-graph">
+<span class="md-ellipsis">
+      Scheduler in debug mode graph
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#running-with-data-lake">
+<span class="md-ellipsis">
+      Running with Data Lake
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../tdag_explorer_part3/">
+<span class="md-ellipsis">
+    Part 3: TDAG Explorer
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    Code Reference
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            Code Reference
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+<span class="md-ellipsis">
+    tdag
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_1">
+<span class="md-nav__icon md-icon"></span>
+            tdag
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/config/">
+<span class="md-ellipsis">
+    config
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_2" id="__nav_4_1_2_label" tabindex="0">
+<span class="md-ellipsis">
+    contrib
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_1_2">
+<span class="md-nav__icon md-icon"></span>
+            contrib
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_2_1" id="__nav_4_1_2_1_label" tabindex="0">
+<span class="md-ellipsis">
+    feature_factory
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_2_1_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_4_1_2_1">
+<span class="md-nav__icon md-icon"></span>
+            feature_factory
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/contrib/feature_factory/bar_features/">
+<span class="md-ellipsis">
+    bar_features
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/contrib/feature_factory/bar_time_series/">
+<span class="md-ellipsis">
+    bar_time_series
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/contrib/feature_factory/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/contrib/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_3" id="__nav_4_1_3_label" tabindex="0">
+<span class="md-ellipsis">
+    distributed
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_1_3">
+<span class="md-nav__icon md-icon"></span>
+            distributed
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/distributed/time_series/">
+<span class="md-ellipsis">
+    time_series
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/distributed/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_4" id="__nav_4_1_4_label" tabindex="0">
+<span class="md-ellipsis">
+    instrumentation
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_1_4">
+<span class="md-nav__icon md-icon"></span>
+            instrumentation
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/instrumentation/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/logconf/">
+<span class="md-ellipsis">
+    logconf
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_6" id="__nav_4_1_6_label" tabindex="0">
+<span class="md-ellipsis">
+    time_series
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_6_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_1_6">
+<span class="md-nav__icon md-icon"></span>
+            time_series
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/persist_managers/">
+<span class="md-ellipsis">
+    persist_managers
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/time_series/">
+<span class="md-ellipsis">
+    time_series
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_6_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_6_3" id="__nav_4_1_6_3_label" tabindex="0">
+<span class="md-ellipsis">
+    update
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_6_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_4_1_6_3">
+<span class="md-nav__icon md-icon"></span>
+            update
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/update/api/">
+<span class="md-ellipsis">
+    api
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/update/ray_manager/">
+<span class="md-ellipsis">
+    ray_manager
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/update/scheduler/">
+<span class="md-ellipsis">
+    scheduler
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/update/update_methods/">
+<span class="md-ellipsis">
+    update_methods
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/update/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+<span class="md-ellipsis">
+    tdag_client
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_2">
+<span class="md-nav__icon md-icon"></span>
+            tdag_client
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_2_1" id="__nav_4_2_1_label" tabindex="0">
+<span class="md-ellipsis">
+    data_sources_interfaces
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_2_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_2_1">
+<span class="md-nav__icon md-icon"></span>
+            data_sources_interfaces
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag_client/data_sources_interfaces/local_data_lake/">
+<span class="md-ellipsis">
+    local_data_lake
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag_client/data_sources_interfaces/timescale/">
+<span class="md-ellipsis">
+    timescale
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag_client/models/">
+<span class="md-ellipsis">
+    models
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag_client/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+<span class="md-ellipsis">
+    vam_client
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_3">
+<span class="md-nav__icon md-icon"></span>
+            vam_client
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/local_vault/">
+<span class="md-ellipsis">
+    local_vault
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_3_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_3_2" id="__nav_4_3_2_label" tabindex="0">
+<span class="md-ellipsis">
+    maintenance
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_3_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_3_2">
+<span class="md-nav__icon md-icon"></span>
+            maintenance
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/maintenance/accounts/">
+<span class="md-ellipsis">
+    accounts
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/models/">
+<span class="md-ellipsis">
+    models
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/models_alpaca/">
+<span class="md-ellipsis">
+    models_alpaca
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/models_binance/">
+<span class="md-ellipsis">
+    models_binance
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/models_helpers/">
+<span class="md-ellipsis">
+    models_helpers
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    Key Concepts
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            Key Concepts
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../key_concepts/time_series_fundamentals/">
+<span class="md-ellipsis">
+    Time Series Fundamentals
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#running-with-tdag-schedulers">
+<span class="md-ellipsis">
+      Running with TDAG Schedulers
+    </span>
+</a>
+<nav aria-label="Running with TDAG Schedulers" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#scheduler-in-debug-mode">
+<span class="md-ellipsis">
+      Scheduler in debug mode
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#scheduler-in-live-mode">
+<span class="md-ellipsis">
+      Scheduler in live mode
+    </span>
+</a>
+<nav aria-label="Scheduler in live mode" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#scheduler-in-live-mode-graph">
+<span class="md-ellipsis">
+      Scheduler in live mode graph
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#scheduler-in-debug-mode-graph">
+<span class="md-ellipsis">
+      Scheduler in debug mode graph
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#running-with-data-lake">
+<span class="md-ellipsis">
+      Running with Data Lake
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="part-2-running-pipelines">Part 2: Running Pipelines</h1>
+<p>In the previous section, we saw how we can build our pipelines. Now, in this section, let's look at how we can start
+running them. In <strong>TDAG</strong>, we have mainly three ways of running our pipelines:</p>
+<ol>
+<li>We run our pipelines as a single continuous process, persisting and reading from our database in <strong>DEBUG Mode</strong>.</li>
+<li>We run our pipelines as a separate distributed process, where we can scale each node in the graph into a Ray cluster.</li>
+<li>We can run locally using Parquet data without interacting with the database. This method is very useful for running
+   fast iterations before we persist something in the database. Because, as you can imagine, continuous queries to a
+   database within a loop can incur time overhead.</li>
+</ol>
+<h2 id="running-with-tdag-schedulers">Running with TDAG Schedulers</h2>
+<p>for the first two methods we will use <code>Schedulers</code> this object is in charge of organizing and coordinating the
+update
+of time series. The reason of why we have sveral schedulers and not only one scheduler its because this helps to
+maintain
+isolated enviroments bewteen different time series even when they become to the same pipeline lets look at one example</p>
+<p>Making reference to our previous example we can have one scheduler that is in charge of updating all our pipeliens which
+uses an environment of scikit learn , while we can have another scheduler that updates pipelines on an environment that
+requires heavy machine learning libraries like Rapids and Pytorch in this case we will have somthing like this.</p>
+<pre class="mermaid"><code>graph TD
+    A[Scheduler: For scikit learn environment] --&gt; B[TimeSerie: Type 1]
+    A --&gt; E[TimeSerie: Type 2]
+
+    E --&gt; E1[Intermediate Time Series]
+    B --&gt; B1[Intermediate Time Series]
+
+    E1 --&gt;P[TimeSeries:Prices]
+    B1 --&gt;P
+
+    A_P[Scheduler: For Nvidia environment] --&gt; B_P[TimeSerie: Type 2]
+    A_P --&gt; E_P[TimeSerie: Type 2]
+
+    E_P --&gt; E1_P[Intermediate Time Series]
+    B_P --&gt; B1_P[Intermediate Time Series]
+
+    E1_P --&gt;P
+    B1_P --&gt;P   
+
+
+
+    classDef purple fill:#DDA0DD,stroke:#000,stroke-width:2px;
+    class A purple;
+    class A_P purple;
+
+</code></pre>
+<p>As you can see in the example above, schedulers can have different configurations and mixed time series dependencies. If
+a time series is dependent on a particular environment, you can isolate it and allow a specific scheduler to update it
+only. You can also let a time series be updated by the next available scheduler. You don't need to worry; this all
+happens in the background. As you will see, setting it up is quite simple.</p>
+<h3 id="scheduler-in-debug-mode">Scheduler in debug mode</h3>
+<p>To Run a scheduler in debug mode first you need to create the time serie that you want to run</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">mainsequence.tdag</span> <span class="kn">import</span> <span class="n">SchedulerUpdater</span>
+
+<span class="n">time_serie</span> <span class="o">=</span> <span class="n">ETFReplicator</span><span class="p">(</span><span class="n">lasso_alpha</span><span class="o">=</span><span class="mf">.01</span><span class="p">,</span> <span class="n">ticker_to_replicate</span><span class="o">=</span><span class="s2">"SPY"</span><span class="p">,</span> <span class="n">in_window</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+<span class="n">SchedulerUpdater</span><span class="o">.</span><span class="n">debug_schedule_ts</span><span class="p">(</span>
+    <span class="n">time_serie_hash_id</span><span class="o">=</span><span class="n">time_serie</span><span class="o">.</span><span class="n">local_hash_id</span><span class="p">,</span>
+    <span class="n">break_after_one_update</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">update_tree</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>That is all! This will start a process in which the full tree will be executed sequentially. Notice that we are using
+the class method <code>debug_schedule_ts</code>. What this method does is generate a new scheduler on the fly and execute the time
+series in this scheduler. We could also start it in the following way:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">mainsequence.tdag</span> <span class="kn">import</span> <span class="n">SchedulerUpdater</span><span class="p">,</span> <span class="n">Scheduler</span>
+
+<span class="n">scheduler</span> <span class="o">=</span> <span class="n">Scheduler</span><span class="o">.</span><span class="n">build_and_assign_to_ts</span><span class="p">(</span><span class="n">scheduler_name</span><span class="o">=</span><span class="n">s_name</span><span class="p">,</span> <span class="n">local_hash_id_list</span><span class="o">=</span><span class="p">[</span><span class="n">time_serie</span><span class="o">.</span><span class="n">local_hash_id</span><span class="p">],</span>
+                                             <span class="n">delink_all_ts</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">SchedulerUpdater</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">scheduler</span><span class="o">=</span><span class="n">scheduler</span><span class="p">,</span> <span class="n">break_after_one_update</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                       <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                       <span class="n">update_tree</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="p">)</span>
+</code></pre></div>
+<p>Now lets dig on the arguments</p>
+<ul>
+<li><strong>time_serie_hash_id</strong>: As discussed previously, all time series are uniquely hashed. However, there are scenarios
+  where we need more than one hash. For example, imagine that we have a time series that depends only on the prices of 2
+  stocks, and another that depends on the prices of 500. We don't want to create a table for 2 stocks and another table
+  for 500; what we want is to have two processes that update the same table with all our stocks. To achieve this, we can
+  set a property in our time series called <code>ignore_local_kwargs</code>. This property will indicate which arguments we should
+  ignore when creating the table, while the others will be used to hash the process. For example, like this:</li>
+</ul>
+<pre class="mermaid"><code>graph TD
+    A[TimeSerie: updates only 2 assets prices] --&gt; B[DB Table: All Prices]
+    C[TimeSerie: updates 500 assets prices] --&gt; B[DB Table: All Prices]
+
+    classDef purple fill:#DDA0DD,stroke:#000,stroke-width:2px;
+    class B purple;
+
+</code></pre>
+<ul>
+<li><strong>break_after_one_update</strong>: Setting this to <strong>True</strong> indicates that we want to perform only one loop rather than
+  continuously having the process be updated.</li>
+<li><strong>debug</strong>: Run in debug mode in a single process.</li>
+<li><strong>update_tree</strong>: Update all the dependencies of the time series being scheduled.</li>
+</ul>
+<h3 id="scheduler-in-live-mode">Scheduler in live mode</h3>
+<p>While the scheduler in debug mode is handy for testing our pipelines, we want to harness the full power of distributed
+and auto-scalable systems to manage all our pipelines, regardless of their complexity. Let's go back to our original
+example of the ETF replicator and assume that when we update the prices, we can take advantage of parallelization.</p>
+<p>Imagine you are requesting prices from an API, allowing you to make batch requests using several cores instead of
+relying on a single loop. In this case, you may want to set the <code>TimeSerie</code> <code>BarPrices</code> to use perhaps 10 CPUs, while
+the other time series might use only 1 CPU. Alternatively, you might want one time series to use 10 CPUs and 1 GPU.</p>
+<p>This and any other configuration is possible thanks to <strong>TDAG</strong>, leveraging Ray as our cluster manager. By using Ray, we
+can easily distribute and parallelize our pipelines and set the requirements we need for each <code>TimeSerie</code>.</p>
+<p>Going back to our previous example the difference between <strong>live</strong> and <strong>debug</strong> mode can be observed in the same time
+serie
+running differently</p>
+<h4 id="scheduler-in-live-mode-graph">Scheduler in live mode graph</h4>
+<pre class="mermaid"><code>graph TD
+    A[TimeSerie: XLF Returns] --&gt; B[TimeSerie: XLF Lasso Regression: 100 Days]
+    A --&gt; E[TimeSerie: XLF Lasso Regression: 200 Days]
+
+    A[TimeSerie: XLE Returns] --&gt; B_1[TimeSerie: XLE Lasso Regression: 100 Days]
+    A --&gt; E_1[TimeSerie: XLE Lasso Regression: 200 Days]
+
+    B --&gt; |to Timescale DB| D[DB Table for: XLF TimeSerie: Lasso Regression: 100 Days]
+    E --&gt; |to Timescale DB| G[DB Table for: XLF TimeSerie: Lasso Regression: 200 Days]
+
+    B_1 --&gt; |to Timescale DB| D_1[DB Table for: XLE TimeSerie: Lasso Regression: 100 Days]
+    E_1 --&gt; |to Timescale DB| G_1[DB Table for: XLE TimeSerie: Lasso Regression: 200 Days]
+
+    D --&gt; |to Portfolio TS| last[TimeSerie: Long Short Portfolio]
+    G --&gt; |to Portfolio TS| last
+
+    D_1 --&gt; |to Portfolio TS| last
+    G_1 --&gt; |to Portfolio TS| last
+
+    classDef purple fill:#DDA0DD,stroke:#000,stroke-width:2px;
+    class D purple;
+    class G purple;
+    class D_1 purple;
+    class G_1 purple;
+</code></pre>
+<h4 id="scheduler-in-debug-mode-graph">Scheduler in debug mode graph</h4>
+<pre class="mermaid"><code>graph TD
+    A[TimeSerie: XLF Returns] --&gt; B[TimeSerie: XLF Lasso Regression: 100 Days]
+    B --&gt; C[DB Table for: XLF TimeSerie: Lasso Regression: 100 Days]
+    C --&gt; D[TimeSerie: XLF Lasso Regression: 200 Days]
+    D --&gt; E[DB Table for: XLF TimeSerie: Lasso Regression: 200 Days]
+
+
+    E--&gt; H[TimeSerie: XLE Lasso Regression: 100 Days]
+    H --&gt; I[DB Table for: XLE TimeSerie: Lasso Regression: 100 Days]
+    I --&gt; J[TimeSerie: XLE Lasso Regression: 200 Days]
+    J --&gt; K[DB Table for: XLE TimeSerie: Lasso Regression: 200 Days]
+    K --&gt; L[TimeSerie: Long Short Portfolio]
+
+    classDef purple fill:#DDA0DD,stroke:#000,stroke-width:2px;
+    class C,E,I,K purple;
+
+</code></pre>
+<h3 id="running-with-data-lake">Running with Data Lake</h3>
+<p>While the previous two ways of running the pipelines are designed for maintainability, explorability, and clarity, we
+realized that there is a need for a different approach to building our pipelines that could help researchers go through
+the full process in a more streamlined way. This is particularly important if we want to run loops and analyses on them.</p>
+<p>Let’s go back to our Long Short portfolio and imagine that we want to observe the hyperspace of portfolios generated by
+several combinations of parameters. If we fix the tickers, we have combinations of rolling windows and regularization
+parameters, which takes us to a four-dimensional space. In this case, we don’t want to persist any iteration in the
+database; perhaps we just want to see at which point the interaction of the regularization parameters starts to
+decrease, for example, or at which point our regression starts to stabilize. For these scenarios, we can run our
+pipelines in <strong>Data Lake</strong> mode.</p>
+<p>Let’s look at a code example to understand it better.</p>
+<div class="highlight"><pre><span></span><code><span class="n">data_lake_yaml_configuration</span> <span class="o">=</span> <span class="s2">"""</span>
+<span class="s2">datalake_end: 2024-09-01 00:00:00</span>
+<span class="s2">datalake_name: Long short portofolio</span>
+<span class="s2">datalake_start: 2022-08-01 00:00:00</span>
+<span class="s2">nodes_to_get_from_db: interpolatedpricestrain_c9676700655ba6d948919ca925ca82c1</span>
+<span class="s2">persist_logs_to_file: false</span>
+<span class="s2">"""</span>
+<span class="n">total_return</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">rolling_window</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">60</span><span class="p">,</span> <span class="mi">30</span> <span class="o">*</span> <span class="mi">24</span><span class="p">,</span> <span class="mi">20</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">lasso_alpha</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mf">1e-2</span><span class="p">,</span> <span class="mf">1e-3</span><span class="p">,</span> <span class="mf">1e-4</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">]:</span>
+        <span class="n">long_short_portfolio</span> <span class="o">=</span> <span class="n">LongShortPortfolio</span><span class="p">(</span><span class="n">ticker_long</span><span class="o">=</span><span class="s2">"XLF"</span><span class="p">,</span> <span class="n">ticker_short</span><span class="o">=</span><span class="s2">"XLE"</span><span class="p">,</span>
+                                                  <span class="n">long_rolling_windows</span><span class="o">=</span><span class="p">[</span><span class="n">long_rollling_window</span><span class="p">],</span>
+                                                  <span class="n">short_rolling_windows</span><span class="o">=</span><span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">200</span><span class="p">],</span> <span class="n">lasso_alpha</span><span class="o">=</span><span class="mf">1e-2</span>
+                                                  <span class="p">)</span>
+        <span class="n">portfolio_df</span> <span class="o">=</span> <span class="n">long_short_portfolio</span><span class="o">.</span><span class="n">get_df_greater_than_in_table</span><span class="p">(</span><span class="n">latest_value</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">total_return</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">long_short_portfolio</span><span class="p">[</span><span class="s2">"portfolio"</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+<p>In the previous example, if we run in Data Lake mode, each of the TimeSeries will be dumped once from the database into
+a Data Lake as a Parquet file. The Data Lake will be configured in a folder structure of the following form:</p>
+<div class="highlight"><pre><span></span><code>DataLakeName/
+├── DateRange/
+│   ├── TimeSeriesHash1/parquet_partitions
+│   ├── TimeSeriesHash2/parquet_partitions
+│   ├── TimeSeriesHash3/parquet_partitions
+│   └── ...
+└── ...
+</code></pre></div>
+<p>Additionally, if we want, we can keep some TimeSeries cached in memory that are constantly being reused. This increases
+the speed at which we can run our pipelines by approximately 100 times, as we read mostly from memory or disk, avoiding
+networking and database overhead.</p>
+<p>To run a TimeSeries in Data Lake mode, we only need to call the method <code>get_df_greater_than_in_table</code> of the <code>TimeSerie</code>
+we want to calculate, and the tree will be updated automatically.</p>
+<p>Now, let’s look at how we can visualize and manage all our pipelines in the GUI. Continue
+to <a href="../tdag_explorer_part3/">Part 3: The TDAG Explorer</a>.</p>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+<script src="../../../../assets/javascripts/bundle.83f73b43.min.js"></script>
+<script src="https://unpkg.com/mermaid@10.9.0/dist/mermaid.min.js"></script>
+<script>window.mermaidConfig = {default: {
+    startOnLoad: false
+}};</script></body>
+</html>

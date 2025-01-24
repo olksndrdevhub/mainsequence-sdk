@@ -1,0 +1,958 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<link href="../../" rel="prev"/>
+<link href="../running_time_series_part2/" rel="next"/>
+<link href="../../../../img/favico.ico" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.5.44" name="generator"/>
+<title>Part 1: TimeSeries - Main Sequence SDK</title>
+<link href="../../../../assets/stylesheets/main.0253249f.min.css" rel="stylesheet"/>
+<link href="../../../../assets/stylesheets/palette.06af60db.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../../../assets/_mkdocstrings.css" rel="stylesheet"/>
+<link href="../../../../stylesheets/custom.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="indigo" data-md-color-primary="indigo" data-md-color-scheme="slate" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#part-1-timeseries">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header md-header--shadow" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="Main Sequence SDK" class="md-header__button md-logo" data-md-component="logo" href="../../../.." title="Main Sequence SDK">
+<img alt="logo" src="../../../../img/logo.png"/>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            Main Sequence SDK
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Part 1: TimeSeries
+            
+          </span>
+</div>
+</div>
+</div>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Main-Sequence-Client-Side/tdag" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="Main Sequence SDK" class="md-nav__button md-logo" data-md-component="logo" href="../../../.." title="Main Sequence SDK">
+<img alt="logo" src="../../../../img/logo.png"/>
+</a>
+    Main Sequence SDK
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Main-Sequence-Client-Side/tdag" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../..">
+<span class="md-ellipsis">
+    Home
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../about/">
+<span class="md-ellipsis">
+    About
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    Getting Started
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+<span class="md-ellipsis">
+    TDAG
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_3_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_1">
+<span class="md-nav__icon md-icon"></span>
+            TDAG
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../">
+<span class="md-ellipsis">
+    Welcome to TDAG
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3_1_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_2" id="__nav_3_1_2_label" tabindex="0">
+<span class="md-ellipsis">
+    Tutorial
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_3_1_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_2">
+<span class="md-nav__icon md-icon"></span>
+            Tutorial
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    Part 1: TimeSeries
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    Part 1: TimeSeries
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#rolling-regression-with-lasso">
+<span class="md-ellipsis">
+      Rolling Regression with Lasso
+    </span>
+</a>
+<nav aria-label="Rolling Regression with Lasso" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-fixed-window-regression-pseudo-code">
+<span class="md-ellipsis">
+      1. Fixed Window Regression (Pseudo-code)
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-maintainability-of-our-pipeline">
+<span class="md-ellipsis">
+      2. Maintainability of Our Pipeline**
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tdag-time-series">
+<span class="md-ellipsis">
+      Tdag Time Series
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../running_time_series_part2/">
+<span class="md-ellipsis">
+    Part 2: Running Pipelines
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../tdag_explorer_part3/">
+<span class="md-ellipsis">
+    Part 3: TDAG Explorer
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    Code Reference
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            Code Reference
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+<span class="md-ellipsis">
+    tdag
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_1">
+<span class="md-nav__icon md-icon"></span>
+            tdag
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/config/">
+<span class="md-ellipsis">
+    config
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_2" id="__nav_4_1_2_label" tabindex="0">
+<span class="md-ellipsis">
+    contrib
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_1_2">
+<span class="md-nav__icon md-icon"></span>
+            contrib
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_2_1" id="__nav_4_1_2_1_label" tabindex="0">
+<span class="md-ellipsis">
+    feature_factory
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_2_1_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_4_1_2_1">
+<span class="md-nav__icon md-icon"></span>
+            feature_factory
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/contrib/feature_factory/bar_features/">
+<span class="md-ellipsis">
+    bar_features
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/contrib/feature_factory/bar_time_series/">
+<span class="md-ellipsis">
+    bar_time_series
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/contrib/feature_factory/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/contrib/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_3" id="__nav_4_1_3_label" tabindex="0">
+<span class="md-ellipsis">
+    distributed
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_1_3">
+<span class="md-nav__icon md-icon"></span>
+            distributed
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/distributed/time_series/">
+<span class="md-ellipsis">
+    time_series
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/distributed/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_4" id="__nav_4_1_4_label" tabindex="0">
+<span class="md-ellipsis">
+    instrumentation
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_1_4">
+<span class="md-nav__icon md-icon"></span>
+            instrumentation
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/instrumentation/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/logconf/">
+<span class="md-ellipsis">
+    logconf
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_6" id="__nav_4_1_6_label" tabindex="0">
+<span class="md-ellipsis">
+    time_series
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_6_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_1_6">
+<span class="md-nav__icon md-icon"></span>
+            time_series
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/persist_managers/">
+<span class="md-ellipsis">
+    persist_managers
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/time_series/">
+<span class="md-ellipsis">
+    time_series
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1_6_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1_6_3" id="__nav_4_1_6_3_label" tabindex="0">
+<span class="md-ellipsis">
+    update
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_6_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_4_1_6_3">
+<span class="md-nav__icon md-icon"></span>
+            update
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/update/api/">
+<span class="md-ellipsis">
+    api
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/update/ray_manager/">
+<span class="md-ellipsis">
+    ray_manager
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/update/scheduler/">
+<span class="md-ellipsis">
+    scheduler
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/update/update_methods/">
+<span class="md-ellipsis">
+    update_methods
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/update/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/time_series/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+<span class="md-ellipsis">
+    tdag_client
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_2">
+<span class="md-nav__icon md-icon"></span>
+            tdag_client
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_2_1" id="__nav_4_2_1_label" tabindex="0">
+<span class="md-ellipsis">
+    data_sources_interfaces
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_2_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_2_1">
+<span class="md-nav__icon md-icon"></span>
+            data_sources_interfaces
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag_client/data_sources_interfaces/local_data_lake/">
+<span class="md-ellipsis">
+    local_data_lake
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag_client/data_sources_interfaces/timescale/">
+<span class="md-ellipsis">
+    timescale
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag_client/models/">
+<span class="md-ellipsis">
+    models
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/tdag_client/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+<span class="md-ellipsis">
+    vam_client
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_3">
+<span class="md-nav__icon md-icon"></span>
+            vam_client
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/local_vault/">
+<span class="md-ellipsis">
+    local_vault
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_3_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_3_2" id="__nav_4_3_2_label" tabindex="0">
+<span class="md-ellipsis">
+    maintenance
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_3_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_3_2">
+<span class="md-nav__icon md-icon"></span>
+            maintenance
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/maintenance/accounts/">
+<span class="md-ellipsis">
+    accounts
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/models/">
+<span class="md-ellipsis">
+    models
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/models_alpaca/">
+<span class="md-ellipsis">
+    models_alpaca
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/models_binance/">
+<span class="md-ellipsis">
+    models_binance
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/models_helpers/">
+<span class="md-ellipsis">
+    models_helpers
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../reference/vam_client/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    Key Concepts
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            Key Concepts
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../../key_concepts/time_series_fundamentals/">
+<span class="md-ellipsis">
+    Time Series Fundamentals
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#rolling-regression-with-lasso">
+<span class="md-ellipsis">
+      Rolling Regression with Lasso
+    </span>
+</a>
+<nav aria-label="Rolling Regression with Lasso" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-fixed-window-regression-pseudo-code">
+<span class="md-ellipsis">
+      1. Fixed Window Regression (Pseudo-code)
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-maintainability-of-our-pipeline">
+<span class="md-ellipsis">
+      2. Maintainability of Our Pipeline**
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tdag-time-series">
+<span class="md-ellipsis">
+      Tdag Time Series
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="part-1-timeseries">Part 1: TimeSeries</h1>
+<p>Let’s start with a simple example and progressively build upon it. Suppose we want to <strong>replicate</strong> a fund for which we
+don’t know the exact components—this could be an ETF (Exchange-Traded Fund) or a closed-end fund. Since we don’t know
+the components, we will adopt a <strong>data-driven approach</strong> to estimate the underlying assets.</p>
+<p>To make it more concrete, let’s assume we want to replicate the <strong>S&amp;P 500 Financial Sector</strong>. A good proxy for this
+sector is the <strong>XLF ETF</strong>. Our goal is to replicate the performance of XLF by identifying its components using
+historical data. Since we don't have the exact components, we'll run a <strong>regularized rolling regression</strong>.</p>
+<p>For regularization, we’ll use <strong>Lasso (Least Absolute Shrinkage and Selection Operator)</strong> because it has the desirable
+property of setting certain weights to zero due to its <strong>L1 regularization</strong>, effectively selecting only the most
+important assets in our replication.</p>
+<h2 id="rolling-regression-with-lasso">Rolling Regression with Lasso</h2>
+<h3 id="1-fixed-window-regression-pseudo-code">1. Fixed Window Regression (Pseudo-code)</h3>
+<p>Before we dive into rolling regressions, let's first outline the process for a <strong>fixed window</strong> regression using Lasso:</p>
+<ul>
+<li>Collect the historical returns for XLF and the individual stocks from the S&amp;P 500 Financial Sector.</li>
+<li>Run the Lasso regression for a given period (e.g., last 60 days).</li>
+<li>Use the Lasso coefficients to identify the most important stocks for that period.</li>
+</ul>
+<p>In pseudo-code:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Pseudo-code for fixed window Lasso regression</span>
+<span class="k">for</span> <span class="n">each</span> <span class="n">window</span> <span class="ow">in</span> <span class="n">historical_data</span><span class="p">:</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">get_returns_for_stocks_in_window</span><span class="p">(</span><span class="n">window</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">get_returns_for_XLF_in_window</span><span class="p">(</span><span class="n">window</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">Lasso</span><span class="p">(</span><span class="n">alpha</span><span class="o">=</span><span class="n">λ</span><span class="p">)</span>  <span class="c1"># λ is the regularization parameter</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+    <span class="n">coefficients</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">coef_</span>
+    <span class="n">select_significant_assets</span><span class="p">(</span><span class="n">coefficients</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="2-maintainability-of-our-pipeline">2. Maintainability of Our Pipeline**</h3>
+<p>What we want to achieve now is to write the code that performs this rolling regression and have a system that runs this
+code automatically, say every day at 11 PM. Additionally, we need to ensure that the results are persisted so they can
+be extracted, reused, and integrated into other processes. Of course, we want to accomplish this in a simple and
+extendable way. This is where our first <strong>Tdag Helper</strong> comes in: a <strong>TimeSerie</strong> object.</p>
+<h2 id="tdag-time-series">Tdag Time Series</h2>
+<p>In simple terms, a <strong>Tdag TimeSerie</strong> is an object of type <code>TimeSerie</code> that controls the following three main tasks:</p>
+<ol>
+<li><strong>Updating Logic</strong>: It contains the logic for updating a time series based on its last update.</li>
+<li><strong>Linked to Storage</strong>: It is linked to a storage solution. By default, we use <strong>TimeScaleDB</strong> for storing the data.</li>
+<li><strong>Uniqueness Guarantee</strong>: It guarantees that the persisted data is unique for each combination of parameters.</li>
+</ol>
+<p>For example, if we have a <code>TimeSerie</code> that performs a rolling regression using the last 100 days of data, this
+<code>TimeSerie</code> should be different from a <code>TimeSerie</code> that uses the last 200 days. This ensures the uniqueness of each time
+series instance based on its specific configuration.</p>
+<pre class="mermaid"><code>graph TD
+    A[TimeSerie: XLF Returns] --&gt; B[TimeSerie: Lasso Regression: 100 Days]
+    A --&gt; E[TimeSerie: Lasso Regression: 200 Days]
+
+    B --&gt; |to Timescale DB| D[DB Table for : TimeSerie: Lasso Regression: 100 Days]
+    E --&gt; |to Timescale DB| G[DB Table for : TimeSerie: Lasso Regression: 200 Days]
+
+    classDef purple fill:#DDA0DD,stroke:#000,stroke-width:2px;
+    class D purple;
+    class G purple;
+</code></pre>
+<p>To achieve this structure, <strong>TDAG</strong> will automatically handle the hashing process and ensure that we have two distinct
+sets
+of data based on our arguments. Let's see how we can achieve this in code.</p>
+<p>First, we extend the <strong>TimeSerie</strong> class with the arguments that we require; in this case, these are the size of the
+rolling window and the regularization parameter. The decorator <code>@TimeSerie._post_init_routines</code> is necessary to perform
+all the magic behind <strong>TDAG</strong>.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">mainsequence.tdag</span> <span class="kn">import</span> <span class="n">TimeSerie</span>
+<span class="kn">from</span> <span class="nn">utils</span> <span class="kn">import</span> <span class="n">BarTimeSerie</span>
+
+
+<span class="k">def</span> <span class="nf">get_prices_bars</span><span class="p">():</span>
+    <span class="o">...</span>
+
+
+<span class="k">class</span> <span class="nc">ETFReplicator</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
+
+    <span class="nd">@TimeSerie</span><span class="o">.</span><span class="n">_post_init_routines</span><span class="p">()</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lasso_alpha</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">in_window</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">in_window</span> <span class="o">=</span> <span class="n">in_window</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lasso_alpha</span> <span class="o">=</span> <span class="n">lasso_alpha</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bars_ts</span> <span class="o">=</span> <span class="n">BarsTimeSerie</span><span class="p">()</span>  <span class="c1"># a time serie with the prices</span>
+</code></pre></div>
+<p>As you can see, the initialization is quite simple. We just need to define the parameters that will uniquely define our
+time series: in this case, <code>lasso_alpha</code> and <code>in_window</code>. It is important to mention that we are referencing another
+time series with <code>BarTimeSerie</code>.</p>
+<p>Now the next step is to add the logic to get the coefficients. This is also quite simple. Here, we use the <strong>TimeSerie</strong>
+method <code>get_df_from_table_after_date</code> to retrieve only the new data that we need. Important observations are:</p>
+<ol>
+<li>If <strong>latest_value</strong> is None, it means that the time series has never been updated, so we need to handle this logic.</li>
+<li>We always use UTC dates in the database to ensure compatibility.</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">mainsequence.tdag</span> <span class="kn">import</span> <span class="n">TimeSerie</span>
+
+
+<span class="k">def</span> <span class="nf">get_lasso_coefficients</span><span class="p">():</span>
+    <span class="o">...</span>
+
+
+<span class="k">class</span> <span class="nc">ETFReplicator</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">update_series_from_source</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">latest_value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">datetime</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">latest_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">latest_value</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2010</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="n">pytz</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+        <span class="n">start_value</span> <span class="o">=</span> <span class="n">latest_value</span> <span class="o">-</span> <span class="n">datetime</span><span class="o">.</span><span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">in_window</span><span class="p">)</span>
+        <span class="n">prices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bars_ts</span><span class="o">.</span><span class="n">get_df_from_table_after_date</span><span class="p">(</span><span class="n">start_value</span><span class="p">)</span>
+
+        <span class="n">prices</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span><span class="o">.</span><span class="n">pivot_table</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s1">'time_index'</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="s1">'asset_symbol'</span><span class="p">,</span>
+                                                  <span class="n">values</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">assets_configuration</span><span class="o">.</span><span class="n">price_type</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">get_lasso_coefficients</span><span class="p">(</span><span class="n">prices</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lasso_alpha</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">weights</span>
+</code></pre></div>
+<p>And thats all with only this lines of code this pipeline will be updated systmetaically and persisted into our database
+Lets get a litte more complicated. As you perhaps noticed in the previous code we are not defining at any point the
+asset that we want to replicate so we should add this to the initialization. Now also lets suppose that we want to build
+a portfolio that goes long a replication of the XLF and goes short a replication of XLE which is the energy sector of
+the S&amp;P500.</p>
+<p>Also, for the sake of stability, let’s build this portfolio where each leg is the average weight of the 100-day and
+200-day rolling regression. For sake of simplicit lets leave on lasso_alpha for all regression but this is something
+we could easily change.</p>
+<p>First, let’s modify our initialization method to include the ticker that we want to replicate.</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">ETFReplicator</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
+
+    <span class="nd">@TimeSerie</span><span class="o">.</span><span class="n">_post_init_routines</span><span class="p">()</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lasso_alpha</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">ticker_to_replicate</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">in_window</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="o">...</span>
+</code></pre></div>
+<p>now lets look at how our portfolio <code>TimeSerie</code> will look like</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">LongShortPortfolio</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
+    <span class="nd">@TimeSerie</span><span class="o">.</span><span class="n">_post_init_routines</span><span class="p">()</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ticker_long</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ticker_short</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">long_roling_windows</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">lasso_alpha</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+                 <span class="n">short_rolling_windows</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">long_ts</span> <span class="o">=</span> <span class="p">{</span><span class="sa">f</span><span class="s2">"ts_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">:</span> <span class="n">ETFReplicator</span><span class="p">(</span><span class="n">lasso_alpha</span><span class="o">=</span><span class="n">lasso_alpha</span><span class="p">,</span> <span class="n">ticker_to_replicate</span><span class="o">=</span><span class="n">ticker_long</span><span class="p">,</span>
+                                            <span class="n">in_window</span><span class="o">=</span><span class="n">i</span>
+                                            <span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">long_roling_windows</span><span class="p">}</span>
+        <span class="n">short_ts</span> <span class="o">=</span> <span class="p">{</span><span class="sa">f</span><span class="s2">"ts_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">:</span> <span class="n">ETFReplicator</span><span class="p">(</span><span class="n">lasso_alpha</span><span class="o">=</span><span class="n">lasso_alpha</span><span class="p">,</span> <span class="n">ticker_to_replicate</span><span class="o">=</span><span class="n">ticker_long</span><span class="p">,</span>
+                                             <span class="n">in_window</span><span class="o">=</span><span class="n">i</span>
+                                             <span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">short_rolling_windows</span><span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">long_ts</span> <span class="o">=</span> <span class="n">long_ts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">short_ts</span> <span class="o">=</span> <span class="n">short_ts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lasso_alpha</span><span class="o">=</span><span class="n">lasso_alpha</span>
+
+
+<span class="n">long_short_portfolio</span> <span class="o">=</span> <span class="n">LongShortPortfolio</span><span class="p">(</span><span class="n">ticker_long</span><span class="o">=</span><span class="s2">"XLF"</span><span class="p">,</span> <span class="n">ticker_short</span><span class="o">=</span><span class="s2">"XLE"</span><span class="p">,</span> <span class="n">long_rolling_windows</span><span class="o">=</span><span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="p">],</span>
+                                          <span class="n">short_rolling_windows</span><span class="o">=</span><span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">200</span><span class="p">],</span><span class="n">lasso_alpha</span><span class="o">=</span><span class="mf">1e-2</span>
+                                          <span class="p">)</span>
+</code></pre></div>
+<p>That’s all! With only these few lines of code, we have a fully integrated data pipeline that will update our portfolio
+automatically. What is more important on this example is how you can build the pipelines as building blocks but agnostic 
+of how the previous block was build. you dont even neeed to know from how many other TimeSeries this block belongs. 
+This process make it extremely powerfull to stack while keeping a clean and lean code. </p>
+<p>The graph of this pipeline should look something like this:</p>
+<pre class="mermaid"><code>graph TD
+    A[TimeSerie: XLF Returns] --&gt; B[TimeSerie:  XLF Lasso Regression: 100 Days]
+    A --&gt; E[TimeSerie: XLF Lasso Regression: 200 Days]
+
+    A[TimeSerie: XLF Returns] --&gt; B_1[TimeSerie:  XLE Lasso Regression: 100 Days]
+    A --&gt; E_1[TimeSerie: XLE Lasso Regression: 200 Days]
+
+
+    B --&gt; |to Timescale DB| D[DB Table for : XLF TimeSerie: Lasso Regression: 100 Days]
+    E --&gt; |to Timescale DB| G[DB Table for : XLF TimeSerie: Lasso Regression: 200 Days]
+
+    B_1 --&gt; |to Timescale DB| D_1[DB Table for : XLE TimeSerie: Lasso Regression: 100 Days]
+    E_1 --&gt; |to Timescale DB| G_1[DB Table for : XLE TimeSerie: Lasso Regression: 200 Days]
+
+    D --&gt; |to portfolio TS | last[TimeSerie: Long Short Portfolio]
+    G --&gt; |to portfolio TS| last
+
+    D_1 --&gt; |to portfolio TS | last
+    G_1 --&gt; |to portfolio TS| last
+
+    classDef purple fill:#DDA0DD,stroke:#000,stroke-width:2px;
+    class D purple;
+    class G purple;
+    class D_1 purple;
+    class G_1 purple;
+</code></pre>
+<p>As you can see, even with this simple example, the pipelines are becoming increasingly complex. Now imagine integrating
+data from a different source—let’s say U.S. economic data from the Federal Reserve. Perhaps you also want to interpolate
+or filter the prices in a specific way. What about adding sentiment analysis from internet searches? And how about a
+machine learning model that requires feeding with thousands of different signals and needs to be retrained every two
+weeks?</p>
+<p>This is just for one pipeline tied to a single portfolio. Now imagine wanting to maintain multiple portfolios, each
+tailored for different profiles. Surely, you wouldn’t want to manage this using a spreadsheet or countless Jupyter
+notebooks, right?</p>
+<p>now lets look at how we can start scheduling our pipelines. continue to <a href="../running_time_series_part2/">Part 2 Running Pipelines</a></p>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+<script src="../../../../assets/javascripts/bundle.83f73b43.min.js"></script>
+<script src="https://unpkg.com/mermaid@10.9.0/dist/mermaid.min.js"></script>
+<script>window.mermaidConfig = {default: {
+    startOnLoad: false
+}};</script></body>
+</html>
