@@ -6,8 +6,8 @@ from .models import (loaders, VAM_API_ENDPOINT, BaseObjectOrm, make_request, Acc
                      DoesNotExist, CurrencyPairMixin)
 import datetime
 import pandas as pd
-
-from .utils import CONSTANTS, get_vam_client_logger
+from mainsequence.logconf import logger
+from .utils import CONSTANTS
 from cryptography.fernet import Fernet
 from pydantic import  condecimal
 
@@ -15,7 +15,7 @@ from pydantic import  condecimal
 
 from .local_vault import VAULT_PATH, get_secrets_for_account_id
 
-logger = get_vam_client_logger()
+
 
 class AlpacaBaseObject(BaseObjectOrm):
     END_POINTS = {

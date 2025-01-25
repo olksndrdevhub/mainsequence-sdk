@@ -6,10 +6,10 @@ import datetime
 import time
 import pytz
 from typing import Union
-import logging
 
 
 from mainsequence.vam_client.local_vault import get_all_entries_in_vault_for_venue
+from mainsequence.logconf import logger
 from tqdm import tqdm
 VAM_ENDPOINT=os.environ.get('VAM_ENDPOINT')
 VAM_API_ENDPOINT=f"{VAM_ENDPOINT}/orm/api"
@@ -20,18 +20,9 @@ VAM_ADMIN_USER=os.environ.get('VAM_ADMIN_USER')
 VAM_ADMIN_PASSWORD=os.environ.get('VAM_ADMIN_PASSWORD')
 
 
-def get_vam_client_logger():
-    # Check if the logger with the name 'virtualfundbuilder' already exists
-    logger = logging.getLogger('mainsequence.vam_client')
 
-    # # If the logger doesn't have any handlers, create it using the custom function
-    # if not logger.hasHandlers():
-    #     logger_file = os.environ.get('VFB_LOGS_PATH', os.path.join(os.path.expanduser("~"), "virtualfundbuilder/logs"))
-    #     logger = create_logger_in_path(logger_name="mainsequence.vam_client", logger_file=logger_file, application_name="mainsequence.vam_client")
 
-    return logger
-
-logger = get_vam_client_logger()
+logger
 
 def request_to_datetime(string_date:str):
     try:

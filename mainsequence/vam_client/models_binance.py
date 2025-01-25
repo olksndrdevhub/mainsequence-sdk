@@ -9,12 +9,11 @@ import datetime
 import pandas as pd
 import json
 from pydantic import  condecimal
-from .utils import CONSTANTS, get_vam_client_logger
+from .utils import CONSTANTS
 from .local_vault import VAULT_PATH, get_secrets_for_account_id
 from cryptography.fernet import Fernet
 import random
-
-logger = get_vam_client_logger()
+from mainsequence.logconf import logger
 
 class BinanceBaseObject(BaseObjectOrm):
     END_POINTS = {

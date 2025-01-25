@@ -2373,10 +2373,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                 raise e
 
                         try:
-                            self.update_tracker.set_start_of_execution(local_hash_id=ts_row["local_hash_id"],
-                                                                       local_time_serie_id=self.local_metadata["id"],
-                                                                       data_source_id=ts_row["data_source_id"]
-                                                                       )
+
                             error_on_last_update = ts.update(debug_mode=debug_mode,
                                                              raise_exceptions=True,
                                                              update_tree=False,
@@ -2435,11 +2432,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                              "max_retries": run_configuration.retry_on_error},
                                kwargs_update=kwargs_update)
 
-            # p = self.update_actor_manager.launch_update_task(**task_kwargs)
+            p = self.update_actor_manager.launch_update_task(**task_kwargs)
 
-            p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
-            continue
-            logger.warning("REMOVE LINES ABOVE FOR DEBUG")
+            # p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
+            # continue
+            # logger.warning("REMOVE LINES ABOVE FOR DEBUG")
 
             futures_.append(p)
 

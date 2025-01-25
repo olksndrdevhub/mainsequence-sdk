@@ -471,11 +471,10 @@ class PersistManager:
                            )
 
 
-        metadatas=self.dth.build_or_update_update_details(metadata=self.metadata,
-                                                **update_kwargs)
+        metadata,local_metadata=self.local_metadata.remote_table.build_or_update_update_details( **update_kwargs)
 
-        self.metadata = metadatas["metadata"]
-        self.local_metadata = metadatas["local_metadata"]
+        self.metadata = metadata
+        self.local_metadata = local_metadata
 
     def patch_update_details(self,local_hash_id=None,
                              **kwargs):

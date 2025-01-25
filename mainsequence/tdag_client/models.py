@@ -380,12 +380,12 @@ class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
     source_class_name:str
     sourcetableconfiguration:Optional[SourceTableConfiguration]=None
 
-    @property
-    def ROOT_URL(self):
+    @staticmethod
+    def get_root_url():
         return get_dynamic_table_metadata(TDAG_ENDPOINT)
 
     def patch(self, time_out: Union[None, int] = None, *args, **kwargs, ):
-        url = self.ROOT_URL + f"/{self.id}/"
+        url = self.get_root_url() + f"/{self.id}/"
         payload = {"json": serialize_to_json(kwargs)}
         s = self.build_session()
         r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload, time_out=time_out)
@@ -405,7 +405,7 @@ class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
 
     @classmethod
     def filter(cls, payload: Union[dict, None]):
-        url = cls.ROOT_URL
+        url = cls.get_root_url()
         payload = {} if payload is None else {"params": payload}
 
         s = cls.build_session()
@@ -445,6 +445,22 @@ class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
         data = r.json()
 
         return cls(**data["metadata"])
+
+    def build_or_update_update_details(self, metadata, *args, **kwargs)->["DynamicTableMetaData","LocalTimeSerie"]:
+
+        base_url = self.get_root_url()
+        payload = { "json": kwargs}
+        # r = self.s.patch(, **payload)
+        url=f"{base_url}/{self.id}/build_or_update_update_details/"
+        r=self.make_request(r_type="PATCH",url=url,payload=payload)
+        if r.status_code != 202:
+            raise Exception(f"Error in request {r.text}")
+
+        result=r.json()
+
+
+        return DynamicTableMetaData(**result["dynamic_table_metadata"]),LocalTimeSeries(**result["local_time_series"])
+
 
 
 class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
@@ -2326,16 +2342,6 @@ class DynamicTableHelpers:
     def set_policy_for_descendants(self,hash_id,policy,pol_type,exclude_ids,extend_to_classes):
         r = TimeSerieNode.set_policy_for_descendants(hash_id,policy,pol_type,exclude_ids,extend_to_classes)
 
-    def build_or_update_update_details(self, metadata, *args, **kwargs):
-
-        base_url = self.root_url
-        payload = { "json": kwargs}
-        # r = self.s.patch(, **payload)
-        url=f"{base_url}/{metadata['id']}/build_or_update_update_details/?data_source_id={metadata['data_source']['id']}"
-        r=self.make_request(r_type="PATCH",url=url,payload=payload)
-        if r.status_code != 202:
-            raise Exception(f"Error in request {r.text}")
-        return r.json()
 
     @none_if_backend_detached
     def patch(self,metadata,timeout=None,*args,**kwargs):
