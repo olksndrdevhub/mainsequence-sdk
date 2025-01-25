@@ -115,10 +115,10 @@ def make_request(s, r_type: str, url: str,   loaders:Union[AuthLoaders,None], pa
                 keep_request = False
                 break
         except requests.exceptions.ConnectionError as errc:
-            logger.warning(f"Error connecting {url} ", errc)
+            logger.exception(f"Error connecting {url} ")
 
         except Exception as e:
-            logger.warning(f"Error connecting {url} ", e)
+            logger.exception(f"Error connecting {url} ")
 
         counter = counter + 1
         if counter >= TRIES:

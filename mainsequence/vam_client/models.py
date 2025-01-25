@@ -285,11 +285,11 @@ class BaseObjectOrm:
         :return:
         :rtype:
         """
-        base_url = cls.get_object_url()
+        url = f"{cls.get_object_url()}/update_or_create/"
         data = cls.serialize_for_json(kwargs)
         payload={"json":data}
 
-        r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="POST", url=f"{base_url}/update_or_create/", payload=payload,
+        r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="POST", url=url, payload=payload,
                          timeout=timeout
                          )
         if r.status_code not in [201, 200]:
@@ -886,7 +886,6 @@ class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
     data_source_id: int = Field(..., description="Unique identifier for the data source")
     local_hash_id: str = Field(..., max_length=64, description="Local hash ID of the data source")
     data_source_description: Optional[str] = Field(None, description="Descriptions of the data source")
-    table_name: str = Field(..., max_length=64, description="Name of the associated table")
     data_frequency_id: str = DataFrequency
 
     @classmethod
