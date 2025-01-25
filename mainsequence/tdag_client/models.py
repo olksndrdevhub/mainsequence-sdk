@@ -301,30 +301,8 @@ class TimeSerieNode(BaseTdagPydanticModel,BaseObject):
         if r.status_code != 200:
             raise Exception(r.text)
 
-    @none_if_backend_detached
-    @classmethod
-    def patch_build_configuration(cls, remote_table_patch: Union[dict,None],
-                                  build_meta_data: dict, data_source_id: int,
-                                  local_table_patch: dict) -> "TimeSerieLocalUpdate":
-        """
 
-        Args:
-            remote_table_patch:
-            local_table_patch:
 
-        Returns:
-
-        """
-
-        url = cls.ROOT_URL + "/patch_build_configuration"
-        payload = {"json": {"remote_table_patch": remote_table_patch, "local_table_patch": local_table_patch,
-                            "build_meta_data": build_meta_data, "data_source_id": data_source_id,
-                            }}
-        s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 200:
-            raise Exception(r.text)
-        return TimeSerieLocalUpdate(**r.json())
 class LocalTimeSerieNode(BaseTdagPydanticModel,BaseObject):
     hash_id: str
     uid: str
@@ -358,108 +336,6 @@ class SourceTableConfiguration(BaseTdagPydanticModel, BaseObject):
         return cls(**r.json())
 
 
-class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
-    id: int = Field(None, description="Primary key, auto-incremented ID")
-    hash_id: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
-    table_name: Optional[str] = Field(None, max_length=63, description="Max length of PostgreSQL table name")
-    creation_date: datetime.datetime = Field(..., description="Creation timestamp")
-    created_by_user_id: Optional[int] = Field(None, description="Foreign key reference to AUTH_USER_MODEL")
-    organization_owner: int = Field(None, description="Foreign key reference to Organization")
-    open_for_everyone: bool = Field(default=False, description="Whether the table is open for everyone")
-    data_source_open_for_everyone: bool = Field(default=False,
-                                                description="Whether the data source is open for everyone")
-    build_configuration: Dict[str, Any] = Field(..., description="Configuration in JSON format")
-    build_meta_data: Optional[Dict[str, Any]] = Field(None, description="Optional YAML metadata")
-    human_readable: Optional[str] = Field(None, max_length=255, description="Human-readable description")
-    time_serie_source_code_git_hash: Optional[str] = Field(None, max_length=255,
-                                                           description="Git hash of the time series source code")
-    time_serie_source_code: Optional[str] = Field(None, description="File path for time series source code")
-    protect_from_deletion: bool = Field(default=False, description="Flag to protect the record from deletion")
-    ogm_linked: bool = Field(default=False, description="OGM linked flag")
-    data_source: Union[int,"DynamicTableDataSource"]
-    source_class_name:str
-    sourcetableconfiguration:Optional[SourceTableConfiguration]=None
-
-    @staticmethod
-    def get_root_url():
-        return get_dynamic_table_metadata(TDAG_ENDPOINT)
-
-    def patch(self, time_out: Union[None, int] = None, *args, **kwargs, ):
-        url = self.get_root_url() + f"/{self.id}/"
-        payload = {"json": serialize_to_json(kwargs)}
-        s = self.build_session()
-        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload, time_out=time_out)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-        return self.__class__(**r.json())
-
-    @classmethod
-    def get(cls, hash_id, data_source__id: int):
-
-        result = cls.filter(payload={"hash_id": hash_id,
-                                     "data_source__id": data_source__id,
-                                     "detail": True})
-        if len(result) != 1:
-            raise Exception("More than 1 return")
-        return cls(**result[0])
-
-    @classmethod
-    def filter(cls, payload: Union[dict, None]):
-        url = cls.get_root_url()
-        payload = {} if payload is None else {"params": payload}
-
-        s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
-        if r.status_code == 404:
-            raise SchedulerDoesNotExist
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-        return r.json()
-
-    @classmethod
-    def patch_by_hash(cls, hash_id: str, *args, **kwargs):
-        metadata = cls.get(hash_id=hash_id)
-        metadata.patch(*args, **kwargs)
-
-    @classmethod
-    def create(cls, **kwargs):
-        """
-
-        :return:
-        :rtype:
-        """
-
-        kwargs = serialize_to_json(kwargs)
-
-        url=get_ts_node_url(TDAG_ENDPOINT)+"/"
-
-        payload = {"json": kwargs}
-        s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
-            if r.status_code == 409:
-                raise AlreadyExist(r.text)
-            else:
-                raise Exception(r.text)
-        data = r.json()
-
-        return cls(**data["metadata"])
-
-    def build_or_update_update_details(self, *args, **kwargs)->["DynamicTableMetaData","LocalTimeSerie"]:
-
-        base_url = self.get_root_url()
-        payload = { "json": kwargs}
-        s = self.build_session()
-        url=f"{base_url}/{self.id}/build_or_update_update_details/"
-        r=make_request(r_type="PATCH",url=url,payload=payload,s=s, loaders=self.LOADERS,)
-        if r.status_code != 202:
-            raise Exception(f"Error in request {r.text}")
-
-        result=r.json()
-
-
-        return DynamicTableMetaData(**result["dynamic_table_metadata"]),LocalTimeSeries(**result["local_time_series"])
 
 
 
@@ -467,7 +343,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
 
     id: Optional[int] = Field(None, description="Primary key, auto-incremented ID")
     local_hash_id: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
-    remote_table: Union[int,DynamicTableMetaData]
+    remote_table: Union[int,"DynamicTableMetaData"]
     build_configuration: Dict[str, Any] = Field(..., description="Configuration in JSON format")
     build_meta_data: Optional[Dict[str, Any]] = Field(None, description="Optional YAML metadata")
     ogm_linked: bool = Field(default=False, description="OGM linked flag")
@@ -508,15 +384,14 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
 
         return cls(**data)
 
-    @classmethod
-    def add_tags(cls, local_metadata, tags: list, timeout=None):
+    def add_tags(self, tags: list, timeout=None):
 
-        base_url = cls.get_root_url()
-        s = cls.build_session()
+        base_url = self.get_root_url()
+        s = self.build_session()
         payload = {"json": {"tags": tags}}
         # r = self.s.get(, )
-        url = f"{base_url}/{local_metadata['id']}/add_tags/"
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="PATCH", url=url,
+        url = f"{base_url}/{self.id}/add_tags/"
+        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url,
                          payload=payload,
                          time_out=timeout)
         if r.status_code != 200:
@@ -972,6 +847,134 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         r = make_request(s=s, loaders=self.LOADERS, r_type="POST", url=url, payload=payload)
         if r.status_code != 201:
             raise Exception(f"Error in request {r.text}")
+
+class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
+    id: int = Field(None, description="Primary key, auto-incremented ID")
+    hash_id: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
+    table_name: Optional[str] = Field(None, max_length=63, description="Max length of PostgreSQL table name")
+    creation_date: datetime.datetime = Field(..., description="Creation timestamp")
+    created_by_user_id: Optional[int] = Field(None, description="Foreign key reference to AUTH_USER_MODEL")
+    organization_owner: int = Field(None, description="Foreign key reference to Organization")
+    open_for_everyone: bool = Field(default=False, description="Whether the table is open for everyone")
+    data_source_open_for_everyone: bool = Field(default=False,
+                                                description="Whether the data source is open for everyone")
+    build_configuration: Dict[str, Any] = Field(..., description="Configuration in JSON format")
+    build_meta_data: Optional[Dict[str, Any]] = Field(None, description="Optional YAML metadata")
+    human_readable: Optional[str] = Field(None, max_length=255, description="Human-readable description")
+    time_serie_source_code_git_hash: Optional[str] = Field(None, max_length=255,
+                                                           description="Git hash of the time series source code")
+    time_serie_source_code: Optional[str] = Field(None, description="File path for time series source code")
+    protect_from_deletion: bool = Field(default=False, description="Flag to protect the record from deletion")
+    ogm_linked: bool = Field(default=False, description="OGM linked flag")
+    data_source: Union[int,"DynamicTableDataSource"]
+    source_class_name:str
+    sourcetableconfiguration:Optional[SourceTableConfiguration]=None
+
+    @staticmethod
+    def get_root_url():
+        return get_dynamic_table_metadata(TDAG_ENDPOINT)
+
+    def patch(self, time_out: Union[None, int] = None, *args, **kwargs, ):
+        url = self.get_root_url() + f"/{self.id}/"
+        payload = {"json": serialize_to_json(kwargs)}
+        s = self.build_session()
+        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload, time_out=time_out)
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+        return self.__class__(**r.json())
+
+    @classmethod
+    def get(cls, hash_id, data_source__id: int):
+
+        result = cls.filter(payload={"hash_id": hash_id,
+                                     "data_source__id": data_source__id,
+                                     "detail": True})
+        if len(result) != 1:
+            raise Exception("More than 1 return")
+        return cls(**result[0])
+
+    @classmethod
+    def filter(cls, payload: Union[dict, None]):
+        url = cls.get_root_url()
+        payload = {} if payload is None else {"params": payload}
+
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
+        if r.status_code == 404:
+            raise SchedulerDoesNotExist
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+        return r.json()
+
+    @classmethod
+    def patch_by_hash(cls, hash_id: str, *args, **kwargs):
+        metadata = cls.get(hash_id=hash_id)
+        metadata.patch(*args, **kwargs)
+
+    @classmethod
+    def create(cls, **kwargs):
+        """
+
+        :return:
+        :rtype:
+        """
+
+        kwargs = serialize_to_json(kwargs)
+
+        url=get_ts_node_url(TDAG_ENDPOINT)+"/"
+
+        payload = {"json": kwargs}
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
+        if r.status_code != 201:
+            if r.status_code == 409:
+                raise AlreadyExist(r.text)
+            else:
+                raise Exception(r.text)
+        data = r.json()
+
+        return cls(**data["metadata"])
+
+    def build_or_update_update_details(self, *args, **kwargs)->["DynamicTableMetaData","LocalTimeSerie"]:
+
+        base_url = self.get_root_url()
+        payload = { "json": kwargs}
+        s = self.build_session()
+        url=f"{base_url}/{self.id}/build_or_update_update_details/"
+        r=make_request(r_type="PATCH",url=url,payload=payload,s=s, loaders=self.LOADERS,)
+        if r.status_code != 202:
+            raise Exception(f"Error in request {r.text}")
+
+        result=r.json()
+
+
+        return DynamicTableMetaData(**result["dynamic_table_metadata"]),LocalTimeSerie(**result["local_time_series"])
+
+    @none_if_backend_detached
+    @classmethod
+    def patch_build_configuration(cls, remote_table_patch: Union[dict, None],
+                                  build_meta_data: dict, data_source_id: int,
+                                  local_table_patch: dict) -> "LocalTimeSerie":
+        """
+
+        Args:
+            remote_table_patch:
+            local_table_patch:
+
+        Returns:
+
+        """
+
+        url = get_ts_node_url(TDAG_ENDPOINT) + "/patch_build_configuration"
+        payload = {"json": {"remote_table_patch": remote_table_patch, "local_table_patch": local_table_patch,
+                            "build_meta_data": build_meta_data, "data_source_id": data_source_id,
+                            }}
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
+        if r.status_code != 200:
+            raise Exception(r.text)
+        return LocalTimeSerie(**r.json())
 
 class Scheduler(BaseTdagPydanticModel,BaseObject):
     uid: str

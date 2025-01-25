@@ -102,15 +102,17 @@ def make_request(s, r_type: str, url: str,   loaders:Union[AuthLoaders,None], pa
     req=get_req(session=s)
     keep_request = True
     counter = 0
+    headers_refreshed=False
     while keep_request == True:
 
         try:
             r = req(url, timeout=timeout, **payload)
-            if r.status_code  in [403, 401]:
+            if r.status_code  in [403, 401] and headers_refreshed ==False:
                 logger.warning(f"Error {r.status_code} Refreshing headers")
                 loaders.refresh_headers()
                 s.headers.update(loaders.auth_headers)
                 req = get_req(session=s)
+                headers_refreshed=True
             else:
                 keep_request = False
                 break

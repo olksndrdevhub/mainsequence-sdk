@@ -10,7 +10,7 @@ from mainsequence.tdag_client import (  LocalTimeSerie,
                                       DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS, DynamicTableMetaData)
 
 from mainsequence.tdag_client.models import BACKEND_DETACHED, none_if_backend_detached, DynamicTableHelpers
-
+import json
 
 class APIPersistManager:
 
@@ -278,8 +278,8 @@ class PersistManager:
 
 
     def add_tags(self, tags: list):
-        if any([t not in self.local_metadata["tags"] for t in tags]) == True:
-            TimeSerieLocalUpdate.add_tags(tags=tags, local_metadata=self.local_metadata)
+        if any([t not in self.local_metadata.tags for t in tags]) == True:
+            self.local_metadata.add_tags(tags=tags)
 
     def destroy(self, delete_only_table: bool):
         self.dth.destroy(metadata=self.metadata, delete_only_table=delete_only_table)
@@ -321,7 +321,7 @@ class PersistManager:
                               )
 
 
-        TimeSerieNode.patch_build_configuration(remote_table_patch=kwargs,
+        self.local_metadata=DynamicTableMetaData.patch_build_configuration(remote_table_patch=kwargs,
                                                 data_source_id=self.data_source.id,
                                                 build_meta_data=remote_build_metadata,
                                                 local_table_patch=local_metadata_kwargs)
@@ -465,7 +465,7 @@ class PersistManager:
         """
 
         update_kwargs=dict(source_class_name=source_class_name,
-                           local_metadata=self.local_metadata,
+                           local_metadata=json.loads(self.local_metadata.model_dump_json())
                            )
 
 
@@ -497,13 +497,13 @@ class PersistManager:
         self.local_metadata=metadatas["local_metadata"]
 
     def patch_table(self,**kwargs):
-        self.dth.patch(metadata=self.metadata, **kwargs)
+        self.metadata.patch( **kwargs)
 
     def protect_from_deletion(self,protect_from_deletion=True):
-        self.dth.patch(metadata=self.metadata, protect_from_deletion=protect_from_deletion)
+        self.metadata.patch( protect_from_deletion=protect_from_deletion)
 
     def open_for_everyone(self,open_for_everyone=True):
-        self.dth.patch(metadata=self.metadata, open_for_everyone=open_for_everyone)
+        self.metadata.patch(open_for_everyone=open_for_everyone)
 
     def set_start_of_execution(self,**kwargs):
         return self.dth.set_start_of_execution(metadata=self.metadata,**kwargs)

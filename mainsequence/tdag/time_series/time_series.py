@@ -447,14 +447,14 @@ class ConfigSerializer:
     @classmethod
     def deserialize_pickle_value(cls, value, include_vam_client_objects: bool,
                                  graph_depth_limit: int,
-                                 graph_depth: int, local_metadatas: Union[dict, None],
+                                 graph_depth: int,
                                  ignore_pydantic=False, data_source_id: Union[DynamicTableDataSource, None] = None, ):
         from mainsequence.vam_client.models_helpers import get_model_class
         import cloudpickle
 
         new_value = value
 
-        state_kwargs = dict(local_metadatas=local_metadatas,
+        state_kwargs = dict(
                             graph_depth_limit=graph_depth_limit,
                             data_source_id=data_source_id,
                             graph_depth=copy.deepcopy(graph_depth),
@@ -482,7 +482,6 @@ class ConfigSerializer:
                         ts.set_state_with_sessions(
                             graph_depth_limit=graph_depth_limit,
                             graph_depth=graph_depth,
-                            local_metadatas=local_metadatas,
                             include_vam_client_objects=include_vam_client_objects)
                     new_value = ts
             elif "is_api_time_serie_pickled" in value.keys():
@@ -498,7 +497,7 @@ class ConfigSerializer:
 
                 new_value = cls.deserialize_pickle_state(value,
 
-                                                         ignore_pydantic=True, **state_kwargs
+                                                          **state_kwargs
                                                          )
                 if ignore_pydantic == False:
                     new_value = cls.rebuild_pydantic_model(new_value,
@@ -531,8 +530,7 @@ class ConfigSerializer:
     @classmethod
     def deserialize_pickle_state(cls, state, include_vam_client_objects: bool, data_source_id: int,
                                  graph_depth_limit: int,
-                                 graph_depth: int, local_metadatas: Union[dict, None],
-                                 ignore_pydantic=False,
+                                 graph_depth: int,
                                  ):
         """
         
@@ -551,13 +549,12 @@ class ConfigSerializer:
             for key, value in state.items():
                 state[key] = cls.deserialize_pickle_value(value, include_vam_client_objects=include_vam_client_objects,
                                                           graph_depth_limit=graph_depth_limit, graph_depth=graph_depth,
-                                                          local_metadatas=local_metadatas,
                                                           data_source_id=data_source_id,
                                                           )
         elif isinstance(state, tuple):
             state = tuple([cls.deserialize_pickle_value(v, include_vam_client_objects=include_vam_client_objects,
                                                         graph_depth_limit=graph_depth_limit, graph_depth=graph_depth,
-                                                        local_metadatas=local_metadatas, data_source_id=data_source_id,
+                                                         data_source_id=data_source_id,
                                                         ) for v in state])
         elif isinstance(state, str) or isinstance(state, float) or isinstance(state, int) or isinstance(state, bool):
             pass
@@ -811,7 +808,6 @@ class TimeSerieRebuildMethods(ABC):
         :param local_metadatas:
         :return:
         """
-        local_metadatas = None
         pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
                                                 data_source_id=data_source_id,
                                                 )
@@ -829,7 +825,6 @@ class TimeSerieRebuildMethods(ABC):
 
         ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path,
                                                 graph_depth_limit=graph_depth_limit,
-                                                local_metadatas=local_metadatas
                                                 )
         return ts, pickle_path
 
@@ -839,15 +834,13 @@ class TimeSerieRebuildMethods(ABC):
 
     @classmethod
     def load_and_set_from_pickle(cls, pickle_path, graph_depth_limit=1,
-                                 local_metadatas: Union[dict, None] = None
                                  ):
-        if local_metadatas is not None:
-            raise Exception("fix state")
+
         ts = cls.load_from_pickle(pickle_path)
         ts.set_state_with_sessions(
             graph_depth=0,
             graph_depth_limit=graph_depth_limit,
-            include_vam_client_objects=False, local_metadatas=local_metadatas)
+            include_vam_client_objects=False)
         return ts
 
     @classmethod
@@ -966,7 +959,7 @@ class TimeSerieRebuildMethods(ABC):
 
     @tracer.start_as_current_span("TS: set_state_with_sessions")
     def set_state_with_sessions(self, include_vam_client_objects=True,
-                                graph_depth_limit=1000, local_metadatas: Union[dict, None] = None,
+                                graph_depth_limit=1000,
                                 graph_depth=0):
         """
          Method to set state after it was loaded from pickle.
@@ -983,8 +976,7 @@ class TimeSerieRebuildMethods(ABC):
         """
         if graph_depth_limit == -1:
             graph_depth_limit = 1e6
-        if local_metadatas is not None:
-            local_metadatas = None if len(local_metadatas) == 0 else local_metadatas
+
 
         minimum_required_depth_for_update = self.get_minimum_required_depth_for_update()
 
@@ -998,21 +990,17 @@ class TimeSerieRebuildMethods(ABC):
         # if the data source is not local then the de-serialization needs to happend after setting the local persist manager
         # to guranteed a proper patch in the back-end
         if graph_depth <= graph_depth_limit and self.data_source.data_type:
-            if local_metadatas :
-                if len(local_metadatas)>0:
-                    raise NotImplementedError
-            local_metadata = local_metadatas[
-                (self.local_hash_id, self.data_source.id)] if local_metadatas is not None else None
+
+
             self._set_local_persist_manager(local_hash_id=self.local_hash_id,
                                             remote_table_hashed_name=self.remote_table_hashed_name,
-                                            local_metadata=local_metadata, verify_local_run=False,
+                                            local_metadata=None, verify_local_run=False,
                                             )
 
         serializer = ConfigSerializer()
         state = serializer.deserialize_pickle_state(state=state, data_source_id=self.data_source.id,
                                                     include_vam_client_objects=include_vam_client_objects,
                                                     graph_depth_limit=graph_depth_limit,
-                                                    local_metadatas=local_metadatas,
                                                     graph_depth=graph_depth + 1)
 
         self.__dict__.update(state)
@@ -1512,10 +1500,9 @@ class APITimeSerie:
 
     @property
     def local_persist_manager(self):
-        if hasattr(self, "logger") == False:
-            self._set_logger(local_hash_id=self.local_hash_id)
+
         if hasattr(self, "_local_persist_manager") == False:
-            self.logger.info(f"Setting local persist manager for {self.local_hash_id}")
+            self.logger.debug(f"Setting local persist manager for {self.local_hash_id}")
             self._set_local_persist_manager()
         return self._local_persist_manager
 
@@ -2070,10 +2057,9 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
     @property
     def local_persist_manager(self):
-        if hasattr(self, "logger") == False:
-            self._set_logger(local_hash_id=self.hashed_name)
+
         if hasattr(self, "_local_persist_manager") == False:
-            self.logger.info(f"Setting local persist manager for {self.hash_id}")
+            self.logger.debug(f"Setting local persist manager for {self.hash_id}")
             self._set_local_persist_manager(local_hash_id=self.local_hash_id,
                                             remote_table_hashed_name=self.remote_table_hashed_name
                                             )
@@ -2671,7 +2657,6 @@ class WrapperTimeSerie(TimeSerie):
     def set_state_with_sessions(self, include_vam_client_objects: bool,
                                 graph_depth_limit: int,
                                 graph_depth: int,
-                                local_metadatas: Union[dict, None] = None
                                 ) -> None:
         """
         Set state with sessions for all wrapped TimeSeries.
@@ -2688,13 +2673,12 @@ class WrapperTimeSerie(TimeSerie):
         super(TimeSerie, self).set_state_with_sessions(
             include_vam_client_objects=include_vam_client_objects,
             graph_depth_limit=graph_depth_limit,
-            local_metadatas=local_metadatas,
             graph_depth=graph_depth)
         errors = {}
 
         def update_ts(related_time_series, ts_key, include_vam_client_objects,
                       graph_depth,
-                      graph_depth_limit, error_list, local_metadatas, rel_ts, raise_exceptions=USE_THREADS):
+                      graph_depth_limit, error_list,  rel_ts, raise_exceptions=USE_THREADS):
             if isinstance(rel_ts, dict):
                 pickle_path = TimeSerie.get_pickle_path(local_hash_id=rel_ts['local_hash_id'])
                 related_time_series[ts_key] = load_from_pickle(pickle_path=pickle_path)
@@ -2704,7 +2688,6 @@ class WrapperTimeSerie(TimeSerie):
                 related_time_series[ts_key].set_state_with_sessions(
                     graph_depth=graph_depth, graph_depth_limit=graph_depth_limit,
                     include_vam_client_objects=include_vam_client_objects,
-                    local_metadatas=local_metadatas
                 )
             except Exception as e:
                 if raise_exceptions == True:
@@ -2719,7 +2702,7 @@ class WrapperTimeSerie(TimeSerie):
                 for ts_key, rel_ts in self.related_time_series.items():
                     future = executor.submit(update_ts, self.related_time_series, ts_key,
                                              include_vam_client_objects, graph_depth,
-                                             graph_depth_limit, errors, local_metadatas,
+                                             graph_depth_limit, errors,
                                              rel_ts)
 
                     thread_list.append(future)
