@@ -108,8 +108,8 @@ class TimeSerieUpdater:
 
 
         # Filter and use timeout
-        dependencies_update_details = TimeSerieLocalUpdate.verify_if_direct_dependencies_are_updated(
-            id=self.time_serie.local_metadata["id"]        )
+        dependencies_update_details = self.time_serie.local_metadata.verify_if_direct_dependencies_are_updated()
+
 
 
         return dependencies_update_details["updated"], dependencies_update_details["error_on_update_dependencies"]
@@ -123,7 +123,7 @@ class TimeSerieUpdater:
 
         ts_update_details = self.time_serie.update_details
         ignore_timeout = configuration.configuration["time_series_config"]["ignore_update_timeout"]
-        execution_timeout_seconds = self.time_serie.run_configuration['execution_time_out_seconds']
+        execution_timeout_seconds = self.time_serie.run_configuration.execution_time_out_seconds
 
         time_out_of_request=min(execution_timeout_seconds,60*5)
         are_dependencies_updated,error_on_dependencies=self._check_if_dependencies_are_updated()

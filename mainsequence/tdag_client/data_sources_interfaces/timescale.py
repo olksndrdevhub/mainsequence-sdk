@@ -141,7 +141,7 @@ def direct_data_from_db(metadata: dict, connection_uri: str,
 
     # Build the WHERE clause dynamically
     where_clauses = []
-    time_index_name = metadata['sourcetableconfiguration']['time_index_name']
+    time_index_name = metadata.sourcetableconfiguration.time_index_name
     if start_date:
         operator = ">=" if great_or_equal else ">"
         where_clauses.append(f"{time_index_name} {operator} '{start_date}'")
@@ -157,7 +157,7 @@ def direct_data_from_db(metadata: dict, connection_uri: str,
     where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     # Construct the query
-    query = f"SELECT {select_clause} FROM {metadata['table_name']} {where_clause}"
+    query = f"SELECT {select_clause} FROM {metadata.table_name} {where_clause}"
     # if where_clause=="":
     #     data=fast_table_dump(connection_config, metadata['table_name'])
     #     data[metadata["sourcetableconfiguration"]['time_index_name']]=pd.to_datetime(data[metadata["sourcetableconfiguration"]['time_index_name']])
@@ -171,7 +171,7 @@ def direct_data_from_db(metadata: dict, connection_uri: str,
     # Convert to DataFrame
     data = pd.DataFrame(data=data, columns=column_names)
 
-    data = data.set_index(metadata['sourcetableconfiguration']["index_names"])
+    data = data.set_index(metadata.sourcetableconfiguration.index_names)
 
     return data
 

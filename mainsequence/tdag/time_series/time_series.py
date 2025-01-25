@@ -770,7 +770,7 @@ class TimeSerieRebuildMethods(ABC):
         if self.local_persist_manager.metadata is not None:
             load_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
 
-            persisted_pickle_hash = self.local_persist_manager.metadata["time_serie_source_code_git_hash"]
+            persisted_pickle_hash = self.local_persist_manager.metadata.time_serie_source_code_git_hash
             if load_git_hash != persisted_pickle_hash:
                 self.logger.warning(
                     f"{bcolors.WARNING}Source code does not match with pickle rebuilding{bcolors.ENDC}")
@@ -841,6 +841,8 @@ class TimeSerieRebuildMethods(ABC):
     def load_and_set_from_pickle(cls, pickle_path, graph_depth_limit=1,
                                  local_metadatas: Union[dict, None] = None
                                  ):
+        if local_metadatas is not None:
+            raise Exception("fix state")
         ts = cls.load_from_pickle(pickle_path)
         ts.set_state_with_sessions(
             graph_depth=0,
@@ -989,7 +991,6 @@ class TimeSerieRebuildMethods(ABC):
         state = self.__dict__
 
         state, init_meta = self._sanitize_init_meta(kwargs=state)
-        self._set_logger(local_hash_id=self.hashed_name)
         if graph_depth_limit < minimum_required_depth_for_update and graph_depth == 0:
             graph_depth_limit = minimum_required_depth_for_update
             self.logger.warning(f"Graph depht limit overrided to {minimum_required_depth_for_update}")
@@ -997,6 +998,9 @@ class TimeSerieRebuildMethods(ABC):
         # if the data source is not local then the de-serialization needs to happend after setting the local persist manager
         # to guranteed a proper patch in the back-end
         if graph_depth <= graph_depth_limit and self.data_source.data_type:
+            if local_metadatas :
+                if len(local_metadatas)>0:
+                    raise NotImplementedError
             local_metadata = local_metadatas[
                 (self.local_hash_id, self.data_source.id)] if local_metadatas is not None else None
             self._set_local_persist_manager(local_hash_id=self.local_hash_id,
@@ -1082,7 +1086,7 @@ class TimeSerieRebuildMethods(ABC):
     @tracer.start_as_current_span("TS: Update")
     def update(self, update_tracker: object, debug_mode: bool,
                raise_exceptions=True, update_tree=False,
-               local_time_series_map: Union[dict, None] = None, update_only_tree=False, force_update=False,
+               local_time_series_map: Union[Dict[str,LocalTimeSerie], None] = None, update_only_tree=False, force_update=False,
                use_state_for_update=False
                ):
         """
@@ -1097,7 +1101,7 @@ class TimeSerieRebuildMethods(ABC):
         """
 
         local_time_serie_historical_update =self.local_persist_manager.local_metadata.set_start_of_execution(
-                                            active_update_scheduler_uid=self.scheduler.uid)
+                                            active_update_scheduler_uid=update_tracker.scheduler_uid)
 
         latest_value, must_update = local_time_serie_historical_update.last_time_index_value, local_time_serie_historical_update.must_update
         update_statistics = local_time_serie_historical_update.update_statistics
@@ -2435,6 +2439,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
             p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
             continue
+            logger.warning("REMOVE LINES ABOVE FOR DEBUG")
 
             futures_.append(p)
 
@@ -2456,20 +2461,21 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         # verify there is no error in hierarchy. this prevents to updating next level if dependencies fails
 
         dependencies_update_details = LocalTimeSerieUpdateDetails.filter(
-            related_table__local_hash_id__in=tmp_ts["local_hash_id"].to_list())
+            related_table__id__in=tmp_ts["local_time_serie_id"].astype(str).to_list())
         ts_with_errors = []
-        for local_ts_details in dependencies_update_details:
-            if local_ts_details["error_on_last_update"] == True:
-                ts_with_errors.append(local_ts_details["related_table__local_hash_id__in"])
+        for local_ts_update_details in dependencies_update_details:
+            if local_ts_update_details.error_on_last_update == True:
+                ts_with_errors.append(local_ts_update_details.related_table.id)
         # Verify there are no errors after finishing hierarchy
         if len(ts_with_errors) > 0:
             raise DependencyUpdateError(f"Update Stop from error in children \n {ts_with_errors}")
 
     @tracer.start_as_current_span("TimeSerie.update_local")
     def update_local(self, update_tree, update_tracker: object, debug_mode: bool,
+                     update_statistics: DataUpdates,
                      local_time_series_map: Union[None, dict] = None,
                      overwrite_latest_value: Union[datetime.datetime, None] = None, update_only_tree: bool = False,
-                     use_state_for_update: bool = False, update_statistics=None,
+                     use_state_for_update: bool = False,
                      *args, **kwargs) -> bool:
 
         from mainsequence.tdag.instrumentation.utils import Status, StatusCode

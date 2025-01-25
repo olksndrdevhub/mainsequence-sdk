@@ -391,6 +391,7 @@ class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
         r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload, time_out=time_out)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
+        return self.__class__(**r.json())
 
     @classmethod
     def get(cls, hash_id, data_source__id: int):
@@ -548,8 +549,17 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                 tzinfo=pytz.utc)
         if result['update_statistics'] is not None:
             result['update_statistics'] = {k: request_to_datetime(v) for k, v in result['update_statistics'].items()}
-        result['update_statistics'] = DataUpdates(update_statistics=result['update_statistics'])
-        return LocalTimeSeriesHistoricalUpdate(**result)
+        hu = LocalTimeSeriesHistoricalUpdate(**result["historical_update"],
+                                             update_statistics=DataUpdates(
+                                                 update_statistics=result['update_statistics'],
+                                                 max_time_index_value=result["last_time_index_value"]
+                                                 ),
+                                             must_update=result["must_update"],
+                                             direct_dependencies_ids=result["direct_dependencies_ids"]
+
+                                             )
+
+        return hu
 
     def set_end_of_execution(self,
                              historical_update_id: int,
@@ -732,11 +742,17 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
 
         return r
 
-    @classmethod
-    def verify_if_direct_dependencies_are_updated(cls, id):
+    def verify_if_direct_dependencies_are_updated(self)->dict:
+        """
+        Response({
+            "error_on_update_dependencies": False,
+            "updated": all_success,
+        })
+        Returns:
 
-        s = cls.build_session()
-        url = cls.LOCAL_UPDATE_URL + f"/{id}/verify_if_direct_dependencies_are_updated/"
+        """
+        s = self.build_session()
+        url = self.get_root_url() + f"/{self.id}/verify_if_direct_dependencies_are_updated/"
         r = make_request(s=s, loaders=None, r_type="GET", url=url)
         if r.status_code != 200:
             raise Exception(f"Error in request: {r.text}")
@@ -1150,7 +1166,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
 
 
     def patch(self,time_out=None, *args, **kwargs):
-        url = self.ROOT_URL + f"/{self.uid}/"
+        url = self.ROOT_URL + f"/{self.uid}/update"
         payload = {"json": serialize_to_json(kwargs)}
         s = self.build_session()
         r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload,time_out=time_out)
@@ -1188,7 +1204,9 @@ class LocalTimeSerieUpdateDetails(BaseTdagPydanticModel,BaseObject):
     update_priority: int = Field(default=0, description="Priority level of the update")
     direct_dependencies_ids: List[int] = Field(default=[], description="List of direct upstream dependencies IDs")
     last_updated_by_user_id: Optional[int] = Field(None, description="Foreign key reference to AUTH_USER_MODEL")
-    def ROOT_URL(self):
+
+    @staticmethod
+    def get_root_url():
         return  get_local_time_serie_update_details(TDAG_ENDPOINT)
 
     @staticmethod
@@ -1202,7 +1220,7 @@ class LocalTimeSerieUpdateDetails(BaseTdagPydanticModel,BaseObject):
     
     @classmethod
     def filter(cls, *args,**kwargs):
-        url = cls.ROOT_URL
+        url = cls.get_root_url()
         payload = {} if kwargs is None else {"params": cls._parse_parameters_filter(kwargs)}
 
         s = cls.build_session()
@@ -1211,8 +1229,7 @@ class LocalTimeSerieUpdateDetails(BaseTdagPydanticModel,BaseObject):
             raise SchedulerDoesNotExist
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
-        instance = [i for i in r.json()]
-        return instance
+        return [cls(**i) for i in r.json()]
 
 
 class DataUpdates(BaseTdagPydanticModel):
@@ -1220,6 +1237,7 @@ class DataUpdates(BaseTdagPydanticModel):
     TODO WIP Helper function to work with the table updates
     """
     update_statistics: Optional[Dict[str, Any]]
+    max_time_index_value:Optional[datetime.datetime]
 
     def get_min_latest_value(self, init_fallback_date: datetime=None):
         if not self.update_statistics:
@@ -1318,10 +1336,14 @@ class LocalTimeSeriesHistoricalUpdate(BaseTdagPydanticModel, BaseObject):
     error_on_update: bool = False
     trace_id: Optional[str] = Field(default=None, max_length=255)
     updated_by_user: Optional[int] = None  # Assuming you're using the ID of the user
-    must_update:bool
-    direct_dependencies_ids:List[int]
+
+
     last_time_index_value:Optional[datetime.datetime] = None
-    update_statistics: DataUpdates
+
+    #extra fields for local control
+    update_statistics: Optional[DataUpdates]
+    must_update: Optional[bool]
+    direct_dependencies_ids: Optional[List[int]]
 
     @classmethod
     @property
@@ -1612,8 +1634,8 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
         logger: Optional[object] = None,
     ) -> pd.DataFrame:
 
-        metadata = local_metadata["remote_table"]  # e.g. from your usage
-        stc = metadata["sourcetableconfiguration"]
+        metadata = local_metadata.remote_table
+        stc = metadata.sourcetableconfiguration
 
         if self.has_direct_connection:
             df = TimeScaleInterface.direct_data_from_db(
@@ -1626,12 +1648,12 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
                 columns=columns,
                 asset_symbols=asset_symbols,
             )
-            df = set_types_in_table(df, stc["column_dtypes_map"])
+            df = set_types_in_table(df, stc.column_dtypes_map)
             return df
         else:
             df = TimeSerieLocalUpdate.get_data_between_dates_from_api(
-                local_hash_id=local_metadata["local_hash_id"],
-                data_source_id=metadata["data_source"]["id"],
+                local_hash_id=local_metadata.local_hash_id,
+                data_source_id=metadata.data_source.id,
                 start_date=start_date,
                 end_date=end_date,
                 great_or_equal=great_or_equal,
@@ -1643,18 +1665,18 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
             if len(df) == 0:
                 if logger:
                     logger.warning(
-                        f"No data returned from remote API for {local_metadata['local_hash_id']}"
+                        f"No data returned from remote API for {local_metadata.local_hash_id}"
                     )
                 return df
 
-            stc = local_metadata["remote_table"]["sourcetableconfiguration"]
-            df[stc["time_index_name"]] = pd.to_datetime(df[stc["time_index_name"]])
-            for c, c_type in stc["column_dtypes_map"].items():
-                if c != stc["time_index_name"]:
+            stc = local_metadata.remote_table.sourcetableconfiguration
+            df[stc.time_index_name] = pd.to_datetime(df[stc.time_index_name])
+            for c, c_type in stc.column_dtypes_map.items():
+                if c != stc.time_index_name:
                     if c_type == "object":
                         c_type = "str"
                     df[c] = df[c].astype(c_type)
-            df = df.set_index(stc["index_names"])
+            df = df.set_index(stc.index_names)
             return df
 
 class BaseYamlModel(BaseTdagPydanticModel,BaseObject):
@@ -2255,27 +2277,7 @@ class DynamicTableHelpers:
         )
         return df
 
-    def get_data_by_time_index(
-            self,
-            local_metadata: Union[dict,str],
-            data_source:object,
-            start_date: Union[datetime.datetime, None] = None,
-            great_or_equal: bool = True,
-            less_or_equal: bool = True,
-            end_date: Union[datetime.datetime, None] = None,
-            columns: Union[list, None] = None,
-            asset_symbols:Union[list,None]=None,
-    ):
-        return data_source.get_data_by_time_index(
-            local_metadata=local_metadata,
-            start_date=start_date,
-            end_date=end_date,
-            great_or_equal=great_or_equal,
-            less_or_equal=less_or_equal,
-            columns=columns,
-            asset_symbols=asset_symbols,
-            logger=self.logger
-        )
+
 
     def time_serie_exist_in_db(self, hash_id):
         """
@@ -2364,17 +2366,7 @@ class DynamicTableHelpers:
         r = self.make_request(r_type="PATCH", url=url, payload=payload)
         if r.status_code != 200:
             raise Exception(f"Error in request ")
-    def get_pending_nodes(self, metadata, **kwargs):
 
-        base_url = self.root_url
-
-        payload = { "json": kwargs}
-        # r = self.s.patch(f"{base_url}/{metadata['id']}/get_pending_update_nodes/", **payload)
-        url=f"{base_url}/{metadata['id']}/get_pending_update_nodes/"
-        r = self.make_request(r_type="PATCH", url=url, payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request ")
-        return r.json()
     def must_update_by_hash_id(self,hash_id:str):
 
         base_url = self.root_url

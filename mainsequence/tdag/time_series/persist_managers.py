@@ -237,7 +237,7 @@ class PersistManager:
     @property
     def run_configuration(self):
 
-        return self.local_metadata['run_configuration']
+        return self.local_metadata.run_configuration
 
 
     @property
@@ -257,7 +257,7 @@ class PersistManager:
 
         """
 
-        self.metadata = DynamicTableMetaData.patch(metadata=self.metadata, time_serie_source_code_git_hash=git_hash_id,
+        self.metadata = self.metadata.patch( time_serie_source_code_git_hash=git_hash_id,
                             time_serie_source_code=source_code,)
 
     
@@ -514,21 +514,7 @@ class PersistManager:
         return self.dth.set_end_of_execution(metadata=self.metadata, **kwargs)
     def reset_dependencies_states(self,hash_id_list):
         return self.dth.reset_dependencies_states(metadata=self.metadata, hash_id_list=hash_id_list)
-    def get_pending_nodes(self,table_id_list:list, filter_by_update_time:bool ):
 
-        """
-
-        Parameters
-        ----------
-        filter_by_update_time :
-
-        Returns
-        -------
-
-        """
-        request_kwargs=dict(table_id_list=table_id_list,   filter_by_update_time=filter_by_update_time)
-        data=self.dth.get_pending_nodes(metadata=self.metadata,**request_kwargs)
-        return data["dependecies_updated"],data['pending_nodes'],data["next_rebalances"],data["error_on_dependencies"]
 
 
     #table dependes
@@ -540,19 +526,18 @@ class PersistManager:
             return self._get_local_lake_update_statistics(remote_table_hash_id=remote_table_hash_id,
                                                           time_serie=time_serie)
 
-        metadata = self.dth.get(hash_id=remote_table_hash_id,data_source__id=self.data_source.id)
+        metadata = self.local_metadata.remote_table
 
         last_update_in_table, last_update_per_asset = None, None
-        if "sourcetableconfiguration" in metadata.keys():
-            if metadata['sourcetableconfiguration'] is not None:
-                last_update_in_table = metadata['sourcetableconfiguration']['last_time_index_value']
-                if last_update_in_table is None:
-                    return last_update_in_table, last_update_per_asset
-                last_update_in_table = self.dth.request_to_datetime(last_update_in_table)
-                if metadata['sourcetableconfiguration']['multi_index_stats'] is not None:
-                    last_update_per_asset = metadata['sourcetableconfiguration']['multi_index_stats']['max_per_asset_symbol']
-                    if last_update_per_asset is not None:
-                        last_update_per_asset = {unique_identifier: self.dth.request_to_datetime(v) for unique_identifier, v in last_update_per_asset.items()}
+
+        if metadata.sourcetableconfiguration is not None:
+            last_update_in_table = metadata.sourcetableconfiguration.last_time_index_value
+            if last_update_in_table is None:
+                return last_update_in_table, last_update_per_asset
+            if metadata.sourcetableconfiguration.multi_index_stats is not None:
+                last_update_per_asset = metadata.sourcetableconfiguration.multi_index_stats['max_per_asset_symbol']
+                if last_update_per_asset is not None:
+                    last_update_per_asset = {unique_identifier: self.dth.request_to_datetime(v) for unique_identifier, v in last_update_per_asset.items()}
 
         if asset_symbols is not None and last_update_per_asset is not None:
             last_update_per_asset = {asset: value for asset, value in last_update_per_asset.items() if asset in asset_symbols}
@@ -622,14 +607,13 @@ class PersistManager:
                              asset_symbols: Union[list, None] = None,
                              columns: Union[list, None] = None):
 
-        filtered_data = self.dth.get_data_by_time_index(local_metadata=self.local_metadata,
+        filtered_data = self.data_source.get_data_by_time_index(local_metadata=self.local_metadata,
                                                         start_date=start_date,
                                                         end_date=end_date,
                                                         great_or_equal=great_or_equal,
                                                         less_or_equal=less_or_equal,
                                                         asset_symbols=asset_symbols,
                                                         columns=columns,
-                                                        data_source=self.data_source
                                                         )
 
         return filtered_data
