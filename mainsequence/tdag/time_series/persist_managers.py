@@ -14,9 +14,7 @@ from mainsequence.tdag_client.models import BACKEND_DETACHED, none_if_backend_de
 
 class APIPersistManager:
 
-    def __init__(self,data_source_id:int,local_hash_id:str,logger):
-        self.logger = logger if logger is not None else logger
-        self.dth = DynamicTableHelpers(logger=logger)
+    def __init__(self,data_source_id:int,local_hash_id:str):
         self.data_source_id = data_source_id
         self.local_hash_id = local_hash_id
 
@@ -74,7 +72,7 @@ class PersistManager:
 
         if local_metadata is not None and metadata is None:
             # query remote hash_id
-            metadata = local_metadata["remote_table"]
+            metadata = local_metadata.remote_table
         self.description=description
         self.logger = logger
 

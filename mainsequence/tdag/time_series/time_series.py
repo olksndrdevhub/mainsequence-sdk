@@ -1556,39 +1556,36 @@ class APITimeSerie:
 
         self._local_persist_manager = APIPersistManager(data_source_id=self.data_source_id,
                                                         local_hash_id=self.local_hash_id,
-                                                        logger=self.logger)
-        local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
-        self.remote_table_hashed_name = local_metadata["remote_table"]["hash_id"]
+                                                        )
+        local_metadata = LocalTimeSerie.get(local_hash_id=self.local_hash_id,
+                                            remote_table__data_source__id=self.data_source_id,
+                                            )
+        self.remote_table_hashed_name = local_metadata.remote_table.hash_id
         if self.data_source is None:
 
-            if isinstance(local_metadata["remote_table"]["data_source"], dict):
+            if isinstance(local_metadata.remote_table.data_source, dict):
                 # data source is open use direct connection
 
                 self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=self.local_hash_id,
                                                                                 class_name=
-                                                                                local_metadata["build_configuration"][
-                                                                                    "time_series_class_import_path"][
-                                                                                    "qualname"],
+                                                                                local_metadata.build_configuration.time_series_class_import_path["qualname"],
+
                                                                                 human_readable=
-                                                                                local_metadata["remote_table"][
-                                                                                    "human_readable"],
-                                                                                logger=self.logger,
+                                                                                local_metadata.remote_table.human_readable,
                                                                                 local_metadata=local_metadata,
                                                                                 description="",
                                                                                 data_source=self.build_data_source_from_configuration(
-                                                                                    local_metadata["remote_table"][
-                                                                                        "data_source"])
+                                                                                    local_metadata.remote_table.data_source)
                                                                                 )
         else:
 
             local_persist_manager_lake = DataLakePersistManager(local_hash_id=self.local_hash_id,
                                                                 class_name=self.__class__.__name__,
                                                                 human_readable=f"Local API Lake for {self.local_hash_id}",
-                                                                logger=self.logger,
                                                                 local_metadata=local_metadata,
                                                                 description=f"Local API Lake for {self.local_hash_id}",
                                                                 data_source=self.data_source)
-            table_exist_locally = local_persist_manager_lake.table_exist(local_metadata["remote_table"]["hash_id"])
+            table_exist_locally = local_persist_manager_lake.table_exist(local_metadata.remote_table.hash_id)
             if table_exist_locally:
                 self.data_source_id = local_persist_manager_lake.data_source.id
                 self._local_persist_manager = local_persist_manager_lake
