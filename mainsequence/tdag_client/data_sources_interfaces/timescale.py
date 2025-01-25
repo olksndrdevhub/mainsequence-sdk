@@ -1,5 +1,6 @@
 import pandas as pd
 import psycopg2
+
 from psycopg2 import errors
 from psycopg2.extras import execute_batch
 from pgcopy import CopyManager
@@ -176,9 +177,9 @@ def direct_data_from_db(metadata: dict, connection_uri: str,
     return data
 
 
-def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwrite: bool,
+def direct_table_update(metadata:"DynamicTableMetaData", serialized_data_frame: pd.DataFrame, overwrite: bool,
                         grouped_dates,
-                        time_index_name: str, index_names: list, table_is_empty: bool, table_index_names: dict,
+                         table_is_empty: bool,
                         time_series_orm_db_connection: Union[str, None] = None,
                         use_chunks: bool = True, num_threads: int = 4):
     """
@@ -198,11 +199,14 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
 
     columns = serialized_data_frame.columns.tolist()
 
+    index_names=metadata.sourcetableconfiguration.index_names
+    table_name=metadata.table_name
+    time_index_name=metadata.sourcetableconfiguration.time_index_name
     def drop_indexes(table_name, table_index_names):
         # Use a separate connection for index management
         with psycopg2.connect(time_series_orm_db_connection) as conn:
             with conn.cursor() as cur:
-                for index_name in table_index_names.keys():
+                for index_name in index_names.keys():
                     drop_index_query = f'DROP INDEX IF EXISTS "{index_name}";'
                     print(f"Dropping index '{index_name}'...")
                     cur.execute(drop_index_query)
@@ -215,10 +219,9 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
    
 
     # do not drop indices this is only done on inception
-    # if serialized_data_frame.shape[0] > 1000000:
-    #     duplicates_exist = serialized_data_frame.duplicated(subset=index_names).any()
-    #     assert not duplicates_exist, f"Duplicates found in columns: {index_names}"
-    #     drop_indexes(table_name, table_index_names)
+    if metadata._drop_indices==True:
+        table_index_names=metadata.sourcetableconfiguration.get_time_scale_extra_table_indices()
+        drop_indexes(table_name, table_index_names)
 
     if overwrite and not table_is_empty:
         min_d = serialized_data_frame[time_index_name].min()
@@ -348,24 +351,37 @@ def direct_table_update(table_name, serialized_data_frame: pd.DataFrame, overwri
             print(f"An error occurred during single insert: {e}")
             raise
     # do not rebuild  indices this is only done on inception
-    # if serialized_data_frame.shape[0] > 500000:
-    #     subprocess.Popen(
-    #         [
-    #             "python", "-m", "mainsequence.tdag", "create_indices_in_table",
-    #             f"--table_name={table_name}",
-    #             f'--table_index_names={json.dumps(table_index_names)}',
-    #             f"--time_series_orm_db_connection={time_series_orm_db_connection}"
-    #         ],
-    #         stdout=subprocess.DEVNULL,
-    #         stderr=subprocess.DEVNULL,
-    #         close_fds=True,
-    #         env=os.environ.copy(),  # Pass the environment variables
-    #     )
+    if metadata._rebuild_indices:
+        logger.info("Rebuilding indices...")
+        extra_indices = metadata.sourcetableconfiguration.get_time_scale_extra_table_indices()
+
+        with psycopg2.connect(time_series_orm_db_connection) as conn:
+            with conn.cursor() as cur:
+                # Create each index
+                for index_name, index_details in extra_indices.items():
+                    index_type, index_query = index_details["type"], index_details["query"]
+
+                    if index_type not in ("INDEX", "UNIQUE INDEX"):
+                        raise Exception(f"Unknown index type: {index_type}")
+
+                    sql_create_index = f"CREATE {index_type} {index_name} ON public.{table_name} {index_query}"
+                    logger.info(f"Executing SQL: {sql_create_index}")
+                    cur.execute(sql_create_index)
+
+                # After creating all indexes, run ANALYZE to update statistics
+                sql_analyze = f"ANALYZE public.{table_name}"
+                logger.info(f"Executing SQL: {sql_analyze}")
+                cur.execute(sql_analyze)
+
+            # Commit the transaction after creating indexes and analyzing
+            conn.commit()
+
+        logger.info("Index rebuilding and ANALYZE complete.")
 
 
 def process_and_update_table(
         serialized_data_frame,
-        metadata: Dict,
+        metadata: "DynamicTableMetaData",
         grouped_dates: List,
         data_source: object,
         index_names: List[str],
@@ -380,7 +396,7 @@ def process_and_update_table(
 
     Args:
         serialized_data_frame (pd.DataFrame): The DataFrame to process and update.
-        metadata (dict): Metadata about the table, including table configuration.
+        metadata (DynamicTableMetaData): Metadata about the table, including table configuration.
         grouped_dates (list): List of grouped dates to assist with the update.
         data_source (object): A data source object with a `get_connection_uri` method.
         index_names (list): List of index column names.
@@ -442,12 +458,9 @@ def process_and_update_table(
         serialized_data_frame=serialized_data_frame,
         grouped_dates=grouped_dates,
         time_series_orm_db_connection=data_source.get_connection_uri(),
-        table_name=metadata.table_name,
+        metadata=metadata,
         overwrite=overwrite,
-        index_names=index_names,
-        time_index_name=time_index_name,
         table_is_empty=table_is_empty,
-        table_index_names=metadata.sourcetableconfiguration.index_names,
     )
 
     # Recompress if needed

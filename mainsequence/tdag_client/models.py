@@ -335,9 +335,13 @@ class SourceTableConfiguration(BaseTdagPydanticModel, BaseObject):
                 raise Exception(r.text)
         return cls(**r.json())
 
-
-
-
+    def get_time_scale_extra_table_indices(self)->dict:
+        url = TDAG_ENDPOINT + "/orm/api" + f"/source_table_config/{self.id}/get_time_scale_extra_table_indices/"
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
+        if r.status_code != 200:
+            raise Exception(r.text)
+        return r.json()
 
 class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
 
@@ -870,6 +874,8 @@ class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
     source_class_name:str
     sourcetableconfiguration:Optional[SourceTableConfiguration]=None
 
+    _drop_indices:bool=False #for direct incertion we can pass this values
+    _rebuild_indidces:bool=False #for direct incertion we can pass this values
     @staticmethod
     def get_root_url():
         return get_dynamic_table_metadata(TDAG_ENDPOINT)
@@ -1258,7 +1264,7 @@ class DataUpdates(BaseTdagPydanticModel):
     update_statistics: Optional[Dict[str, Any]]
     max_time_index_value:Optional[datetime.datetime]
 
-    @property
+
     def is_empty(self):
         return self.update_statistics is None or self.max_time_index_value is None
 

@@ -1783,10 +1783,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
     @staticmethod
     def sanitize_default_build_metadata(build_meta_data: Union[dict, None] = None):
         if build_meta_data is None:
-            build_meta_data = {"initialize_with_default_partitions": False}
+            build_meta_data = {"initialize_with_default_partitions": True}
 
         if "initialize_with_default_partitions" not in build_meta_data.keys():
-            build_meta_data["initialize_with_default_partitions"] = False
+            build_meta_data["initialize_with_default_partitions"] = True
         return build_meta_data
 
     def __init__(self, init_meta=None,
@@ -2169,7 +2169,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         if self.local_persist_manager.metadata.sourcetableconfiguration is not None:
             if self.remote_build_metadata["initialize_with_default_partitions"] == False:
                 if self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-                    self.logger.warning("Default Partitions will be initialized ")
+                    self.logger.warning("Default Partitions will not be initialized ")
 
     def _create_config(self, kwargs, post_init_log_messages: list):
         """
