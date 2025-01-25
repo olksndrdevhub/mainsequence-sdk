@@ -54,7 +54,7 @@ local_hash_id:str,
                                       kind=SpanKind(4)) as span:
         span.set_attribute("local_hash_id", local_hash_id)
 
-        ts, pickle_path = TimeSerie.rebuild_and_set_from_id(
+        ts, pickle_path = TimeSerie.rebuild_and_set_from_local_hash_id(
             data_source_id=data_source_id,
             local_hash_id=local_hash_id,graph_depth_limit=0,
         )

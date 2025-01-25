@@ -799,7 +799,7 @@ class TimeSerieRebuildMethods(ABC):
         return data_source
 
     @classmethod
-    def rebuild_and_set_from_id(cls, local_hash_id:int,data_source_id:int, set_dependencies_df: bool = False,
+    def rebuild_and_set_from_local_hash_id(cls, local_hash_id:int,data_source_id:int, set_dependencies_df: bool = False,
                                            graph_depth_limit=1,
                                            ):
         """

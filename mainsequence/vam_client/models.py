@@ -882,6 +882,7 @@ class DataFrequency(str, Enum):
     one_month ="1mo"
 
 class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
+    id:Optional[int]
     unique_identifier: str = Field(..., description="Unique identifier for the api")
     data_source_id: int = Field(..., description="Unique identifier for the data source")
     local_hash_id: str = Field(..., max_length=64, description="Local hash ID of the data source")
