@@ -323,8 +323,8 @@ class SourceTableConfiguration(BaseTdagPydanticModel, BaseObject):
 
     @classmethod
     def create(cls, *args, **kwargs):
-        url = TDAG_ENDPOINT +"/orm/api" + "/source_table_config"
-        data = cls.serialize_for_json(kwargs)
+        url = TDAG_ENDPOINT +"/orm/api" + "/source_table_config/"
+        data = serialize_to_json(kwargs)
         payload = {"json": data, }
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
@@ -518,7 +518,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         """
         s = cls.build_session()
         base_url = cls.LOCAL_TIME_SERIE_HISTORICAL_UPDATE
-        data = cls.serialize_for_json(kwargs)
+        data = serialize_to_json(kwargs)
         payload = {"json": data, }
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=f"{base_url}/", payload=payload)
         if r.status_code != 201:
@@ -1142,7 +1142,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
         Runs forever (until the main thread ends),
         calling _scheduler_heart_beat_patch every 30 seconds.
         """
-        logger.info("Heartbeat thread started with interval = %d seconds", run_interval)
+        logger.debug("Heartbeat thread started with interval = %d seconds", run_interval)
 
         while  True:
 
@@ -1258,6 +1258,10 @@ class DataUpdates(BaseTdagPydanticModel):
     update_statistics: Optional[Dict[str, Any]]
     max_time_index_value:Optional[datetime.datetime]
 
+    @property
+    def is_empty(self):
+        return self.update_statistics is None or self.max_time_index_value is None
+
     def get_min_latest_value(self, init_fallback_date: datetime=None):
         if not self.update_statistics:
             return init_fallback_date
@@ -1271,15 +1275,19 @@ class DataUpdates(BaseTdagPydanticModel):
     def asset_identifier(self):
         return list(self.update_statistics.keys())
 
-    def update_assets(self, asset_list: list, init_fallback_date: datetime=None):
+    def update_assets(self, asset_list: list,*, init_fallback_date: datetime=None,
+                      unique_identifier_list:Union[list,None]=None
+                      ):
         new_update_statistics = {}
-        for a in asset_list:
-            unique_identifier = a.unique_identifier
+        unique_identifier_list=[a.unique_identifier for a in asset_list] if unique_identifier_list is None else unique_identifier_list
+
+        for unique_identifier in unique_identifier_list:
+
             if self.update_statistics and unique_identifier in self.update_statistics:
                 new_update_statistics[unique_identifier] = self.update_statistics[unique_identifier]
             else:
                 if init_fallback_date is None: raise ValueError(f"No initial start date for {a.unique_identifier} assets defined")
-                new_update_statistics[a.unique_identifier] = init_fallback_date
+                new_update_statistics[unique_identifier] = init_fallback_date
 
         max_time_index_value=max(new_update_statistics.values()) if len(new_update_statistics)>0 else None
 
@@ -1606,7 +1614,6 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
                 time_index_name=time_index_name,
                 overwrite=overwrite,
                 JSON_COMPRESSED_PREFIX=JSON_COMPRESSED_PREFIX,
-                logger=logger
             )
 
     def filter_by_assets_ranges(
@@ -1883,9 +1890,7 @@ class DynamicTableHelpers:
         retries = Retry(total=2, backoff_factor=2,)
         s.mount('http://', HTTPAdapter(max_retries=retries))
         return s
-    @staticmethod
-    def serialize_for_json(kwargs):
-       return serialize_to_json(kwargs)
+
 
     @staticmethod
     def _parse_parameters_filter(parameters):
@@ -1928,7 +1933,7 @@ class DynamicTableHelpers:
     def patch_update_details(self,*args,**kwargs):
         base_url = self.update_details_url
         
-        data=self.serialize_for_json(kwargs)
+        data=serialize_to_json(kwargs)
         payload = {"json": data }
         r=self.make_request(r_type="PATCH",url=f"{base_url}/0/",payload=payload)
         if r.status_code != 200:
@@ -1937,7 +1942,7 @@ class DynamicTableHelpers:
     def patch_local_update_details(self,*args,**kwargs):
         base_url = self.local_update_details_url
 
-        data = self.serialize_for_json(kwargs)
+        data = serialize_to_json(kwargs)
         payload = {"json": data}
         r = self.make_request(r_type="PATCH", url=f"{base_url}/0/", payload=payload)
         if r.status_code != 200:
@@ -1958,7 +1963,7 @@ class DynamicTableHelpers:
         return r.json()
     def delete_all_data_after_date(self,after_date:str):
         base_url = self.root_url
-        data = self.serialize_for_json({"after_date": after_date})
+        data = erialize_to_json({"after_date": after_date})
         payload = {"json": data, }
         r = self.s.patch(f"{base_url}/delete_all_data_after_date/", **payload)
         if r.status_code != 200:
@@ -1968,7 +1973,7 @@ class DynamicTableHelpers:
     def delete_after_date(self, metadata:Union[dict,None], after_date: str):
 
         base_url = self.root_url
-        data = self.serialize_for_json({"after_date": after_date})
+        data = serialize_to_json({"after_date": after_date})
         payload = {"json": data, }
         r = self.s.patch(f"{base_url}/{metadata['id']}/delete_after_date/", **payload)
         if r.status_code != 200:
@@ -2068,7 +2073,7 @@ class DynamicTableHelpers:
         """
 
      
-        metadata_kwargs = self.serialize_for_json(metadata_kwargs)
+        metadata_kwargs = serialize_to_json(metadata_kwargs)
         time_serie_node, metadata = TimeSerieNode.create(metadata_kwargs=metadata_kwargs)
         return metadata
 
@@ -2191,7 +2196,7 @@ class DynamicTableHelpers:
                     index_names=index_names,
                     time_index_name=time_index_name,
                     column_index_names=column_index_names,
-                    metadata_id=metadata["id"]
+                    metadata_id=metadata.id
                 )
                 metadata.sourcetableconfiguration = stc
             except AlreadyExist:

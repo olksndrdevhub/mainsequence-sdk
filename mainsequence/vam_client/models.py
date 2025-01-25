@@ -506,6 +506,8 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
 class Asset(AssetMixin,BaseObjectOrm):
 
     def get_spot_reference_asset_symbol(self):
+        """"
+        """
 
         return self.symbol
     

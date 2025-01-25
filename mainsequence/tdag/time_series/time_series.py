@@ -1715,6 +1715,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         - set_graph node
 
     """
+    @staticmethod
+    def set_context_in_logger(logger_context:dict):
+        global logger
+        for key,value in logger_context.items():
+            logger.bind(**dict(key=value))
 
     @staticmethod
     def get_time_serie_source_code(TimeSerieClass: "TimeSerie"):
@@ -1977,6 +1982,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
         from mainsequence.tdag_client import Scheduler
         import gc
+        global logger
         if update_tree:
             update_only_tree = False
 
@@ -1999,7 +2005,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             scheduler.start_heart_beat()
         else:
             scheduler = remote_scheduler
-
+        logger=logger.bind(scheduler_name=scheduler.name)
+        logger=logger.bind(head_local_ts_hash_id=self.local_hash_id)
         error_to_raise = None
         with tracer.start_as_current_span(f"Scheduler TS Head Update ") as span:
             span.set_attribute("time_serie_local_hash_id", self.local_hash_id)
@@ -2015,7 +2022,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                                                set_time_serie_queue_status=False,
                                                                                update_tree=update_tree)
                 self.set_actor_manager(actor_manager=distributed_actor_manager)
-                self.logger.info("state set with dependencies metadatas")
+                self.logger.debug("state set with dependencies metadatas")
 
                 # 3 build update tracker
                 update_tracker = UpdateInterface(head_hash=self.local_hash_id, trace_id=None,
@@ -2215,7 +2222,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         :return:
         """
 
-        self.logger.info("Initializing update priority ... ")
+        self.logger.debug("Initializing update priority ... ")
         depth_df = self.local_persist_manager.get_all_dependencies_update_priority()
         self.depth_df = depth_df
 
@@ -2248,7 +2255,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         if hasattr(self, "depth_df") == False:
             self.set_dependencies_df()
 
-            self.logger.info("Setting dependencies in scheduler active_tree")
+            self.logger.debug("Setting dependencies in scheduler active_tree")
             # only set once
             all_local_time_series_in_tree = []
 
@@ -2301,11 +2308,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         if self.is_local_relation_tree_set == False:
             start_tree_relationship_update_time = time.time()
             self.set_relation_tree()
-            self.logger.info(
+            self.logger.debug(
                 f"relationship tree updated took {time.time() - start_tree_relationship_update_time} seconds ")
 
         else:
-            self.logger.info("Tree is not updated as is_local_relation_tree_set== True")
+            self.logger.debug("Tree is not updated as is_local_relation_tree_set== True")
 
         update_map = {}
         if use_state_for_update == True:
@@ -2369,7 +2376,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                             self.logger.exception(f"Error updating dependencie {ts.local_hash_id}")
                             raise e
                     updated_uids.extend(tmp_ts.index.to_list())
-        self.logger.info(f'Dependency Tree evaluated for  {self}')
+        self.logger.debug(f'Dependency Tree evaluated for  {self}')
 
     def set_actor_manager(self, actor_manager: object):
         self.update_actor_manager = actor_manager

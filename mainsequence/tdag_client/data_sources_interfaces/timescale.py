@@ -18,7 +18,7 @@ import json
 
 from typing import Dict, List, Union
 import datetime
-
+from mainsequence.logconf import logger
 from ..utils import DATE_FORMAT, make_request, set_types_in_table
 import os
 
@@ -370,7 +370,6 @@ def process_and_update_table(
         data_source: object,
         index_names: List[str],
         time_index_name: str,
-        logger: object,
         overwrite: bool = False,
         JSON_COMPRESSED_PREFIX: List[str] = None,
 

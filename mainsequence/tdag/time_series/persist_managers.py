@@ -534,7 +534,7 @@ class PersistManager:
             if metadata.sourcetableconfiguration.multi_index_stats is not None:
                 last_update_per_asset = metadata.sourcetableconfiguration.multi_index_stats['max_per_asset_symbol']
                 if last_update_per_asset is not None:
-                    last_update_per_asset = {unique_identifier: self.dth.request_to_datetime(v) for unique_identifier, v in last_update_per_asset.items()}
+                    last_update_per_asset = {unique_identifier: DynamicTableHelpers.request_to_datetime(v) for unique_identifier, v in last_update_per_asset.items()}
 
         if asset_symbols is not None and last_update_per_asset is not None:
             last_update_per_asset = {asset: value for asset, value in last_update_per_asset.items() if asset in asset_symbols}
