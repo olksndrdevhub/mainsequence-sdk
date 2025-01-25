@@ -16,7 +16,7 @@ import pytz
 from tqdm import tqdm
 import shutil
 from mainsequence.tdag_client.utils import set_types_in_table
-
+from mainsequence.logconf import logger
 TIME_PARTITION = "TIME_PARTITION"
 
 
@@ -207,7 +207,7 @@ def get_extrema_per_asset_symbol_from_sidecars(file_path: str, extrema: str = "m
 
 class DataLakeInterface:
 
-    def __init__(self,data_lake_source:"PodLocalLake",logger):
+    def __init__(self,data_lake_source:"PodLocalLake"):
         from mainsequence.tdag.config import TDAG_PATH
         self.base_path = f"{TDAG_PATH}/data_lakes"
         self.data_source = data_lake_source
@@ -216,7 +216,6 @@ class DataLakeInterface:
             f"{int(self.data_source.related_resource.datalake_end.timestamp() * 1_000_000) if self.data_source.related_resource.datalake_end is not None else 'None'}"
         )
 
-        self.logger=logger
         self.s3_endpoint_url = None
         self.s3_secure_connection = False
         self.s3_data_lake=None
@@ -359,7 +358,7 @@ class DataLakeInterface:
         Returns:
             pd.DataFrame: The queried data.
         """
-        self.logger.debug(f"Data Lake Read {table_name} ")
+        logger.debug(f"Data Lake Read {table_name} ")
         data = read_full_data(file_path=self.get_data_file_path_for_table(table_name=table_name),
                               filters=filters,
         )

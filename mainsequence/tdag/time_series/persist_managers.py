@@ -784,7 +784,6 @@ class DataLakePersistManager(PersistManager):
             self.verify_if_already_run(time_serie)
         last_index_value, last_multiindex = DataLakeInterface(
             data_lake_source=self.data_source,
-            logger=self.logger
         ).get_parquet_latest_value(
             table_name=remote_table_hash_id
         )
@@ -797,7 +796,7 @@ class DataLakePersistManager(PersistManager):
         from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
         return DataLakeInterface(data_lake_source=self.data_source,
-                                                              logger=self.logger).table_exist(
+                                                              ).table_exist(
             table_name=table_name)
     def get_table_schema(self,table_name):
         from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface

@@ -1537,7 +1537,7 @@ class LocalDiskSourceLake(DynamicTableDataSource):
 
         metadata = local_metadata["remote_table"]
         table_name = metadata["table_name"]
-        data_lake_interface = DataLakeInterface(data_lake_source=self, logger=logger)
+        data_lake_interface = DataLakeInterface(data_lake_source=self)
 
         filters = data_lake_interface.build_time_and_symbol_filter(
             start_date=start_date,
