@@ -446,13 +446,13 @@ class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
 
         return cls(**data["metadata"])
 
-    def build_or_update_update_details(self, metadata, *args, **kwargs)->["DynamicTableMetaData","LocalTimeSerie"]:
+    def build_or_update_update_details(self, *args, **kwargs)->["DynamicTableMetaData","LocalTimeSerie"]:
 
         base_url = self.get_root_url()
         payload = { "json": kwargs}
-        # r = self.s.patch(, **payload)
+        s = self.build_session()
         url=f"{base_url}/{self.id}/build_or_update_update_details/"
-        r=self.make_request(r_type="PATCH",url=url,payload=payload)
+        r=make_request(r_type="PATCH",url=url,payload=payload,s=s, loaders=self.LOADERS,)
         if r.status_code != 202:
             raise Exception(f"Error in request {r.text}")
 
@@ -1277,7 +1277,10 @@ class DataUpdates(BaseTdagPydanticModel):
             else:
                 if init_fallback_date is None: raise ValueError(f"No initial start date for {a.unique_identifier} assets defined")
                 new_update_statistics[a.unique_identifier] = init_fallback_date
-        return DataUpdates(update_statistics=new_update_statistics)
+
+        max_time_index_value=max(new_update_statistics.values()) if len(new_update_statistics)>0 else None
+
+        return DataUpdates(update_statistics=new_update_statistics,max_time_index_value=max_time_index_value)
 
     def is_empty(self):
         return self.update_statistics is None or len(self.update_statistics) == 0
