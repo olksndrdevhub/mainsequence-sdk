@@ -1156,7 +1156,7 @@ class Scheduler(BaseTdagPydanticModel,BaseObject):
         r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload,time_out=time_out)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
-    
+        return Scheduler(**r.json())
 
 class RunConfiguration(BaseTdagPydanticModel, BaseObject):
 
