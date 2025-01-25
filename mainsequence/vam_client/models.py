@@ -901,7 +901,7 @@ class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
 
 
 class HistoricalBarsSource(TDAGAPIDataSource):
-    execution_venue: int
+    execution_venues: list
 
 
 class Trade(BaseObjectOrm):

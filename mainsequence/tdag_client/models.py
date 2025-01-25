@@ -875,7 +875,7 @@ class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
     sourcetableconfiguration:Optional[SourceTableConfiguration]=None
 
     _drop_indices:bool=False #for direct incertion we can pass this values
-    _rebuild_indidces:bool=False #for direct incertion we can pass this values
+    _rebuild_indices:bool=False #for direct incertion we can pass this values
     @staticmethod
     def get_root_url():
         return get_dynamic_table_metadata(TDAG_ENDPOINT)
