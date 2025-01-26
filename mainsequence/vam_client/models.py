@@ -6,7 +6,7 @@ import pytz
 import requests
 from functools import wraps
 import pandas as pd
-from typing import Union
+from typing import Union,Literal
 from types import SimpleNamespace
 import requests
 import os
@@ -902,7 +902,11 @@ class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
 
 class HistoricalBarsSource(TDAGAPIDataSource):
     execution_venues: list
+    data_mode:Literal['live', 'backtest'] = Field(
 
+        description="Indicates whether the source is for live data or backtesting."
+    )
+    adjusted:bool
 
 class Trade(BaseObjectOrm):
     @classmethod
