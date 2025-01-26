@@ -653,21 +653,19 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
             raise Exception(f"Error in request: {r.text}")
         return r.json()
 
-    @classmethod
-    def get_data_between_dates_from_api(cls, local_hash_id: str, data_source_id: int, start_date: datetime.datetime,
+    def get_data_between_dates_from_api(self, start_date: datetime.datetime,
                                         end_date: datetime.datetime, great_or_equal: bool,
                                         less_or_equal: bool,
-                                        asset_symbols: list,
+                                        unique_identifier_list: list,
                                         columns: list,
-                                        execution_venue_symbols: list,
-                                        symbol_range_map: Union[None, dict]
+                                        unique_identifier_range_map: Union[None, dict]
                                         ):
-        s = cls.build_session()
-        url = cls.LOCAL_UPDATE_URL + f"/get_data_between_dates_from_remote/"
+        s = self.build_session()
+        url = self.LOCAL_UPDATE_URL + f"/{self.id}/get_data_between_dates_from_remote/"
 
-        symbol_range_map = copy.deepcopy(symbol_range_map)
-        if symbol_range_map is not None:
-            for symbol, date_info in symbol_range_map.items():
+        unique_identifier_range_map = copy.deepcopy(unique_identifier_range_map)
+        if unique_identifier_range_map is not None:
+            for unique_identifier, date_info in unique_identifier_range_map.items():
                 # Convert start_date if present
                 if 'start_date' in date_info and isinstance(date_info['start_date'], datetime.datetime):
                     date_info['start_date'] = int(date_info['start_date'].timestamp())
@@ -677,17 +675,15 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                     date_info['end_date'] = int(date_info['end_date'].timestamp())
 
         payload = {"json": {
-            "local_hash_id": local_hash_id,
-            "data_source_id": data_source_id,
+
             "start_date": start_date.timestamp() if start_date else None,
             "end_date": end_date.timestamp() if end_date else None,
             "great_or_equal": great_or_equal,
             "less_or_equal": less_or_equal,
-            "asset_symbols": asset_symbols,
+            "unique_identifier_list": unique_identifier_list,
             "columns": columns,
-            "execution_venue_symbols": execution_venue_symbols,
             "offset": 0,  # Will increase in each loop
-            "symbol_range_map": symbol_range_map
+            "unique_identifier_range_map": unique_identifier_range_map
         }}
         all_results = []
         while True:

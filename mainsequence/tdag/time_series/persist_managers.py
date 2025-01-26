@@ -18,15 +18,20 @@ class APIPersistManager:
         self.data_source_id = data_source_id
         self.local_hash_id = local_hash_id
 
+        local_metadata = LocalTimeSerie.get(local_hash_id=self.local_hash_id,
+                                                  data_source_id=self.data_source_id
+                                                  )
+        self.local_metadata=local_metadata
+
     def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
                              less_or_equal=True,
                              asset_symbols: Union[list, None] = None,
                              execution_venue_symbols: Union[list, None] = None,
                              columns: Union[list, None] = None,
                              symbol_range_map: Union[dict, None] = None,):
-        filtered_data = TimeSerieLocalUpdate.get_data_between_dates_from_api(
-                                                        local_hash_id=self.local_hash_id,
-                                                        data_source_id=self.data_source_id, start_date=start_date,
+        filtered_data = self.local_metadata.get_data_between_dates_from_api(
+
+                                                        start_date=start_date,
                                                         end_date=end_date, great_or_equal=great_or_equal,
                                                         less_or_equal=less_or_equal,
                                                         asset_symbols=asset_symbols,
@@ -39,17 +44,15 @@ class APIPersistManager:
             return filtered_data
 
         #fix types
-        local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id,
-                                                  data_source_id=self.data_source_id
-                                                  )
-        stc = local_metadata["remote_table"]["sourcetableconfiguration"]
-        filtered_data[stc["time_index_name"]] = pd.to_datetime(filtered_data[stc["time_index_name"]])
-        for c, c_type in stc["column_dtypes_map"].items():
-            if c!=stc["time_index_name"]:
+
+        stc = self.local_metadata.remote_table.sourcetableconfiguration
+        filtered_data[stc.time_index_name] = pd.to_datetime(filtered_data[stc.time_index_name])
+        for c, c_type in stc.column_dtypes_map.items():
+            if c!=stc.time_index_name:
                 if c_type=="object":
                     c_type="str"
                 filtered_data[c]=filtered_data[c].astype(c_type)
-        filtered_data=filtered_data.set_index(stc["index_names"])
+        filtered_data=filtered_data.set_index(stc.index_names)
         return filtered_data
 
     def filter_by_assets_ranges(self, symbol_range_map: dict):
