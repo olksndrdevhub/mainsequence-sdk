@@ -24,6 +24,7 @@ class APIPersistManager:
                                                   )
         self.local_metadata=local_metadata
 
+
     def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
                              less_or_equal=True,
                              unique_identifier_list: Union[list, None] = None,
@@ -39,7 +40,7 @@ class APIPersistManager:
                                                         unique_identifier_range_map=unique_identifier_range_map)
 
         if len(filtered_data) == 0:
-            self.logger.warning(f"Data from {self.local_hash_id} is empty ({start_date} to {end_date} for assets {asset_symbols}) ")
+            logger.warning(f"Data from {self.local_hash_id} is empty in request ")
             return filtered_data
 
         #fix types

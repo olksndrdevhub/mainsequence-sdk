@@ -941,7 +941,7 @@ class TimeSerieRebuildMethods(ABC):
         import cloudpickle
         path = self.pickle_path
         # after persisting pickle , build_hash and source code need to be patched
-        self.logger.info(f"Persisting pickle and patching source code and git hash for {self.hash_id}")
+        self.logger.debug(f"Persisting pickle and patching source code and git hash for {self.hash_id}")
         self._update_git_and_code_in_backend()
 
         pp = data_source_pickle_path(self.data_source.id)
@@ -1619,7 +1619,7 @@ class APITimeSerie:
     def persist_to_pickle(self, overwrite=False):
         path = self.pickle_path
         # after persisting pickle , build_hash and source code need to be patched
-        self.logger.info(f"Persisting pickle")
+        self.logger.debug(f"Persisting pickle")
 
         pp = data_source_pickle_path(self.data_source_id)
         if os.path.isfile(pp) == False or overwrite == True:
