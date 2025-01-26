@@ -1592,7 +1592,7 @@ class APITimeSerie:
 
         return filtered_data
 
-    def filter_by_assets_ranges(self, asset_ranges_map: dict):
+    def filter_by_assets_ranges(self, unique_identifier_range_map: dict):
         """
 
         Parameters
@@ -1603,7 +1603,7 @@ class APITimeSerie:
         -------
 
         """
-        df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map, time_serie=self)
+        df = self.local_persist_manager.filter_by_assets_ranges(unique_identifier_range_map, time_serie=self)
         return df
 
     @property

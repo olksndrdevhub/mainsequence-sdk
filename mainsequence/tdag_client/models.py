@@ -661,7 +661,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                                         unique_identifier_range_map: Union[None, dict]
                                         ):
         s = self.build_session()
-        url = self.LOCAL_UPDATE_URL + f"/{self.id}/get_data_between_dates_from_remote/"
+        url = self.get_root_url() + f"/{self.id}/get_data_between_dates_from_remote/"
 
         unique_identifier_range_map = copy.deepcopy(unique_identifier_range_map)
         if unique_identifier_range_map is not None:

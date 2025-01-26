@@ -26,19 +26,17 @@ class APIPersistManager:
 
     def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
                              less_or_equal=True,
-                             asset_symbols: Union[list, None] = None,
-                             execution_venue_symbols: Union[list, None] = None,
+                             unique_identifier_list: Union[list, None] = None,
                              columns: Union[list, None] = None,
-                             symbol_range_map: Union[dict, None] = None,):
+                             unique_identifier_range_map: Union[dict, None] = None,):
         filtered_data = self.local_metadata.get_data_between_dates_from_api(
 
                                                         start_date=start_date,
                                                         end_date=end_date, great_or_equal=great_or_equal,
                                                         less_or_equal=less_or_equal,
-                                                        asset_symbols=asset_symbols,
+                                                        unique_identifier_list=unique_identifier_list,
                                                         columns=columns,
-                                                        execution_venue_symbols=execution_venue_symbols,
-                                                        symbol_range_map=symbol_range_map)
+                                                        unique_identifier_range_map=unique_identifier_range_map)
 
         if len(filtered_data) == 0:
             self.logger.warning(f"Data from {self.local_hash_id} is empty ({start_date} to {end_date} for assets {asset_symbols}) ")
@@ -56,8 +54,8 @@ class APIPersistManager:
         filtered_data=filtered_data.set_index(stc.index_names)
         return filtered_data
 
-    def filter_by_assets_ranges(self, symbol_range_map: dict):
-        df = self.get_df_between_dates(start_date=None, end_date=None, symbol_range_map=symbol_range_map)
+    def filter_by_assets_ranges(self, unique_identifier_range_map: dict,time_serie:"TimeSerie"):
+        df = self.get_df_between_dates(start_date=None, end_date=None, unique_identifier_range_map=unique_identifier_range_map)
         return df
 
 class PersistManager:
