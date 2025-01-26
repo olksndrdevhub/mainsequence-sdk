@@ -1337,11 +1337,11 @@ class DataPersistanceMethods(ABC):
             last_update_in_table = np.max(last_update_per_asset.values)
         return last_update_in_table
 
-    def get_earliest_updated_asset_filter(self, asset_symbols: Union[list],
+    def last_update_per_unique_identifier(self, unique_identifier_list: Union[list],
                                           last_update_per_asset: dict):
-        if asset_symbols is not None:
+        if unique_identifier_list is not None:
             last_update_in_table = min(
-                [t for a in last_update_per_asset.values() for t in a.values() if a in asset_symbols])
+                [t for a in last_update_per_asset.values() for t in a.values() if a in unique_identifier_list])
         else:
             last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values()])
         return last_update_in_table
@@ -1650,11 +1650,11 @@ class APITimeSerie:
             asset_symbols=asset_symbols, time_serie=self)
         return last_update_in_table, last_update_per_asset
 
-    def get_earliest_updated_asset_filter(self, asset_symbols: Union[list],
+    def get_earliest_updated_asset_filter(self, unique_identifier_list: Union[list],
                                           last_update_per_asset: dict):
-        if asset_symbols is not None:
+        if unique_identifier_list is not None:
             last_update_in_table = min(
-                [t for a in last_update_per_asset.values() for t in a.values() if a in asset_symbols])
+                [t for a in last_update_per_asset.values() for t in a.values() if a in unique_identifier_list])
         else:
             last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values()])
         return last_update_in_table

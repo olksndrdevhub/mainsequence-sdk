@@ -5,9 +5,10 @@ import os
 from mainsequence.logconf import logger
 
 
-from mainsequence.tdag_client import (  LocalTimeSerie,
+from mainsequence.tdag_client import (LocalTimeSerie,
                                       LocalTimeSeriesDoesNotExist, PodLocalLake,
-                                      DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS, DynamicTableMetaData)
+                                      DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS, DynamicTableMetaData,
+                                      DataUpdates)
 
 from mainsequence.tdag_client.models import BACKEND_DETACHED, none_if_backend_detached, DynamicTableHelpers
 import json
@@ -727,7 +728,7 @@ class DataLakePersistManager(PersistManager):
         from mainsequence.tdag.time_series import WrapperTimeSerie
         if self.already_run== True or self.is_introspecting ==True:
             return None
-
+        update_statistics=DataUpdates(update_statistics=None,max_time_index_value=None)
         if BACKEND_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             self.set_is_introspecting(True)
             self.metadata = {"sourcetableconfiguration":None, "hash_id": ts.remote_table_hashed_name,
@@ -737,10 +738,14 @@ class DataLakePersistManager(PersistManager):
             last_update_in_table=None
             if self.table_exist(table_name=ts.remote_table_hashed_name):
                 # check if table is complete and continue with earliest latest value to avoid data gaps
-                last_update_in_table, last_update_per_asset = ts.get_update_statistics()
-                if last_update_per_asset is not None:
-                    last_update_in_table = ts.get_earliest_updated_asset_filter(last_update_per_asset=last_update_per_asset,
-                                                                                asset_symbols=None)
+                last_update_in_table, last_update_per_unique_identifier = ts.get_update_statistics()
+                if last_update_per_unique_identifier is not None:
+                    last_update_in_table = ts.get_earliest_updated_asset_filter(last_update_per_unique_identifier=last_update_per_unique_identifier,
+                                                                                unique_identifier_list=None)
+
+                update_statistics.update_statistics=last_update_per_unique_identifier
+                update_statistics.max_time_index_value=last_update_in_table
+
 
             self.logger.debug(f"Building local data lake from latest value  {last_update_in_table}")
 
@@ -749,7 +754,7 @@ class DataLakePersistManager(PersistManager):
                 for _,sub_ts in ts.related_time_series.items():
                     sub_ts.local_persist_manager #query the first run
             else:
-                df = ts.update_series_from_source(latest_value=last_update_in_table)
+                df = ts.update_series_from_source(update_statistics=update_statistics)
 
 
             if df is None:
