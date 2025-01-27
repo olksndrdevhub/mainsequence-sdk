@@ -59,7 +59,7 @@ def get_right_asset_class(execution_venue_symbol:str,asset_type:str):
     try:
         AssetClass = getattr(model_module, CONSTANTS.ASSET_VENUE_FACTORY[execution_venue_symbol][asset_type])
     except Exception as e:
-        raise e
+        raise Exception(f"There are no assets of type {asset_type}  in {execution_venue_symbol}")
     return AssetClass
 
 def sync_account_funds(account:Account,*args,**kwargs)->Account:

@@ -40,7 +40,7 @@ class APIPersistManager:
                                                         unique_identifier_range_map=unique_identifier_range_map)
 
         if len(filtered_data) == 0:
-            logger.warning(f"Data from {self.local_hash_id} is empty in request ")
+            logger.info(f"Data from {self.local_hash_id} is empty in request ")
             return filtered_data
 
         #fix types

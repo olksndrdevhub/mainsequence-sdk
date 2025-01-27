@@ -46,6 +46,8 @@ from mainsequence.logconf import logger
 
 
 def serialize_model_list(value):
+    if value is None:
+        return None
     value.sort(key=lambda x: x.unique_identifier, reverse=False)
     new_value = {"is_model_list": True}
     new_value['model_list'] = [v.to_serialized_dict() for v in value]
@@ -2511,8 +2513,10 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             else:
                 if not update_statistics:
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
-
-                temp_df = self.update_series_from_source(update_statistics=update_statistics)
+                try:
+                    temp_df = self.update_series_from_source(update_statistics=update_statistics)
+                except Exception as e:
+                    raise e
                 for col, ddtype in temp_df.dtypes.items():
                     if "datetime64" in str(ddtype):
                         self.logger.info(f"WARNING DATETIME TYPE IN {self}")
@@ -2892,7 +2896,8 @@ class WrapperTimeSerie(TimeSerie):
 
         return all_dfs
 
-    def update_series_from_source(self, latest_value, *args, **kwargs):
+    def update_series_from_source(self, update_statistics):
+
         """ Implemented in the wrapped nodes"""
         pass
 
