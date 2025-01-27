@@ -1259,6 +1259,7 @@ class DataUpdates(BaseTdagPydanticModel):
     """
     update_statistics: Optional[Dict[str, Any]]
     max_time_index_value:Optional[datetime.datetime]
+    _max_time_in_update_statistics: Optional[datetime.datetime]
 
 
     def is_empty(self):
@@ -1291,12 +1292,14 @@ class DataUpdates(BaseTdagPydanticModel):
                 if init_fallback_date is None: raise ValueError(f"No initial start date for {a.unique_identifier} assets defined")
                 new_update_statistics[unique_identifier] = init_fallback_date
 
-        max_time_index_value=max(new_update_statistics.values()) if len(new_update_statistics)>0 else None
+        _max_time_in_update_statistics=max(new_update_statistics.values()) if len(new_update_statistics)>0 else None
 
-        return DataUpdates(update_statistics=new_update_statistics,max_time_index_value=max_time_index_value)
+        return DataUpdates(update_statistics=new_update_statistics,
+                           max_time_index_value=self.max_time_index_value,
+                           _max_time_in_update_statistics=_max_time_in_update_statistics)
 
     def is_empty(self):
-        return self.update_statistics is None or len(self.update_statistics) == 0
+        return self.max_time_index_value is None
 
     def __getitem__(self, key: str) -> Any:
         if self.update_statistics is None:
@@ -1338,6 +1341,23 @@ class DataUpdates(BaseTdagPydanticModel):
         if not self.update_statistics:
             return []
         return self.update_statistics.items()
+
+    def filter_df_by_latest_value(self,df):
+        if self.is_empty() == False:
+            for unique_identifier, last_update in self.update_statistics.items():
+                df = df[
+                    (
+                            (df.index.get_level_values("unique_identifier") == unique_identifier) &
+
+                            (df.index.get_level_values("time_index") > last_update)
+                    )
+                    |
+                    (
+                        (df.index.get_level_values("unique_identifier") != unique_identifier)
+                    )
+                    ]
+
+        return df
 
 def get_chunk_stats(chunk_df,time_index_name,index_names):
     chunk_stats = {"_GLOBAL_": {"max": chunk_df[time_index_name].max().timestamp(),
