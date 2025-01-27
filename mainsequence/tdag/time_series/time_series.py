@@ -4,7 +4,7 @@ from venv import logger
 
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import json
 import time
 import traceback
@@ -1235,8 +1235,8 @@ class DataPersistanceMethods(ABC):
 
         return self.local_persist_manager.persist_size
 
-    def get_update_statistics(self, asset_symbols: Union[list, None] = None,
-                              ) -> datetime.datetime:
+    def get_update_statistics(self, unique_identifier_list: Optional[list[str]] = None,
+                              ) ->DataUpdates:
         """
         getts latest value directly from querying the DB,
         args and kwargs are nedeed for datalake
@@ -1249,11 +1249,12 @@ class DataPersistanceMethods(ABC):
         -------
 
         """
+        if self.metadata.sourcetableconfiguration is None:
+            return DataUpdates()
 
-        last_update_in_table, last_update_per_asset = self.local_persist_manager.get_update_statistics(
-            remote_table_hash_id=self.remote_table_hashed_name,
-            asset_symbols=asset_symbols, time_serie=self)
-        return last_update_in_table, last_update_per_asset
+
+        update_stats=self.metadata.sourcetableconfiguration.get_data_updates()
+        return update_stats
 
     def get_earliest_value(self) -> datetime.datetime:
         earliest_value = self.local_persist_manager.get_earliest_value()
@@ -1348,7 +1349,7 @@ class DataPersistanceMethods(ABC):
             last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values()])
         return last_update_in_table
 
-    def get_last_observation(self, asset_symbols: Union[None, list] = None,
+    def get_last_observation(self, unique_identifier_list: Optional[list] = None,
 
                              ):
         """
@@ -1364,18 +1365,15 @@ class DataPersistanceMethods(ABC):
 
         """
 
-        last_update_in_table, last_update_per_asset = self.get_update_statistics(asset_symbols=asset_symbols)
-        if last_update_in_table is None and last_update_per_asset is None:
+        update_statistics = self.get_update_statistics(unique_identifier_list=unique_identifier_list)
+        if update_statistics.is_empty():
             return None
-        if asset_symbols is not None and last_update_per_asset is not None:
-            if len(last_update_per_asset) > 0:
-                last_update_in_table = self.get_latest_update_by_assets_filter(asset_symbols=asset_symbols,
-                                                                               last_update_per_asset=last_update_per_asset
-                                                                               )
+
+
 
         last_observation = self.get_df_between_dates(
-            start_date=last_update_in_table, great_or_equal=True,
-            asset_symbols=asset_symbols
+            start_date=update_statistics._max_time_in_update_statistics, great_or_equal=True,
+            unique_identifier_list=unique_identifier_list
         )
 
         return last_observation
@@ -1579,17 +1577,18 @@ class APITimeSerie:
                 self.data_source_id = local_persist_manager_lake.data_source.id
                 self._local_persist_manager = local_persist_manager_lake
 
-    def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
-                             end_date: Union[datetime.datetime, None] = None,
-                             asset_symbols: Union[None, list] = None,
+    def get_df_between_dates(self, start_date: Optional[datetime.datetime] = None,
+                             end_date: Optional[datetime.datetime] = None,
+                             unique_identifier_list: Optional[list] = None,unique_identifier_range_map:Optional[dict] = None,
                              data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True,
                              ):
 
         filtered_data = self.local_persist_manager.get_df_between_dates(start_date=start_date,
                                                                         end_date=end_date,
-                                                                        asset_symbols=asset_symbols,
+                                                                        unique_identifier_list=unique_identifier_list,
                                                                         great_or_equal=great_or_equal,
                                                                         less_or_equal=less_or_equal,
+                                                                        unique_identifier_range_map=unique_identifier_range_map,
                                                                         )
 
         return filtered_data
@@ -2516,6 +2515,9 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                 try:
                     temp_df = self.update_series_from_source(update_statistics=update_statistics)
                 except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+
                     raise e
                 for col, ddtype in temp_df.dtypes.items():
                     if "datetime64" in str(ddtype):

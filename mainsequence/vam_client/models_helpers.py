@@ -35,6 +35,13 @@ def get_model_class(model_class:str):
                      }
 
     return MODEL_CLASS_MAP[model_class]
+def create_from_serializer_with_class(asset_list:List[dict]):
+    new_list=[]
+    for a in asset_list:
+        AssetClass=get_model_class(a["AssetClass"])
+        a.pop("AssetClass")
+        new_list.append(AssetClass(**a))
+    return new_list
 
 def module_factory(execution_venue_symbol):
     if execution_venue_symbol in CONSTANTS.BINANCE_VENUES:

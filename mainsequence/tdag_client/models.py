@@ -321,6 +321,19 @@ class SourceTableConfiguration(BaseTdagPydanticModel, BaseObject):
     multi_index_stats: Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field")
     table_partition: Dict[str, Any] = Field(..., description="Table partition settings")
 
+
+    def get_data_updates(self):
+        max_per_asset=self.multi_index_stats["max_per_asset_symbol"]
+        max_per_asset={k:request_to_datetime(v) for k,v in max_per_asset.items()}
+
+        du=DataUpdates(max_time_index_value=self.last_time_index_value,
+                           update_statistics=max_per_asset
+                           )
+
+
+        du._max_time_in_update_statistics=self.last_time_index_value
+        return du
+
     @classmethod
     def create(cls, *args, **kwargs):
         url = TDAG_ENDPOINT +"/orm/api" + "/source_table_config/"
@@ -660,6 +673,44 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                                         columns: list,
                                         unique_identifier_range_map: Union[None, dict]
                                         ):
+
+        # Helper function to make a single batch request (or multiple paged requests if next_offset).
+        def fetch_one_batch(chunk_range_map):
+            all_results_chunk = []
+            offset = 0
+            while True:
+                payload = {
+                    "json": {
+                        "start_date": start_date.timestamp() if start_date else None,
+                        "end_date": end_date.timestamp() if end_date else None,
+                        "great_or_equal": great_or_equal,
+                        "less_or_equal": less_or_equal,
+                        "unique_identifier_list": unique_identifier_list,
+                        "columns": columns,
+                        "offset": offset,  # pagination offset
+                        "unique_identifier_range_map": chunk_range_map,
+                    }
+                }
+
+                # Perform the POST request
+                r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url)
+                if r.status_code != 200:
+                    raise Exception(f"Error in request: {r.text}")
+
+                response_data = r.json()
+                # Accumulate results
+                chunk = response_data.get("results", [])
+                all_results_chunk.extend(chunk)
+
+                # Retrieve next offset; if None, we've got all the data in this chunk
+                next_offset = response_data.get("next_offset")
+                if not next_offset:
+                    break
+
+                # Update offset for the next iteration
+                offset = next_offset
+
+            return all_results_chunk
         s = self.build_session()
         url = self.get_root_url() + f"/{self.id}/get_data_between_dates_from_remote/"
 
@@ -674,40 +725,29 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                 if 'end_date' in date_info and isinstance(date_info['end_date'], datetime.datetime):
                     date_info['end_date'] = int(date_info['end_date'].timestamp())
 
-        payload = {"json": {
-
-            "start_date": start_date.timestamp() if start_date else None,
-            "end_date": end_date.timestamp() if end_date else None,
-            "great_or_equal": great_or_equal,
-            "less_or_equal": less_or_equal,
-            "unique_identifier_list": unique_identifier_list,
-            "columns": columns,
-            "offset": 0,  # Will increase in each loop
-            "unique_identifier_range_map": unique_identifier_range_map
-        }}
+       
         all_results = []
-        while True:
-            # Make the POST request
-            r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url)
+        if unique_identifier_range_map:
+            keys = list(unique_identifier_range_map.keys())
+            chunk_size = 100
+            for start_idx in range(0, len(keys), chunk_size):
+                key_chunk = keys[start_idx: start_idx + chunk_size]
 
-            if r.status_code != 200:
-                raise Exception(f"Error in request: {r.text}")
+                # Build sub-dictionary for this chunk
+                chunk_map = {
+                    k: unique_identifier_range_map[k] for k in key_chunk
+                }
 
-            response_data = r.json()
-
-            # Accumulate results
-            chunk = response_data.get("results", [])
-            all_results.extend(chunk)
-
-            # Retrieve next offset; if None, we've got all the data
-            next_offset = response_data.get("next_offset")
-            if not next_offset:
-                break
-
-            # Update payload with the new offset
-            payload["json"]["offset"] = next_offset
+                # Fetch data (including any pagination via next_offset)
+                chunk_results = fetch_one_batch(chunk_map)
+                all_results.extend(chunk_results)
+        else:
+            # If unique_identifier_range_map is None, do a single batch with offset-based pagination.
+            chunk_results = fetch_one_batch(None)
+            all_results.extend(chunk_results)
 
         return pd.DataFrame(all_results)
+
 
     @classmethod
     def post_data_frame_in_chunks(cls,
@@ -1257,10 +1297,13 @@ class DataUpdates(BaseTdagPydanticModel):
     """
     TODO WIP Helper function to work with the table updates
     """
-    update_statistics: Optional[Dict[str, Any]]
-    max_time_index_value:Optional[datetime.datetime]
-    _max_time_in_update_statistics: Optional[datetime.datetime]
+    update_statistics: Optional[Dict[str, Any]]=None
+    max_time_index_value:Optional[datetime.datetime]=None #does not include fitler
+    _max_time_in_update_statistics: Optional[datetime.datetime]=None #include filter
 
+    @classmethod
+    def return_empty(cls):
+        return cls()
 
     def is_empty(self):
         return self.update_statistics is None or self.max_time_index_value is None
@@ -1293,10 +1336,11 @@ class DataUpdates(BaseTdagPydanticModel):
                 new_update_statistics[unique_identifier] = init_fallback_date
 
         _max_time_in_update_statistics=max(new_update_statistics.values()) if len(new_update_statistics)>0 else None
-
-        return DataUpdates(update_statistics=new_update_statistics,
+        du=DataUpdates(update_statistics=new_update_statistics,
                            max_time_index_value=self.max_time_index_value,
-                           _max_time_in_update_statistics=_max_time_in_update_statistics)
+                         )
+        du._max_time_in_update_statistics=_max_time_in_update_statistics
+        return du
 
     def is_empty(self):
         return self.max_time_index_value is None
@@ -1343,6 +1387,8 @@ class DataUpdates(BaseTdagPydanticModel):
         return self.update_statistics.items()
 
     def filter_df_by_latest_value(self,df):
+        if df.shape[0]==0:
+            return df
         if self.is_empty() == False:
             for unique_identifier, last_update in self.update_statistics.items():
                 df = df[
@@ -1658,7 +1704,7 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
                 column_types=column_types
             )
         else:
-            df = TimeSerieLocalUpdate.get_data_between_dates_from_api(
+            df = LocalTimeSerie.get_data_between_dates_from_api(
                 local_hash_id=local_hash_id,
                 data_source_id=self.id,
                 start_date=None,
@@ -1702,7 +1748,7 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
             df = set_types_in_table(df, stc.column_dtypes_map)
             return df
         else:
-            df = TimeSerieLocalUpdate.get_data_between_dates_from_api(
+            df = LocalTimeSerie.get_data_between_dates_from_api(
                 local_hash_id=local_metadata.local_hash_id,
                 data_source_id=metadata.data_source.id,
                 start_date=start_date,
@@ -1985,7 +2031,7 @@ class DynamicTableHelpers:
         return r.json()
     def delete_all_data_after_date(self,after_date:str):
         base_url = self.root_url
-        data = erialize_to_json({"after_date": after_date})
+        data = serialize_to_json({"after_date": after_date})
         payload = {"json": data, }
         r = self.s.patch(f"{base_url}/delete_all_data_after_date/", **payload)
         if r.status_code != 200:

@@ -503,6 +503,26 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
             raise Exception("Error getting all assets in positions")
         return [cls(**a) for a in r.json()]
 
+    @classmethod
+    def filter_with_asset_class(cls,timeout=None,*args,**kwargs):
+        from .models_helpers import create_from_serializer_with_class
+        base_url = cls.get_object_url()
+        params = cls._parse_parameters_filter(parameters=kwargs)
+
+        request_kwargs = {"params": params, }
+        url = f"{base_url}/list_with_asset_class/"
+        if "pk" in kwargs:
+            url = f"{base_url}/{kwargs['pk']}/"
+            request_kwargs = {}
+
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="GET", url=url, payload=request_kwargs,
+                         timeout=timeout)
+        if r.status_code != 200:
+            raise Exception("Error getting assets")
+        
+        return create_from_serializer_with_class(r.json())
+        
+
 class Asset(AssetMixin,BaseObjectOrm):
 
     def get_spot_reference_asset_symbol(self):
@@ -540,6 +560,11 @@ class CurrencyPairMixin(AssetMixin, BaseVamPydanticModel):
     base_asset: Union[AssetMixin, int]
     quote_asset: Union[AssetMixin, int]
 
+    def get_spot_reference_asset_symbol(self):
+
+
+        base_asset_symbol = self.symbol.replace(self.quote_asset.symbol, "")
+        return base_asset_symbol
 class CurrencyPair(CurrencyPairMixin):
   pass
 
