@@ -102,6 +102,8 @@ def get_correct_asset_class(asset_type):
         return Asset
     elif asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_USDM]:
         return AssetFutureUSDM
+    elif asset_type in [CONSTANTS.ASSET_TYPE_CURRENCY_PAIR]:
+        return CurrencyPair
     else:
         raise NotImplementedError
 
@@ -844,7 +846,7 @@ class AccountPortfolioHistoricalWeights(BaseObjectOrm):
 class WeightPosition(BaseObjectOrm, BaseVamPydanticModel):
     id: Optional[int] = None
     parent_weights: int
-    asset: Union[Asset,AssetFutureUSDM,  int]
+    asset: Union[AssetMixin,int]
     weight_notional_exposure: float
 
     @property
@@ -866,10 +868,10 @@ class HistoricalWeights(BaseObjectOrm,BaseVamPydanticModel):
     weights_date: datetime.datetime
     comments: Optional[str] = None
     target_portfolio: int
-    weights:list[WeightPosition]
+    weights:Union[List[WeightPosition],List[int]]
 
     @classmethod
-    def add_from_time_serie(cls, time_serie_hash_id: str, positions_list: list,
+    def add_from_time_serie(cls, local_time_serie_id: int, positions_list: list,
                             weights_date: datetime.datetime,
                             comments: Union[str, None] = None, timeout=None):
         """
@@ -878,7 +880,7 @@ class HistoricalWeights(BaseObjectOrm,BaseVamPydanticModel):
         :return:
         """
         url = f"{cls.get_object_url()}/add_from_time_serie/"
-        payload = {"json": {"time_serie_hash_id": time_serie_hash_id,
+        payload = {"json": {"local_time_serie_id": local_time_serie_id,
                             "weights_date": weights_date.strftime(DATE_FORMAT),
                             "positions_list": positions_list,
 
@@ -889,7 +891,7 @@ class HistoricalWeights(BaseObjectOrm,BaseVamPydanticModel):
         if r.status_code not in [201, 204]:
             raise Exception(f"Error inserting new weights {r.text}")
      
-        return r.json()
+        return cls(**r.json())
 
 
 class ExecutionVenue(BaseObjectOrm,BaseVamPydanticModel):
