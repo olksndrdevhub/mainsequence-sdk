@@ -1324,21 +1324,26 @@ class DataUpdates(BaseTdagPydanticModel):
     def asset_identifier(self):
         return list(self.update_statistics.keys())
 
-    def update_assets(self, asset_list: list,*, init_fallback_date: datetime=None,
+    def update_assets(self, asset_list: Optional[List],*, init_fallback_date: datetime=None,
                       unique_identifier_list:Union[list,None]=None
                       ):
-        new_update_statistics = {}
-        unique_identifier_list=[a.unique_identifier for a in asset_list] if unique_identifier_list is None else unique_identifier_list
+        new_update_statistics=self.update_statistics
+        
+        if asset_list  is not None:
+            new_update_statistics = {}
+            unique_identifier_list=[a.unique_identifier for a in asset_list] if unique_identifier_list is None else unique_identifier_list
+    
+            for unique_identifier in unique_identifier_list:
+    
+                if self.update_statistics and unique_identifier in self.update_statistics:
+                    new_update_statistics[unique_identifier] = self.update_statistics[unique_identifier]
+                else:
+                    if init_fallback_date is None: raise ValueError(f"No initial start date for {a.unique_identifier} assets defined")
+                    new_update_statistics[unique_identifier] = init_fallback_date
 
-        for unique_identifier in unique_identifier_list:
-
-            if self.update_statistics and unique_identifier in self.update_statistics:
-                new_update_statistics[unique_identifier] = self.update_statistics[unique_identifier]
-            else:
-                if init_fallback_date is None: raise ValueError(f"No initial start date for {a.unique_identifier} assets defined")
-                new_update_statistics[unique_identifier] = init_fallback_date
-
-        _max_time_in_update_statistics=max(new_update_statistics.values()) if len(new_update_statistics)>0 else None
+            _max_time_in_update_statistics=max(new_update_statistics.values()) if len(new_update_statistics)>0 else None
+        else:
+            _max_time_in_update_statistics = self.max_time_index_value or init_fallback_date
         du=DataUpdates(update_statistics=new_update_statistics,
                            max_time_index_value=self.max_time_index_value,
                          )
