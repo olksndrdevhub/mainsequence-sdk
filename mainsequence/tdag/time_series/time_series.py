@@ -1288,7 +1288,7 @@ class DataPersistanceMethods(ABC):
 
     def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
                              end_date: Union[datetime.datetime, None] = None,
-                             asset_symbols: Union[None, list] = None,
+                             unique_identifier_list: Union[None, list] = None,
                              data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True,
                              ):
         func = self.local_persist_manager.get_df_between_dates
@@ -1296,7 +1296,7 @@ class DataPersistanceMethods(ABC):
         kwargs = dict(
             start_date=start_date,
             end_date=end_date,
-            asset_symbols=asset_symbols,
+            unique_identifier_list=unique_identifier_list,
             great_or_equal=great_or_equal,
             less_or_equal=less_or_equal,
         )
