@@ -604,7 +604,7 @@ class PersistManager:
 
     def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
                              less_or_equal=True,
-                             asset_symbols: Union[list, None] = None,
+                             unique_identifier_list: Union[list, None] = None,
                              columns: Union[list, None] = None):
 
         filtered_data = self.data_source.get_data_by_time_index(local_metadata=self.local_metadata,
@@ -612,7 +612,7 @@ class PersistManager:
                                                         end_date=end_date,
                                                         great_or_equal=great_or_equal,
                                                         less_or_equal=less_or_equal,
-                                                        asset_symbols=asset_symbols,
+                                                        unique_identifier_list=unique_identifier_list,
                                                         columns=columns,
                                                         )
 
