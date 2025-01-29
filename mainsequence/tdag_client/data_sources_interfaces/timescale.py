@@ -97,7 +97,7 @@ def direct_data_from_db(metadata: dict, connection_uri: str,
                         great_or_equal: bool = True, less_or_equal: bool = True,
                         end_date: Union[datetime.datetime, None] = None,
                         columns: Union[list, None] = None,
-                        asset_symbols: Union[list, None] = None
+                        unique_identifier_list: Union[list, None] = None
                         ):
     """
     Connects directly to the DB without passing through the ORM to speed up calculations.
@@ -150,9 +150,9 @@ def direct_data_from_db(metadata: dict, connection_uri: str,
         operator = "<=" if less_or_equal else "<"
         where_clauses.append(f"{time_index_name} {operator} '{end_date}'")
 
-    if asset_symbols:
+    if unique_identifier_list:
         helper_symbol = "','"
-        where_clauses.append(f"unique_identifier IN ('{helper_symbol.join(asset_symbols)}')")
+        where_clauses.append(f"unique_identifier IN ('{helper_symbol.join(unique_identifier_list)}')")
 
     # Combine WHERE clauses
     where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""

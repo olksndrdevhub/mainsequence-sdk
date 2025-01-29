@@ -1612,7 +1612,7 @@ class LocalDiskSourceLake(DynamicTableDataSource):
         great_or_equal: bool = True,
         less_or_equal: bool = True,
         columns: Optional[List[str]] = None,
-        asset_symbols: Optional[List[str]] = None,
+        unique_identifier_list: Optional[List[str]] = None,
         execution_venue_symbols: Optional[List[str]] = None,
         logger: Optional[object] = None,
     ) -> pd.DataFrame:
@@ -1626,7 +1626,7 @@ class LocalDiskSourceLake(DynamicTableDataSource):
             end_date=end_date,
             great_or_equal=great_or_equal,
             less_or_equal=less_or_equal,
-            asset_symbols=asset_symbols,
+            unique_identifier_list=unique_identifier_list,
         )
 
         df = data_lake_interface.query_datalake(filters=filters, table_name=table_name)
@@ -1729,7 +1729,7 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
         great_or_equal: bool = True,
         less_or_equal: bool = True,
         columns: Optional[List[str]] = None,
-        asset_symbols: Optional[List[str]] = None,
+        unique_identifier_list: Optional[List[str]] = None,
         execution_venue_symbols: Optional[List[str]] = None,
         logger: Optional[object] = None,
     ) -> pd.DataFrame:
@@ -1746,7 +1746,7 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
                 great_or_equal=great_or_equal,
                 less_or_equal=less_or_equal,
                 columns=columns,
-                asset_symbols=asset_symbols,
+                unique_identifier_list=unique_identifier_list,
             )
             df = set_types_in_table(df, stc.column_dtypes_map)
             return df
@@ -1758,7 +1758,7 @@ class TimeScaleDBDataSource(DynamicTableDataSource):
                 end_date=end_date,
                 great_or_equal=great_or_equal,
                 less_or_equal=less_or_equal,
-                asset_symbols=asset_symbols,
+                unique_identifier_list=unique_identifier_list,
                 columns=columns,
                 symbol_range_map=None,  # pass a custom map if needed
             )

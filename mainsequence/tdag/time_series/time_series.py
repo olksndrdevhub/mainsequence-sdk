@@ -2744,7 +2744,7 @@ class WrapperTimeSerie(TimeSerie):
                                                       great_or_equal: bool,
                                                       end_date: datetime.datetime, less_or_equal: bool,
                                                       thread: bool = False,
-                                                      asset_symbols: Union[None, list] = None,
+                                                      unique_identifier_list: Union[None, list] = None,
                                                       return_as_list=False, key_date_filter: Union[dict, None] = None,
 
                                                       ) -> pd.DataFrame:
@@ -2757,7 +2757,7 @@ class WrapperTimeSerie(TimeSerie):
              end_date: The end date for the data range.
              less_or_equal: Whether to include the end date (True) or not (False).
              thread: Whether to use threading for parallel processing.
-             asset_symbols: asset_symbol filter
+             unique_identifier_list: asset_symbol filter
              return_as_list: If True, return a dictionary of DataFrames instead of concatenating.
             key_date_filter: Concatenate DataFrames only for key date filter.
          Returns:
@@ -2767,7 +2767,7 @@ class WrapperTimeSerie(TimeSerie):
         all_dfs_thread = {}
         thread = True
 
-        def add_ts(ts, key, thread, asset_symbols, key_date_filter):
+        def add_ts(ts, key, thread, unique_identifier_list, key_date_filter):
             data_start_date = start_date
             if isinstance(start_date, dict):
                 data_start_date = start_date[key]
@@ -2776,7 +2776,7 @@ class WrapperTimeSerie(TimeSerie):
 
             tmp_df = ts.get_df_between_dates(start_date=data_start_date, great_or_equal=great_or_equal,
                                              end_date=end_date, less_or_equal=less_or_equal,
-                                             asset_symbols=asset_symbols,
+                                             unique_identifier_list=unique_identifier_list,
                                              )
             tmp_df["key"] = key
             all_dfs_thread[key] = tmp_df

@@ -247,7 +247,7 @@ class DataLakeInterface:
             great_or_equal: bool = True,
             less_or_equal: bool = True,
             end_date: Union[datetime.datetime, None] = None,
-            asset_symbols: Union[list, None] = None):
+            unique_identifier_list: Union[list, None] = None):
         """
         Build hashable parquet filters based on the parameters.
 
@@ -265,9 +265,9 @@ class DataLakeInterface:
         # Define the filters
         filters = []
 
-        # Add asset_symbols filter (OR condition across symbols)
-        if asset_symbols:
-            asset_symbol_filter = ('asset_symbol', 'in', tuple(asset_symbols))
+        # Add unique_identifier_list filter (OR condition across symbols)
+        if unique_identifier_list:
+            asset_symbol_filter = ('unique_identifier_list', 'in', tuple(unique_identifier_list))
             filters.append((asset_symbol_filter))
 
         # Add time_index filter for start_date
