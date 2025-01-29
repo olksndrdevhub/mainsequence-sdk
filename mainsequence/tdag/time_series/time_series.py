@@ -2789,7 +2789,7 @@ class WrapperTimeSerie(TimeSerie):
             with ThreadPoolExecutor(max_workers=10) as executor:
                 future_list = []
                 for key, ts in self.related_time_series.items():
-                    future = executor.submit(add_ts, ts, key, thread, asset_symbols, key_date_filter)
+                    future = executor.submit(add_ts, ts, key, thread, unique_identifier_list, key_date_filter)
                     future_list.append(future)
 
                 for future in as_completed(future_list):
