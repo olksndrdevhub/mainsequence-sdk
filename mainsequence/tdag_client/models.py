@@ -323,8 +323,11 @@ class SourceTableConfiguration(BaseTdagPydanticModel, BaseObject):
 
 
     def get_data_updates(self):
-        max_per_asset=self.multi_index_stats["max_per_asset_symbol"]
-        max_per_asset={k:request_to_datetime(v) for k,v in max_per_asset.items()}
+        max_per_asset=None
+        if self.multi_index_stats is not  None:
+            
+            max_per_asset=self.multi_index_stats["max_per_asset_symbol"]
+            max_per_asset={k:request_to_datetime(v) for k,v in max_per_asset.items()}
 
         du=DataUpdates(max_time_index_value=self.last_time_index_value,
                            update_statistics=max_per_asset

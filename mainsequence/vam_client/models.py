@@ -538,7 +538,7 @@ class Asset(AssetMixin,BaseObjectOrm):
         url = f"{cls.get_object_url()}/create_or_update_index_asset_from_portfolios/"
         payload = {"json": kwargs}
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code in [200] == False:
+        if r.status_code not in [200,201]:
             raise Exception(f" {r.text()}")
 
         return TargetPortfolioIndexAsset(**r.json())
@@ -552,8 +552,6 @@ class TargetPortfolioIndexAsset(IndexAsset):
     can_trade:bool=False
     live_portfolio : "TargetPortfolio"
     backtest_portfolio : "TargetPortfolio"
-    live_portfolio_data_source_id: int
-    backtest_portfolio_data_source_id: int
     execution_venue: "ExecutionVenue"= Field(
         default_factory=lambda: ExecutionVenue(**CONSTANTS.VENUE_MAIN_SEQUENCE_PORTFOLIOS)
     )
@@ -972,7 +970,9 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
     portfolio_name: str = Field(..., max_length=255)
     portfolio_ticker: str = Field(..., max_length=150)
     latest_rebalance: Optional[datetime.datetime] = None
-
+    calendar:Calendar
+    
+    
     is_asset_only: bool = False
     build_purpose:str
     is_active: bool = False
