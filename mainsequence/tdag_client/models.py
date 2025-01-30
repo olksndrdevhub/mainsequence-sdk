@@ -780,7 +780,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
             :param JSON_COMPRESSED_PREFIX: String indicating the compression scheme in your JSON payload.
             """
         s = cls.build_session()
-        url = cls.get_root_url() + f"/{local_metadata['id']}/insert_data_into_table/"
+        url = cls.get_root_url() + f"/{local_metadata.id}/insert_data_into_table/"
         total_rows = len(serialized_data_frame)
         total_chunks = math.ceil(total_rows / chunk_size)
         logger.info(f"Starting upload of {total_rows} rows in {total_chunks} chunk(s).")
@@ -1491,7 +1491,15 @@ class DataSource(BaseTdagPydanticModel,BaseObject):
             grouped_dates: dict,
 
     ):
-        raise NotImplementedError("insert_data_into_table is not implemented for Base class.")
+
+        LocalTimeSerie.post_data_frame_in_chunks(
+            serialized_data_frame=serialized_data_frame,
+            local_metadata=local_metadata,
+            data_source=self,
+            index_names=index_names,
+            time_index_name=time_index_name,
+            overwrite=overwrite,
+        )
 
 class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     id:int
@@ -1515,9 +1523,11 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
                     return TimeScaleDB(**value)
                 elif class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
                     return PodLocalLake(**value)
+                elif class_type == 'remote':
+                    return DataSource(**value)
                 # default fallback:
                 else:
-                    raise NotImplementedError(f"{class_type} is not supported.")
+                    raise NotImplementedError(f"DataSource type {class_type} is not supported.")
 
             # If it's not a dict (maybe it's an integer or already a BaseDataSource),
             # just return it as-is so Pydantic can handle it.
@@ -1582,7 +1592,7 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
         return cls(**r.json())
 
     def has_direct_connection(self):
-        has_direct=~ isinstance(self.related_resource, int)
+        has_direct=self.related_resource.class_type!='remote'
         if has_direct:
             assert self.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB
         return has_direct
@@ -1601,6 +1611,7 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
             return df
         else:
             return self.related_resource.get_data_by_time_index(*args,**kwargs)
+
     def insert_data_into_table(self,*args,**kwargs):
         if self.has_direct_connection():
             TimeScaleInterface.process_and_update_table(
@@ -1608,7 +1619,6 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
                *args,**kwargs,
             )
         else:
-
             self.related_resource.insert_data_into_table(*args,**kwargs)
 
 
