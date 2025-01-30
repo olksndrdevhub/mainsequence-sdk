@@ -92,12 +92,12 @@ class PersistManager:
     @classmethod
     def get_from_data_type(self,data_source:DynamicTableDataSource,*args, **kwargs):
 
-        data_type = data_source.data_type
-        if data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+        data_type = data_source.related_resource_class_type
+        if data_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             return DataLakePersistManager(data_source=data_source,
                                          *args, **kwargs)
 
-        elif data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+        elif data_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
 
     def synchronize_metadata(self, meta_data: Union[dict, None], local_metadata: Union[dict, None],
@@ -728,7 +728,7 @@ class DataLakePersistManager(PersistManager):
         if self.already_run== True or self.is_introspecting ==True:
             return None
         update_statistics=DataUpdates(update_statistics=None,max_time_index_value=None)
-        if BACKEND_DETACHED() and self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+        if BACKEND_DETACHED() and self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             self.set_is_introspecting(True)
             self.metadata = {"sourcetableconfiguration":None, "hash_id": ts.remote_table_hashed_name,
                             "table_name":ts.remote_table_hashed_name
@@ -786,7 +786,7 @@ class DataLakePersistManager(PersistManager):
 
     def _get_local_lake_update_statistics(self,remote_table_hash_id,time_serie):
         from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
-        assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+        assert self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
         if self.already_run == False:
             self.verify_if_already_run(time_serie)
         last_index_value, last_multiindex = DataLakeInterface(
@@ -801,7 +801,7 @@ class DataLakePersistManager(PersistManager):
 
     def table_exist(self,table_name):
         from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
-        assert self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+        assert self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
         return DataLakeInterface(data_lake_source=self.data_source,
                                                               ).table_exist(
             table_name=table_name)

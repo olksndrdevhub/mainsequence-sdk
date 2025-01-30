@@ -1,7 +1,7 @@
 from .models import  ( request_to_datetime,
 LocalTimeSeriesDoesNotExist,DynamicTableDoesNotExist,SourceTableConfigurationDoesNotExist,ChatYamls,SignalYamls,LocalTimeSerieUpdateDetails,
     JSON_COMPRESSED_PREFIX,Scheduler ,SchedulerDoesNotExist,LocalTimeSerie,DynamicTableMetaData,
-DynamicTableDataSource,LocalDiskSourceLake,LocalTimeSerieNode,PodLocalLake,TimeScaleDBDataSource,
+DynamicTableDataSource,LocalTimeSerieNode,PodLocalLake,
 BACKEND_DETACHED,DataUpdates,
                        ChatObject)
 

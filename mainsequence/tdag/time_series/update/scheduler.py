@@ -20,7 +20,7 @@ import gc
 from mainsequence.logconf import  logger
 
 from contextlib import contextmanager
-from mainsequence.tdag_client import LocalDiskSourceLake, DynamicTableDataSource
+from mainsequence.tdag_client import  DynamicTableDataSource
 
 
 

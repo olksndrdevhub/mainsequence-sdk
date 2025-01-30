@@ -991,7 +991,7 @@ class TimeSerieRebuildMethods(ABC):
 
         # if the data source is not local then the de-serialization needs to happend after setting the local persist manager
         # to guranteed a proper patch in the back-end
-        if graph_depth <= graph_depth_limit and self.data_source.data_type:
+        if graph_depth <= graph_depth_limit and self.data_source.related_resource_class_type:
 
 
             self._set_local_persist_manager(local_hash_id=self.local_hash_id,
@@ -1492,7 +1492,7 @@ class APITimeSerie:
         :param table_name:
         """
         if data_source_local_lake is not None:
-            assert data_source_local_lake.data_type == CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE, "data_source_local_lake should be of type CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE"
+            assert data_source_local_lake.data_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE, "data_source_local_lake should be of type CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE"
         self.data_source_id = data_source_id
         self.local_hash_id = local_hash_id
         self.data_source = data_source_local_lake
@@ -2169,7 +2169,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
         if self.local_persist_manager.metadata.sourcetableconfiguration is not None:
             if self.remote_build_metadata["initialize_with_default_partitions"] == False:
-                if self.data_source.data_type == CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+                if self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
                     self.logger.warning("Default Partitions will not be initialized ")
 
     def _create_config(self, kwargs, post_init_log_messages: list):
