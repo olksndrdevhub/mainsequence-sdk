@@ -1837,11 +1837,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         description = f"""<p>Time Serie Instance of {self.__class__.__name__} updating table {self.remote_table_hashed_name}</p>"""
         return description
 
-    @property
-    def multi_index_asset_symbols_filter(self):
-        if hasattr(self, "asset_symbols_filter"):
-            return self.asset_symbols_filter
-        return None
+
 
     @property
     def hash_id(self):
@@ -2258,27 +2254,26 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
             self.logger.debug("Setting dependencies in scheduler active_tree")
             # only set once
-            all_local_time_series_in_tree = []
+            all_local_time_series_ids_in_tree = []
 
             if self.depth_df.shape[0] > 0:
-                all_local_time_series_in_tree = self.depth_df["local_time_serie_id"].to_list()
+                all_local_time_series_ids_in_tree = self.depth_df["local_time_serie_id"].to_list()
                 if update_tree == True:
-                    scheduler.in_active_tree_connect(local_time_series_ids=all_local_time_series_in_tree + [self.local_persist_manager.local_metadata.id])
+                    scheduler.in_active_tree_connect(local_time_series_ids=all_local_time_series_ids_in_tree + [self.local_persist_manager.local_metadata.id])
 
         depth_df = self.depth_df.copy()
         # set active tree connections
-        all_hash_id_in_tree = []
 
         if self.depth_df.shape[0] > 0:
-            all_local_time_series_in_tree = depth_df[["local_time_serie_id"]].to_dict("records")
-        all_local_time_series_in_tree.append({"local_time_serie_id":self.local_persist_manager.local_metadata.id})
+            all_local_time_series_ids_in_tree = depth_df[["local_time_serie_id"]].to_dict("records")
+        all_local_time_series_ids_in_tree.append({"local_time_serie_id":self.local_persist_manager.local_metadata.id})
 
         update_details_batch = dict(error_on_last_update=False,
                                     active_update_scheduler_uid=scheduler.uid)
         if set_time_serie_queue_status == True:
             update_details_batch['active_update_status'] = "Q"
-        all_metadatas = self.get_metadatas_and_set_updates(local_hash_id__in=all_hash_id_in_tree,
-                                                           multi_index_asset_symbols_filter=self.multi_index_asset_symbols_filter,
+        all_metadatas = self.get_metadatas_and_set_updates(local_time_series_ids=[i["local_time_serie_id"] for i in all_local_time_series_ids_in_tree],
+
                                                            update_details_kwargs=update_details_batch,
                                                            update_priority_dict=update_priority_dict,
                                                            )

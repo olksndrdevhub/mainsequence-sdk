@@ -823,7 +823,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                 raise Exception(r.text)
 
     @classmethod
-    def get_metadatas_and_set_updates(cls,local_hash_id__in,multi_index_asset_symbols_filter,
+    def get_metadatas_and_set_updates(cls,local_time_series_ids:list,
                                       update_details_kwargs,update_priority_dict):
         """
         {'local_hash_id__in': [{'local_hash_id': 'alpacaequitybarstest_97018e7280c1bad321b3f4153cc7e986', 'data_source_id': 1},
@@ -837,8 +837,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
 
         base_url = cls.get_root_url()
         s = cls.build_session()
-        payload = { "json": dict(local_hash_id__in=local_hash_id__in,
-                                 multi_index_asset_symbols_filter=multi_index_asset_symbols_filter,
+        payload = { "json": dict(local_time_series_ids=local_time_series_ids,
                                  update_details_kwargs=update_details_kwargs,
                                  update_priority_dict=update_priority_dict,
                                  )}
@@ -851,8 +850,10 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         r["source_table_config_map"] = {int(k): SourceTableConfiguration(**v) if v is not None else v for k, v in r["source_table_config_map"].items()}
         r["state_data"] = {int(k): LocalTimeSerieUpdateDetails(**v) for k, v in r["state_data"].items()}
         r["all_index_stats"] = {int(k): v for k, v in r["all_index_stats"].items()}
-        r["local_metadatas"]=[LocalTimeSerie(**v) for v in r["local_metadatas"]]
-
+        try:
+            r["local_metadatas"]=[LocalTimeSerie(**v) for v in r["local_metadatas"]]
+        except Exception as e:
+            raise e
         return r
 
     @classmethod
@@ -1482,10 +1483,11 @@ class DataSource(BaseTdagPydanticModel,BaseObject):
     id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
     organization: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
     class_type:str
+    status:str
 
 class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     id:int
-    related_resource:Optional[Union[DataSource,int]]=None
+    related_resource:Union[DataSource,int]
     related_project:Union[Project,int]
     related_resource_class_type:str
     class Config:
@@ -1497,20 +1499,23 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
         Decide if `value` should be parsed into a specific subclass
         of BaseDataSource. This runs before the standard validation.
         """
-        if isinstance(value, dict):
-            # Example logic: pick subclass by `type`
-            class_type = value.get('class_type')
-            if class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-                return TimeScaleDB(**value)
-            elif class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-                return PodLocalLake(**value)
-            # default fallback:
-            else:
-                raise NotImplementedError(f"{class_type} is not supported.")
+        try:
+            if isinstance(value, dict):
+                # Example logic: pick subclass by `type`
+                class_type = value.get('class_type')
+                if class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+                    return TimeScaleDB(**value)
+                elif class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+                    return PodLocalLake(**value)
+                # default fallback:
+                else:
+                    raise NotImplementedError(f"{class_type} is not supported.")
 
-        # If it's not a dict (maybe it's an integer or already a BaseDataSource),
-        # just return it as-is so Pydantic can handle it.
-        return value
+            # If it's not a dict (maybe it's an integer or already a BaseDataSource),
+            # just return it as-is so Pydantic can handle it.
+            return value
+        except Exception as e:
+            raise e
 
     @classmethod
     @property
