@@ -1500,9 +1500,9 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
         if isinstance(value, dict):
             # Example logic: pick subclass by `type`
             class_type = value.get('class_type')
-            if class_type == 'timescale_db':
+            if class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
                 return TimeScaleDB(**value)
-            elif class_type == 'csv':
+            elif class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
                 return PodLocalLake(**value)
             # default fallback:
             else:
