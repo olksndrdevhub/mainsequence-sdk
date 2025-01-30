@@ -560,11 +560,9 @@ class PersistManager:
         """
 
         self.local_metadata = DynamicTableHelpers.upsert_data_into_table(
-            metadata=self.local_metadata.remote_table,
             local_metadata=self.local_metadata,
             data=temp_df,
-            historical_update_id=historical_update_id,
-            overwrite=overwrite,data_source=self.data_source,
+            data_source=self.data_source,
 
         )
 

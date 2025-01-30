@@ -1,4 +1,4 @@
-
+from importlib.metadata import metadata
 
 from .utils import (TDAG_ENDPOINT, is_process_running, get_network_ip,
                     CONSTANTS,
@@ -355,8 +355,8 @@ class SourceTableConfiguration(BaseTdagPydanticModel, BaseObject):
 
     def get_time_scale_extra_table_indices(self)->dict:
         url = TDAG_ENDPOINT + "/orm/api" + f"/source_table_config/{self.id}/get_time_scale_extra_table_indices/"
-        s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
+        s = self.build_session()
+        r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, )
         if r.status_code != 200:
             raise Exception(r.text)
         return r.json()
@@ -780,7 +780,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
             :param JSON_COMPRESSED_PREFIX: String indicating the compression scheme in your JSON payload.
             """
         s = cls.build_session()
-        url = cls.LOCAL_UPDATE_URL + f"/{local_metadata['id']}/insert_data_into_table/"
+        url = cls.get_root_url() + f"/{local_metadata['id']}/insert_data_into_table/"
         total_rows = len(serialized_data_frame)
         total_chunks = math.ceil(total_rows / chunk_size)
         logger.info(f"Starting upload of {total_rows} rows in {total_chunks} chunk(s).")
@@ -1337,7 +1337,7 @@ class DataUpdates(BaseTdagPydanticModel):
                 if self.update_statistics and unique_identifier in self.update_statistics:
                     new_update_statistics[unique_identifier] = self.update_statistics[unique_identifier]
                 else:
-                    if init_fallback_date is None: raise ValueError(f"No initial start date for {a.unique_identifier} assets defined")
+                    if init_fallback_date is None: raise ValueError(f"No initial start date for {unique_identifier} assets defined")
                     new_update_statistics[unique_identifier] = init_fallback_date
 
             _max_time_in_update_statistics=max(new_update_statistics.values()) if len(new_update_statistics)>0 else None
@@ -1481,9 +1481,21 @@ class DataSource(BaseTdagPydanticModel,BaseObject):
     class_type:str
     status:str
 
+    def insert_data_into_table(
+            self,
+            serialized_data_frame: pd.DataFrame,
+            local_metadata: LocalTimeSerie,
+            overwrite: bool,
+            time_index_name: str,
+            index_names: list,
+            grouped_dates: dict,
+
+    ):
+        raise NotImplementedError("insert_data_into_table is not implemented for Base class.")
+
 class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     id:int
-    related_resource:Union[DataSource,int]
+    related_resource:DataSource
     related_project:Union[Project,int]
     related_resource_class_type:str
     class Config:
@@ -1572,8 +1584,8 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     def has_direct_connection(self):
         has_direct=~ isinstance(self.related_resource, int)
         if has_direct:
-            assert self.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
-        return
+            assert self.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB
+        return has_direct
 
     def get_data_by_time_index(self,*args,**kwargs):
 
@@ -1592,6 +1604,7 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     def insert_data_into_table(self,*args,**kwargs):
         if self.has_direct_connection():
             TimeScaleInterface.process_and_update_table(
+                data_source=self.related_resource,
                *args,**kwargs,
             )
         else:
@@ -1626,7 +1639,7 @@ class PodLocalLake(DataSource):
             serialized_data_frame,
             overwrite=True,
             time_index_name=time_index_name, index_names=index_names,
-            table_name=metadata["table_name"]
+            table_name=local_metadata.remote_table.table_name
         )
 
     def filter_by_assets_ranges(
@@ -1689,7 +1702,6 @@ class TimeScaleDB(DataSource):
     def insert_data_into_table(
             self,
             serialized_data_frame: pd.DataFrame,
-            metadata,
             local_metadata: dict,
             overwrite: bool,
             time_index_name: str,
@@ -2296,13 +2308,10 @@ class DynamicTableHelpers:
         return metadata, data
 
     @classmethod
-    def upsert_data_into_table(cls,metadata:dict,
+    def upsert_data_into_table(cls,
                                local_metadata:dict,
-                               historical_update_id:Union[int,None],
                                data: pd.DataFrame,
-                               overwrite: bool,
                                data_source:DynamicTableDataSource,
-                               logger=logger
                                ):
         """
         1) Build or get metadata
@@ -2318,7 +2327,7 @@ class DynamicTableHelpers:
 
         """
         overwrite = True #ALWAYS OVERWRITE
-
+        metadata=local_metadata.remote_table
         data, column_index_names, index_names, column_dtypes_map, time_index_name = cls._break_pandas_dataframe(
             data)
 
@@ -2516,246 +2525,6 @@ class DynamicTableHelpers:
 
 
 
-    def rename_data_table(self,source_hash_id:str,target_hash_id:str):
-        from .utils import TDAG_ORM_DB_CONNECTION
-
-        source_table_metadata, _ = self.get(hash_id=source_hash_id)
-        target_metadata, _ = self.get(hash_id=target_hash_id)
-        
-        if len(target_metadata)>0:
-            #delete table
-            raise Exception("Table exist delete first")
-      
-        # no metadata cant coopy
-        metadata_kwargs = {}
-
-        node_kwargs = dict(hash_id=target_hash_id,
-                           class_name="DeflatedPricesMCap",
-                           human_readable=f"Deflated Prices Market CAP 19 Assets"
-                           )
-        for f in ['hash_id', 'build_configuration', 'build_meta_data', 'human_readable',
-                  'retention_policy_config', 'compression_policy_config'
-                  ]:
-            metadata_kwargs[f] = source_table_metadata[f]
-        metadata_kwargs["hash_id"]=target_hash_id
-        metadata_kwargs["human_readable"]=node_kwargs["human_readable"]
-        try:
-            ts_created = TimeSerieNode.create(metadata_kwargs=metadata_kwargs, node_kwargs=node_kwargs)
-            time.sleep(5)
-            target_metadata, _ = self.get(hash_id=target_hash_id)
-        except Exception as e:
-            raise e
-        import psycopg2
-        with psycopg2.connect(TDAG_ORM_DB_CONNECTION, ) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(f"ALTER TABLE {source_hash_id} RENAME TO {target_hash_id};")
 
 
 
-
-    def copy_table_data_to_other_orm(self, target_database_uri: str, target_admin_user: str, target_admin_password: str,
-                                     target_orm_url_api_root: str,target_gcp_credentials_path:Union[str,None],
-                                     hash_id_contains: str,
-
-                                     source_database_uri: str,
-                                     source_orm_url_api_root: str,
-                                     source_orm_admin_user: str,
-                                     source_orm_admin_password: str,
-                                     source_gcp_credentials_path: str,
-                                     
-                                     start_date: datetime.datetime,
-                                     end_date: datetime.datetime, great_or_equal: bool, less_or_equal: bool,
-                                     overwrite=False,copy_descendants=False,exclude_hash_ids:Union[list,None]=None,
-
-                                
-                                     
-                                     ):
-        """
-         This function copies table data from an ORM to another one example:
-        copy_database
-        Parameters
-        ----------
-        target_database_uri :
-        target_admin_user :
-        target_admin_password :
-        target_orm_url_api_root :
-        hash_id_contains :
-        start_date :
-        end_date :
-        great_or_equal :
-        less_or_equal :
-        overwrite :
-
-        Returns
-        -------
-
-        """
-
-
-        from tqdm import tqdm
-
-        local_hash_prefix=f"cp_{self.ROOT_URL}".replace("/orm/api","").replace("http://","")
-        updated_hids=[]
-        exclude_hash_ids=[] if exclude_hash_ids is None else exclude_hash_ids
-        
-        authorization_headers_kwargs = dict(time_series_orm_admin_user=target_admin_user,
-                                            time_series_orm_admin_password=target_admin_password,
-                                            gcp_credentials_path=target_gcp_credentials_path
-                                            )
-        
-        target_dth = DynamicTableHelpers(
-            authorization_headers_kwargs=authorization_headers_kwargs,
-            time_series_orm_db_connection=target_database_uri,
-            time_series_orm_root=target_orm_url_api_root)
-
-        source_dth = DynamicTableHelpers(
-            authorization_headers_kwargs= dict(time_series_orm_admin_user=source_orm_admin_user,
-                                            time_series_orm_admin_password=source_orm_admin_password,
-                                            gcp_credentials_path=source_gcp_credentials_path
-                                            ),
-            time_series_orm_db_connection=source_database_uri,
-            time_series_orm_root=source_orm_url_api_root)
-        
-        
-
-        SKIP_EXIST=True
-      
-
-        class TargetTimeSerieNode(TimeSerieNode):
-            LOADERS = target_dth.LOADERS
-            ROOT_URL = get_ts_node_url(target_dth.ROOT_URL.replace("/orm/api",""))
-
-        class TargetTimeSerieLocalUpdate(TimeSerieLocalUpdate):
-            LOADERS = target_dth.LOADERS
-            ROOT_URL = get_time_serie_local_update_url(target_dth.ROOT_URL.replace("/orm/api", ""))
-            LOCAL_UPDATE_URL = get_time_serie_local_update_table_url(target_dth.ROOT_URL.replace("/orm/api", ""))
-            LOCAL_TIME_SERIE_HISTORICAL_UPDATE = get_local_time_serie_historical_update_url(
-                target_dth.ROOT_URL.replace("/orm/api", ""))
-            
-        class SourceTimeSerieNode(TimeSerieNode):
-            LOADERS = source_dth.LOADERS
-            ROOT_URL = get_ts_node_url(source_dth.ROOT_URL.replace("/orm/api", ""))
-
-        class SourceTimeSerieLocalUpdate(TimeSerieLocalUpdate):
-            LOADERS = source_dth.LOADERS
-            ROOT_URL = get_time_serie_local_update_url(source_dth.ROOT_URL.replace("/orm/api", ""))
-            LOCAL_UPDATE_URL = get_time_serie_local_update_table_url(source_dth.ROOT_URL.replace("/orm/api", ""))
-            LOCAL_TIME_SERIE_HISTORICAL_UPDATE = get_local_time_serie_historical_update_url(
-                source_dth.ROOT_URL.replace("/orm/api", ""))
-
-        target_dth.set_TSLU(TSLU=TargetTimeSerieLocalUpdate)
-        source_dth.set_TSLU(TSLU=SourceTimeSerieLocalUpdate)
-        tables, _ = source_dth.search(key_word=hash_id_contains)
-        if hash_id_contains == "*":
-            tables, _ = source_dth.filter()
-
-        if isinstance(tables[0], dict):
-            tables = [t["hash_id"] for t in tables]
-        if copy_descendants == True:
-            for hash_id in tqdm(copy.deepcopy(tables)):
-                desc_df=SourceTimeSerieLocalUpdate.get_all_dependencies(hash_id=hash_id)
-                tables.extend(desc_df["remote_table_hash_id"].to_list())
-            tables=list(set(tables))
-            tables=[c for c in tables if "historicalcoinsupply" not in c]
-      
-        for hash_id in tqdm(tables):
-            if hash_id in exclude_hash_ids:
-                continue
-            source_table_metadata = source_dth.get(hash_id=hash_id)
-            if "wrappertimeserie" in hash_id:
-                # Do not copy wrappers
-                continue
-            # if "historicalcoinsupply" in hash_id:
-            #     continue
-            if source_table_metadata["sourcetableconfiguration"] is None:
-                logger.info(f"sourcetableconfiguration for {hash_id} is empty - not copying")
-                continue
-            
-
-          
-            target_metadata,_= target_dth.filter(hash_id=hash_id)
-            if len(target_metadata)!=0 and SKIP_EXIST==True:
-                logger.info(f"Skipping {hash_id} already exist")
-                continue
-            data = source_dth.get_data_by_time_index(metadata=source_table_metadata, start_date=start_date, end_date=end_date,
-                                               great_or_equal=great_or_equal, less_or_equal=less_or_equal)
-            if "testfeature2" in hash_id:
-                target_metadata, _ = target_dth.filter(hash_id="testfeature2_copy")
-                source_table_metadata["hash_id"]="testfeature2_copy"
-            if len(target_metadata) == 0:
-                #no metadata cant coopy
-                metadata_kwargs={}
-                node_kwargs=dict(hash_id=source_table_metadata["hash_id"],
-                                 source_class_name=source_table_metadata['source_class_name'],
-                                    human_readable=source_table_metadata["human_readable"]
-                                 )
-                for f in ['hash_id', 'build_configuration', 'build_meta_data', 'human_readable',
-                          'retention_policy_config', 'compression_policy_config'
-                          ]:
-                    metadata_kwargs[f]=source_table_metadata[f]
-                try:
-                    ts_created=TargetTimeSerieNode.create(metadata_kwargs=metadata_kwargs,node_kwargs=node_kwargs)
-                    time.sleep(5)
-                    target_metadata = target_dth.get(hash_id=hash_id)
-                except Exception as e:
-                    raise e
-            #build local updater
-            local_hash_id = local_hash_prefix + hash_id.replace(source_table_metadata['source_class_name'].lower(),"")
-            local_hash_id=local_hash_id[:63]
-            target_local_metadata=TargetTimeSerieLocalUpdate.get(local_hash_id=local_hash_id)
-            if len(target_local_metadata)==0:
-                #create local updated
-
-                local_metadata_kwargs = dict(local_hash_id=local_hash_id,
-                                       build_configuration=target_metadata["build_configuration"],
-                                             build_meta_data=target_metadata["build_meta_data"],
-                                       remote_table__hash_id=target_metadata["hash_id"],
-                                             human_readable=target_metadata["human_readable"]
-                                             )
-
-                local_node_kwargs = {"hash_id": local_hash_id,
-                                   "source_class_name":source_table_metadata['source_class_name'],
-                               "human_readable":target_metadata["human_readable"],
-                               }
-                target_local_metadata= TargetTimeSerieLocalUpdate.create(metadata_kwargs=local_metadata_kwargs,
-                                                             node_kwargs=local_node_kwargs
-                                              )
-
-            target_last_time_index_value=None
-            if  target_metadata["sourcetableconfiguration"] is not None:
-                target_last_time_index_value = target_metadata["sourcetableconfiguration"]['last_time_index_value']
-                index_names=target_metadata["sourcetableconfiguration"]['index_names']
-                time_index_name=target_metadata["sourcetableconfiguration"]['time_index_name']
-            if target_last_time_index_value is not None:
-                last_time_index_value = target_dth.request_to_datetime(string_date=target_last_time_index_value)
-                if overwrite == False:
-                    logger.debug(f"filtering time index {hash_id}  after {last_time_index_value} ")
-                    #if no overwrite filter by last value
-                    if len(index_names)>1:
-
-                        data = data[data.index.get_level_values(time_index_name).floor("us") > last_time_index_value]
-                    else:
-                        data = data[data.index.floor("us") > last_time_index_value]
-
-            if data.shape[0]==0:
-                logger.info(f"No data in dates for {hash_id}")
-                continue
-
-            for c in data.columns:
-                if any([t in c for t in JSON_COMPRESSED_PREFIX]) == True:
-                    if isinstance(data[c].iloc[0],str):
-                        data[c] = data[c].apply(lambda x: json.loads(x))
-
-            logger.debug(f"Copying {source_table_metadata['hash_id']}")
-
-            batch_size_limit,batch_size=10,1000
-            if overwrite == True:
-                batch_size_limit=data.shape[0]//batch_size+1
-
-            target_dth.upsert_data_into_table(metadata=target_metadata,local_metadata=target_local_metadata,
-                                                historical_update_id=None,
-                                              batch_size_limit=batch_size_limit, batch_size=batch_size,
-                                              data=data, overwrite=overwrite)
-            updated_hids.append(hash_id)
-            
-        return updated_hids

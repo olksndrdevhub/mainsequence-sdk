@@ -409,6 +409,7 @@ def process_and_update_table(
     Returns:
         None
     """
+    JSON_COMPRESSED_PREFIX=JSON_COMPRESSED_PREFIX or []
     metadata=local_metadata.remote_table
     if "unique_identifier" in serialized_data_frame.columns:
         serialized_data_frame['unique_identifier'] = serialized_data_frame['unique_identifier'].astype(str)
