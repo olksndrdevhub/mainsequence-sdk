@@ -457,8 +457,6 @@ class PersistManager:
         if isinstance(temp_df.index,pd.MultiIndex)==True:
             assert temp_df.index.names==["time_index","asset_symbol"] or  temp_df.index.names==["time_index","asset_symbol","execution_venue_symbol"]
 
-
-
     def build_update_details(self,source_class_name):
         """
 
@@ -514,8 +512,6 @@ class PersistManager:
         return self.dth.set_end_of_execution(metadata=self.metadata, **kwargs)
     def reset_dependencies_states(self,hash_id_list):
         return self.dth.reset_dependencies_states(metadata=self.metadata, hash_id_list=hash_id_list)
-
-
 
     #table dependes
 

@@ -1,3 +1,5 @@
+from importlib.metadata import metadata
+
 import pandas as pd
 import psycopg2
 
@@ -92,7 +94,7 @@ def filter_by_assets_ranges(table_name, asset_ranges_map, index_names, data_sour
     return df
 
 
-def direct_data_from_db(metadata: dict, connection_uri: str,
+def direct_data_from_db(local_metadata: dict, connection_uri: str,
                         start_date: Union[datetime.datetime, None] = None,
                         great_or_equal: bool = True, less_or_equal: bool = True,
                         end_date: Union[datetime.datetime, None] = None,
@@ -124,7 +126,7 @@ def direct_data_from_db(metadata: dict, connection_uri: str,
     pd.DataFrame
         Data from the table as a pandas DataFrame, optionally filtered by date range.
     """
-
+    metadata=local_metadata.remote_table
     def fast_table_dump(connection_config, table_name, ):
         query = f"COPY {table_name} TO STDOUT WITH CSV HEADER"
 
@@ -381,7 +383,7 @@ def direct_table_update(metadata:"DynamicTableMetaData", serialized_data_frame: 
 
 def process_and_update_table(
         serialized_data_frame,
-        metadata: "DynamicTableMetaData",
+        local_metadata: "LocalTimeSerie",
         grouped_dates: List,
         data_source: object,
         index_names: List[str],
@@ -407,6 +409,7 @@ def process_and_update_table(
     Returns:
         None
     """
+    metadata=local_metadata.remote_table
     if "unique_identifier" in serialized_data_frame.columns:
         serialized_data_frame['unique_identifier'] = serialized_data_frame['unique_identifier'].astype(str)
 

@@ -756,7 +756,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
 
     @classmethod
     def post_data_frame_in_chunks(cls,
-                                  serialized_data_frame: pd.DataFrame, logger: object,
+                                  serialized_data_frame: pd.DataFrame,
                                   chunk_size: int = 50_000,
                                   local_metadata: dict = None,
                                   data_source: str = None,
@@ -764,7 +764,6 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                                   time_index_name: str = 'timestamp',
                                   overwrite: bool = False,
                                   JSON_COMPRESSED_PREFIX: str = "base64-gzip",
-                                  session: requests.Session = None
 
                                   ):
         """
@@ -779,7 +778,6 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
             :param time_index_name: The column name used for time indexing.
             :param overwrite: Boolean indicating whether existing data should be overwritten.
             :param JSON_COMPRESSED_PREFIX: String indicating the compression scheme in your JSON payload.
-            :param session: Optional requests.Session() for connection reuse.
             """
         s = cls.build_session()
         url = cls.LOCAL_UPDATE_URL + f"/{local_metadata['id']}/insert_data_into_table/"
@@ -850,10 +848,8 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         r["source_table_config_map"] = {int(k): SourceTableConfiguration(**v) if v is not None else v for k, v in r["source_table_config_map"].items()}
         r["state_data"] = {int(k): LocalTimeSerieUpdateDetails(**v) for k, v in r["state_data"].items()}
         r["all_index_stats"] = {int(k): v for k, v in r["all_index_stats"].items()}
-        try:
-            r["local_metadatas"]=[LocalTimeSerie(**v) for v in r["local_metadatas"]]
-        except Exception as e:
-            raise e
+        r["local_metadatas"]=[LocalTimeSerie(**v) for v in r["local_metadatas"]]
+
         return r
 
     @classmethod
@@ -1332,7 +1328,7 @@ class DataUpdates(BaseTdagPydanticModel):
                       ):
         new_update_statistics=self.update_statistics
         
-        if asset_list  is not None:
+        if asset_list  is not None or unique_identifier_list is not None:
             new_update_statistics = {}
             unique_identifier_list=[a.unique_identifier for a in asset_list] if unique_identifier_list is None else unique_identifier_list
     
@@ -1550,7 +1546,7 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
 
 
         data=r.json()
-        return cls.get_class(data["data_type"])(**data)
+        return cls(**data)
 
 
     def persist_to_pickle(self, path):
@@ -1573,6 +1569,35 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
             raise Exception(f"Error in request {r.text}")
         return cls(**r.json())
 
+    def has_direct_connection(self):
+        has_direct=~ isinstance(self.related_resource, int)
+        if has_direct:
+            assert self.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+        return
+
+    def get_data_by_time_index(self,*args,**kwargs):
+
+        if self.has_direct_connection():
+            stc = kwargs["local_metadata"].remote_table.sourcetableconfiguration
+
+            df = TimeScaleInterface.direct_data_from_db(
+                connection_uri=self.related_resource.get_connection_uri(),
+               *args,**kwargs,
+
+            )
+            df = set_types_in_table(df, stc.column_dtypes_map)
+            return df
+        else:
+            return self.related_resource.get_data_by_time_index(*args,**kwargs)
+    def insert_data_into_table(self,*args,**kwargs):
+        if self.has_direct_connection():
+            TimeScaleInterface.process_and_update_table(
+               *args,**kwargs,
+            )
+        else:
+
+            self.related_resource.insert_data_into_table(*args,**kwargs)
+
 
 class PodLocalLake(DataSource):
     id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
@@ -1585,17 +1610,18 @@ class PodLocalLake(DataSource):
     use_s3_if_available: bool = Field(False, description="Whether to use S3 if available")
 
 
-    def _insert_data_into_table(
+    def insert_data_into_table(
             self,
             serialized_data_frame: pd.DataFrame,
-            metadata,
+            local_metadata:LocalTimeSerie,
+            overwrite: bool,
             time_index_name: str,
             index_names: list,
-            logger: object,
+            grouped_dates: dict,
 
     ):
 
-        data_lake_interface = DataLakeInterface(data_lake_source=self, logger=logger)
+        data_lake_interface = DataLakeInterface(data_lake_source=self, )
         data_lake_interface.persist_datalake(
             serialized_data_frame,
             overwrite=True,
@@ -1610,7 +1636,7 @@ class PodLocalLake(DataSource):
 
     ):
         table_name = metadata["table_name"]
-        data_lake_interface = DataLakeInterface(data_lake_source=self, logger=logger)
+        data_lake_interface = DataLakeInterface(data_lake_source=self, )
         df = data_lake_interface.filter_by_assets_ranges(
             table_name=table_name,
             asset_ranges_map=asset_ranges_map,
@@ -1660,7 +1686,7 @@ class TimeScaleDB(DataSource):
         password = self.password  # Decrypt password if necessary
         return f"postgresql://{self.database_user}:{password}@{self.host}:{self.port}/{self.database_name}"
 
-    def _insert_data_into_table(
+    def insert_data_into_table(
             self,
             serialized_data_frame: pd.DataFrame,
             metadata,
@@ -1669,34 +1695,20 @@ class TimeScaleDB(DataSource):
             time_index_name: str,
             index_names: list,
             grouped_dates: dict,
-            logger: object,
-            has_direct_connection:bool,
     ):
-        if BACKEND_DETACHED() == True:
-            return None
 
-        if not has_direct_connection :
-            # Do API insertion
-            LocalTimeSerie.post_data_frame_in_chunks(
-                serialized_data_frame=serialized_data_frame,
-                logger=logger,
-                local_metadata=local_metadata,
-                data_source=self,
-                index_names=index_names,
-                time_index_name=time_index_name,
-                overwrite=overwrite,
-            )
-        else:
-            TimeScaleInterface.process_and_update_table(
-                serialized_data_frame=serialized_data_frame,
-                metadata=metadata,
-                grouped_dates=grouped_dates,
-                data_source=self,
-                index_names=index_names,
-                time_index_name=time_index_name,
-                overwrite=overwrite,
-                JSON_COMPRESSED_PREFIX=JSON_COMPRESSED_PREFIX,
-            )
+
+
+        LocalTimeSerie.post_data_frame_in_chunks(
+            serialized_data_frame=serialized_data_frame,
+            local_metadata=local_metadata,
+            data_source=self,
+            index_names=index_names,
+            time_index_name=time_index_name,
+            overwrite=overwrite,
+        )
+
+
 
     def filter_by_assets_ranges(
             self,
@@ -1740,54 +1752,39 @@ class TimeScaleDB(DataSource):
         less_or_equal: bool = True,
         columns: Optional[List[str]] = None,
         unique_identifier_list: Optional[List[str]] = None,
-        logger: Optional[object] = None,
 
     ) -> pd.DataFrame:
 
         metadata = local_metadata.remote_table
-        stc = metadata.sourcetableconfiguration
 
-        if has_direct_connection:
-            df = TimeScaleInterface.direct_data_from_db(
-                metadata=metadata,
-                connection_uri=self.get_connection_uri(),
-                start_date=start_date,
-                end_date=end_date,
-                great_or_equal=great_or_equal,
-                less_or_equal=less_or_equal,
-                columns=columns,
-                unique_identifier_list=unique_identifier_list,
-            )
-            df = set_types_in_table(df, stc.column_dtypes_map)
-            return df
-        else:
-            df = LocalTimeSerie.get_data_between_dates_from_api(
-                local_hash_id=local_metadata.local_hash_id,
-                data_source_id=metadata.data_source.id,
-                start_date=start_date,
-                end_date=end_date,
-                great_or_equal=great_or_equal,
-                less_or_equal=less_or_equal,
-                unique_identifier_list=unique_identifier_list,
-                columns=columns,
-                symbol_range_map=None,  # pass a custom map if needed
-            )
-            if len(df) == 0:
-                if logger:
-                    logger.warning(
-                        f"No data returned from remote API for {local_metadata.local_hash_id}"
-                    )
-                return df
 
-            stc = local_metadata.remote_table.sourcetableconfiguration
-            df[stc.time_index_name] = pd.to_datetime(df[stc.time_index_name])
-            for c, c_type in stc.column_dtypes_map.items():
-                if c != stc.time_index_name:
-                    if c_type == "object":
-                        c_type = "str"
-                    df[c] = df[c].astype(c_type)
-            df = df.set_index(stc.index_names)
+
+        df = LocalTimeSerie.get_data_between_dates_from_api(
+            local_hash_id=local_metadata.local_hash_id,
+            data_source_id=metadata.data_source.id,
+            start_date=start_date,
+            end_date=end_date,
+            great_or_equal=great_or_equal,
+            less_or_equal=less_or_equal,
+            unique_identifier_list=unique_identifier_list,
+            columns=columns,
+        )
+        if len(df) == 0:
+            if logger:
+                logger.warning(
+                    f"No data returned from remote API for {local_metadata.local_hash_id}"
+                )
             return df
+
+        stc = local_metadata.remote_table.sourcetableconfiguration
+        df[stc.time_index_name] = pd.to_datetime(df[stc.time_index_name])
+        for c, c_type in stc.column_dtypes_map.items():
+            if c != stc.time_index_name:
+                if c_type == "object":
+                    c_type = "str"
+                df[c] = df[c].astype(c_type)
+        df = df.set_index(stc.index_names)
+        return df
 
 
 
@@ -2349,16 +2346,12 @@ class DynamicTableHelpers:
             time_index_name=time_index_name
         )
 
-        data_source._insert_data_into_table(
+        data_source.insert_data_into_table(
             serialized_data_frame=data,
-            metadata=metadata,
             local_metadata=local_metadata,
             overwrite=overwrite,
             time_index_name=time_index_name,
             index_names=index_names,
-            historical_update_id=historical_update_id,
-            logger=logger,
-            global_stats=global_stats,
             grouped_dates=grouped_dates
         )
 
