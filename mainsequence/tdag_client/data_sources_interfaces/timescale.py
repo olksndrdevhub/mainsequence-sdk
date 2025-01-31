@@ -19,7 +19,7 @@ from tqdm import tqdm  # Import tqdm for progress bar
 import numpy as np
 import json
 
-from typing import Dict, List, Union
+from typing import Dict, List, Union,Optional
 import datetime
 from mainsequence.logconf import logger
 from ..utils import DATE_FORMAT, make_request, set_types_in_table
@@ -99,7 +99,8 @@ def direct_data_from_db(local_metadata: dict, connection_uri: str,
                         great_or_equal: bool = True, less_or_equal: bool = True,
                         end_date: Union[datetime.datetime, None] = None,
                         columns: Union[list, None] = None,
-                        unique_identifier_list: Union[list, None] = None
+                        unique_identifier_list: Union[list, None] = None,
+                        unique_identifier_range_map:Optional[dict] = None
                         ):
     """
     Connects directly to the DB without passing through the ORM to speed up calculations.

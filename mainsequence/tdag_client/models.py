@@ -1501,6 +1501,48 @@ class DataSource(BaseTdagPydanticModel,BaseObject):
             overwrite=overwrite,
         )
 
+    def get_data_by_time_index(
+            self,
+            local_metadata: dict,
+            start_date: Optional[datetime.datetime] = None,
+            end_date: Optional[datetime.datetime] = None,
+            great_or_equal: bool = True,
+            less_or_equal: bool = True,
+            columns: Optional[List[str]] = None,
+            unique_identifier_list: Optional[List[str]] = None,
+            unique_identifier_range_map:Optional[Dict] = None,
+
+    ) -> pd.DataFrame:
+
+        metadata = local_metadata.remote_table
+
+        df = local_metadata.get_data_between_dates_from_api(
+            start_date=start_date,
+            end_date=end_date,
+            great_or_equal=great_or_equal,
+            less_or_equal=less_or_equal,
+            unique_identifier_list=unique_identifier_list,
+            columns=columns,
+            unique_identifier_range_map=unique_identifier_range_map
+        )
+        if len(df) == 0:
+            if logger:
+                logger.warning(
+                    f"No data returned from remote API for {local_metadata.local_hash_id}"
+                )
+            return df
+
+        stc = local_metadata.remote_table.sourcetableconfiguration
+        df[stc.time_index_name] = pd.to_datetime(df[stc.time_index_name])
+        for c, c_type in stc.column_dtypes_map.items():
+            if c != stc.time_index_name:
+                if c_type == "object":
+                    c_type = "str"
+                df[c] = df[c].astype(c_type)
+        df = df.set_index(stc.index_names)
+        return df
+
+
 class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     id:int
     related_resource:DataSource
@@ -1693,7 +1735,6 @@ class PodLocalLake(DataSource):
         return df
 
 
-
 class TimeScaleDB(DataSource):
 
     database_user : str
@@ -1766,7 +1807,7 @@ class TimeScaleDB(DataSource):
 
     def get_data_by_time_index(
         self,
-        local_metadata: dict,has_direct_connection:bool,
+        local_metadata: dict,
         start_date: Optional[datetime.datetime] = None,
         end_date: Optional[datetime.datetime] = None,
         great_or_equal: bool = True,
@@ -1780,9 +1821,8 @@ class TimeScaleDB(DataSource):
 
 
 
-        df = LocalTimeSerie.get_data_between_dates_from_api(
-            local_hash_id=local_metadata.local_hash_id,
-            data_source_id=metadata.data_source.id,
+        df = local_metadata.get_data_between_dates_from_api(
+
             start_date=start_date,
             end_date=end_date,
             great_or_equal=great_or_equal,

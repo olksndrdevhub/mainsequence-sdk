@@ -1,6 +1,6 @@
 import pandas as pd
 import datetime
-from typing import Union, List,Dict
+from typing import Union, List,Dict,Optional
 import os
 from mainsequence.logconf import logger
 
@@ -599,7 +599,8 @@ class PersistManager:
     def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
                              less_or_equal=True,
                              unique_identifier_list: Union[list, None] = None,
-                             columns: Union[list, None] = None):
+                             columns: Union[list, None] = None,
+                             unique_identifier_range_map:Optional[dict]=None):
 
         filtered_data = self.data_source.get_data_by_time_index(local_metadata=self.local_metadata,
                                                         start_date=start_date,
@@ -608,6 +609,7 @@ class PersistManager:
                                                         less_or_equal=less_or_equal,
                                                         unique_identifier_list=unique_identifier_list,
                                                         columns=columns,
+                                                                unique_identifier_range_map=unique_identifier_range_map
                                                         )
 
         return filtered_data
