@@ -1533,7 +1533,10 @@ class DataSource(BaseTdagPydanticModel,BaseObject):
             return df
 
         stc = local_metadata.remote_table.sourcetableconfiguration
-        df[stc.time_index_name] = pd.to_datetime(df[stc.time_index_name])
+        try:
+            df[stc.time_index_name] =pd.to_datetime(df[stc.time_index_name],format='ISO8601')
+        except Exception as e:
+            raise e
         for c, c_type in stc.column_dtypes_map.items():
             if c != stc.time_index_name:
                 if c_type == "object":
