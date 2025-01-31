@@ -20,7 +20,7 @@ class APIPersistManager:
         self.local_hash_id = local_hash_id
 
         local_metadata = LocalTimeSerie.get(local_hash_id=self.local_hash_id,
-                                                  data_source_id=self.data_source_id
+                                                  remote_table__data_source__id=self.data_source_id
                                                   )
         self.local_metadata=local_metadata
 

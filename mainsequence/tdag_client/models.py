@@ -1504,7 +1504,6 @@ class DataSource(BaseTdagPydanticModel,BaseObject):
 class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
     id:int
     related_resource:DataSource
-    related_project:Union[Project,int]
     related_resource_class_type:str
     class Config:
         use_enum_values = True  # This ensures that enums are stored as their values (e.g., 'TEXT')
