@@ -368,7 +368,6 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
     remote_table: Union[int,"DynamicTableMetaData"]
     build_configuration: Dict[str, Any] = Field(..., description="Configuration in JSON format")
     build_meta_data: Optional[Dict[str, Any]] = Field(None, description="Optional YAML metadata")
-    ogm_linked: bool = Field(default=False, description="OGM linked flag")
     ogm_dependencies_linked: bool = Field(default=False, description="OGM dependencies linked flag")
     tags: Optional[list[str]] = Field(default=[], description="List of tags")
     description: Optional[str] = Field(None, description="Optional HTML description")
@@ -389,19 +388,19 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         return get_local_time_serie_historical_update_url(TDAG_ENDPOINT)
 
     @classmethod
-    def create(cls,**kwargs):
-        url=get_local_time_serie_nodes_methods_url()+"/"
+    def get_or_create(cls,**kwargs):
+        url=cls.get_root_url()+"/get_or_create/"
         kwargs = serialize_to_json(kwargs)
 
 
         payload = {"json": kwargs}
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
-            if r.status_code == 409:
+        if r.status_code in [200,201]:
+            if r.status_code == 200:
                 raise AlreadyExist(r.text)
-            else:
-                raise Exception(r.text)
+        else:
+            raise Exception(r.text)
         data = r.json()
 
         return cls(**data)
@@ -907,7 +906,6 @@ class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
                                                            description="Git hash of the time series source code")
     time_serie_source_code: Optional[str] = Field(None, description="File path for time series source code")
     protect_from_deletion: bool = Field(default=False, description="Flag to protect the record from deletion")
-    ogm_linked: bool = Field(default=False, description="OGM linked flag")
     data_source: Union[int,"DynamicTableDataSource"]
     source_class_name:str
     sourcetableconfiguration:Optional[SourceTableConfiguration]=None
@@ -957,7 +955,7 @@ class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
         metadata.patch(*args, **kwargs)
 
     @classmethod
-    def create(cls, **kwargs):
+    def get_or_create(cls, **kwargs):
         """
 
         :return:
@@ -966,19 +964,19 @@ class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
 
         kwargs = serialize_to_json(kwargs)
 
-        url=get_ts_node_url(TDAG_ENDPOINT)+"/"
+        url=cls.get_root_url()+"/get_or_create/"
 
         payload = {"json": kwargs}
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
-            if r.status_code == 409:
+        if r.status_code not in  [201,200]:
+            if r.status_code == 200:
                 raise AlreadyExist(r.text)
             else:
                 raise Exception(r.text)
         data = r.json()
 
-        return cls(**data["metadata"])
+        return cls(**data)
 
     def build_or_update_update_details(self, *args, **kwargs)->["DynamicTableMetaData","LocalTimeSerie"]:
 
@@ -2188,9 +2186,7 @@ class DynamicTableHelpers:
             return {}, r
         else:
             metadata=instance[0]
-            # hack to patch nodes
-            if metadata["ogm_linked"]==False:
-                raise Exception("OGM is not linked with metadata")
+
 
             return metadata, r
 

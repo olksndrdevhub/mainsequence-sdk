@@ -365,15 +365,9 @@ class PersistManager:
 
                 if self.human_readable is not None:
                     kwargs["human_readable"] = self.human_readable
-                # node_kwargs={"hash_id":self.remote_table_hashed_name,
-                #                                                  "source_class_name":self.class_name,
-                #                                                  "human_readable": self.human_readable,
-                #
-                #                                                  }
-
 
                 # kwargs["source_class_name"]=self.class_name
-                self.metadata = DynamicTableMetaData.create(metadata_kwargs=kwargs)
+                self.metadata = DynamicTableMetaData.get_or_create(**kwargs)
 
                 #todo: after creating metadata always delete local parquet manager even if not exist
                 # self.delete_local_parquet()
@@ -416,17 +410,9 @@ class PersistManager:
                                      description=self.description,
                                      data_source_id=self.data_source.id
                                      )
-                if self.human_readable is not None:
-                    metadata_kwargs["human_readable"] = self.human_readable
 
-                node_kwargs = {"hash_id": self.local_hash_id,
-                               "source_class_name": self.class_name,
-                               "human_readable": self.human_readable,
-                               "data_source_id" : self.data_source.id
-                               }
 
-                local_metadata = LocalTimeSerie.create(metadata_kwargs=metadata_kwargs,
-                                                             node_kwargs=node_kwargs,
+                local_metadata = LocalTimeSerie.get_or_create(**metadata_kwargs,
 
                                               )
                 self.local_build_configuration = local_metadata.build_configuration
