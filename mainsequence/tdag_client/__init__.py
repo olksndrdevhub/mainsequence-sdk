@@ -1,4 +1,3 @@
-from build.lib.mainsequence.tdag_client import POD_DEFAULT_DATA_SOURCE
 
 from .models import  ( request_to_datetime,
 LocalTimeSeriesDoesNotExist,DynamicTableDoesNotExist,SourceTableConfigurationDoesNotExist,ChatYamls,SignalYamls,LocalTimeSerieUpdateDetails,
@@ -14,8 +13,8 @@ logger = get_tdag_client_logger()
 try:
     POD_PROJECT=Project.get_user_default_project()
     POD_DEFAULT_DATA_SOURCE=POD_PROJECT.data_source
+    logger=logger.bind(project_id=POD_PROJECT.id)
 
-    logger.bind(project_id=POD_PROJECT.id)
 except Exception as e:
     POD_PROJECT = None
     logger.exception(f"Could not retrive pod project {e}")

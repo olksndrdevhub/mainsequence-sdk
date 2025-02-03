@@ -1461,26 +1461,7 @@ class ChatObject(BaseTdagPydanticModel,BaseObject):
         return get_chat_object_url(TDAG_ENDPOINT)
 
 
-class Project(BaseTdagPydanticModel,BaseObject):
-    id:int
-    project_name:str
-    data_source:["DynamicTableDataSource"]
-    @staticmethod
-    def get_root_url():
-        return get_project_url(TDAG_ENDPOINT)
 
-    @classmethod
-    def get_user_default_project(cls):
-        url = cls.get_root_url()+"/get_user_default_project/"
-
-        s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url,)
-        if r.status_code == 404:
-            raise Exception(r.text)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-        return cls(**r.json())
 
 
 class DataSource(BaseTdagPydanticModel,BaseObject):
@@ -1675,6 +1656,28 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
         else:
             self.related_resource.insert_data_into_table(*args,**kwargs)
 
+
+class Project(BaseTdagPydanticModel,BaseObject):
+    id:int
+    project_name:str
+    data_source:DynamicTableDataSource
+
+    @staticmethod
+    def get_root_url():
+        return get_project_url(TDAG_ENDPOINT)
+
+    @classmethod
+    def get_user_default_project(cls):
+        url = cls.get_root_url()+"/get_user_default_project/"
+
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url,)
+        if r.status_code == 404:
+            raise Exception(r.text)
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+        return cls(**r.json())
 
 class PodLocalLake(DataSource):
     id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
