@@ -6,7 +6,7 @@ import structlog
 from typing import Union
 from structlog.dev import ConsoleRenderer
 
-
+logger=None
 
 def extract_from_record(_, __, event_dict):
     """
@@ -56,6 +56,8 @@ class CustomConsoleRenderer(ConsoleRenderer):
 def build_application_logger(application_name:str="ms-sdk",
 
                       **metadata):
+
+
     """
     Create a logger that logs to console and file in JSON format.
     """
@@ -160,8 +162,6 @@ def build_application_logger(application_name:str="ms-sdk",
     logger = logger.bind(application_name=application_name,**metadata)
 
     return logger
-
-
 
 
 logger=build_application_logger()

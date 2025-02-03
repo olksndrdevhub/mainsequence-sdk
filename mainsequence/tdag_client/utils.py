@@ -34,8 +34,10 @@ COMPRESSED_KEYS = ["json_compressed_", "jcomp_"]
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 
-def get_tdag_client_logger():
+def get_tdag_client_logger(**kwargs):
     global logger
+    for k,v in kwargs.items():
+        logger=logger.bind(**{k:v})
 
 
     return logger
@@ -117,6 +119,7 @@ class AuthLoaders:
         return self._auth_headers
 
     def refresh_headers(self):
+        global logger
         logger.debug("Getting Auth Headers TS_ORM")
         self._auth_headers, gcp_token_decoded = get_authorization_headers(
             time_series_orm_token_url=self.time_series_orm_token_url,
