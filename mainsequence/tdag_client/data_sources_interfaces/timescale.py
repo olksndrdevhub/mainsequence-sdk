@@ -1,12 +1,7 @@
 from importlib.metadata import metadata
 
 import pandas as pd
-import psycopg2
 
-from psycopg2 import errors
-from psycopg2.extras import execute_batch
-from pgcopy import CopyManager
-from psycopg2.extras import execute_values
 import tempfile
 import tqdm
 
@@ -24,6 +19,14 @@ import datetime
 from mainsequence.logconf import logger
 from ..utils import DATE_FORMAT, make_request, set_types_in_table
 import os
+
+
+def import_psycopg2():
+    import psycopg2
+    from psycopg2 import errors
+    from psycopg2.extras import execute_batch
+    from pgcopy import CopyManager
+    from psycopg2.extras import execute_values
 
 def read_sql_tmpfile(query, time_series_orm_uri_db_connection: str):
     with tempfile.TemporaryFile() as tmpfile:
@@ -127,6 +130,7 @@ def direct_data_from_db(local_metadata: dict, connection_uri: str,
     pd.DataFrame
         Data from the table as a pandas DataFrame, optionally filtered by date range.
     """
+    import_psycopg2()
     metadata=local_metadata.remote_table
     def fast_table_dump(connection_config, table_name, ):
         query = f"COPY {table_name} TO STDOUT WITH CSV HEADER"
@@ -199,7 +203,7 @@ def direct_table_update(metadata:"DynamicTableMetaData", serialized_data_frame: 
     - use_chunks: If True, data will be inserted in chunks using threads.
     - num_threads: Number of threads to use when use_chunks is True.
     """
-
+    import_psycopg2()
     columns = serialized_data_frame.columns.tolist()
 
     index_names=metadata.sourcetableconfiguration.index_names
@@ -410,6 +414,7 @@ def process_and_update_table(
     Returns:
         None
     """
+    import_psycopg2()
     JSON_COMPRESSED_PREFIX=JSON_COMPRESSED_PREFIX or []
     metadata=local_metadata.remote_table
     if "unique_identifier" in serialized_data_frame.columns:

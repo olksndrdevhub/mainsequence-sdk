@@ -216,11 +216,7 @@ class PersistManager:
 
         return mermaid_chart
 
-    def get_all_local_dependencies(self):
-        depth_df = TimeSerieLocalUpdate.get_all_dependencies(hash_id=self.local_hash_id,
-                                                             data_source_id=self.data_source.id
-                                                             )
-        return depth_df
+
 
     def get_all_dependencies_update_priority(self):
         depth_df = self.local_metadata.get_all_dependencies_update_priority()

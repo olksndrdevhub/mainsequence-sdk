@@ -47,9 +47,7 @@ class RunningMode(Enum):
 
 class Configuration:
     OBLIGATORY_ENV_VARIABLES = [
-        "VAM_ENDPOINT", 
         "TDAG_ENDPOINT",
-        "TDAG_RAY_CLUSTER_ADDRESS",
         "MAINSEQUENCE_TOKEN",
     ]
 

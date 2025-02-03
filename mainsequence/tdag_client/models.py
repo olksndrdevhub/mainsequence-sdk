@@ -231,10 +231,6 @@ class TimeSerieNode(BaseTdagPydanticModel,BaseObject):
     creation_date: datetime.datetime
     relation_tree_frozen: bool
 
-
-
-
-
     @none_if_backend_detached
     @classmethod
     def get_all_dependencies(cls, hash_id):
@@ -562,21 +558,12 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         return r.json()
 
     # Node Updates
-    @classmethod
-    def get_all_dependencies(cls, hash_id, data_source_id, timeout=None):
-        s = cls.build_session()
-        url = cls.get_node_methods_url() + f"/{hash_id}/get_all_dependencies?data_source_id={data_source_id}"
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
 
-        depth_df = pd.DataFrame(r.json())
-        return depth_df
 
 
     def get_all_dependencies_update_priority(self,timeout=None)->pd.DataFrame:
         s = self.build_session()
-        url = self.get_node_methods_url() + f"/{self.id}/get_all_dependencies_update_priority"
+        url = self.get_root_url() + f"/{self.id}/get_all_dependencies_update_priority"
         r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -584,15 +571,6 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         depth_df = pd.DataFrame(r.json())
         return depth_df
 
-    @classmethod
-    def get_max_depth(cls, hash_id, data_source_id, timeout=None):
-        s = cls.build_session()
-        url = cls.get_node_methods_url() + f"/{hash_id}/get_max_depth?data_source_id={data_source_id}"
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-        return r.json()["max_depth"]
 
     @classmethod
     def get_upstream_nodes(cls, hash_id, data_source_id, timeout=None):
