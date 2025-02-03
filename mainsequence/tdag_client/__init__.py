@@ -14,3 +14,4 @@ try:
 except Exception as e:
     POD_DEFAULT_DATA_SOURCE = None
     logger.exception(f"Could not set default data source {e}")
+    raise e
