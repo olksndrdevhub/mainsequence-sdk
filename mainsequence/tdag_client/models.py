@@ -138,9 +138,12 @@ get_local_time_serie_url=lambda root_url:  root_url + "/orm/api/local_time_serie
 get_local_time_serie_update_details=lambda root_url: root_url + "/orm/api/local_time_serie_update_details"
 get_local_time_serie_historical_update_url=lambda root_url:  root_url + "/orm/api/lts_historical_update"
 get_dynamic_table_data_source=lambda root_url: root_url + "/orm/api/dynamic_table_data_source"
+get_project_url=lambda root_url: root_url + "/pods/api/projects"
 get_chat_yaml_url=lambda root_url:  root_url + "/tdag-gpt/api/chat_yaml"
 get_signal_yaml_url=lambda root_url:  root_url + "/tdag-gpt/api/signal_yaml"
 get_chat_object_url=lambda root_url: root_url + "/tdag-gpt/api/chat_object"
+
+
 
 class BaseTdagPydanticModel(BaseModel):
     tdag_orm_class: str = None  # This will be set to the class that inherits
@@ -167,7 +170,7 @@ class BaseObject:
     @staticmethod
     def request_to_datetime(x:str):
         return request_to_datetime(x)
-    
+
     @classmethod
     def build_session(cls):
         # from requests.adapters import HTTPAdapter, Retry
@@ -216,6 +219,23 @@ class BaseObject:
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
         return Scheduler(**r.json())
+
+    @none_if_backend_detached
+    @classmethod
+    def filter(cls, **kwargs):
+        url = cls.get_root_url()
+        payload = {"params": kwargs}
+
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
+        if r.status_code == 404:
+            raise Exception(r.text)
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+        return r.json()
+
+
 
 class SchedulerDoesNotExist(Exception):
     pass
@@ -918,19 +938,7 @@ class DynamicTableMetaData(BaseTdagPydanticModel, BaseObject):
             raise Exception("More than 1 return")
         return cls(**result[0])
 
-    @classmethod
-    def filter(cls, payload: Union[dict, None]):
-        url = cls.get_root_url()
-        payload = {} if payload is None else {"params": payload}
 
-        s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
-        if r.status_code == 404:
-            raise SchedulerDoesNotExist
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-        return r.json()
 
     @classmethod
     def patch_by_hash(cls, hash_id: str, *args, **kwargs):
@@ -1455,6 +1463,25 @@ class ChatObject(BaseTdagPydanticModel,BaseObject):
 
 class Project(BaseTdagPydanticModel,BaseObject):
     id:int
+    project_name:str
+    data_source:["DynamicTableDataSource"]
+    @staticmethod
+    def get_root_url():
+        return get_project_url(TDAG_ENDPOINT)
+
+    @classmethod
+    def get_user_default_project(cls):
+        url = cls.get_root_url()+"/get_user_default_project/"
+
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url,)
+        if r.status_code == 404:
+            raise Exception(r.text)
+        if r.status_code != 200:
+            raise Exception(f"Error in request {r.text}")
+
+        return cls(**r.json())
+
 
 class DataSource(BaseTdagPydanticModel,BaseObject):
     id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
@@ -1525,6 +1552,8 @@ class DataSource(BaseTdagPydanticModel,BaseObject):
                 df[c] = df[c].astype(c_type)
         df = df.set_index(stc.index_names)
         return df
+
+
 
 
 class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
