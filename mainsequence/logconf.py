@@ -76,11 +76,20 @@ def build_application_logger(application_name:str="ms-sdk",
     ]
 
     handlers= {
+        # "console": {
+        #     "class": "logging.StreamHandler",
+        #     "formatter": "colored",
+        #     "level":os.getenv("LOG_LEVEL", "DEBUG")
+        # },
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "colored",
+            "formatter": "plain",
             "level":os.getenv("LOG_LEVEL", "DEBUG")
         },
+
+
+
+
 
     }
     if logger_file is not None:
