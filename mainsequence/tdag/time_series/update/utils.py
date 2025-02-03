@@ -34,9 +34,8 @@ def get_node_time_to_wait(local_metadata):
         time_to_wait = max(0, time_to_wait)
     return time_to_wait, next_update
 def get_time_to_wait_from_hash_id(local_hash_id: str,data_source_id:int):
-    from mainsequence.tdag_client import DynamicTableHelpers, TimeSerieLocalUpdate
-    dth = DynamicTableHelpers()
-    local_metadata = TimeSerieLocalUpdate.get(local_hash_id=local_hash_id,
+    
+    local_metadata = LocalTimeSerie.get(local_hash_id=local_hash_id,
                                               data_source_id=data_source_id
                                               )
     time_to_wait, next_update = get_node_time_to_wait(local_metadata=local_metadata)
