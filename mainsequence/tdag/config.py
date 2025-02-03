@@ -71,6 +71,10 @@ class Configuration:
             return None
         for ob_var in self.OBLIGATORY_ENV_VARIABLES:
             assert ob_var in os.environ, f"{ob_var} not in environment variables"
+            
+        #set VAM_ENDPOINT
+        from mainsequence.tdag_client import CONSTANTS
+        os.environ["VAM_ENDPOINT"]=CONSTANTS.VAM_ENDPOINT
 
     def _build_template_yaml(self):
         config = {
