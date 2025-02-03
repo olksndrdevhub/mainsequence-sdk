@@ -163,6 +163,11 @@ session=build_session(loaders=loaders)
 
 class BaseObject:
     LOADERS = loaders
+
+    @staticmethod
+    def request_to_datetime(x:str):
+        return request_to_datetime(x)
+    
     @classmethod
     def build_session(cls):
         # from requests.adapters import HTTPAdapter, Retry
