@@ -54,11 +54,12 @@ class CustomConsoleRenderer(ConsoleRenderer):
 
 
 def build_application_logger(application_name:str="ms-sdk",
-                      logger_file:Union[str,None]=None,
+
                       **metadata):
     """
     Create a logger that logs to console and file in JSON format.
     """
+    logger_file = os.path.expanduser("~/.local/share/tdag/logs/tdag.log")
     # Ensure the directory for the log file exists
     logger_name="tdag"
     logger = logging.getLogger(logger_name)
@@ -67,7 +68,8 @@ def build_application_logger(application_name:str="ms-sdk",
     #     return logger
 
     # Define the timestamper and pre_chain processors
-    timestamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S")
+    timestamper = structlog.processors.TimeStamper( fmt="iso",
+    utc=True,)
     pre_chain = [
         structlog.stdlib.add_log_level,
         structlog.stdlib.ExtraAdder(),
@@ -76,19 +78,11 @@ def build_application_logger(application_name:str="ms-sdk",
     ]
 
     handlers= {
-        # "console": {
-        #     "class": "logging.StreamHandler",
-        #     "formatter": "colored",
-        #     "level":os.getenv("LOG_LEVEL", "DEBUG")
-        # },
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "plain",
+            "formatter": "colored",
             "level":os.getenv("LOG_LEVEL", "DEBUG")
         },
-
-
-
 
 
     }
