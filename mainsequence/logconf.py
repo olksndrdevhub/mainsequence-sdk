@@ -61,7 +61,7 @@ def build_application_logger(application_name:str="ms-sdk",
     """
     Create a logger that logs to console and file in JSON format.
     """
-    logger_file = os.path.expanduser("~/.local/share/tdag/logs/tdag.log")
+    logger_file = os.getenv("LOGGER_FILE_PATH", "/var/log/tdag/tdag.log")
     # Ensure the directory for the log file exists
     logger_name="tdag"
     logger = logging.getLogger(logger_name)
