@@ -1517,7 +1517,6 @@ class APITimeSerie:
         logger = logger.bind(local_hash_id=self.local_hash_id,
                              local_hash_id_data_source=self.data_source_id,
                              api_time_series=True,
-                             local_time_serie_id=self.local_metadata.id
                              )
 
         return logger

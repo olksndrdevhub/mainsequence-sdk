@@ -114,7 +114,7 @@ class PersistManager:
 
         # start with remote metadata
         if set_last_index_value == True:
-            TimeSerieLocalUpdate.set_last_update_index_time(metadata=self.local_metadata)
+            LocalTimeSerie.set_last_update_index_time(metadata=self.local_metadata)
         if meta_data is None or local_metadata is None:  # avoid calling 2 times the DB
             meta_data = {}
 
