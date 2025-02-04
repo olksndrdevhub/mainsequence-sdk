@@ -2,6 +2,8 @@ import logging
 import logging.config
 import os
 from pathlib import Path
+
+import requests
 import structlog
 from typing import Union
 from structlog.dev import ConsoleRenderer
@@ -61,7 +63,7 @@ def build_application_logger(application_name:str="ms-sdk",
     """
     Create a logger that logs to console and file in JSON format.
     """
-    logger_file = os.path.expanduser("~/.local/share/tdag/logs/tdag.log")
+    logger_file = os.getenv("LOGGER_FILE_PATH", "/var/log/tdag/tdag.log")
     # Ensure the directory for the log file exists
     logger_name="tdag"
     logger = logging.getLogger(logger_name)
@@ -161,7 +163,25 @@ def build_application_logger(application_name:str="ms-sdk",
     logger = structlog.get_logger(logger_name)
     logger = logger.bind(application_name=application_name,**metadata)
 
+    try:
+        # do initial request when on logger initialization TODO create startup script
+        project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/pods/api/projects/get_user_default_project'
+
+        headers = {
+            "Authorization": f"Token {os.getenv('MAINSEQUENCE_TOKEN')}"
+        }
+        response = requests.get(project_info_endpoint, headers=headers)
+        json_response = response.json()
+        logger = logger.bind(project_id=json_response["id"], **metadata)
+        logger = logger.bind(data_source_id=json_response["data_source"]["id"], **metadata)
+        logger = logger.bind(job_run_id=os.getenv("JOB_RUN_ID"), **metadata)
+
+    except Exception as e:
+        logger.exception(f"Could not retrive pod project {e}")
+        raise e
+
+    logger = logger.bind()
     return logger
 
 
-logger=build_application_logger()
+logger = build_application_logger()
