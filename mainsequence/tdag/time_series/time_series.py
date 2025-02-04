@@ -1511,12 +1511,11 @@ class APITimeSerie:
 
     @property
     def logger(self):
-        from mainsequence.tdag_client import POD_PROJECT
         global logger
         logger = logger.bind(local_hash_id=self.local_hash_id,
                              local_hash_id_data_source=self.data_source_id,
                              api_time_series=True,
-                             project_id=POD_PROJECT.id
+                             local_time_serie_id=self.local_metadata.id
                              )
 
         return logger
