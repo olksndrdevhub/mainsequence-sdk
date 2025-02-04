@@ -530,6 +530,8 @@ class AssetCategory(BaseObjectOrm,BaseVamPydanticModel):
     source:str
     assets:List[int]
     
+    def __repr__(self):
+        return self.name+" source:"+self.source 
     
 class Asset(AssetMixin,BaseObjectOrm):
 
