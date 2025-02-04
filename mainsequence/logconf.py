@@ -163,9 +163,8 @@ def build_application_logger(application_name:str="ms-sdk",
     logger = structlog.get_logger(logger_name)
     logger = logger.bind(application_name=application_name,**metadata)
 
-
-    #todo request to tdag Project, and bind also env variable
     try:
+        # do initial request when on logger initialization TODO create startup script
         project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/pods/api/projects/get_user_default_project'
 
         headers = {
@@ -184,4 +183,4 @@ def build_application_logger(application_name:str="ms-sdk",
     return logger
 
 
-logger=build_application_logger()
+logger = build_application_logger()
