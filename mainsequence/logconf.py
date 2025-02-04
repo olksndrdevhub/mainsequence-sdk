@@ -174,6 +174,7 @@ def build_application_logger(application_name:str="ms-sdk",
         json_response = response.json()
         logger = logger.bind(project_id=json_response["id"], **metadata)
         logger = logger.bind(data_source_id=json_response["data_source"]["id"], **metadata)
+        logger = logger.bind(data_source_id=os.getenv("JOB_RUN_ID"), **metadata)
 
     except Exception as e:
         logger.exception(f"Could not retrive pod project {e}")
