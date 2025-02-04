@@ -1289,7 +1289,8 @@ class DataPersistanceMethods(ABC):
     def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
                              end_date: Union[datetime.datetime, None] = None,
                              unique_identifier_list: Union[None, list] = None,
-                             data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True,
+                              great_or_equal=True, less_or_equal=True,
+                             unique_identifier_range_map:Optional[dict] = None,
                              ):
         func = self.local_persist_manager.get_df_between_dates
         sig = inspect.signature(func)
@@ -1299,6 +1300,7 @@ class DataPersistanceMethods(ABC):
             unique_identifier_list=unique_identifier_list,
             great_or_equal=great_or_equal,
             less_or_equal=less_or_equal,
+            unique_identifier_range_map=unique_identifier_range_map,
         )
         if 'time_serie' in sig.parameters:
             kwargs["time_serie"] = self
@@ -1582,7 +1584,7 @@ class APITimeSerie:
     def get_df_between_dates(self, start_date: Optional[datetime.datetime] = None,
                              end_date: Optional[datetime.datetime] = None,
                              unique_identifier_list: Optional[list] = None,unique_identifier_range_map:Optional[dict] = None,
-                             data_lake_force_db_look=False, great_or_equal=True, less_or_equal=True,
+                              great_or_equal=True, less_or_equal=True,
                              ):
 
         filtered_data = self.local_persist_manager.get_df_between_dates(start_date=start_date,
@@ -1907,7 +1909,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
 
     def __repr__(self):
         try:
-            local_id = self.local_metadata["id"]
+            local_id = self.local_metadata.id
         except:
             local_id = 0
         repr = self.__class__.__name__ + f" {os.environ['TDAG_ENDPOINT']}/local-time-series/details/?local_time_serie_id={local_id}"
@@ -2737,13 +2739,14 @@ class WrapperTimeSerie(TimeSerie):
         #     t.join()
 
     @tracer.start_as_current_span("Wrapper.concat_between_dates")
-    def pandas_df_concat_on_rows_by_key_between_dates(self, start_date: Union[datetime.datetime, dict],
-                                                      great_or_equal: bool,
-                                                      end_date: datetime.datetime, less_or_equal: bool,
+    def pandas_df_concat_on_rows_by_key_between_dates(self, start_date: Optional[datetime.datetime]=None,
+                                                      great_or_equal: Optional[bool]=None,
+                                                      end_date: Optional[datetime.datetime]=None,
+                                                      less_or_equal: Optional[bool]=None,
                                                       thread: bool = False,
-                                                      unique_identifier_list: Union[None, list] = None,
-                                                      return_as_list=False, key_date_filter: Union[dict, None] = None,
-
+                                                      unique_identifier_list: Optional[list] = None,
+                                                      return_as_list=False, key_date_filter: Optional[dict] = None,
+                                                      unique_identifier_range_map:Optional[dict] = None,
                                                       ) -> pd.DataFrame:
         """
          Concatenate DataFrames from all wrapped TimeSeries between given dates.
@@ -2762,9 +2765,9 @@ class WrapperTimeSerie(TimeSerie):
          """
         all_dfs = []
         all_dfs_thread = {}
-        thread = True
+        thread = False
 
-        def add_ts(ts, key, thread, unique_identifier_list, key_date_filter):
+        def add_ts(ts, key, thread, unique_identifier_list, key_date_filter,unique_identifier_range_map):
             data_start_date = start_date
             if isinstance(start_date, dict):
                 data_start_date = start_date[key]
@@ -2774,19 +2777,22 @@ class WrapperTimeSerie(TimeSerie):
             tmp_df = ts.get_df_between_dates(start_date=data_start_date, great_or_equal=great_or_equal,
                                              end_date=end_date, less_or_equal=less_or_equal,
                                              unique_identifier_list=unique_identifier_list,
+                                             unique_identifier_range_map=unique_identifier_range_map
                                              )
             tmp_df["key"] = key
             all_dfs_thread[key] = tmp_df
 
         if thread == False:
             for key, ts in self.related_time_series.items():
-                add_ts(ts, key, thread, asset_symbols, key_date_filter)
+                add_ts(ts, key, thread, unique_identifier_list, key_date_filter,unique_identifier_range_map)
         else:
 
             with ThreadPoolExecutor(max_workers=10) as executor:
                 future_list = []
                 for key, ts in self.related_time_series.items():
-                    future = executor.submit(add_ts, ts, key, thread, unique_identifier_list, key_date_filter)
+                    future = executor.submit(add_ts, ts, key, thread, unique_identifier_list, key_date_filter,
+                                             unique_identifier_range_map
+                                             )
                     future_list.append(future)
 
                 for future in as_completed(future_list):

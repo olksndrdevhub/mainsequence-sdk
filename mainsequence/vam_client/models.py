@@ -524,7 +524,11 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
         
         return create_from_serializer_with_class(r.json())
         
-
+class AssetCategory(BaseObjectOrm,BaseVamPydanticModel):
+    name:str
+    assets:List[int]
+    
+    
 class Asset(AssetMixin,BaseObjectOrm):
 
     def get_spot_reference_asset_symbol(self):
