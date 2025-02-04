@@ -151,6 +151,7 @@ class BaseObjectOrm:
 
         "HistoricalBarsSource":"historical-bars-source",
         "TDAGAPIDataSource": "tdag-api-data-source",
+        "AssetCategory":"asset-category",
 
     }
     ROOT_URL = VAM_API_ENDPOINT
@@ -526,6 +527,7 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
         
 class AssetCategory(BaseObjectOrm,BaseVamPydanticModel):
     name:str
+    source:str
     assets:List[int]
     
     
