@@ -536,6 +536,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         url = self.get_root_url() + f"/{self.id}/set_last_update_index_time_from_update_stats/"
         payload = {
             "json": {"last_time_index_value": last_time_index_value, "max_per_asset_symbol": max_per_asset_symbol}}
+        print(f"Set last update index with {payload['json']}")
         r = make_request(s=s, loaders=self.LOADERS, payload=payload, r_type="GET", url=url, time_out=timeout)
 
         if r.status_code == 404:
