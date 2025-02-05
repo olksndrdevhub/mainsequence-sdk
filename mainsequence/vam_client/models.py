@@ -1029,7 +1029,7 @@ class TargetPortfolioFrontEndDetails(BaseObjectOrm, BaseVamPydanticModel):
 
     @classmethod
     def get_object_url(cls):
-        url = f"{cls.ROOT_URL.replace('orm', '')}/{cls.END_POINTS[cls.class_name()]}"
+        url = f"{cls.ROOT_URL.replace('orm/api', 'api')}/{cls.END_POINTS[cls.class_name()]}"
         return url
 
     @property
