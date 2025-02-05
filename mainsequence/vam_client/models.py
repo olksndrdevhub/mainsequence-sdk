@@ -149,8 +149,8 @@ class BaseObjectOrm:
         "HistoricalWeights": "portfolio_weights",
         "TargetPortfolioIndexAsset":"target_portfolio_index_asset",
 
-        "HistoricalBarsSource":"historical-bars-source",
-        "TDAGAPIDataSource": "tdag-api-data-source",
+        "HistoricalBarsSource":"data_sources/historical-bars-source",
+        "TDAGAPIDataSource": "data_sources/tdag-api-data-source",
         "AssetCategory":"asset-category",
 
     }
@@ -923,11 +923,6 @@ class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
     local_hash_id: str = Field(..., max_length=64, description="Local hash ID of the data source")
     data_source_description: Optional[str] = Field(None, description="Descriptions of the data source")
     data_frequency_id: str = DataFrequency
-
-    @classmethod
-    def get_object_url(cls):
-        url = f"{cls.ROOT_URL.replace('orm', 'data_sources')}/{cls.END_POINTS[cls.class_name()]}"
-        return url
 
     def __str__(self):
         return self.class_name() +f"{self.unique_identifier}"
