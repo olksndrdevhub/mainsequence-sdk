@@ -169,6 +169,8 @@ def make_request(s, r_type: str, url: str, loaders: Union[AuthLoaders, None], pa
                  ):
     from requests.models import Response
 
+    logger.debug(f"Requesting {r_type} from {url}")
+
     TIMEOFF = .25
     TRIES = 15 // TIMEOFF
     payload = {} if payload is None else payload
