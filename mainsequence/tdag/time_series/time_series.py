@@ -1096,12 +1096,15 @@ class TimeSerieRebuildMethods(ABC):
         latest_value, must_update = local_time_serie_historical_update.last_time_index_value, local_time_serie_historical_update.must_update
         update_statistics = local_time_serie_historical_update.update_statistics
         error_on_last_update = False
+        exception_raised= None
 
         if force_update == True:
             must_update = True
-
-        if must_update == True:
-            try:
+        
+        try:
+        
+            if must_update == True:
+              
 
                 max_update_time_days = os.getenv("TDAG_MAX_UPDATE_TIME_DAYS", None)
                 update_on_batches = False
@@ -1118,34 +1121,25 @@ class TimeSerieRebuildMethods(ABC):
                 self.local_persist_manager.local_metadata.set_end_of_execution(
                     historical_update_id=local_time_serie_historical_update.id,
                                                     error_on_update=error_on_last_update)
+            else:
+                self.logger.info("Already updated, waiting until next update time")
 
-            except Exception as e:
+        except Exception as e:
 
-                error_on_last_update = True
-                self.logger.exception(f"Error updating")
+            error_on_last_update = True
+            raise e
+        finally:
 
-                logging.shutdown()
-                if raise_exceptions is True:
-                    self.local_persist_manager.local_metadata.set_end_of_execution(
-                        historical_update_id=local_time_serie_historical_update.id,
-                        error_on_update=error_on_last_update)
-
-
-
-
-
-
-
-        else:
-
-            self.logger.info("Already updated, waiting until next update time")
             self.local_persist_manager.local_metadata.set_end_of_execution(
                 historical_update_id=local_time_serie_historical_update.id,
                 error_on_update=error_on_last_update)
 
-        self._run_post_update_routines(error_on_last_update=error_on_last_update)
-        # close all logging handlers
-        logging.shutdown()
+            self._run_post_update_routines(error_on_last_update=error_on_last_update)
+
+            # close all logging handlers
+            logging.shutdown()
+         
+            
         return error_on_last_update
 
 
@@ -2368,8 +2362,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                                                              update_tracker=self.update_tracker
                                                              )
 
-                            if error_on_last_update == True:
-                                raise Exception(f"Error updating dependencie {ts.local_hash_id} pipeline stopped")
+                            
                         except Exception as e:
                             self.logger.exception(f"Error updating dependencie {ts.local_hash_id}")
                             raise e

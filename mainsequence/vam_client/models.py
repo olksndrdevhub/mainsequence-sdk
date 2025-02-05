@@ -152,6 +152,7 @@ class BaseObjectOrm:
         "HistoricalBarsSource":"historical-bars-source",
         "TDAGAPIDataSource": "tdag-api-data-source",
         "AssetCategory":"asset-category",
+        "TargetPortfolioFrontEndDetails": "target-portfolio-details",
 
     }
     ROOT_URL = VAM_API_ENDPOINT
@@ -1019,13 +1020,26 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
             raise Exception(f" {r.text()}")
 
 
-
+class PortfolioTags(BaseVamPydanticModel):
+    id:Optional[int]=None
+    name:str
+    color:str
+    
 class TargetPortfolioFrontEndDetails(BaseObjectOrm, BaseVamPydanticModel):
-    target_portfolio: Optional[dict] = None  # different serialization of target portfolio
+    target_portfolio: Optional[TargetPortfolio]=None
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_time_index_name: Optional[str] = Field(None, max_length=20)
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
-    
+    tags: Optional[List[PortfolioTags]] = None
+
+    @classmethod
+    def get_object_url(cls):
+        url = f"{cls.ROOT_URL.replace('orm', '')}/{cls.END_POINTS[cls.class_name()]}"
+        return url
+
+    @property
+    def id(self):
+        return self.target_portfolio.id
     
     @staticmethod
     def get_base_endpoint():
@@ -1046,7 +1060,7 @@ class TargetPortfolioFrontEndDetails(BaseObjectOrm, BaseVamPydanticModel):
         if r.status_code not in [ 200]:
             raise Exception(r.text)
 
-        return r.json()
+        return [cls(**i) for i in r.json()]
     @classmethod
     def create(cls, *args, **kwargs):
         """
