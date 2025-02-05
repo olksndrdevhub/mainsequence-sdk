@@ -537,7 +537,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
         payload = {
             "json": {"last_time_index_value": last_time_index_value, "max_per_asset_symbol": max_per_asset_symbol}}
         print(f"Set last update index with {payload['json']}")
-        r = make_request(s=s, loaders=self.LOADERS, payload=payload, r_type="GET", url=url, time_out=timeout)
+        r = make_request(s=s, loaders=self.LOADERS, payload=payload, r_type="POST", url=url, time_out=timeout)
 
         if r.status_code == 404:
             raise SourceTableConfigurationDoesNotExist
