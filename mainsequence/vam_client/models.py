@@ -924,6 +924,7 @@ class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
     local_hash_id: str = Field(..., max_length=64, description="Local hash ID of the data source")
     data_source_description: Optional[str] = Field(None, description="Descriptions of the data source")
     data_frequency_id: str = DataFrequency
+    assets_in_data_source:Optional[List[int]]
 
     def __str__(self):
         return self.class_name() +f"{self.unique_identifier}"
