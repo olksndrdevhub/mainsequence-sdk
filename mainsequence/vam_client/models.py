@@ -929,6 +929,17 @@ class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
         return self.class_name() +f"{self.unique_identifier}"
 
 
+    def append_assets(self,asset_id_list:list,timeout=None):
+        url = f"{self.get_object_url()}/{self.id}/append_assets/"
+
+        payload = {"json": {"asset_id_list":asset_id_list}}
+        r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload,
+                         timeout=timeout)
+        if r.status_code in [200] == False:
+            raise Exception(f" {r.text()}")
+        return self.__class__(**r.json())
+
+
 class HistoricalBarsSource(TDAGAPIDataSource):
     execution_venues: list
     data_mode:Literal['live', 'backtest'] = Field(
