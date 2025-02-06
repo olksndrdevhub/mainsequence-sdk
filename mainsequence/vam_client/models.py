@@ -205,6 +205,7 @@ class BaseObjectOrm:
         for key, value in parameters.items():
             if "__in" in key:
                 assert isinstance(value,list)
+                value=[str(v) for v in value]
                 parameters[key] = ",".join(value)
         return parameters
 
