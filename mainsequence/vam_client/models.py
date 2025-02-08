@@ -572,9 +572,10 @@ class CurrencyPairMixin(AssetMixin, BaseVamPydanticModel):
 
     def get_spot_reference_asset_symbol(self):
 
-
         base_asset_symbol = self.symbol.replace(self.quote_asset.symbol, "")
         return base_asset_symbol
+
+
 class CurrencyPair(CurrencyPairMixin):
   pass
 

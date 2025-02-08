@@ -2313,6 +2313,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         if debug_mode == False:
             tmp_ts = self.dependencies_df.copy()
             if tmp_ts.shape[0] == 0:
+                self.logger.debug("No dependencies in this time serie")
                 return None
             tmp_ts = tmp_ts[tmp_ts["source_class_name"] != "WrapperTimeSerie"]
 
