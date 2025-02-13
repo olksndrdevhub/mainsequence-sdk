@@ -74,7 +74,7 @@ class Configuration:
             
         #set VAM_ENDPOINT
         from mainsequence.tdag_client import CONSTANTS
-        os.environ["VAM_ENDPOINT"]=CONSTANTS.VAM_ENDPOINT
+        os.environ["VAM_ENDPOINT"] = CONSTANTS.VAM_ENDPOINT
 
     def _build_template_yaml(self):
         config = {

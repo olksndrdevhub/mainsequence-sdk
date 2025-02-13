@@ -51,7 +51,7 @@ def module_factory(execution_venue_symbol):
     elif execution_venue_symbol in CONSTANTS.NON_TRADABLE_VENUES:
         from mainsequence.vam_client import models as model_module
     else:
-        raise NotImplementedError
+        raise NotImplementedError(f"Execution_venue_symbol {execution_venue_symbol} not implemented")
 
     return model_module
 def get_right_account_class(account:Account):

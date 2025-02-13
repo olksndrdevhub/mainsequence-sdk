@@ -199,19 +199,18 @@ class BaseObjectOrm:
     def get_object_url(cls):
         url=f"{cls.ROOT_URL}/{cls.END_POINTS[cls.class_name()]}"
         return  url
+    
     @staticmethod
     def _parse_parameters_filter(parameters):
-
         for key, value in parameters.items():
             if "__in" in key:
-                assert isinstance(value,list)
-                value=[str(v) for v in value]
+                assert isinstance(value, list)
+                value = [str(v) for v in value]
                 parameters[key] = ",".join(value)
         return parameters
 
-
     @classmethod
-    def filter(cls,timeout=None,*args,**kwargs):
+    def filter(cls, timeout=None, *args, **kwargs):
         base_url = cls.get_object_url()
         params = cls._parse_parameters_filter(parameters=kwargs)
 
@@ -527,7 +526,7 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
         
         return create_from_serializer_with_class(r.json())
         
-class AssetCategory(BaseObjectOrm,BaseVamPydanticModel):
+class AssetCategory(BaseObjectOrm, BaseVamPydanticModel):
     name:str
     source:str
     assets:List[int]
@@ -535,12 +534,11 @@ class AssetCategory(BaseObjectOrm,BaseVamPydanticModel):
     def __repr__(self):
         return self.name+" source:"+self.source 
     
-class Asset(AssetMixin,BaseObjectOrm):
+class Asset(AssetMixin, BaseObjectOrm):
 
     def get_spot_reference_asset_symbol(self):
         """"
         """
-
         return self.symbol
     
     @classmethod

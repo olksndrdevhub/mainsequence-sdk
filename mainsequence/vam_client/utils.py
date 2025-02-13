@@ -11,7 +11,7 @@ from typing import Union
 from mainsequence.vam_client.local_vault import get_all_entries_in_vault_for_venue
 from mainsequence.logconf import logger
 from tqdm import tqdm
-VAM_ENDPOINT=os.environ.get('VAM_ENDPOINT')
+VAM_ENDPOINT = os.environ.get('VAM_ENDPOINT')
 VAM_API_ENDPOINT=f"{VAM_ENDPOINT}/orm/api"
 VAM_REST_TOKEN_URL=f"{VAM_ENDPOINT}/auth/rest-token-auth/"
 
