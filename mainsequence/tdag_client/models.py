@@ -2410,7 +2410,8 @@ class DynamicTableHelpers:
                           )  is not None else (metadata, data))
 
         duplicates_exist = data.duplicated(subset=index_names).any()
-        assert not duplicates_exist, f"Duplicates found in columns: {index_names}"
+        if duplicates_exist:
+            raise Exception(f"Duplicates found in columns: {index_names}") 
 
 
         global_stats, grouped_dates = get_chunk_stats(
