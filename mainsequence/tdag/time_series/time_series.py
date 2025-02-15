@@ -16,11 +16,11 @@ import hashlib
 import importlib
 import cloudpickle
 from pathlib import Path
-from mainsequence.tdag.instrumentation import tracer, tracer_instrumentator
-from mainsequence.logconf import logger
+from mainsequence.instrumentation import tracer, tracer_instrumentator
 from mainsequence.tdag.config import (
     ogm
 )
+import structlog.contextvars as cvars
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager, DataLakePersistManager
 from mainsequence.tdag_client.models import (none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate,
@@ -1098,9 +1098,9 @@ class TimeSerieRebuildMethods(ABC):
         error_on_last_update = False
         exception_raised= None
 
-        if force_update == True:
+        if force_update == True or update_statistics.max_time_index_value is None:
             must_update = True
-        
+
         try:
         
             if must_update == True:
@@ -1136,10 +1136,8 @@ class TimeSerieRebuildMethods(ABC):
 
             self._run_post_update_routines(error_on_last_update=error_on_last_update)
 
-            # close all logging handlers
-            logging.shutdown()
-         
-            
+
+
         return error_on_last_update
 
 
@@ -1458,7 +1456,31 @@ def load_from_pickle(pickle_path):
     return time_serie
 
 
-class APITimeSerie:
+class CommonMethodsMixin:
+
+    def get_logger_context_variables(self):
+        return dict(local_hash_id=self.local_hash_id,
+                                   local_hash_id_data_source=self.data_source_id,
+                                   api_time_series=self.__class__.__name__=="APITimeSerie")
+
+    @property
+    def logger(self):
+        # import structlog.contextvars as cvars
+        # cvars.bind_contextvars(local_hash_id=self.local_hash_id,
+        #                      local_hash_id_data_source=self.data_source_id,
+        #                      api_time_series=True,)
+        global logger
+        if hasattr(self, "_logger") == False:
+            cvars.bind_contextvars(**self.get_logger_context_variables() )
+
+            self._logger = logger
+
+        return self._logger
+    def unbind_context_variables_from_logger(self):
+        cvars.unbind_contextvars(*self.get_logger_context_variables().keys())
+
+
+class APITimeSerie(CommonMethodsMixin):
     PICKLE_PREFIFX = "api-"
 
     @classmethod
@@ -1505,15 +1527,8 @@ class APITimeSerie:
     def set_relation_tree(self):
         pass  # do nothing  for API Time Series
 
-    @property
-    def logger(self):
-        global logger
-        logger = logger.bind(local_hash_id=self.local_hash_id,
-                             local_hash_id_data_source=self.data_source_id,
-                             api_time_series=True,
-                             )
 
-        return logger
+
 
     def _verify_local_data_source(self):
         pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
@@ -1700,7 +1715,7 @@ class APITimeSerie:
         return persisted
 
 
-class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):
+class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):
     """
     Pipeline
 
@@ -1942,14 +1957,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             init_meta = {}
         return kwargs, init_meta
 
-    @property
-    def logger(self):
-        global logger
-        logger = logger.bind(local_hash_id=self.local_hash_id,
-                             local_hash_id_data_source=self.data_source_id,
-                             api_time_series=False,
-                             )
-        return logger
+
 
     def run_local_update(self, tdag_detached=True):
         self.local_persist_manager
@@ -1969,7 +1977,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
         Returns:
 
         """
-        from mainsequence.tdag.instrumentation import TracerInstrumentator
+        from mainsequence.instrumentation import TracerInstrumentator
         from mainsequence.tdag.config import configuration
         from mainsequence.tdag.time_series.update.utils import UpdateInterface, wait_for_update_time
         from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
@@ -1980,9 +1988,8 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             update_only_tree = False
 
         # set tracing
-        tracer_instrumentator = TracerInstrumentator(
-            configuration.configuration["instrumentation_config"]["grafana_agent_host"])
-        tracer = tracer_instrumentator.build_tracer("tdag_head_distributed", __name__)
+        tracer_instrumentator = TracerInstrumentator()
+        tracer = tracer_instrumentator.build_tracer()
         error_on_update = None
         # 1 Create Scheduler for this time serie
 
@@ -1998,8 +2005,11 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
             scheduler.start_heart_beat()
         else:
             scheduler = remote_scheduler
-        logger=logger.bind(scheduler_name=scheduler.name)
-        logger=logger.bind(head_local_ts_hash_id=self.local_hash_id)
+
+        cvars.bind_contextvars(scheduler_name=scheduler.name,
+                               head_local_ts_hash_id=self.local_hash_id)
+
+
         error_to_raise = None
         with tracer.start_as_current_span(f"Scheduler TS Head Update ") as span:
             span.set_attribute("time_serie_local_hash_id", self.local_hash_id)
@@ -2457,7 +2467,7 @@ class TimeSerie(DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethod
                      use_state_for_update: bool = False,
                      *args, **kwargs) -> bool:
 
-        from mainsequence.tdag.instrumentation.utils import Status, StatusCode
+        from mainsequence.instrumentation.utils import Status, StatusCode
         persisted = False
         if update_tree == True:
 

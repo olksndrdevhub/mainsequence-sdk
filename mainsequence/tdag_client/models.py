@@ -2,7 +2,7 @@ from importlib.metadata import metadata
 
 from .utils import (TDAG_ENDPOINT, is_process_running, get_network_ip,
                     CONSTANTS,
-                    DATE_FORMAT, get_authorization_headers, AuthLoaders, make_request, get_tdag_client_logger, set_types_in_table, parse_postgres_url)
+                    DATE_FORMAT, get_authorization_headers, AuthLoaders, make_request,  set_types_in_table, parse_postgres_url)
 import copy
 import datetime
 import pytz
@@ -14,6 +14,7 @@ from typing import Union
 import structlog
 import time
 import os
+from mainsequence.logconf import logger
 
 
 from pydantic import BaseModel, Field, field_validator
@@ -89,7 +90,7 @@ JSON_COMPRESSED_PREFIX = ["json_compressed", "jcomp_"]
 
 
 
-logger = get_tdag_client_logger()
+
 
 loaders=AuthLoaders()
 

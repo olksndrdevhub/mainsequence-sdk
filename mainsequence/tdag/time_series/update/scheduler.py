@@ -90,7 +90,7 @@ class TimeSerieHeadUpdateActor:
         -------
 
         """
-        from mainsequence.tdag.instrumentation import TracerInstrumentator
+        from mainsequence.instrumentation import TracerInstrumentator
         from mainsequence.tdag.config import configuration
         from .utils import UpdateInterface
         error_on_update = False

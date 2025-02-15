@@ -1,14 +1,12 @@
 
-from mainsequence.tdag import tracer_instrumentator, ogm, tracer
-
-from .settings import *
+from mainsequence.instrumentation import tracer_instrumentator, tracer
+from mainsequence.tdag import ogm
+from mainsequence.logconf import logger
 import json
 import datetime
 import requests
 
-from mainsequence.tdag.logconf import get_tdag_logger
 
-logger = get_tdag_logger()
 
 
 def build_ts_updater_serve_request(pickle_path:str,update_priority:int,scheduler_uid:str,

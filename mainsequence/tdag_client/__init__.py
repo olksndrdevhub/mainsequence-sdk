@@ -3,10 +3,10 @@ from .models import  ( request_to_datetime,
 LocalTimeSeriesDoesNotExist,DynamicTableDoesNotExist,SourceTableConfigurationDoesNotExist,ChatYamls,SignalYamls,LocalTimeSerieUpdateDetails,
     JSON_COMPRESSED_PREFIX,Scheduler ,SchedulerDoesNotExist,LocalTimeSerie,DynamicTableMetaData,
 DynamicTableDataSource,LocalTimeSerieNode,PodLocalLake,Project,
-BACKEND_DETACHED,DataUpdates,logger,
+BACKEND_DETACHED,DataUpdates,
                        ChatObject)
 
-from .utils import CONSTANTS, get_tdag_client_logger
+from .utils import CONSTANTS
 from mainsequence.logconf import logger
 
 

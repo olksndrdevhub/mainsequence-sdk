@@ -6,7 +6,7 @@ import time
 from mainsequence.tdag_client import LocalTimeSerieUpdateDetails,request_to_datetime
 from mainsequence.tdag.config import bcolors, configuration
 from typing import Union
-from mainsequence.tdag.instrumentation import tracer
+from mainsequence.instrumentation import tracer
 import ray
 from mainsequence.tdag_client import CONSTANTS,LocalTimeSerie
 
@@ -40,12 +40,12 @@ local_hash_id:str,
     Returns:
 
     """
-    from mainsequence.tdag.instrumentation import SpanKind, TraceContextTextMapPropagator, TracerInstrumentator
+    from mainsequence.instrumentation import SpanKind, TraceContextTextMapPropagator, TracerInstrumentator
     import psutil
     import gc
 
-    tracer_instrumentator = TracerInstrumentator(configuration.configuration["instrumentation_config"]["grafana_agent_host"])
-    tracer = tracer_instrumentator.build_tracer("tdag", __name__)
+    tracer_instrumentator = TracerInstrumentator()
+    tracer = tracer_instrumentator.build_tracer()
 
     prop = TraceContextTextMapPropagator()
     ctx = prop.extract(carrier=telemetry_carrier)

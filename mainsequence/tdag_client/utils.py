@@ -34,16 +34,6 @@ COMPRESSED_KEYS = ["json_compressed_", "jcomp_"]
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 
-def get_tdag_client_logger(**kwargs):
-    global logger
-    for k,v in kwargs.items():
-        logger=logger.bind(**{k:v})
-
-
-    return logger
-
-logger = get_tdag_client_logger()
-
 def get_network_ip():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         # Connect to a well-known external host (Google DNS) on port 80

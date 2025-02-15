@@ -7,8 +7,13 @@ import requests
 import structlog
 from typing import Union
 from structlog.dev import ConsoleRenderer
-
+from .instrumentation import add_otel_trace_context,OTelJSONRenderer
 logger=None
+
+
+
+
+
 
 def extract_from_record(_, __, event_dict):
     """
@@ -48,7 +53,6 @@ class CustomConsoleRenderer(ConsoleRenderer):
             rendered += f" (at {filename}:{lineno} in {func_name}())"
         elif filename and lineno:
             rendered += f" (at {filename}:{lineno})"
-
 
 
         return rendered
@@ -112,13 +116,13 @@ def build_application_logger(application_name:str="ms-sdk",
         "formatters": {
             "plain": {
                 "()": structlog.stdlib.ProcessorFormatter,
-                "processor": structlog.processors.JSONRenderer(),  # Outputs logs as JSON
+                "processor":OTelJSONRenderer(),#structlog.processors.JSONRenderer(),
                 "foreign_pre_chain": pre_chain,
             },
             "colored": {
                 "()": structlog.stdlib.ProcessorFormatter,
                 "processor": CustomConsoleRenderer(colors=True),
-                "foreign_pre_chain": pre_chain,
+                "foreign_pre_chain":  pre_chain,
             },
         },
         "handlers":handlers,
@@ -138,6 +142,7 @@ def build_application_logger(application_name:str="ms-sdk",
     # Configure structlog
     structlog.configure(
         processors=[
+            structlog.contextvars.merge_contextvars,  # context that always appears in the logs
             structlog.stdlib.add_log_level,
             structlog.stdlib.PositionalArgumentsFormatter(),
             structlog.processors.CallsiteParameterAdder(
@@ -150,8 +155,11 @@ def build_application_logger(application_name:str="ms-sdk",
             timestamper,
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info, #suggested to remove for pretty exceptions
+
+
             add_structlog_event_to_record,  # Add this processor before wrap_for_formatter
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
