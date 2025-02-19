@@ -24,6 +24,7 @@ import subprocess
 from mainsequence.logconf import logger
 from urllib.parse import urlparse, unquote
 from typing import Dict
+import requests
 
 TDAG_ENDPOINT = f"{os.environ.get('TDAG_ENDPOINT')}"
 
@@ -226,11 +227,24 @@ def get_authorization_headers(time_series_orm_token_url: str,
     gcp_token_decoded = None
     headers = CaseInsensitiveDict()
     headers["Content-Type"] = "application/json"
-    if os.getenv("MAINSEQUENCE_TOKEN"):
-        headers["Authorization"] = "Token " + os.getenv("MAINSEQUENCE_TOKEN")
-        return headers, None
-    else:
-        raise Exception("MAINSEQUENCE_TOKEN is not set in env")
+
+
+    if os.getenv("TDAG_TOKEN") is None:
+        MAINSEQUENCE_TOKEN=os.getenv("MAINSEQUENCE_TOKEN")
+        if MAINSEQUENCE_TOKEN is None:
+            raise Exception("MAINSEQUENCE_TOKEN is not set in env")
+        url = f"{TDAG_ENDPOINT}/user/verify-ms-token/"
+        payload = {"token": MAINSEQUENCE_TOKEN}
+        response = requests.post(url, json=payload)
+
+        if response.status_code != 200:
+            raise Exception(response.json())
+        os.environ["TDAG_TOKEN"] = response.json()["Token"]
+
+    headers["Authorization"] = "Token " + os.getenv("TDAG_TOKEN")
+
+
+    return headers, None
     try:
 
         s = build_session()
