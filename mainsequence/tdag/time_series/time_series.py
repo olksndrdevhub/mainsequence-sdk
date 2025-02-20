@@ -1558,6 +1558,8 @@ class APITimeSerie(CommonMethodsMixin):
         local_metadata = LocalTimeSerie.get(local_hash_id=self.local_hash_id,
                                             remote_table__data_source__id=self.data_source_id,
                                             )
+        assert local_metadata is not None, f"Verify that  {self.local_hash_id} exists if you are not the author reach to the author"
+        
         self.remote_table_hashed_name = local_metadata.remote_table.hash_id
         if self.data_source is None:
 
