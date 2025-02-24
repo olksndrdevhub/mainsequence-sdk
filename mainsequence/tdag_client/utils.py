@@ -238,7 +238,13 @@ def get_authorization_headers(time_series_orm_token_url: str,
         response = requests.post(url, json=payload)
 
         if response.status_code != 200:
-            raise Exception(response.json())
+            try:
+                error_payload = response.json()
+            except ValueError:
+                error_payload = response.text
+            raise Exception(f"Request failed with status {response.status_code}. "
+                            f"Response was: {error_payload}")
+
         os.environ["TDAG_TOKEN"] = response.json()["Token"]
 
     headers["Authorization"] = "Token " + os.getenv("TDAG_TOKEN")

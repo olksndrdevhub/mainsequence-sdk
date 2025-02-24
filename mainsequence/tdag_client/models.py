@@ -704,7 +704,8 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                 # Perform the POST request
                 r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url)
                 if r.status_code != 200:
-                    raise Exception(f"Error in request: {r.text}")
+                    logger.warning(f"Error in request: {r.text}")
+                    return []
 
                 response_data = r.json()
                 # Accumulate results
