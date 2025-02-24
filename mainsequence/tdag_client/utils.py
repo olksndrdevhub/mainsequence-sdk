@@ -230,7 +230,7 @@ def get_authorization_headers(time_series_orm_token_url: str,
 
 
     if os.getenv("TDAG_TOKEN") is None:
-        MAINSEQUENCE_TOKEN=os.getenv("MAINSEQUENCE_TOKEN")
+        MAINSEQUENCE_TOKEN = os.getenv("MAINSEQUENCE_TOKEN")
         if MAINSEQUENCE_TOKEN is None:
             raise Exception("MAINSEQUENCE_TOKEN is not set in env")
         url = f"{TDAG_ENDPOINT}/user/verify-ms-token/"
