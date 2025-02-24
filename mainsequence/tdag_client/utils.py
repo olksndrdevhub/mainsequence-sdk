@@ -253,6 +253,21 @@ def get_authorization_headers(time_series_orm_token_url: str,
     headers["Content-Type"] = "application/json"
 
 
+    if os.getenv("TDAG_TOKEN") is None:
+        MAINSEQUENCE_TOKEN = os.getenv("MAINSEQUENCE_TOKEN")
+        if MAINSEQUENCE_TOKEN is None:
+            raise Exception("MAINSEQUENCE_TOKEN is not set in env")
+        url = f"{TDAG_ENDPOINT}/user/verify-ms-token/"
+        payload = {"token": MAINSEQUENCE_TOKEN}
+        response = requests.post(url, json=payload)
+
+        if response.status_code != 200:
+            try:
+                error_payload = response.json()
+            except ValueError:
+                error_payload = response.text
+            raise Exception(f"Request failed with status {response.status_code}. "
+                            f"Response was: {error_payload}")
 
 
     headers["Authorization"] = "Token " + os.getenv("TDAG_TOKEN")

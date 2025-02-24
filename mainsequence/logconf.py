@@ -6,6 +6,8 @@ from pathlib import Path
 import requests
 import structlog
 from typing import Union
+
+from requests.structures import CaseInsensitiveDict
 from structlog.dev import ConsoleRenderer
 from .instrumentation import add_otel_trace_context,OTelJSONRenderer
 logger=None
@@ -173,14 +175,14 @@ def build_application_logger(application_name:str="ms-sdk",
 
     try:
         # do initial request when on logger initialization TODO create startup script
-
+        headers = CaseInsensitiveDict()
+        headers["Content-Type"] = "application/json"
 
         if os.getenv("TDAG_TOKEN") is None:
-            TDAG_ENDPOINT = f"{os.environ.get('TDAG_ENDPOINT')}"
             MAINSEQUENCE_TOKEN = os.getenv("MAINSEQUENCE_TOKEN")
             if MAINSEQUENCE_TOKEN is None:
                 raise Exception("MAINSEQUENCE_TOKEN is not set in env")
-            url = f"{TDAG_ENDPOINT}/user/verify-ms-token/"
+            url = f"{os.getenv('TDAG_ENDPOINT')}/user/verify-ms-token/"
             payload = {"token": MAINSEQUENCE_TOKEN}
             response = requests.post(url, json=payload)
 
@@ -194,13 +196,10 @@ def build_application_logger(application_name:str="ms-sdk",
 
             os.environ["TDAG_TOKEN"] = response.json()["Token"]
 
+        headers["Authorization"] = "Token " + os.getenv("TDAG_TOKEN")
 
         project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/pods/api/job/get_job_startup_state'
-        TDAG_TOKEN=os.getenv('TDAG_TOKEN')
-        assert TDAG_TOKEN is not None , "TDAG_TOKEN environment variable is not set"
-        headers = {
-            "Authorization": f"Token {os.getenv('TDAG_TOKEN')}"
-        }
+
         response = requests.get(project_info_endpoint, headers=headers)
         json_response = response.json()
 
