@@ -173,13 +173,39 @@ def build_application_logger(application_name:str="ms-sdk",
 
     try:
         # do initial request when on logger initialization TODO create startup script
-        project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/pods/api/job/get_job_startup_state'
 
+
+        if os.getenv("TDAG_TOKEN") is None:
+            TDAG_ENDPOINT = f"{os.environ.get('TDAG_ENDPOINT')}"
+            MAINSEQUENCE_TOKEN = os.getenv("MAINSEQUENCE_TOKEN")
+            if MAINSEQUENCE_TOKEN is None:
+                raise Exception("MAINSEQUENCE_TOKEN is not set in env")
+            url = f"{TDAG_ENDPOINT}/user/verify-ms-token/"
+            payload = {"token": MAINSEQUENCE_TOKEN}
+            response = requests.post(url, json=payload)
+
+            if response.status_code != 200:
+                try:
+                    error_payload = response.json()
+                except ValueError:
+                    error_payload = response.text
+                raise Exception(f"Request failed with status {response.status_code}. "
+                                f"Response was: {error_payload}")
+
+            os.environ["TDAG_TOKEN"] = response.json()["Token"]
+
+
+        project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/pods/api/job/get_job_startup_state'
+        TDAG_TOKEN=os.getenv('TDAG_TOKEN')
+        assert TDAG_TOKEN is not None , "TDAG_TOKEN environment variable is not set"
         headers = {
-            "Authorization": f"Token {os.getenv('MAINSEQUENCE_TOKEN')}"
+            "Authorization": f"Token {os.getenv('TDAG_TOKEN')}"
         }
         response = requests.get(project_info_endpoint, headers=headers)
         json_response = response.json()
+
+
+
         logger = logger.bind(project_id=json_response["project_id"], **metadata)
         logger = logger.bind(data_source_id=json_response["data_source_id"], **metadata)
         logger = logger.bind(job_run_id=json_response["job_run_id"], **metadata)

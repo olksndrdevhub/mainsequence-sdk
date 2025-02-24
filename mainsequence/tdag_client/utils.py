@@ -98,6 +98,27 @@ class AuthLoaders:
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = gcp_credentials_path
         self.gcp_token_decoded = None
 
+    @classmethod
+    def set_tdag_token_in_environment(cls):
+        if os.getenv("TDAG_TOKEN") is None:
+            MAINSEQUENCE_TOKEN = os.getenv("MAINSEQUENCE_TOKEN")
+            if MAINSEQUENCE_TOKEN is None:
+                raise Exception("MAINSEQUENCE_TOKEN is not set in env")
+            url = f"{TDAG_ENDPOINT}/user/verify-ms-token/"
+            payload = {"token": MAINSEQUENCE_TOKEN}
+            response = requests.post(url, json=payload)
+
+            if response.status_code != 200:
+                try:
+                    error_payload = response.json()
+                except ValueError:
+                    error_payload = response.text
+                raise Exception(f"Request failed with status {response.status_code}. "
+                                f"Response was: {error_payload}")
+
+            os.environ["TDAG_TOKEN"] = response.json()["Token"]
+
+
     @property
     def auth_headers(self):
 
@@ -109,8 +130,11 @@ class AuthLoaders:
             self.refresh_headers()
         return self._auth_headers
 
+
+
     def refresh_headers(self):
         global logger
+
         logger.debug("Getting Auth Headers TS_ORM")
         self._auth_headers, gcp_token_decoded = get_authorization_headers(
             time_series_orm_token_url=self.time_series_orm_token_url,
@@ -229,23 +253,7 @@ def get_authorization_headers(time_series_orm_token_url: str,
     headers["Content-Type"] = "application/json"
 
 
-    if os.getenv("TDAG_TOKEN") is None:
-        MAINSEQUENCE_TOKEN=os.getenv("MAINSEQUENCE_TOKEN")
-        if MAINSEQUENCE_TOKEN is None:
-            raise Exception("MAINSEQUENCE_TOKEN is not set in env")
-        url = f"{TDAG_ENDPOINT}/user/verify-ms-token/"
-        payload = {"token": MAINSEQUENCE_TOKEN}
-        response = requests.post(url, json=payload)
 
-        if response.status_code != 200:
-            try:
-                error_payload = response.json()
-            except ValueError:
-                error_payload = response.text
-            raise Exception(f"Request failed with status {response.status_code}. "
-                            f"Response was: {error_payload}")
-
-        os.environ["TDAG_TOKEN"] = response.json()["Token"]
 
     headers["Authorization"] = "Token " + os.getenv("TDAG_TOKEN")
 
