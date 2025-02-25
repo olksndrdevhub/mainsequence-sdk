@@ -1970,10 +1970,10 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         """
 
         Args:
-            debug_mode:
-            update_tree:
-            force_update:
-            update_only_tree:
+            debug_mode: if the time serie is run in debug mode the DAG will be run node by node in the same process
+            update_tree: if set to False then only the selected time series will be run, default is True
+            force_update: Force an update even if the time serie schedule does not require an update
+            update_only_tree: If set to True then only the dependency graph of the selected time serie will be updated
             remote_scheduler:
 
         Returns:

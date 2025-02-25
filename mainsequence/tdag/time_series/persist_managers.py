@@ -672,8 +672,6 @@ class TimeScaleLocalPersistManager(PersistManager):
 
 
 
-
-
 class DataLakePersistManager(PersistManager):
 
     """
@@ -708,19 +706,23 @@ class DataLakePersistManager(PersistManager):
         update_statistics=DataUpdates(update_statistics=None,max_time_index_value=None)
         if BACKEND_DETACHED() and self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
             self.set_is_introspecting(True)
-            self.metadata = {"sourcetableconfiguration":None, "hash_id": ts.remote_table_hashed_name,
-                            "table_name":ts.remote_table_hashed_name
-                            }
-            self.local_metadata= {"local_hash_id":self.local_hash_id,"remote_table":self.metadata}
+            self.metadata = DynamicTableMetaData(**{"sourcetableconfiguration":None, "hash_id": ts.remote_table_hashed_name,
+                            "table_name":ts.remote_table_hashed_name,"data_source":self.data_source,
+                                                    "build_configuration":{},"source_class_name":ts.__class__.__name__,
+                                                    "creation_date":datetime.datetime.utcnow()
+                            })
+            self.local_metadata=LocalTimeSerie(**{"local_hash_id":self.local_hash_id,"remote_table":self.metadata,
+                                                  "build_configuration":{},"run_configuration":{}
+                                                  })
             last_update_in_table=None
             if self.table_exist(table_name=ts.remote_table_hashed_name):
                 # check if table is complete and continue with earliest latest value to avoid data gaps
-                last_update_in_table, last_update_per_unique_identifier = ts.get_update_statistics()
-                if last_update_per_unique_identifier is not None:
-                    last_update_in_table = ts.get_earliest_updated_asset_filter(last_update_per_unique_identifier=last_update_per_unique_identifier,
+                data_updates = ts.get_update_statistics()
+                if data_updates.update_statistics is not None:
+                    last_update_in_table = ts.get_earliest_updated_asset_filter(last_update_per_unique_identifier=data_updates.update_statistics ,
                                                                                 unique_identifier_list=None)
 
-                update_statistics.update_statistics=last_update_per_unique_identifier
+
                 update_statistics.max_time_index_value=last_update_in_table
 
 
@@ -738,9 +740,13 @@ class DataLakePersistManager(PersistManager):
                 return None
             if df.shape[0] == 0:
                 return None
-            self.dth.upsert_data_into_table(metadata={"table_name": ts.remote_table_hashed_name}, local_metadata=None, data=df,
-                                            logger=self.logger, overwrite=True, historical_update_id=None,
-                                            data_source=self.data_source)
+            DynamicTableHelpers.upsert_data_into_table(
+                local_metadata=self.local_metadata,
+                data=df,
+                data_source=self.data_source,
+
+            )
+
             #verify pickle exist
             ts.persist_to_pickle()
             self.set_already_run(True)  # set before the update to stop recurisivity
@@ -780,7 +786,7 @@ class DataLakePersistManager(PersistManager):
     def table_exist(self,table_name):
         from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         assert self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
-        return DataLakeInterface(data_lake_source=self.data_source,
+        return DataLakeInterface(data_lake_source=self.data_source.related_resource,
                                                               ).table_exist(
             table_name=table_name)
     def get_table_schema(self,table_name):

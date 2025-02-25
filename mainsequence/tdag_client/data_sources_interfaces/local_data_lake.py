@@ -15,6 +15,7 @@ import pyarrow as pa
 import pytz
 from tqdm import tqdm
 import shutil
+
 from mainsequence.tdag_client.utils import set_types_in_table
 from mainsequence.logconf import logger
 TIME_PARTITION = "TIME_PARTITION"
@@ -212,8 +213,8 @@ class DataLakeInterface:
         self.base_path = f"{TDAG_PATH}/data_lakes"
         self.data_source = data_lake_source
         self.date_range_folder = (
-            f"{int(self.data_source.related_resource.datalake_start.timestamp() * 1_000_000) if self.data_source.related_resource.datalake_start is not None else 'None'}_"
-            f"{int(self.data_source.related_resource.datalake_end.timestamp() * 1_000_000) if self.data_source.related_resource.datalake_end is not None else 'None'}"
+            f"{int(self.data_source.datalake_start.timestamp() * 1_000_000) if self.data_source.datalake_start is not None else 'None'}_"
+            f"{int(self.data_source.datalake_end.timestamp() * 1_000_000) if self.data_source.datalake_end is not None else 'None'}"
         )
 
         self.s3_endpoint_url = None
@@ -247,7 +248,9 @@ class DataLakeInterface:
             great_or_equal: bool = True,
             less_or_equal: bool = True,
             end_date: Union[datetime.datetime, None] = None,
-            unique_identifier_list: Union[list, None] = None):
+            unique_identifier_list: Union[list, None] = None,
+            unique_identifier_range_map:Union[dict,None] = None,
+    ):
         """
         Build hashable parquet filters based on the parameters.
 
@@ -326,7 +329,7 @@ class DataLakeInterface:
 
 
 
-        file_path = self.get_file_path(data_lake_name=self.data_source.related_resource.datalake_name,
+        file_path = self.get_file_path(data_lake_name=self.data_source.datalake_name,
                                                            date_range_folder=self.date_range_folder,
                                                            table_hash=table_name, )
 
@@ -377,7 +380,7 @@ class DataLakeInterface:
         """
         if overwrite == False:
             raise NotImplementedError
-        self.logger.debug(f"Persisting  datalake {self.data_source.related_resource.datalake_name}")
+        logger.debug(f"Persisting  datalake {self.data_source.datalake_name}")
         file_path = self.get_file_path_for_table(table_name=table_name)
 
         iso_calendar = data[time_index_name].dt.isocalendar()
@@ -555,25 +558,15 @@ class DataLakeInterface:
         df=df.reset_index()
         summary_dict = {"BY_ASSET_VENUE":{}}
         if is_multin_index:
-            per_group_dict = {}
 
             grouped = (
 
-                df.groupby(["asset_symbol", "execution_venue_symbol"])["time_index"]
+                df.groupby(["unique_identifier"])["time_index"]
                 .agg(["min", "max"])
             )  # This returns a Pandas DataFrame with index=(asset_symbol, exec_venue) and columns=[min, max]
 
-            # 4. Convert the result into a nested dictionary structure:
-            #    { asset_symbol : { execution_venue_symbol : { "min": ..., "max": ... } } }
 
-            for (asset, venue), row in grouped.iterrows():
-                if asset not in per_group_dict:
-                    per_group_dict[asset] = {}
-                per_group_dict[asset][venue] = {
-                    "min": row["min"].timestamp(),
-                    "max": row["max"].timestamp()
-                }
-            summary_dict["BY_ASSET_VENUE"]=per_group_dict
+            summary_dict["BY_ASSET_VENUE"]=grouped.applymap(lambda x: x.timestamp()).to_dict("index")
         #add to summary dict the global_max and global_min
 
         global_min = df[time_index_name].min().timestamp()

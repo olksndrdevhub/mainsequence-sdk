@@ -1573,6 +1573,17 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
         except Exception as e:
             raise e
 
+    def model_dump_json(self, **json_dumps_kwargs) -> str:
+        """
+        Dump the current instance to a JSON string,
+        ensuring that the dependent `related_resource` is also properly dumped.
+        """
+        # Obtain the dictionary representation using Pydantic's model_dump
+        dump = self.model_dump()
+        # Properly dump the dependent resource if it supports model_dump
+        dump["related_resource"] = self.related_resource.model_dump()
+        # Convert the dict to a JSON string
+        return json.dumps(dump, **json_dumps_kwargs)
     @classmethod
     @property
     def ROOT_URL(cls):
@@ -1616,12 +1627,12 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
             cloudpickle.dump(self, handle)
 
     @classmethod
-    def get_or_create(cls, *args, **kwargs):
+    def get_or_create_local_data_source(cls, *args, **kwargs):
         url = cls.ROOT_URL + "/get_or_create/"
         for field in ['datalake_start', 'datalake_end']:
             if field in kwargs and kwargs[field] is not None:
                 kwargs[field] = int(kwargs[field].timestamp())
-        kwargs["data_type"] = CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
+        kwargs["data_type"] = CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE[0]
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": kwargs})
 
@@ -1629,7 +1640,10 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
             raise Exception(f"Error in request {r.text}")
         return cls(**r.json())
 
-    def has_direct_connection(self):
+    def has_direct_postgres_connection(self):
+
+        if self.related_resource.class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
+            return False
         has_direct=self.related_resource.class_type!='remote'
         if has_direct:
             assert self.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB
@@ -1637,7 +1651,7 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
 
     def get_data_by_time_index(self,*args,**kwargs):
 
-        if self.has_direct_connection():
+        if self.has_direct_postgres_connection():
             stc = kwargs["local_metadata"].remote_table.sourcetableconfiguration
 
             df = TimeScaleInterface.direct_data_from_db(
@@ -1651,11 +1665,12 @@ class DynamicTableDataSource(BaseTdagPydanticModel,BaseObject):
             return self.related_resource.get_data_by_time_index(*args,**kwargs)
 
     def insert_data_into_table(self,*args,**kwargs):
-        if self.has_direct_connection():
+        if self.has_direct_postgres_connection():
             TimeScaleInterface.process_and_update_table(
                 data_source=self.related_resource,
                *args,**kwargs,
             )
+
         else:
             self.related_resource.insert_data_into_table(*args,**kwargs)
 
@@ -1689,7 +1704,6 @@ class PodLocalLake(DataSource):
     datalake_end: Optional[datetime.datetime] = Field(None, description="The end time of the data lake")
     datalake_start: Optional[datetime.datetime] = Field(None, description="The start time of the data lake")
     nodes_to_get_from_db: Optional[Dict] = Field(None, description="Nodes to retrieve from the database as JSON")
-    persist_logs_to_file: bool = Field(False, description="Whether to persist logs to a file")
     use_s3_if_available: bool = Field(False, description="Whether to use S3 if available")
 
 
@@ -1735,11 +1749,12 @@ class PodLocalLake(DataSource):
         less_or_equal: bool = True,
         columns: Optional[List[str]] = None,
         unique_identifier_list: Optional[List[str]] = None,
+            unique_identifier_range_map: Optional[Dict] = None,
 
     ) -> pd.DataFrame:
 
-        metadata = local_metadata["remote_table"]
-        table_name = metadata["table_name"]
+        metadata = local_metadata.remote_table
+        table_name = metadata.table_name
         data_lake_interface = DataLakeInterface(data_lake_source=self)
 
         filters = data_lake_interface.build_time_and_symbol_filter(
@@ -1748,6 +1763,7 @@ class PodLocalLake(DataSource):
             great_or_equal=great_or_equal,
             less_or_equal=less_or_equal,
             unique_identifier_list=unique_identifier_list,
+            unique_identifier_range_map=unique_identifier_range_map,
         )
 
         df = data_lake_interface.query_datalake(filters=filters, table_name=table_name)
@@ -1865,11 +1881,6 @@ class TimeScaleDB(DataSource):
                 df[c] = df[c].astype(c_type)
         df = df.set_index(stc.index_names)
         return df
-
-
-
-
-
 
 
 
