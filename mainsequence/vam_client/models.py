@@ -229,7 +229,7 @@ class BaseObjectOrm:
             elif r.status_code == 500:
                 raise Exception("Server Error")
             else:
-                return {}
+                return []
         else:
             serialized=[r.json()] if "pk" in kwargs else r.json()
             new_serialized=[]
