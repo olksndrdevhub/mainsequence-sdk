@@ -12,10 +12,11 @@ from mainsequence.vam_client.local_vault import get_all_entries_in_vault_for_ven
 from mainsequence.logconf import logger
 from tqdm import tqdm
 VAM_ENDPOINT = os.environ.get('VAM_ENDPOINT')
+assert VAM_ENDPOINT is not None, "VAM_ENDPOINT environment variable has not been set"
 VAM_API_ENDPOINT=f"{VAM_ENDPOINT}/orm/api"
 VAM_REST_TOKEN_URL=f"{VAM_ENDPOINT}/auth/rest-token-auth/"
 
-assert VAM_API_ENDPOINT is not None, "VAM_ENDPOINT environment variable has not been set"
+
 VAM_ADMIN_USER=os.environ.get('VAM_ADMIN_USER')
 VAM_ADMIN_PASSWORD=os.environ.get('VAM_ADMIN_PASSWORD')
 

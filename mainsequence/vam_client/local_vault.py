@@ -13,15 +13,7 @@ if VAULT_PATH is not None:
         DATABASE_FILE = f'{root_path}/local_vault.db'
         ENCRYPTION_KEY_FILE = f'{root_path}/VAULT_ENCRYPTION_KEY'
 
-def get_venue_from_symbol(execution_venue_symbol):
-    ev, _ = ExecutionVenue.filter(symbol=execution_venue_symbol)
-    if len(ev) == 0:
-        # create if not exists
-        ev = ExecutionVenue.create(symbol=execution_venue_symbol,
-                                   name=CONSTANTS.EXECUTION_VENUES_NAMES[execution_venue_symbol])
-    else:
-        ev = ev[0]
-    return ev
+
 
 def get_secrets_for_account_id(account_id):
     """

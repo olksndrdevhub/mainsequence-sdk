@@ -127,6 +127,7 @@ session=build_session(loaders=loaders)
 
 class BaseObjectOrm:
     END_POINTS = {
+        "User":"user",
         "TargetPortfolio": 'target_portfolio',
 
         "Asset": "asset",
@@ -210,49 +211,106 @@ class BaseObjectOrm:
         return parameters
 
     @classmethod
-    def filter(cls, timeout=None, *args, **kwargs):
-        base_url = cls.get_object_url()
-        params = cls._parse_parameters_filter(parameters=kwargs)
+    def filter(cls, timeout=None, **kwargs):
+        """
+        Fetches *all pages* from a DRF-paginated endpoint.
+        Accumulates results from each page until 'next' is None.
 
-        request_kwargs = {"params": params,}
-        url = f"{base_url}/"
-        if "pk" in kwargs:
-            url = f"{base_url}/{kwargs['pk']}/"
-            request_kwargs = {}
+        Returns a list of `cls` objects (not just one page).
 
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="GET", url=url, payload=request_kwargs,
-                         timeout=timeout)
+        DRF's typical paginated response looks like:
+            {
+              "count": <int>,
+              "next": <str or null>,
+              "previous": <str or null>,
+              "results": [ ...items... ]
+            }
+        """
+        base_url = cls.get_object_url()  # e.g. "https://api.example.com/assets"
+        params = cls._parse_parameters_filter(kwargs)
 
-        if r.status_code != 200:
-            if r.status_code == 401:
-                raise Exception("Unauthorized please add credentials to environment")
-            elif r.status_code == 500:
-                raise Exception("Server Error")
-            else:
-                return []
-        else:
-            serialized=[r.json()] if "pk" in kwargs else r.json()
-            new_serialized=[]
+        # We'll handle pagination by following the 'next' links from DRF.
+        accumulated = []
+        next_url = f"{base_url}/"  # Start with the main endpoint (list)
 
-            for q in serialized:
-                q["orm_class"]=cls.__name__
+        while next_url:
+            # For each page, do a GET request
+            r = make_request(
+                s=cls.build_session(),
+                loaders=cls.LOADERS,
+                r_type="GET",
+                url=next_url,  # next_url changes each iteration
+                payload={"params": params},
+                timeout=timeout
+            )
+
+            if r.status_code != 200:
+                # Handle errors or break out
+                if r.status_code == 401:
+                    raise Exception("Unauthorized. Please add credentials to environment.")
+                elif r.status_code == 500:
+                    raise Exception("Server Error.")
+                else:
+                    raise Exception(r.status_code)
+
+            data = r.json()
+            # data should be a dict with "count", "next", "previous", and "results".
+
+            # DRF returns the next page URL in `data["next"]`
+            next_url = data["next"]  # either a URL string or None
+
+            # data["results"] should be a list of objects
+            for item in data["results"]:
+                # Insert "orm_class" if you still need that
+                item["orm_class"] = cls.__name__
                 try:
-                    new_serialized.append(cls(**q))
+                    accumulated.append(cls(**item))
                 except Exception as e:
                     raise e
 
-            return  new_serialized
+
+            # We set `params = None` (or empty) after the first loop to avoid appending repeatedly
+            # but only if DRF's `next` doesn't contain the query parameters.
+            # Usually, DRF includes them, so you don't need to do anything special here.
+            params = None
+
+        return accumulated
+
 
     @classmethod
-    def get(cls,*args,**kwargs):
+    def get(cls, pk, timeout=None):
+        """
+        Retrieves exactly one object by primary key: GET /base_url/<pk>/
+        Raises `DoesNotExist` if 404 or the response is empty.
+        Raises Exception if multiple or unexpected data is returned.
+        """
+        base_url = cls.get_object_url()
+        url = f"{base_url}/{pk}/"  # e.g. https://api.example.com/assets/123/
 
-        instance = cls.filter(*args, **kwargs)
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="GET",
+            url=url,
+            payload={},  # Typically no query params for a single retrieve
+            timeout=timeout
+        )
 
-        if len(instance)==0:
-            raise DoesNotExist
-        if len(instance)!=1:
-            raise Exception(f"Get does not return only one instance ")
-        return instance[0]
+        if r.status_code == 404:
+            raise DoesNotExist(f"No object found for pk={pk}")
+        elif r.status_code == 401:
+            raise Exception("Unauthorized. Please add credentials to environment.")
+        elif r.status_code == 500:
+            raise Exception("Server Error")
+        elif r.status_code != 200:
+            # Some other error; handle as appropriate
+            raise Exception(f"Unexpected status code: {r.status_code}")
+
+        # Expecting a single JSON object
+        data = r.json()
+        # Instantiate the single object
+        data["orm_class"] = cls.__name__
+        return cls(**data)
 
     @staticmethod
     def serialize_for_json(kwargs):
@@ -278,7 +336,7 @@ class BaseObjectOrm:
         r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="POST", url=f"{base_url}/", payload=payload,
                          timeout=timeout
                          )
-        if r.status_code not in [201, 200]:
+        if r.status_code not in [201]:
            raise Exception(r.text)
         return cls(** r.json())
 
@@ -330,6 +388,8 @@ class BaseObjectOrm:
     
     def delete(self,*args,**kwargs):
         return self.__class__.destroy_by_id(self.id)
+
+
 
 
 class ExecutionPositions(BaseObjectOrm,BaseVamPydanticModel):
@@ -407,6 +467,55 @@ class Calendar(BaseObjectOrm,BaseVamPydanticModel):
     id: Optional[int] = None
     name: str
     calendar_dates:Optional[dict]=None
+
+
+
+class Organization(BaseModel):
+    id: int
+    uid: str
+    name: str
+    url: Optional[str]  # URL can be None
+
+class Group(BaseModel):
+    id: int
+    name: str
+    permissions: List[Any]  # Adjust the type for permissions as needed
+
+class User(BaseObjectOrm,BaseVamPydanticModel):
+    id: int
+    password: str
+    is_superuser: bool
+    first_name: str
+    last_name: str
+    is_staff: bool
+    is_active: bool
+    date_joined: datetime.datetime
+    role: str
+    username: str
+    email: str
+    last_login: datetime.datetime
+    api_request_limit: int
+    mfa_secret: Optional[str]
+    mfa_enabled: bool
+    organization: Organization
+    plan: Optional[Any]  # Use a specific model if plan details are available
+    groups: List[Group]
+    user_permissions: List[Any]  # Adjust as necessary for permission structure
+
+    @classmethod
+    def get_object_url(cls):
+        url = f"{cls.ROOT_URL.replace('orm/api', 'users/api')}/{cls.END_POINTS[cls.class_name()]}"
+        return url
+    @classmethod
+    def get_authenticated_user_details(cls):
+        url = f"{cls.get_object_url()}/get_user_details/"
+
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="GET", url=url,)
+        if r.status_code not in [200, 201]:
+            raise Exception(f" {r.text()}")
+
+        return cls(**r.json())
+
 
 class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
 
@@ -508,31 +617,113 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
         return [cls(**a) for a in r.json()]
 
     @classmethod
-    def filter_with_asset_class(cls,timeout=None,*args,**kwargs):
+    def filter_with_asset_class(cls, timeout=None, *args, **kwargs):
+        """
+        Filters assets and returns instances with their correct asset class,
+        looping through all DRF-paginated pages.
+        """
         from .models_helpers import create_from_serializer_with_class
+
         base_url = cls.get_object_url()
+        # Convert `kwargs` to query parameters
         params = cls._parse_parameters_filter(parameters=kwargs)
 
-        request_kwargs = {"params": params, }
+        # We'll call the custom action endpoint
         url = f"{base_url}/list_with_asset_class/"
-        if "pk" in kwargs:
-            url = f"{base_url}/{kwargs['pk']}/"
-            request_kwargs = {}
+        all_results = []
 
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="GET", url=url, payload=request_kwargs,
-                         timeout=timeout)
-        if r.status_code != 200:
-            raise Exception("Error getting assets")
-        
-        return create_from_serializer_with_class(r.json())
+        # Build a single requests session
+        s = cls.build_session()
+
+        while url:
+            # Make the request to the current page URL
+            request_kwargs = {"params": params} if params else {}
+            r = make_request(
+                s=s,
+                loaders=cls.LOADERS,
+                r_type="GET",
+                url=url,
+                payload=request_kwargs,
+                timeout=timeout
+            )
+
+            if r.status_code != 200:
+                raise Exception(f"Error getting assets (status code: {r.status_code})")
+
+            data = r.json()
+
+            # Check if it's a DRF paginated response by looking for "results"
+            if isinstance(data, dict) and "results" in data:
+                # Paginated response
+                results = data["results"]
+                next_url = data["next"]
+            else:
+                # Either not paginated or no "results" key
+                # It's possible your endpoint returns a plain list or other structure
+                # Adjust accordingly if needed
+                results = data
+                next_url = None
+
+            # Accumulate the results
+            all_results.extend(results)
+
+            # Prepare for the next loop iteration
+            url = next_url
+            # After the first request, DRF's `next` link is a full URL that already includes
+            # appropriate query params, so we set `params=None` to avoid conflicts.
+            params = None
+
+        # Convert the accumulated raw data into asset instances with correct classes
+        return create_from_serializer_with_class(all_results)
         
 class AssetCategory(BaseObjectOrm, BaseVamPydanticModel):
+    id:int
+    unique_id:str
     name:str
     source:str
     assets:List[int]
+    organization_owner_uid:str
     
     def __repr__(self):
-        return self.name+" source:"+self.source 
+        return self.name+" source:"+self.source
+
+    def append_assets(self, asset_ids: List[int]) -> "AssetCategory":
+        """
+        Append the given asset IDs to this category.
+        Expects a payload: {"assets": [<asset_id1>, <asset_id2>, ...]}
+        """
+        url = f"{self.get_object_url()}/{self.id}/append-assets/"
+        payload = {"assets": asset_ids}
+        r = make_request(
+            s=self.build_session(),
+            loaders=self.LOADERS,
+            r_type="POST",
+            url=url,
+            payload={"json":payload}
+        )
+        if r.status_code not in [200, 201]:
+            raise Exception(f"Error appending assets: {r.text()}")
+        # Return a new instance of AssetCategory built from the response JSON.
+        return AssetCategory(**r.json())
+
+    def remove_assets(self, asset_ids: List[int]) -> "AssetCategory":
+        """
+        Remove the given asset IDs from this category.
+        Expects a payload: {"assets": [<asset_id1>, <asset_id2>, ...]}
+        """
+        url = f"{self.get_object_url()}/{self.id}/remove-assets/"
+        payload = {"assets": asset_ids}
+        r = make_request(
+            s=self.build_session(),
+            loaders=self.LOADERS,
+            r_type="POST",
+            url=url,
+            payload={"json": payload}
+        )
+        if r.status_code not in [200, 201]:
+            raise Exception(f"Error removing assets: {r.text()}")
+        # Return a new instance of AssetCategory built from the response JSON.
+        return AssetCategory(**r.json())
     
 class Asset(AssetMixin, BaseObjectOrm):
 
