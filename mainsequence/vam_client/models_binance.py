@@ -122,57 +122,6 @@ class BaseFuturesAccount(AccountMixin,BinanceBaseObject):
 
 
 
-    def sync_funds(self,
-                   target_trade_time: Union[None, datetime.datetime] = None,
-                   target_holdings: Union[None, dict] = None, holdings_source: Union[str, None] = None,
-                   target_weights: Union[None, dict] = None,
-                   end_of_execution_time: Union[None, datetime.datetime] = None, timeout=None,
-                   is_trade_snapshot=False
-                   ) -> [pd.DataFrame,BinanceFuturesAccountRiskFactors]:
-
-        """
-
-        Parameters
-        ----------
-        account_data :
-        target_trade_time :
-        target_holdings :
-        holdings_source :
-        end_of_execution_time :
-
-        Returns
-        -------
-
-        """
-
-
-        base_url = self.get_object_url()
-        url = f"{base_url}/{self.id}/sync_funds/"
-        payload = {"json": {}}
-        if target_trade_time is not None:
-            end_of_execution_time = end_of_execution_time.strftime(
-                DATE_FORMAT) if end_of_execution_time is not None else None
-            payload["json"] = {"target_trade_time": target_trade_time.strftime(DATE_FORMAT),
-                               "target_holdings": target_holdings,
-                               "target_weights": target_weights,
-                               "holdings_source": holdings_source,
-                               "end_of_execution_time": end_of_execution_time,
-                               "is_trade_snapshot": is_trade_snapshot
-                               }
-
-
-        r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="POST", url=url, payload=payload,
-                         timeout=timeout)
-        if r.status_code == 404:
-            #asset not found Create
-            response=r.json()
-            raise Exception(response.json())
-
-        if r.status_code != 200:
-
-            raise Exception("Error Syncing funds in account")
-
-        return pd.DataFrame(json.loads(r.json()))
 
 class BinanceFuturesTestNetAccount(BaseFuturesAccount):
     pass

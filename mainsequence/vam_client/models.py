@@ -17,7 +17,8 @@ from enum import IntEnum, Enum
 
 
 
-from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, CONSTANTS,VAM_API_ENDPOINT
+from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, CONSTANTS, VAM_API_ENDPOINT, \
+    VAM_ENDPOINT
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field, validator,root_validator
 import time
@@ -98,7 +99,7 @@ class BaseVamPydanticModel(BaseModel):
 
 
 def get_correct_asset_class(asset_type):
-    if asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_SPOT, CONSTANTS.ASSET_TYPE_CASH_EQUITY]:
+    if asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_SPOT, CONSTANTS.ASSET_TYPE_CASH_EQUITY,CONSTANTS.ASSET_TYPE_CURRENCY]:
         return Asset
     elif asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_USDM]:
         return AssetFutureUSDM
@@ -142,6 +143,7 @@ class BaseObjectOrm:
         "Trade": "trade",
         "VirtualFundHistoricalHoldings": "historical_holdings",
         "AccountHistoricalHoldings": "account_historical_holdings",
+        "AccountRiskFactors":"account_risk_factors",
         "AccountPortfolioScheduledRebalance": "account_portfolio_scheduled_rebalance",
         "AccountPortfolioHistoricalPositions":"account_portfolio_historical_positions",
         "ExecutionPrediction": "execution_predictions",
@@ -264,7 +266,7 @@ class BaseObjectOrm:
                 # Insert "orm_class" if you still need that
                 item["orm_class"] = cls.__name__
                 try:
-                    accumulated.append(cls(**item))
+                    accumulated.append(cls(**item) if issubclass(cls,BaseVamPydanticModel) else item)
                 except Exception as e:
                     raise e
 
@@ -528,7 +530,7 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
     execution_venue: Union["ExecutionVenue", int]
     delisted_datetime: Optional[datetime.datetime] = None
     unique_identifier: str
-    unique_symbol: str
+    unique_symbol: Optional[str]=None
 
     @staticmethod
     def get_properties_from_unique_symbol(unique_symbol: str):
@@ -733,10 +735,19 @@ class Asset(AssetMixin, BaseObjectOrm):
         return self.symbol
     
     @classmethod
-    def create_or_update_index_asset_from_portfolios(cls,*args,**kwargs)->"TargetPortfolioIndexAsset":
+    def create_or_update_index_asset_from_portfolios(cls,
+                                                     live_portfolio:int,
+                                                     backtest_portfolio:int,
+                                                     valuation_asset:int,
+                                                     calendar:str,timeout=None
+                                                     )->"TargetPortfolioIndexAsset":
         url = f"{cls.get_object_url()}/create_or_update_index_asset_from_portfolios/"
-        payload = {"json": kwargs}
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
+        payload = {"json": dict(  live_portfolio=live_portfolio,
+                                                     backtest_portfolio=backtest_portfolio,
+                                                     valuation_asset=valuation_asset,
+                                                     calendar=calendar)}
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload,
+                         timeout=timeout)
         if r.status_code not in [200,201]:
             raise Exception(f" {r.text()}")
 
@@ -754,6 +765,16 @@ class TargetPortfolioIndexAsset(IndexAsset):
     execution_venue: "ExecutionVenue"= Field(
         default_factory=lambda: ExecutionVenue(**CONSTANTS.VENUE_MAIN_SEQUENCE_PORTFOLIOS)
     )
+
+    @property
+    def live_portfolio_details_url(self):
+
+        return f"{VAM_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.live_portfolio.id}"
+
+    @property
+    def backtest_portfolio_details_url(self):
+
+        return f"{VAM_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.backtest_portfolio.id}"
 
 class CurrencyPairMixin(AssetMixin, BaseVamPydanticModel):
     base_asset: Union[AssetMixin, int]
@@ -824,18 +845,16 @@ class AccountTargetPortfolio(BaseObjectOrm,BaseVamPydanticModel):
     @property
     def unique_identifier(self):
         return self.related_account_id
-    def __repr__(self):
-        return f"{self.class_name()}: for account {self.related_account}"
+
 
 class AccountMixin(BaseVamPydanticModel):
     id: Optional[int] = None
-    account_id: str
     execution_venue: "ExecutionVenue"
     account_is_active: bool
     account_name: Optional[str] = None
     is_account_in_cool_down:bool
     cash_asset: Asset
-    execution_mode:str
+    is_paper:bool
     is_on_manual_rebalance: bool
     user: Optional[int] = None
     execution_configuration:"AccountExecutionConfiguration"
@@ -973,16 +992,7 @@ class AccountMixin(BaseVamPydanticModel):
 
 class Account(AccountMixin,BaseObjectOrm,BaseVamPydanticModel):
 
-    def sync_funds(self,fernet_key:object,
-                   target_trade_time:Union[None,datetime.datetime]=None,
-                   target_holdings: Union[None, dict] = None,holdings_source:Union[str,None]=None,
-                   target_weights:Union[None,dict]=None,  holdings_source_id:Union[int,None]=None,
-                 
-                   end_of_execution_time: Union[None, datetime.datetime] = None,timeout=None,
-                   last_income_record:Union[None,object]=None,is_trade_snapshot=False
-                   )->pd.DataFrame:
-       raise Exception("Use Account per exchange")
-
+    ...
 
 
 class AccountLatestHoldingsSerializer(BaseObjectOrm,BaseVamPydanticModel):
@@ -998,6 +1008,9 @@ class AccountLatestHoldingsSerializer(BaseObjectOrm,BaseVamPydanticModel):
 
     holdings: list
 
+class AccountRiskFactors(BaseObjectOrm):
+
+    ...
 
 
 class AccountHistoricalHoldings(BaseObjectOrm,BaseVamPydanticModel):
@@ -1006,7 +1019,7 @@ class AccountHistoricalHoldings(BaseObjectOrm,BaseVamPydanticModel):
     comments: Optional[str] = Field(None, max_length=150)
     nav: Optional[float] = None
 
-    related_account: "Account"
+    related_account: Union[int,"Account"]
     is_trade_snapshot: bool = Field(default=False)
     target_trade_time: Optional[datetime.datetime] = None
     related_expected_asset_exposure_df: Optional[Dict[str, Any]] = None
@@ -1027,9 +1040,6 @@ class AccountHistoricalHoldings(BaseObjectOrm,BaseVamPydanticModel):
             raise Exception(r.text)
 
 
-class AccountRiskFactors(BaseVamPydanticModel):
-    related_holdings: Optional[AccountHistoricalHoldings] = None
-    account_balance: float
 
 
 class FundingFeeTransaction(BaseObjectOrm):
@@ -1086,7 +1096,7 @@ class HistoricalWeights(BaseObjectOrm,BaseVamPydanticModel):
 
         r = make_request(s=cls.build_session(),
                          loaders=cls.LOADERS, r_type="POST", url=url, payload=payload, timeout=timeout)
-        if r.status_code not in [201, 204]:
+        if r.status_code not in [201, 200]:
             raise Exception(f"Error inserting new weights {r.text}")
      
         return cls(**r.json())
@@ -1197,16 +1207,39 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
     creation_date: Optional[datetime.datetime] = None
     execution_configuration: Union[int, TargetPortfolioExecutionConfiguration]
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}: {self.id} - {self.portfolio_ticker}"
+
 
     @classmethod
-    def create_from_time_series(cls, *args,**kwargs) -> None:
+    def create_from_time_series(cls,  portfolio_name: str,
+                            build_purpose: str,
+                            local_time_serie_id: int,
+                            local_time_serie_hash_id: str,
+                            local_signal_time_serie_id:int,
+                            is_active: bool ,
+                            available_in_venues__symbols:list[str],
+                            execution_configuration: dict,
+                            calendar_name: str,
+                            tracking_funds_expected_exposure_from_latest_holdings:bool
+                                ) -> "PortfolioType":
         url = f"{cls.get_object_url()}/create_from_time_series/"
-        payload = {"json":kwargs}
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code in [200] == False:
-            raise Exception(f" {r.text()}")
+        # Build the payload with the required arguments.
+        payload_data = {
+            "portfolio_name": portfolio_name,
+            "build_purpose": build_purpose,
+            "is_active": is_active,
+            "local_time_serie_id": local_time_serie_id,
+            "local_time_serie_hash_id": local_time_serie_hash_id,
+            # Using the same ID for local_signal_time_serie_id as specified.
+            "local_signal_time_serie_id": local_signal_time_serie_id,
+            "available_in_venues__symbols": available_in_venues__symbols,
+            "execution_configuration": execution_configuration,
+            "calendar_name": calendar_name,
+            "tracking_funds_expected_exposure_from_latest_holdings":tracking_funds_expected_exposure_from_latest_holdings
+        }
+
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": payload_data},)
+        if r.status_code not in [201]:
+            raise Exception(f" {r.json()}")
 
         return cls(**r.json())
 
@@ -1242,23 +1275,7 @@ class TargetPortfolioFrontEndDetails(BaseObjectOrm, BaseVamPydanticModel):
     @staticmethod
     def get_base_endpoint():
         return  VAM_API_ENDPOINT.replace("orm/api","api/")
-    
-    @classmethod
-    def filter(cls, timeout=None, *args, **kwargs):
-        url = cls.get_base_endpoint()+"target-portfolio-details"
-        params = cls._parse_parameters_filter(parameters=kwargs)
 
-        request_kwargs = {"params": params, }
-        if "pk" in kwargs:
-            url = f"{url}/{kwargs['pk']}/"
-            request_kwargs = {}
-
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="GET", url=f"{url}/", payload=request_kwargs,
-                         timeout=timeout)
-        if r.status_code not in [ 200]:
-            raise Exception(r.text)
-
-        return [cls(**i) for i in r.json()]
     @classmethod
     def create(cls, *args, **kwargs):
         """
@@ -1568,7 +1585,7 @@ class Order(BaseObjectOrm,BaseVamPydanticModel):
 
 
 
-class OrderManagerTargetRebalance(BaseObjectOrm,BaseVamPydanticModel):
+class OrderManagerTargetQuantity(BaseObjectOrm,BaseVamPydanticModel):
 
     id:Optional[int]=None
     asset:Union[Asset,int]
@@ -1577,7 +1594,7 @@ class OrderManagerTargetRebalance(BaseObjectOrm,BaseVamPydanticModel):
 class OrderManager(BaseObjectOrm,BaseVamPydanticModel):
     id: Optional[int] = None
     target_time: datetime.datetime
-    target_rebalance: list[OrderManagerTargetRebalance]
+    target_rebalance: list[OrderManagerTargetQuantity]
     order_received_time: Optional[datetime.datetime] = None
     execution_end: Optional[datetime.datetime] = None
     related_account: Union[Account,int]  # Representing the ForeignKey field with the related account ID

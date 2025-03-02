@@ -24,7 +24,7 @@ import structlog.contextvars as cvars
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager, DataLakePersistManager
 from mainsequence.tdag_client.models import (none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate,
-                                             DataUpdates
+                                             DataUpdates,UniqueIdentifierRangeMap
                                              )
 from numpy.f2py.auxfuncs import isint1
 
@@ -1282,7 +1282,7 @@ class DataPersistanceMethods(ABC):
                              end_date: Union[datetime.datetime, None] = None,
                              unique_identifier_list: Union[None, list] = None,
                               great_or_equal=True, less_or_equal=True,
-                             unique_identifier_range_map:Optional[dict] = None,
+                             unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
                              ):
         func = self.local_persist_manager.get_df_between_dates
         sig = inspect.signature(func)
@@ -1364,7 +1364,7 @@ class DataPersistanceMethods(ABC):
             return None
 
 
-
+        #todo request specific endpoint
         last_observation = self.get_df_between_dates(
             start_date=update_statistics._max_time_in_update_statistics, great_or_equal=True,
             unique_identifier_list=unique_identifier_list
@@ -1592,7 +1592,7 @@ class APITimeSerie(CommonMethodsMixin):
 
     def get_df_between_dates(self, start_date: Optional[datetime.datetime] = None,
                              end_date: Optional[datetime.datetime] = None,
-                             unique_identifier_list: Optional[list] = None,unique_identifier_range_map:Optional[dict] = None,
+                             unique_identifier_list: Optional[list] = None,unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
                               great_or_equal=True, less_or_equal=True,
                              ):
 
@@ -1606,7 +1606,7 @@ class APITimeSerie(CommonMethodsMixin):
 
         return filtered_data
 
-    def filter_by_assets_ranges(self, unique_identifier_range_map: dict):
+    def filter_by_assets_ranges(self, unique_identifier_range_map: UniqueIdentifierRangeMap):
         """
 
         Parameters
@@ -1729,6 +1729,45 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         - set_graph node
 
     """
+
+    def __init__(self, init_meta=None,
+                 build_meta_data: Union[dict, None] = None, local_kwargs_to_ignore: Union[List[str], None] = None,
+
+                 *args, **kwargs):
+        """
+        Initializes the TimeSerie object with the provided metadata and configurations.
+
+        This method sets up the time series object, loading the necessary configurations
+        and metadata. If `is_local_relation_tree_set` is True, it avoids recalculating the
+        relationship tree in schedulers, optimizing the process if the tree is already
+        calculated during initialization.
+
+        Parameters
+        ----------
+        init_meta : dict, optional
+            Metadata for initializing the time series instance.
+        build_meta_data : dict, optional
+            Metadata related to the building process of the time series.
+        local_kwargs_to_ignore : list, optional
+            List of keyword arguments to ignore during configuration.
+        *args : tuple
+            Additional arguments.
+        **kwargs : dict
+            Additional keyword arguments.
+        """
+
+        self.init_meta = init_meta
+        self.build_meta_data = self.sanitize_default_build_metadata(build_meta_data)
+        self.local_kwargs_to_ignore = local_kwargs_to_ignore
+
+        self.pre_load_routines_run = False
+
+        # asser that method is decorated
+        if not len(self.__init__.__closure__) == 1:
+            logger.error("init method is not decorated with @TimeSerie._post_init_routines()")
+            raise Exception
+        # create logger
+
     @staticmethod
     def set_context_in_logger(logger_context:dict):
         global logger
@@ -1737,7 +1776,25 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
     @staticmethod
     def get_time_serie_source_code(TimeSerieClass: "TimeSerie"):
-        return inspect.getsource(TimeSerieClass)
+        global logger
+        try:
+            # First try the standard approach.
+            source = inspect.getsource(TimeSerieClass)
+            if source.strip():
+                return source
+        except Exception:
+            logger.warning("Your TimeSeries is not in a python module this will likely bring exceptions when running in a pipeline")
+        from IPython import get_ipython
+        # Fallback: Scan IPython's input history.
+        ip = get_ipython()  # Get the current IPython instance.
+        if ip is not None:
+            # Retrieve the full history as a single string.
+            history = "\n".join(code for _, _, code in ip.history_manager.get_range())
+            marker = f"class {TimeSerieClass.__name__}"
+            idx = history.find(marker)
+            if idx != -1:
+                return history[idx:]
+        return "Source code unavailable."
 
     @staticmethod
     def get_time_serie_source_code_git_hash(TimeSerieClass: "TimeSerie"):
@@ -1803,43 +1860,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             build_meta_data["initialize_with_default_partitions"] = True
         return build_meta_data
 
-    def __init__(self, init_meta=None,
-                 build_meta_data: Union[dict, None] = None, local_kwargs_to_ignore: Union[List[str], None] = None,
 
-                 *args, **kwargs):
-        """
-        Initializes the TimeSerie object with the provided metadata and configurations.
-
-        This method sets up the time series object, loading the necessary configurations
-        and metadata. If `is_local_relation_tree_set` is True, it avoids recalculating the
-        relationship tree in schedulers, optimizing the process if the tree is already
-        calculated during initialization.
-
-        Parameters
-        ----------
-        init_meta : dict, optional
-            Metadata for initializing the time series instance.
-        build_meta_data : dict, optional
-            Metadata related to the building process of the time series.
-        local_kwargs_to_ignore : list, optional
-            List of keyword arguments to ignore during configuration.
-        *args : tuple
-            Additional arguments.
-        **kwargs : dict
-            Additional keyword arguments.
-        """
-
-        self.init_meta = init_meta
-        self.build_meta_data = self.sanitize_default_build_metadata(build_meta_data)
-        self.local_kwargs_to_ignore = local_kwargs_to_ignore
-
-        self.pre_load_routines_run = False
-
-        # asser that method is decorated
-        if not len(self.__init__.__closure__) == 1:
-            logger.error("init method is not decorated with @TimeSerie._post_init_routines()")
-            raise Exception
-        # create logger
 
     def get_html_description(self) -> Union[str, None]:
         """
@@ -2750,7 +2771,7 @@ class WrapperTimeSerie(TimeSerie):
                                                       thread: bool = False,
                                                       unique_identifier_list: Optional[list] = None,
                                                       return_as_list=False, key_date_filter: Optional[dict] = None,
-                                                      unique_identifier_range_map:Optional[dict] = None,
+                                                      unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
                                                       ) -> pd.DataFrame:
         """
          Concatenate DataFrames from all wrapped TimeSeries between given dates.

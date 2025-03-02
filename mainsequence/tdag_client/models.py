@@ -19,7 +19,7 @@ from mainsequence.logconf import logger
 
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, Any
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any,TypedDict
 from .data_sources_interfaces.local_data_lake import DataLakeInterface
 from .data_sources_interfaces import timescale as TimeScaleInterface
 from functools import wraps
@@ -89,9 +89,6 @@ def none_if_backend_detached(func):
 JSON_COMPRESSED_PREFIX = ["json_compressed", "jcomp_"]
 
 
-
-
-
 loaders=AuthLoaders()
 
 
@@ -104,7 +101,12 @@ class AlreadyExist(Exception):
 if "dth_ws" not in locals():
     DTH_WS = None
 
-
+class DateInfo(TypedDict, total=False):
+    start_date: Optional[datetime.datetime]
+    start_date_operand: Optional[str]
+    end_date: Optional[datetime.datetime]
+    end_date_operand: Optional[str]
+UniqueIdentifierRangeMap = Dict[str, DateInfo]
 
 def request_to_datetime(string_date: str):
     if "+" in string_date:
@@ -680,7 +682,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                                         less_or_equal: bool,
                                         unique_identifier_list: list,
                                         columns: list,
-                                        unique_identifier_range_map: Union[None, dict]
+                                        unique_identifier_range_map: Union[None, UniqueIdentifierRangeMap]
                                         ):
 
         # Helper function to make a single batch request (or multiple paged requests if next_offset).
@@ -1291,7 +1293,7 @@ class DataUpdates(BaseTdagPydanticModel):
     """
     TODO WIP Helper function to work with the table updates
     """
-    update_statistics: Optional[Dict[str, Any]]=None
+    update_statistics: Optional[Dict[str, Union[datetime.datetime,None]]]=None
     max_time_index_value:Optional[datetime.datetime]=None #does not include fitler
     _max_time_in_update_statistics: Optional[datetime.datetime]=None #include filter
 
@@ -1300,7 +1302,7 @@ class DataUpdates(BaseTdagPydanticModel):
         return cls()
 
     def is_empty(self):
-        return self.update_statistics is None or self.max_time_index_value is None
+        return self.update_statistics is None and self.max_time_index_value is None
 
     def get_min_latest_value(self, init_fallback_date: datetime=None):
         if not self.update_statistics:
@@ -1467,6 +1469,7 @@ class ChatObject(BaseTdagPydanticModel,BaseObject):
 
 
 
+
 class DataSource(BaseTdagPydanticModel,BaseObject):
     id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
     organization: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
@@ -1502,7 +1505,7 @@ class DataSource(BaseTdagPydanticModel,BaseObject):
             less_or_equal: bool = True,
             columns: Optional[List[str]] = None,
             unique_identifier_list: Optional[List[str]] = None,
-            unique_identifier_range_map:Optional[Dict] = None,
+            unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
 
     ) -> pd.DataFrame:
 
@@ -1749,7 +1752,7 @@ class PodLocalLake(DataSource):
         less_or_equal: bool = True,
         columns: Optional[List[str]] = None,
         unique_identifier_list: Optional[List[str]] = None,
-            unique_identifier_range_map: Optional[Dict] = None,
+            unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
 
     ) -> pd.DataFrame:
 

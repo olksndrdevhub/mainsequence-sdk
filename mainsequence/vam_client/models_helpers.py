@@ -69,22 +69,6 @@ def get_right_asset_class(execution_venue_symbol:str,asset_type:str):
         raise Exception(f"There are no assets of type {asset_type}  in {execution_venue_symbol}")
     return AssetClass
 
-def sync_account_funds(account:Account,*args,**kwargs)->Account:
-    """
-    This functions takes and Account and makes the correct sync  by quering the right account objectt
-    Parameters
-    ----------
-    account :
-
-    Returns
-    -------
-
-    """
-    
-    account=get_right_account_class(account=account)
-    _,risk_factors=account.sync_funds(*args,**kwargs)
-
-    return account, risk_factors
 
 
 def copy_assets_between_orms(execution_venue_symbol: Union[list,None],

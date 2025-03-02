@@ -33,6 +33,7 @@ ccxt = "*"
 kombu = "*"
 psutil = "*"
 python-dotenv = "*"
+ipywidgets = "*"
 
 [dev-packages]
 mkdocs = "*"

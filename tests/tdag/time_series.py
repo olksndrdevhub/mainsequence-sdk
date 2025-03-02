@@ -13,6 +13,9 @@ class TestFeature2(TimeSerie):
         super().__init__(*args, **kwargs)
 
     def update_series_from_source(self, update_statistics):
+
+
+
         update_time = datetime.datetime.now(pytz.utc).replace(microsecond=0, second=0)
         data = pd.DataFrame(index=[update_time], columns=[a.unique_identifier for a in self.asset_list]).fillna(0)
         data.index.name = "time_index"
@@ -27,8 +30,6 @@ class TestFeature(TimeSerie):
         self.asset_list=asset_list
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
         self.base_feature=TestFeature2(asset_list=asset_list,other_config=other_config,*args,**kwargs)
-
-        new_code_to=5
 
         super().__init__(*args, **kwargs)
 

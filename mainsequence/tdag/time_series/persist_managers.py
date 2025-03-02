@@ -5,7 +5,7 @@ import os
 from mainsequence.logconf import logger
 
 
-from mainsequence.tdag_client import (LocalTimeSerie,
+from mainsequence.tdag_client import (LocalTimeSerie,UniqueIdentifierRangeMap,
                                       LocalTimeSeriesDoesNotExist, PodLocalLake,
                                       DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS, DynamicTableMetaData,
                                       DataUpdates)
@@ -29,7 +29,7 @@ class APIPersistManager:
                              less_or_equal=True,
                              unique_identifier_list: Union[list, None] = None,
                              columns: Union[list, None] = None,
-                             unique_identifier_range_map: Union[dict, None] = None,):
+                             unique_identifier_range_map: Union[UniqueIdentifierRangeMap, None] = None,):
         filtered_data = self.local_metadata.get_data_between_dates_from_api(
 
                                                         start_date=start_date,
@@ -55,7 +55,7 @@ class APIPersistManager:
         filtered_data=filtered_data.set_index(stc.index_names)
         return filtered_data
 
-    def filter_by_assets_ranges(self, unique_identifier_range_map: dict,time_serie:"TimeSerie"):
+    def filter_by_assets_ranges(self, unique_identifier_range_map: UniqueIdentifierRangeMap,time_serie:"TimeSerie"):
         df = self.get_df_between_dates(start_date=None, end_date=None, unique_identifier_range_map=unique_identifier_range_map)
         return df
 
@@ -582,7 +582,7 @@ class PersistManager:
                              less_or_equal=True,
                              unique_identifier_list: Union[list, None] = None,
                              columns: Union[list, None] = None,
-                             unique_identifier_range_map:Optional[dict]=None):
+                             unique_identifier_range_map:Optional[UniqueIdentifierRangeMap]=None):
 
         filtered_data = self.data_source.get_data_by_time_index(local_metadata=self.local_metadata,
                                                         start_date=start_date,

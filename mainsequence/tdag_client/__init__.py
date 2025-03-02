@@ -5,7 +5,7 @@ AuthLoaders.set_tdag_token_in_environment()
 from .models import  ( request_to_datetime,
 LocalTimeSeriesDoesNotExist,DynamicTableDoesNotExist,SourceTableConfigurationDoesNotExist,ChatYamls,SignalYamls,LocalTimeSerieUpdateDetails,
     JSON_COMPRESSED_PREFIX,Scheduler ,SchedulerDoesNotExist,LocalTimeSerie,DynamicTableMetaData,
-DynamicTableDataSource,LocalTimeSerieNode,PodLocalLake,Project,
+DynamicTableDataSource,LocalTimeSerieNode,PodLocalLake,Project,UniqueIdentifierRangeMap,
 BACKEND_DETACHED,DataUpdates,
                        ChatObject)
 
