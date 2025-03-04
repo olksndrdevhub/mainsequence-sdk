@@ -287,7 +287,7 @@ class BaseObjectOrm:
         Raises Exception if multiple or unexpected data is returned.
         """
         if pk is not None:
-            base_url = cls.get_object_url()G
+            base_url = cls.get_object_url()
             detail_url = f"{base_url}/{pk}/"
 
             r = make_request(
