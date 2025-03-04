@@ -253,7 +253,7 @@ class BaseObjectOrm:
                 elif r.status_code == 500:
                     raise Exception("Server Error.")
                 else:
-                    raise Exception(r.status_code)
+                    raise Exception(f"{r.status_code} - {r.text}")
 
             data = r.json()
             # data should be a dict with "count", "next", "previous", and "results".
@@ -287,7 +287,7 @@ class BaseObjectOrm:
         Raises Exception if multiple or unexpected data is returned.
         """
         if pk is not None:
-            base_url = cls.get_object_url()
+            base_url = cls.get_object_url()G
             detail_url = f"{base_url}/{pk}/"
 
             r = make_request(
