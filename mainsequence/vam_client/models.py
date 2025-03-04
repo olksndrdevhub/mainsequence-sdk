@@ -1231,8 +1231,10 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
                             available_in_venues__symbols:list[str],
                             execution_configuration: dict,
                             calendar_name: str,
-                            tracking_funds_expected_exposure_from_latest_holdings:bool
-                                ) -> "PortfolioType":
+                            tracking_funds_expected_exposure_from_latest_holdings: bool,
+                            *args,
+                            **kwargs
+    ) -> "PortfolioType":
         url = f"{cls.get_object_url()}/create_from_time_series/"
         # Build the payload with the required arguments.
         payload_data = {
@@ -1251,7 +1253,7 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
 
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": payload_data},)
         if r.status_code not in [201]:
-            raise Exception(f" {r.json()}")
+            raise Exception(f" {r.text}")
 
         return cls(**r.json())
 
