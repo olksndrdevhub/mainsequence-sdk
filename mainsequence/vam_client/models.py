@@ -280,39 +280,51 @@ class BaseObjectOrm:
 
 
     @classmethod
-    def get(cls, pk, timeout=None):
+    def get(cls, pk=None, timeout=None, **filters):
         """
         Retrieves exactly one object by primary key: GET /base_url/<pk>/
         Raises `DoesNotExist` if 404 or the response is empty.
         Raises Exception if multiple or unexpected data is returned.
         """
-        base_url = cls.get_object_url()
-        url = f"{base_url}/{pk}/"  # e.g. https://api.example.com/assets/123/
+        if pk is not None:
+            base_url = cls.get_object_url()
+            detail_url = f"{base_url}/{pk}/"
 
-        r = make_request(
-            s=cls.build_session(),
-            loaders=cls.LOADERS,
-            r_type="GET",
-            url=url,
-            payload={},  # Typically no query params for a single retrieve
-            timeout=timeout
-        )
+            r = make_request(
+                s=cls.build_session(),
+                loaders=cls.LOADERS,
+                r_type="GET",
+                url=detail_url,
+                payload={},
+                timeout=timeout
+            )
 
-        if r.status_code == 404:
-            raise DoesNotExist(f"No object found for pk={pk}")
-        elif r.status_code == 401:
-            raise Exception("Unauthorized. Please add credentials to environment.")
-        elif r.status_code == 500:
-            raise Exception("Server Error")
-        elif r.status_code != 200:
-            # Some other error; handle as appropriate
-            raise Exception(f"Unexpected status code: {r.status_code}")
+            if r.status_code == 404:
+                raise DoesNotExist(f"No object found for pk={pk}")
+            elif r.status_code == 401:
+                raise Exception("Unauthorized. Please add credentials to environment.")
+            elif r.status_code == 500:
+                raise Exception("Server Error")
+            elif r.status_code != 200:
+                raise Exception(f"Unexpected status code: {r.status_code}")
 
-        # Expecting a single JSON object
-        data = r.json()
-        # Instantiate the single object
-        data["orm_class"] = cls.__name__
-        return cls(**data)
+            data = r.json()
+            data["orm_class"] = cls.__name__
+            return cls(**data)
+
+        # Otherwise, do the filter approach
+        candidates = cls.filter(timeout=timeout, **filters)
+
+        if not candidates:
+            raise DoesNotExist(f"No {cls.class_name()} found matching {filters}")
+
+        if len(candidates) > 1:
+            raise Exception(
+                f"Multiple {cls.class_name()} objects found for filters {filters}. "
+                f"Expected exactly one."
+            )
+
+        return candidates[0]
 
     @staticmethod
     def serialize_for_json(kwargs):
@@ -361,7 +373,7 @@ class BaseObjectOrm:
         return cls(** r.json())
     
     @classmethod
-    def destroy_by_id(cls,instance_id,*args,**kwargs):
+    def destroy_by_id(cls, instance_id,*args,**kwargs):
         base_url = cls.get_object_url()
         data = cls.serialize_for_json(kwargs)
         payload = {"json": data}
