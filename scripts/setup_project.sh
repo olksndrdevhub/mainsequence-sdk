@@ -81,7 +81,7 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   touch "$VFB_PROJECT_PATH/rebalance_strategies/__init__.py"
 
   # Copy a sample notebook (optional)
-  cp -a "/opt/code/VirtualFundBuilder/notebooks/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy step failed!"
+  cp -a "/opt/code/mainsequence-sdk/notebooks/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy step failed!"
 
   chown -R 1000:100 "$HOME_DIR" 2>/dev/null || true
   python -m pip freeze > ${ROOT_PROJECT_PATH}/requirements.txt
