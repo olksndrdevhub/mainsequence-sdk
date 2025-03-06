@@ -1345,7 +1345,7 @@ class DataPersistanceMethods(ABC):
 
     def get_last_observation(self, unique_identifier_list: Optional[list] = None,
 
-                             ):
+                             )->pd.DataFrame():
         """
 
         (1) Requests last observatiion from local persist manager
@@ -1361,7 +1361,7 @@ class DataPersistanceMethods(ABC):
 
         update_statistics = self.get_update_statistics(unique_identifier_list=unique_identifier_list)
         if update_statistics.is_empty():
-            return None
+            return pd.DataFrame()
 
 
         #todo request specific endpoint

@@ -2,7 +2,6 @@ import pytz
 import pandas as pd
 import datetime
 import numpy as np
-import numpy as np
 np.NaN = np.nan
 import dotenv
 dotenv.load_dotenv('../../.env')
@@ -23,7 +22,6 @@ class SimulatedPrices(TimeSerie):
         yesterday at midnight (UTC).
     """
     SIMULATION_OFFSET_START = datetime.timedelta(days=30)
-    SIMULATION_OFFSET_END = datetime.timedelta(days=20)
 
     @TimeSerie._post_init_routines()
     def __init__(self, asset_list: ModelList, *args, **kwargs):
@@ -39,7 +37,7 @@ class SimulatedPrices(TimeSerie):
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
         super().__init__(*args, **kwargs)
 
-    def update_series_from_source(self, update_statistics: DataUpdates):
+    def update_series_from_source(self, update_statistics: DataUpdates)->pd.DataFrame:
         """
         Mocks price updates for assets with stochastic lognormal returns.
 
@@ -66,43 +64,32 @@ class SimulatedPrices(TimeSerie):
             self.asset_list, init_fallback_date=now - self.SIMULATION_OFFSET_START
         )
 
-        if update_statistics.is_empty():
-            # CASE 1: No prior updates; simulate data from (now-30 days) to (now-20 days), floored to the minute.
-            sim_start = (now - self.SIMULATION_OFFSET_START).replace(second=0, microsecond=0)
-            sim_end = (now - self.SIMULATION_OFFSET_END).replace(second=0, microsecond=0)
-            time_range = pd.date_range(start=sim_start, end=sim_end, freq='H')
-            for asset in self.asset_list:
-                random_returns = np.random.lognormal(mean=mu, sigma=sigma, size=len(time_range))
-                simulated_prices = initial_price * np.cumprod(random_returns)
-                df_asset = pd.DataFrame({asset.unique_identifier: simulated_prices}, index=time_range)
-                df_list.append(df_asset)
-        else:
-            # CASE 2: Use update_statistics and the last observation to determine the simulation start price.
-            # Get the latest historical observations; assumed to be a DataFrame with a multi-index:
-            # (time_index, unique_identifier) and a column "feature_1" for the last observed price.
-            last_observation = self.get_last_observation()
-            # Define simulation end: yesterday at midnight (UTC)
-            yesterday_midnight = datetime.datetime.now(pytz.utc).replace(
-                hour=0, minute=0, second=0, microsecond=0
-            ) - datetime.timedelta(days=1)
-            # Loop over each unique identifier and its last update timestamp.
-            for unique_id, last_update in update_statistics.update_statistics.items():
-                # Simulation starts one hour after the last update.
-                start_time = last_update + datetime.timedelta(hours=1)
-                if start_time > yesterday_midnight:
-                    continue  # Skip if no simulation period is available.
-                time_range = pd.date_range(start=start_time, end=yesterday_midnight, freq='H')
-                if len(time_range) == 0:
-                    continue
-                # Use the last observed price for the asset as the starting price.
-                try:
-                    last_price = last_observation.xs(unique_id, level="unique_identifier")["feature_1"].iloc[-1]
-                except KeyError:
-                    last_price = initial_price  # Fallback to default if not found.
-                random_returns = np.random.lognormal(mean=mu, sigma=sigma, size=len(time_range))
-                simulated_prices = last_price * np.cumprod(random_returns)
-                df_asset = pd.DataFrame({unique_id: simulated_prices}, index=time_range)
-                df_list.append(df_asset)
+
+        # Get the latest historical observations; assumed to be a DataFrame with a multi-index:
+        # (time_index, unique_identifier) and a column "feature_1" for the last observed price.
+        last_observation = self.get_last_observation()
+        # Define simulation end: yesterday at midnight (UTC)
+        yesterday_midnight = datetime.datetime.now(pytz.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ) - datetime.timedelta(days=1)
+        # Loop over each unique identifier and its last update timestamp.
+        for unique_id, last_update in update_statistics.update_statistics.items():
+            # Simulation starts one hour after the last update.
+            start_time = last_update + datetime.timedelta(hours=1)
+            if start_time > yesterday_midnight:
+                continue  # Skip if no simulation period is available.
+            time_range = pd.date_range(start=start_time, end=yesterday_midnight, freq='H')
+            if len(time_range) == 0:
+                continue
+            # Use the last observed price for the asset as the starting price.
+            try:
+                last_price = last_observation.xs(unique_id, level="unique_identifier")["feature_1"].iloc[-1]
+            except KeyError:
+                last_price = initial_price  # Fallback to default if not found.
+            random_returns = np.random.lognormal(mean=mu, sigma=sigma, size=len(time_range))
+            simulated_prices = last_price * np.cumprod(random_returns)
+            df_asset = pd.DataFrame({unique_id: simulated_prices}, index=time_range)
+            df_list.append(df_asset)
 
         if df_list:
             data = pd.concat(df_list, axis=1)
