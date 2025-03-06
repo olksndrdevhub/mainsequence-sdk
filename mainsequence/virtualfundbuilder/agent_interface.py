@@ -1,0 +1,61 @@
+import copy
+import json
+import os
+import traceback
+from pathlib import Path
+
+import yaml
+
+from mainsequence.virtualfundbuilder.enums import StrategyType
+from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
+from mainsequence.virtualfundbuilder.utils import _send_strategy_to_registry, is_jupyter_environment
+from .utils import logger
+
+
+class TDAGAgent:
+    backend_registered = False
+
+    def __init__(self):
+        from mainsequence.virtualfundbuilder.__main__ import VirtualFundLauncher
+
+        self.logger = logger
+
+        # initialize default state once
+        if not self.backend_registered:
+            VirtualFundLauncher().send_default_configuration()
+            self.backend_registered = True
+
+        self.logger.info("Setup TDAG Agent successfull")
+
+    def generate_portfolio(self, cls, signal_description=None):
+        full_signal_description = f"Create me a default portfolio using the {cls.__name__} signal."
+        if signal_description is not None:
+            full_signal_description += f"\n{signal_description}"
+        else:
+            full_signal_description += f"Use NVDA, AAPL and GOOGL for the assets universe."
+
+        _send_strategy_to_registry(StrategyType.SIGNAL_WEIGHTS_STRATEGY, cls, is_jupyter=is_jupyter_environment(), is_production=False)
+
+        payload = {
+            "strategy_name": cls.__name__,
+            "signal_description": full_signal_description,
+        }
+        self.logger.info(f"Get configuration for {cls.__name__} ...")
+        payload = json.loads(json.dumps(payload))
+        try:
+            from mainsequence.tdag_client.models import create_configuration_for_strategy
+            response = create_configuration_for_strategy(json_payload=payload)
+            if response.status_code not in [200, 201]:
+                raise Exception(response.text)
+
+            generated_configuration = response.json()["generated_configuration"]
+            portfolio = PortfolioInterface(generated_configuration)
+
+            self.logger.info(f"Received configuration:\n{portfolio}")
+
+        except Exception as e:
+            self.logger.warning(f"Could not get configuration from TSORM {e}")
+            traceback.print_exc()
+            return None
+
+        return portfolio
