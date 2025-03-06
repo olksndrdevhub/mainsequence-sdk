@@ -35,7 +35,7 @@ class IntradayTrend(WeightsBase, TimeSerie):
         self.bars_ts, self.asset_symbols = get_prices_timeseries(copy.deepcopy(self.assets_configuration))
 
 
-    def update_series_from_source(self, latest_value: Union[datetime, None], params_for_tree_run=None, *args, **kwargs) -> pd.DataFrame:
+    def update(self, latest_value: Union[datetime, None], params_for_tree_run=None, *args, **kwargs) -> pd.DataFrame:
         """
         Updates the weights considering rebalance periods and execution frequency.
 

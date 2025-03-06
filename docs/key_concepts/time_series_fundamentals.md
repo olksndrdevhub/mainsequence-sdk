@@ -11,7 +11,7 @@ Updating an ORM with the state of the data and the pipeline's updates.
 The `TimeSerie` class is primarily defined by two key methods:
 
 1. The `__init__` method, which constructs the initial details and configuration of the class.
-2. The `update_series_from_source(latest_value=None)` method, which handles updating the time series with new data
+2. The `update(latest_value=None)` method, which handles updating the time series with new data
    starting from the latest value.
 
 By defining these two methods, it will be enough to make a time series work and be able to interconnect with other time
@@ -20,7 +20,7 @@ series.
 ```mermaid
 flowchart TD
     subgraph TDAG_System[TDAG Framework]
-         TimeSerieConstructor["TimeSerie.__init__(*args, **kwargs)"] -->|Defines| TimeSerie["TimeSerie.update_series_from_source(latest_value)"]
+         TimeSerieConstructor["TimeSerie.__init__(*args, **kwargs)"] -->|Defines| TimeSerie["TimeSerie.update(latest_value)"]
     end
 
     subgraph DataRepositories["Data Repositories"]
@@ -116,10 +116,10 @@ Each time a time series is pickled, **its code is hashed, and a unique identifie
 
 
 
-## `update_series_from_source` Method
+## `update` Method
 
 ```python
-   def update_series_from_source(self, latest_value: Union[None, datetime.datetime], *args, **kwargs) -> pd.DataFrame:
+   def update(self, latest_value: Union[None, datetime.datetime], *args, **kwargs) -> pd.DataFrame:
     """
     This method performs all the necessary logic to update our time series. The method should always return a DataFrame with the following characteristics:
 

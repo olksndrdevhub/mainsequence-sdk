@@ -115,7 +115,7 @@ def get_lasso_coefficients():
 
 
 class ETFReplicator(TimeSerie):
-    def update_series_from_source(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
+    def update(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
         if latest_value is None:
             latest_value = datetime.datetime(2010, 1, 1).replace(tzinfo=pytz.utc)
         start_value = latest_value - datetime.timedelta(days=self.in_window)

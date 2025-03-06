@@ -53,7 +53,7 @@ class FixedWeights(WeightsBase, TimeSerie):
         return info
 
     @send_weights_as_position_to_vam
-    def update_series_from_source(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
+    def update(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
         if latest_value is not None:
             return pd.DataFrame()  # No need to store more than one constant weight
         latest_value = latest_value or datetime(1985, 1, 1).replace(tzinfo=pytz.utc)
@@ -115,7 +115,7 @@ class MarketCap(WeightsBase, TimeSerie):
         )
 
     @send_weights_as_position_to_vam
-    def update_series_from_source(self, update_statistics):
+    def update(self, update_statistics):
         """
         Args:
             latest_value (Union[datetime, None]): The timestamp of the most recent data point.

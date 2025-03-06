@@ -213,7 +213,7 @@ class ETFReplicator(WeightsBase, TimeSerie):
         betas.index.name = "time_index"
         return betas
 
-    def update_series_from_source(
+    def update(
         self, latest_value: Union[datetime, None], *args, **kwargs
     ) -> pd.DataFrame:
         if latest_value is None:

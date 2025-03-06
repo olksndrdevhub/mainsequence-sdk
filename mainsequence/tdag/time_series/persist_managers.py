@@ -733,7 +733,7 @@ class DataLakePersistManager(PersistManager):
                 for _,sub_ts in ts.related_time_series.items():
                     sub_ts.local_persist_manager #query the first run
             else:
-                df = ts.update_series_from_source(update_statistics=update_statistics)
+                df = ts.update(update_statistics=update_statistics)
 
 
             if df is None:
@@ -756,8 +756,8 @@ class DataLakePersistManager(PersistManager):
     def set_already_run(self, already_run: bool):
         """
         This methos is critical as it control the level of introspection and avouids recursivity\
-        This happens for example when TimeSeries.update_series_from_source(*,**):
-        TimeSeries.update_series_from_source(latest_value,*,**):
+        This happens for example when TimeSeries.update(*,**):
+        TimeSeries.update(latest_value,*,**):
             self.get_update_statistics() <- will incurr in a circular refefence using local data late
         Args:
             introspection:

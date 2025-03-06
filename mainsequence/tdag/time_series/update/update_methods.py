@@ -169,7 +169,7 @@ class TimeSerieUpdater:
 
                 are_dependencies_updates, error_on_dependencies = self._check_if_dependencies_are_updated()
 
-        self.time_serie.update( raise_exceptions=True, update_tree=self.update_tree,
+        self.time_serie.start_time_serie_update( raise_exceptions=True, update_tree=self.update_tree,
                              update_tracker=update_tracker,
                                 debug_mode=False
                           )

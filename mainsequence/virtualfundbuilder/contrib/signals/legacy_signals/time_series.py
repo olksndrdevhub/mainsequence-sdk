@@ -109,7 +109,7 @@ class LongShortMomentum(WeightsBase, TimeSerie):
         return top_coins, bottom_coins
 
     @send_weights_as_position_to_vam
-    def update_series_from_source(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
+    def update(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
         """
         Calculates signal weights for a long/short momentum strategy using market capitalization.
         Long weights are positive while short weights are negative.
@@ -245,7 +245,7 @@ class Beta(TimeSerie):
         )
         super().__init__(*args, **kwargs)
 
-    def update_series_from_source(self, latest_value: datetime, *args, **kwargs) -> pd.DataFrame:
+    def update(self, latest_value: datetime, *args, **kwargs) -> pd.DataFrame:
         """
         Updates and calculates new beta values based on the most recent asset prices and market index returns.
 
@@ -358,7 +358,7 @@ class BetaMomentum(WeightsBase, TimeSerie):
             signal_weights_strategy_config=None,
         )
 
-    def update_series_from_source(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
+    def update(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
         """
         Calculates signal weights in a way that aims to neutralize beta across the portfolio.
         First a long/short strategy is used to get the top and bottom coins and then the weights are adapted for a

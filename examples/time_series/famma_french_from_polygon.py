@@ -36,7 +36,7 @@ class FamaFrenchTimeSerie(TimeSerie):
         # No asset_list is required, we dynamically discover equities from Polygon.
         super().__init__(*args, **kwargs)
 
-    def update_series_from_source(self, update_statistics: DataUpdates):
+    def update(self, update_statistics: DataUpdates):
         """
         1) Determine how far back to fetch data using update_statistics.
         2) Pull a list of stocks from Polygon's reference endpoint.
@@ -223,7 +223,7 @@ def test_fama_french_time_serie():
 
     # 2) CASE 1: Simulation with empty DataUpdates
     print("=== FIRST RUN WITH EMPTY DATA UPDATES ===")
-    data_df = ff_ts.update_series_from_source(DataUpdates())
+    data_df = ff_ts.update(DataUpdates())
     print(data_df)
 
     # 3) Extract the max time per unique_identifier
@@ -239,7 +239,7 @@ def test_fama_french_time_serie():
 
     # 4) CASE 2: Another run, simulating an incremental update.
     print("\n=== SECOND RUN USING EXTRACTED update_statistics ===")
-    df_updates = ff_ts.update_series_from_source(updates)
+    df_updates = ff_ts.update(updates)
     print(df_updates)
 
 if __name__ == "__main__":

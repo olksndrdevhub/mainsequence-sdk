@@ -523,7 +523,7 @@ class PortfolioStrategy(TimeSerie):
 
         return raw_prices, interpolated_prices
 
-    def update_series_from_source(self, update_statistics):
+    def update(self, update_statistics):
         """
         Updates the portfolio weights based on the latest available data.
 

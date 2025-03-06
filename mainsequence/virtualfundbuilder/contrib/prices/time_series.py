@@ -772,7 +772,7 @@ class InterpolatedPrices(TimeSerie):
         )
         return upsampled_df
 
-    def update_series_from_source(
+    def update(
             self,
             update_statistics: DataUpdates
     ) -> pd.DataFrame:
@@ -904,7 +904,7 @@ class InterpolatedPricesLive():
 
         return bars_df
 
-    def update_series_from_source(
+    def update(
             self,
             update_statistics:DataUpdates
     ) -> pd.DataFrame:

@@ -1074,7 +1074,7 @@ class TimeSerieRebuildMethods(ABC):
         )
 
     @tracer.start_as_current_span("TS: Update")
-    def update(self, update_tracker: object, debug_mode: bool,
+    def start_time_serie_update(self, update_tracker: object, debug_mode: bool,
                raise_exceptions=True, update_tree=False,
                local_time_series_map: Union[Dict[str,LocalTimeSerie], None] = None, update_only_tree=False, force_update=False,
                use_state_for_update=False
@@ -1673,7 +1673,7 @@ class APITimeSerie(CommonMethodsMixin):
             last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values()])
         return last_update_in_table
 
-    def update_series_from_source(self, latest_value: Union[None, datetime.datetime], *args, **kwargs) -> pd.DataFrame:
+    def update(self, latest_value: Union[None, datetime.datetime], *args, **kwargs) -> pd.DataFrame:
         self.logger.info("Not updating series")
         pass
 
@@ -2062,7 +2062,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                                          data_source_id=self.data_source.id,
                                          logger=self.logger,
                                          force_next_start_of_minute=False)
-                error_on_update = self.update(debug_mode=debug_mode,
+                error_on_update = self.start_time_serie_update(debug_mode=debug_mode,
                                               raise_exceptions=True,
                                               force_update=force_update,
                                               update_tree=update_tree,
@@ -2390,7 +2390,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
                         try:
 
-                            error_on_last_update = ts.update(debug_mode=debug_mode,
+                            error_on_last_update = ts.start_time_serie_update(debug_mode=debug_mode,
                                                              raise_exceptions=True,
                                                              update_tree=False,
                                                              update_tracker=self.update_tracker
@@ -2518,7 +2518,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 latest_value = overwrite_latest_value
 
                 self.logger.info(f'Updating Local Time Series for  {self}  since {latest_value}')
-                temp_df = self.update_series_from_source(update_statistics=update_statistics)
+                temp_df = self.update(update_statistics=update_statistics)
 
                 if temp_df.shape[0] == 0:
                     # concatenate empty
@@ -2537,7 +2537,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 if not update_statistics:
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
                 try:
-                    temp_df = self.update_series_from_source(update_statistics=update_statistics)
+                    temp_df = self.update(update_statistics=update_statistics)
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
@@ -2568,7 +2568,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
     def _run_post_update_routines(self, error_on_last_update: bool):
         pass
 
-    def update_series_from_source(self, update_statistics: DataUpdates, ) -> pd.DataFrame:
+    def update(self, update_statistics: DataUpdates, ) -> pd.DataFrame:
         """
 
         """
@@ -2926,7 +2926,7 @@ class WrapperTimeSerie(TimeSerie):
 
         return all_dfs
 
-    def update_series_from_source(self, update_statistics):
+    def update(self, update_statistics):
 
         """ Implemented in the wrapped nodes"""
         pass

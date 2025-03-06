@@ -843,8 +843,8 @@ organized by date ranges and table hashes.</p>
 <code class="highlight language-python"><span class="n">set_already_run</span><span class="p">(</span><span class="n">already_run</span><span class="p">)</span></code>
 </h5>
 <div class="doc doc-contents">
-<p>This methos is critical as it control the level of introspection and avouids recursivity        This happens for example when TimeSeries.update_series_from_source(<em>,</em><em>):
-TimeSeries.update_series_from_source(latest_value,</em>,**):
+<p>This methos is critical as it control the level of introspection and avouids recursivity        This happens for example when TimeSeries.update(<em>,</em><em>):
+TimeSeries.update(latest_value,</em>,**):
     self.get_update_statistics() &lt;- will incurr in a circular refefence using local data late
 Args:
     introspection:</p>

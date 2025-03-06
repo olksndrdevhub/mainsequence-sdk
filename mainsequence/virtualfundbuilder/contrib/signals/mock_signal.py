@@ -35,7 +35,7 @@ class MockSignal(WeightsBase, TimeSerie):
         return self.source_frequency
 
     @send_weights_as_position_to_vam
-    def update_series_from_source(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
+    def update(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
         """
         Args:
             latest_value (Union[datetime, None]): The timestamp of the most recent data point.

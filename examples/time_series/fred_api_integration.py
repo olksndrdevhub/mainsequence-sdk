@@ -28,7 +28,7 @@ class FREDTimeSerie(TimeSerie):
         self.asset_list = asset_list
         super().__init__(*args, **kwargs)
 
-    def update_series_from_source(self, update_statistics: DataUpdates):
+    def update(self, update_statistics: DataUpdates):
         """
         Pulls data for each FRED series in fred_symbols.
         Uses update_statistics to track each symbol’s last update date,
@@ -108,7 +108,7 @@ def test_fred_time_serie():
     fred_ts = FREDTimeSerie(asset_list=ModelList(assets))
 
     # Call the update method
-    df = fred_ts.update_series_from_source(DataUpdates())
+    df = fred_ts.update(DataUpdates())
     print(df)
 
 

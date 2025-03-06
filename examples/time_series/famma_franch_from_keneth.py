@@ -27,7 +27,7 @@ class KennethFrenchTimeSerie(TimeSerie):
         RF
     in percent. We'll parse them, convert to decimal, and store them in a DataFrame.
 
-    Steps in update_series_from_source:
+    Steps in update:
       1. Use update_statistics to figure out how far back we need data.
       2. Download & extract the daily 3-factor CSV from Kenneth French's site.
       3. Parse & load the data into a DataFrame.
@@ -46,7 +46,7 @@ class KennethFrenchTimeSerie(TimeSerie):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def update_series_from_source(self, update_statistics: DataUpdates):
+    def update(self, update_statistics: DataUpdates):
         # 1) Determine how far back to fetch data using update_statistics
         #    If empty, fallback to 20 years ago.
         now_utc = datetime.datetime.now(pytz.utc)
@@ -184,7 +184,7 @@ def test_kenneth_french_time_serie():
 
     # First run with empty updates => fetch full data up to 20 yrs back
     print("=== FIRST RUN (EMPTY DataUpdates) ===")
-    df1 = kfts.update_series_from_source(DataUpdates())
+    df1 = kfts.update(DataUpdates())
     print(df1)
 
     if not df1.empty:
@@ -199,7 +199,7 @@ def test_kenneth_french_time_serie():
 
     # Second run => incremental from the last date
     print("\n=== SECOND RUN (INCREMENTAL) ===")
-    df2 = kfts.update_series_from_source(updates)
+    df2 = kfts.update(updates)
     print(df2)
 
 

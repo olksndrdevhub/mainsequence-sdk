@@ -37,7 +37,32 @@ class SimulatedPrices(TimeSerie):
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
         super().__init__(*args, **kwargs)
 
-    def update_series_from_source(self, update_statistics: DataUpdates)->pd.DataFrame:
+    @staticmethod
+    def _get_last_price(obs_df: pd.DataFrame, unique_id: str, fallback: float) -> float:
+        """
+        Helper method to retrieve the last price for a given unique_id or return 'fallback'
+        if unavailable.
+
+        Args:
+            obs_df (pd.DataFrame): A DataFrame with multi-index (time_index, unique_identifier).
+            unique_id (str): Asset identifier to look up.
+            fallback (float): Value to return if the last price cannot be retrieved.
+
+        Returns:
+            float: Last observed price or the fallback value.
+        """
+        # If there's no historical data at all, return fallback immediately
+        if obs_df.empty:
+            return fallback
+
+        # Try to slice for this asset and get the last 'feature_1' value
+        try:
+            slice_df = obs_df.xs(unique_id, level="unique_identifier")["feature_1"]
+            return slice_df.iloc[-1]
+        except (KeyError, IndexError):
+            # KeyError if unique_id not present, IndexError if slice is empty
+            return fallback
+    def update(self, update_statistics: DataUpdates)->pd.DataFrame:
         """
         Mocks price updates for assets with stochastic lognormal returns.
 
@@ -82,10 +107,13 @@ class SimulatedPrices(TimeSerie):
             if len(time_range) == 0:
                 continue
             # Use the last observed price for the asset as the starting price.
-            try:
-                last_price = last_observation.xs(unique_id, level="unique_identifier")["feature_1"].iloc[-1]
-            except KeyError:
-                last_price = initial_price  # Fallback to default if not found.
+                # Get or fallback to initial_price
+            last_price = self._get_last_price(
+                obs_df=last_observation,
+                unique_id=unique_id,
+                fallback=initial_price
+            )
+
             random_returns = np.random.lognormal(mean=mu, sigma=sigma, size=len(time_range))
             simulated_prices = last_price * np.cumprod(random_returns)
             df_asset = pd.DataFrame({unique_id: simulated_prices}, index=time_range)
@@ -117,7 +145,7 @@ def test_simple_crypto_feature():
 
     # CASE 1: Run simulation with an empty DataUpdates instance.
     print("=== Simulation using empty DataUpdates ===")
-    data_update_df = ts.update_series_from_source(DataUpdates())
+    data_update_df = ts.update(DataUpdates())
     print(data_update_df)
 
     # Efficiently extract the latest time per unique_identifier using groupby.
@@ -134,7 +162,7 @@ def test_simple_crypto_feature():
                           max_time_index_value=data_update_df.index.get_level_values("time_index").max())
     # CASE 2: Run simulation using the provided update_statistics instance.
     print("=== Simulation using extracted update_statistics ===")
-    df_updates = ts.update_series_from_source(updates)
+    df_updates = ts.update(updates)
     print(df_updates)
 
 
@@ -172,7 +200,7 @@ class TAFeature(TimeSerie):
         self.prices_time_serie = SimulatedPrices(asset_list=asset_list, *args, **kwargs)
         super().__init__(*args, **kwargs)
 
-    def update_series_from_source(self, update_statistics: DataUpdates):
+    def update(self, update_statistics: DataUpdates):
         """
         Retrieves simulated crypto prices and calculates a TA indicator on those prices.
         It does NOT skip if update_statistics is empty. Instead, for each asset:
@@ -313,7 +341,7 @@ def test_ta_feature_simulated_crypto_prices():
         For simplicity, this version returns the precomputed all_prices_data.
         """
         # In a more realistic scenario, you could filter all_prices_data based on parameters.
-        prices_data = ts.prices_time_serie.update_series_from_source(DataUpdates())
+        prices_data = ts.prices_time_serie.update(DataUpdates())
         return prices_data
 
     # Bind the patch to the instance. One way to do this is by using __get__ to
@@ -321,7 +349,7 @@ def test_ta_feature_simulated_crypto_prices():
     ts.prices_time_serie.get_df_between_dates = get_df_between_dates_patch.__get__( ts.prices_time_serie, type( ts.prices_time_serie))
 
 
-    result = ts.update_series_from_source(DataUpdates())
+    result = ts.update(DataUpdates())
     print(result)
 
 
