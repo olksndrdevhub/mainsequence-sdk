@@ -27,6 +27,8 @@ import math
 import gzip
 import base64
 
+
+
 _default_data_source = None  # Module-level cache
 BACKEND_DETACHED=lambda : os.environ.get('BACKEND_DETACHED',"false").lower()=="true"
 
@@ -485,11 +487,24 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                 tzinfo=pytz.utc)
         if result['update_statistics'] is not None:
             result['update_statistics'] = {k: request_to_datetime(v) for k, v in result['update_statistics'].items()}
+        last_observation=pd.DataFrame()
+        if result["last_observation"] is not None:
+
+            last_observation=pd.DataFrame(result["last_observation"]).T
+            last_observation[result["time_index_name"]]= pd.to_datetime(  last_observation.loc[:,result["time_index_name"]], unit='s', utc=True)
+            if len(result["index_names"])>1:
+                last_observation.index.name="unique_identifier"
+            else:
+                raise NotImplementedError
+            last_observation=last_observation.reset_index().set_index(result["index_names"])
+
         hu = LocalTimeSeriesHistoricalUpdate(**result["historical_update"],
                                              update_statistics=DataUpdates(
                                                  update_statistics=result['update_statistics'],
-                                                 max_time_index_value=result["last_time_index_value"]
+                                                 max_time_index_value=result["last_time_index_value"],
+                                                 last_observation=last_observation,
                                                  ),
+
                                              must_update=result["must_update"],
                                              direct_dependencies_ids=result["direct_dependencies_ids"]
 
@@ -534,11 +549,14 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
 
     def set_last_update_index_time_from_update_stats(self,
                                                      last_time_index_value: float, max_per_asset_symbol,
+                                                     last_observation:dict,
                                                      timeout=None)->"LocalTimeSerie":
         s = self.build_session()
         url = self.get_root_url() + f"/{self.id}/set_last_update_index_time_from_update_stats/"
         payload = {
-            "json": {"last_time_index_value": last_time_index_value, "max_per_asset_symbol": max_per_asset_symbol}}
+            "json": {"last_time_index_value": last_time_index_value,
+                     "last_observation":last_observation,
+                     "max_per_asset_symbol": max_per_asset_symbol}}
         print(f"Set last update index with {payload['json']}")
         r = make_request(s=s, loaders=self.LOADERS, payload=payload, r_type="POST", url=url, time_out=timeout)
 
@@ -799,7 +817,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
             chunk_df = serialized_data_frame.iloc[start_idx:end_idx]
 
             # Compute grouped_dates for this chunk
-            chunk_stats, _ = get_chunk_stats(chunk_df=chunk_df, index_names=index_names,
+            chunk_stats, grouped_dates,last_chunk_observation = get_chunk_stats(chunk_df=chunk_df, index_names=index_names,
                                              time_index_name=time_index_name)
 
             # Convert the chunk to JSON
@@ -815,6 +833,7 @@ class LocalTimeSerie(BaseTdagPydanticModel, BaseObject):
                 "overwrite": overwrite,
                 "chunk_index": i,
                 "total_chunks": total_chunks,
+                "last_observation":last_chunk_observation
             })
             try:
                 r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url, time_out=60 * 15)
@@ -1289,17 +1308,23 @@ class LocalTimeSerieUpdateDetails(BaseTdagPydanticModel,BaseObject):
         return [cls(**i) for i in r.json()]
 
 
-class DataUpdates(BaseTdagPydanticModel):
+class DataUpdates(BaseModel):
     """
     TODO WIP Helper function to work with the table updates
     """
-    update_statistics: Optional[Dict[str, Union[datetime.datetime,None]]]=None
-    max_time_index_value:Optional[datetime.datetime]=None #does not include fitler
-    _max_time_in_update_statistics: Optional[datetime.datetime]=None #include filter
+    update_statistics: Optional[Dict[str, Union[datetime.datetime, None]]] = None
+    max_time_index_value: Optional[datetime.datetime] = None  # does not include filter
+    last_observation: Optional[pd.DataFrame] = Field(default_factory=pd.DataFrame)
+
+    _max_time_in_update_statistics: Optional[datetime.datetime] = None  # include filter
+
+    class Config:
+        arbitrary_types_allowed = True
 
     @classmethod
     def return_empty(cls):
         return cls()
+
 
     def is_empty(self):
         return self.update_statistics is None and self.max_time_index_value is None
@@ -1320,8 +1345,9 @@ class DataUpdates(BaseTdagPydanticModel):
     def update_assets(self, asset_list: Optional[List],*, init_fallback_date: datetime=None,
                       unique_identifier_list:Union[list,None]=None
                       ):
+        logger.warning("REFACTOR TO SHOW LAST_OBSERVATION")
         new_update_statistics=self.update_statistics
-        
+        last_observation=self.last_observation
         if asset_list  is not None or unique_identifier_list is not None:
             new_update_statistics = {}
             unique_identifier_list=[a.unique_identifier for a in asset_list] if unique_identifier_list is None else unique_identifier_list
@@ -1335,10 +1361,14 @@ class DataUpdates(BaseTdagPydanticModel):
                     new_update_statistics[unique_identifier] = init_fallback_date
 
             _max_time_in_update_statistics=max(new_update_statistics.values()) if len(new_update_statistics)>0 else None
+
+            last_observation=last_observation[last_observation.index.get_level_values("unique_identifier").isin(unique_identifier_list)]
+
         else:
             _max_time_in_update_statistics = self.max_time_index_value or init_fallback_date
         du=DataUpdates(update_statistics=new_update_statistics,
                            max_time_index_value=self.max_time_index_value,
+                       last_observation=last_observation
                          )
         du._max_time_in_update_statistics=_max_time_in_update_statistics
         return du
@@ -1410,6 +1440,13 @@ def get_chunk_stats(chunk_df,time_index_name,index_names):
     chunk_stats = {"_GLOBAL_": {"max": chunk_df[time_index_name].max().timestamp(),
                                 "min": chunk_df[time_index_name].min().timestamp()}}
 
+
+
+
+    last_observation = chunk_df.loc[[chunk_df['time_index'].idxmax()]]
+    last_observation[time_index_name]=last_observation[time_index_name].apply(lambda x: x.timestamp())
+    last_observation=last_observation.set_index(time_index_name).to_dict("index")
+
     grouped_dates = None
     if len(index_names) > 1:
         grouped_dates = chunk_df.groupby(["unique_identifier"])[
@@ -1422,7 +1459,15 @@ def get_chunk_stats(chunk_df,time_index_name,index_names):
             }
             for _, row in grouped_dates.reset_index().iterrows()
         }
-    return chunk_stats, grouped_dates
+
+        idx = chunk_df.groupby('unique_identifier')[time_index_name].idxmax()
+        last_observation = chunk_df.loc[idx].reset_index(drop=True)
+        last_observation[time_index_name]=last_observation[time_index_name].apply(lambda x: x.timestamp())
+        last_observation=last_observation.set_index("unique_identifier").to_dict("index")
+
+
+
+    return chunk_stats, grouped_dates, last_observation
 
 
 
@@ -2430,7 +2475,7 @@ class DynamicTableHelpers:
             raise Exception(f"Duplicates found in columns: {index_names}") 
 
 
-        global_stats, grouped_dates = get_chunk_stats(
+        global_stats, grouped_dates,last_observation = get_chunk_stats(
             chunk_df=data,
             index_names=index_names,
             time_index_name=time_index_name
@@ -2457,6 +2502,7 @@ class DynamicTableHelpers:
         local_metadata = local_metadata.set_last_update_index_time_from_update_stats(
             max_per_asset_symbol=max_per_asset_symbol,
             last_time_index_value=last_time_index_value,
+            last_observation=last_observation
         )
 
 

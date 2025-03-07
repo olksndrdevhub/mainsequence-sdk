@@ -1372,11 +1372,6 @@ class DataPersistanceMethods(ABC):
 
         return last_observation
 
-    @property
-    def last_observation(self):
-        last_observation = self.get_last_observation()
-        return last_observation
-
     def delete_time_series(self, delete_only_time_series: bool = False, ):
 
         self.local_persist_manager.delete_time_series(delete_only_time_series=delete_only_time_series)
@@ -2518,7 +2513,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 latest_value = overwrite_latest_value
 
                 self.logger.info(f'Updating Local Time Series for  {self}  since {latest_value}')
-                temp_df = self.update(update_statistics=update_statistics)
+                temp_df = self.set_update_statistics_and_update(update_statistics=update_statistics)
 
                 if temp_df.shape[0] == 0:
                     # concatenate empty
@@ -2537,7 +2532,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 if not update_statistics:
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
                 try:
-                    temp_df = self.update(update_statistics=update_statistics)
+                    temp_df = self.set_update_statistics_and_update(update_statistics=update_statistics)
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
@@ -2567,6 +2562,25 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
     def _run_post_update_routines(self, error_on_last_update: bool):
         pass
+
+    def set_update_statistics_and_update(self, update_statistics: DataUpdates):
+        update_statistics = self.set_update_statistics(update_statistics)
+        return self.update(update_statistics)
+
+    def set_update_statistics(self, update_statistics: DataUpdates):
+        """
+        Default method to narrow down update statistics un local time series,
+        the method will filter using asset_list if the attribute exists as well as the init fallback date
+        :param update_statistics:
+        :return:
+        """
+        # Filter update_statistics to include only assets in self.asset_list.
+
+        asset_list = hasattr(self,"asset_list") or None
+        update_statistics = update_statistics.update_assets(
+            asset_list, init_fallback_date=self.SIMULATION_OFFSET_START
+        )
+        return update_statistics
 
     def update(self, update_statistics: DataUpdates, ) -> pd.DataFrame:
         """
