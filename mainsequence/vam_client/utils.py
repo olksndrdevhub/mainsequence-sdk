@@ -11,17 +11,9 @@ from typing import Union
 from mainsequence.vam_client.local_vault import get_all_entries_in_vault_for_venue
 from mainsequence.logconf import logger
 from tqdm import tqdm
-VAM_ENDPOINT = os.environ.get('VAM_ENDPOINT')
-assert VAM_ENDPOINT is not None, "VAM_ENDPOINT environment variable has not been set"
-VAM_API_ENDPOINT=f"{VAM_ENDPOINT}/orm/api"
-VAM_REST_TOKEN_URL=f"{VAM_ENDPOINT}/auth/rest-token-auth/"
-
-
-VAM_ADMIN_USER=os.environ.get('VAM_ADMIN_USER')
-VAM_ADMIN_PASSWORD=os.environ.get('VAM_ADMIN_PASSWORD')
-
-
-
+TDAG_ENDPOINT = os.environ.get('TDAG_ENDPOINT')
+VAM_API_ENDPOINT = f"{TDAG_ENDPOINT}/orm/api"
+VAM_REST_TOKEN_URL = f"{TDAG_ENDPOINT}/auth/rest-token-auth/"
 
 logger
 
@@ -59,13 +51,8 @@ class AuthLoaders:
             self.gcp_token_decoded = gcp_token_decoded
             self.gcp_token_decoded["exp"] = datetime.datetime.utcfromtimestamp(gcp_token_decoded["exp"])
 
-
-
-
-def get_authorization_headers(token_url=VAM_REST_TOKEN_URL,
-                          username=VAM_ADMIN_USER,password=VAM_ADMIN_PASSWORD):
-
-    headers=get_rest_token_header(token_url=token_url,username=username ,password=password)
+def get_authorization_headers(token_url=VAM_REST_TOKEN_URL):
+    headers = get_rest_token_header(token_url=token_url)
     return headers
 
 def get_gcp_headers():
@@ -74,8 +61,7 @@ def get_gcp_headers():
     from google.auth import jwt
 
     auth_req = google.auth.transport.requests.Request()
-    id_token = google.oauth2.id_token.fetch_id_token(auth_req,
-                                                     VAM_ENDPOINT)
+    id_token = google.oauth2.id_token.fetch_id_token(auth_req, TDAG_ENDPOINT)
     headers = {"X-Serverless-Authorization": f"Bearer {id_token}"}
     return headers, jwt.decode(id_token, verify=False)
 
@@ -148,16 +134,15 @@ def build_session():
 
 
 def get_constants(root_url=VAM_API_ENDPOINT):
-    url = f"{root_url}/constants"
+    url = f"{root_url}/asset_constants"
     loaders = AuthLoaders()
     s = build_session()
     s.headers.update(loaders.auth_headers)
-    r = make_request(s=s,loaders=loaders, r_type="GET", url=url)
-
+    r = make_request(s=s, loaders=loaders, r_type="GET", url=url)
     return r.json()
 
 def get_binance_constants(root_url=VAM_API_ENDPOINT):
-    url = f"{ root_url}/binance/constants"
+    url = f"{root_url}/binance/constants"
     loaders = AuthLoaders()
     s = build_session()
     s.headers.update(loaders.auth_headers)
@@ -218,7 +203,7 @@ if "BINANCE_CONSTANTS" not in locals():
     BINANCE_CONSTANTS = BinanceLazyConstants()
 
 
-def get_rest_token_header(token_url:str,  username:str,password:str  ):
+def get_rest_token_header(token_url: str):
     if token_url is None:
         return None
 

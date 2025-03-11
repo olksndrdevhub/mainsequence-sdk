@@ -17,8 +17,7 @@ from enum import IntEnum, Enum
 
 
 
-from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, CONSTANTS, VAM_API_ENDPOINT, \
-    VAM_ENDPOINT
+from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, CONSTANTS, VAM_API_ENDPOINT, TDAG_ENDPOINT
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field, validator,root_validator
 import time
@@ -781,12 +780,12 @@ class TargetPortfolioIndexAsset(IndexAsset):
     @property
     def live_portfolio_details_url(self):
 
-        return f"{VAM_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.live_portfolio.id}"
+        return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.live_portfolio.id}"
 
     @property
     def backtest_portfolio_details_url(self):
 
-        return f"{VAM_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.backtest_portfolio.id}"
+        return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.backtest_portfolio.id}"
 
 class CurrencyPairMixin(AssetMixin, BaseVamPydanticModel):
     base_asset: Union[AssetMixin, int]

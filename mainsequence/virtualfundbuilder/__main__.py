@@ -33,27 +33,8 @@ from structlog.dev import ConsoleRenderer
 def get_tdag_headers():
     headers = CaseInsensitiveDict()
     headers["Content-Type"] = "application/json"
-
-    MAINSEQUENCE_TOKEN = os.getenv("MAINSEQUENCE_TOKEN")
-    if MAINSEQUENCE_TOKEN is None:
-        raise Exception("MAINSEQUENCE_TOKEN is not set in env")
-    url = f"{os.getenv('TDAG_ENDPOINT')}/user/verify-ms-token/"
-    payload = {"token": MAINSEQUENCE_TOKEN}
-    response = requests.post(url, json=payload)
-
-    if response.status_code != 200:
-        try:
-            error_payload = response.json()
-        except ValueError:
-            error_payload = response.text
-        raise Exception(f"Request failed with status {response.status_code}. "
-                        f"Response was: {error_payload}")
-
-    os.environ["TDAG_TOKEN"] = response.json()["Token"]
-
-    headers["Authorization"] = "Token " + os.getenv("TDAG_TOKEN")
+    headers["Authorization"] = "Token " + os.getenv("MAINSEQUENCE_TOKEN")
     return headers
-
 
 def update_job_status(status_message):
     url = f"{os.getenv('TDAG_ENDPOINT')}/pods/api/job/job_run_status/"

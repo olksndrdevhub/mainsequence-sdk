@@ -142,10 +142,6 @@ get_local_time_serie_update_details=lambda root_url: root_url + "/orm/api/local_
 get_local_time_serie_historical_update_url=lambda root_url:  root_url + "/orm/api/lts_historical_update"
 get_dynamic_table_data_source=lambda root_url: root_url + "/orm/api/dynamic_table_data_source"
 get_project_url=lambda root_url: root_url + "/pods/api/projects"
-get_chat_yaml_url=lambda root_url:  root_url + "/tdag-gpt/api/chat_yaml"
-get_signal_yaml_url=lambda root_url:  root_url + "/tdag-gpt/api/signal_yaml"
-get_chat_object_url=lambda root_url: root_url + "/tdag-gpt/api/chat_object"
-
 
 
 class BaseTdagPydanticModel(BaseModel):

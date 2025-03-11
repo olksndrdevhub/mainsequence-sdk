@@ -177,33 +177,12 @@ def build_application_logger(application_name:str="ms-sdk",
         # do initial request when on logger initialization TODO create startup script
         headers = CaseInsensitiveDict()
         headers["Content-Type"] = "application/json"
-
-        if os.getenv("TDAG_TOKEN") is None:
-            MAINSEQUENCE_TOKEN = os.getenv("MAINSEQUENCE_TOKEN")
-            if MAINSEQUENCE_TOKEN is None:
-                raise Exception("MAINSEQUENCE_TOKEN is not set in env")
-            url = f"{os.getenv('TDAG_ENDPOINT')}/user/verify-ms-token/"
-            payload = {"token": MAINSEQUENCE_TOKEN}
-            response = requests.post(url, json=payload)
-
-            if response.status_code != 200:
-                try:
-                    error_payload = response.json()
-                except ValueError:
-                    error_payload = response.text
-                raise Exception(f"Request failed with status {response.status_code}. "
-                                f"Response was: {error_payload}")
-
-            os.environ["TDAG_TOKEN"] = response.json()["Token"]
-
-        headers["Authorization"] = "Token " + os.getenv("TDAG_TOKEN")
+        headers["Authorization"] = "Token " + os.getenv("MAINSEQUENCE_TOKEN")
 
         project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/pods/api/job/get_job_startup_state'
 
         response = requests.get(project_info_endpoint, headers=headers)
         json_response = response.json()
-
-
 
         logger = logger.bind(project_id=json_response["project_id"], **metadata)
         logger = logger.bind(data_source_id=json_response["data_source_id"], **metadata)
