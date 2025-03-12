@@ -119,7 +119,7 @@ else
 fi
 
 # update the backend that project is setup
-local url="${TDAG_ENDPOINT}/pods/api/job/job_run_status/"
+url="${TDAG_ENDPOINT}/pods/api/job/job_run_status/"
 
 http_code=$(curl -s -o /tmp/update_response.txt -w "%{http_code}" \
   -X POST \
