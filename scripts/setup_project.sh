@@ -118,5 +118,23 @@ else
     echo "requirements.txt not found at ${ROOT_PROJECT_PATH}, skipping installation."
 fi
 
+# update the backend that project is setup
+local url="${TDAG_ENDPOINT}/pods/api/job/job_run_status/"
+
+http_code=$(curl -s -o /tmp/update_response.txt -w "%{http_code}" \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Token ${MAINSEQUENCE_TOKEN}" \
+  -d "{\"status\": \"SUCCEEDED\"}" \
+  "${url}")
+
+response_body=$(cat /tmp/update_response.txt)
+if [ "${http_code}" -eq 200 ]; then
+  echo "Update success: ${response_body}"
+else
+  echo "Error updating job (HTTP code ${http_code}): ${response_body}"
+fi
+
 echo ">> PostStart script completed."
 echo "======================================================"
+
