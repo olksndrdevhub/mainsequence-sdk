@@ -1,20 +1,8 @@
-import os
-from typing import Union, Literal
-from .models import (loaders, VAM_API_ENDPOINT, BaseObjectOrm, make_request, AccountMixin, AssetMixin,
-                     FutureUSDMMixin, BaseVamPydanticModel, DATE_FORMAT,
-                     Asset, AssetFutureUSDM, ExecutionVenue, AccountRiskFactors,
-                     DoesNotExist, CurrencyPairMixin)
-import datetime
-import pandas as pd
-from mainsequence.logconf import logger
-from .utils import CONSTANTS
-from cryptography.fernet import Fernet
-from pydantic import  condecimal
+from typing import Literal
 
-
-
-from .local_vault import VAULT_PATH, get_secrets_for_account_id
-
+from .utils import make_request
+from .models_vam import AccountMixin, AccountRiskFactors, CurrencyPairMixin, AssetMixin
+from .models_base import BaseObjectOrm, API_ENDPOINT, VAM_CONSTANTS as CONSTANTS
 
 
 class AlpacaBaseObject(BaseObjectOrm):
@@ -24,10 +12,9 @@ class AlpacaBaseObject(BaseObjectOrm):
         "AlpacaAsset": 'asset/spot',
         "AlpacaCurrencyPair": 'asset/currency_pair',
     }
-    ROOT_URL = VAM_API_ENDPOINT + "/alpaca"
+    ROOT_URL = API_ENDPOINT + "/alpaca"
 
-
-class AlpacaAssetMixin(AssetMixin, AlpacaBaseObject):
+class AlpacaAssetMixin(AlpacaBaseObject):
     ticker: str
     asset_class: str
     exchange: str
@@ -67,7 +54,7 @@ class AlapaAccountRiskFactors(AccountRiskFactors):
     regt_buying_power: float
     sma: float
 
-class AlpacaAccount(AccountMixin,AlpacaBaseObject):
+class AlpacaAccount(AccountMixin, AlpacaBaseObject):
     api_key: str
     secret_key: str
 
@@ -83,45 +70,6 @@ class AlpacaAccount(AccountMixin,AlpacaBaseObject):
     transfers_blocked: bool
     shorting_enabled: bool
 
-
-
-    def get_secrets_from_local_vault(self):
-        if hasattr(self,"_secrets"):
-            return self._secrets
-        if VAULT_PATH is not None:
-            secrets = get_secrets_for_account_id(self.account_id)
-            self._secrets=secrets["secrets"]
-        else:
-            return None
-        return self._secrets
-
-
-    @property
-    def fernet_key(self):
-        fernet_key = os.environ["ACCOUNT_SETTINGS_ENCRYPTION_KEY"]
-        fernet_key = Fernet(fernet_key)
-        return fernet_key
-
-    @property
-    def account_api_key(self):
-        secrets = self.get_secrets_from_local_vault()
-        if secrets is not None:
-            return secrets['api_key']
-
-        return self.fernet_key.decrypt(self.api_key).decode(
-            "utf-8")
-
-    @property
-    def account_secret_key(self):
-        secrets = self.get_secrets_from_local_vault()
-        if secrets is not None:
-            return secrets['secret_key']
-        return self.fernet_key.decrypt(self.secret_key).decode(
-            "utf-8")
-
-
-
-# trades
 class AlpacaAssetTrade(AlpacaBaseObject):
 
     @classmethod
@@ -135,6 +83,3 @@ class AlpacaAssetTrade(AlpacaBaseObject):
         if r.status_code not in [201, 200]:
             raise Exception(r.text)
         return cls(**r.json())
-
-
-

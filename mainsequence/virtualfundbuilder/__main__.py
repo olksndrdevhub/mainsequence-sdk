@@ -153,7 +153,7 @@ class VirtualFundLauncher:
             try:
                 _send_strategy_to_registry(StrategyType.SIGNAL_WEIGHTS_STRATEGY, SignalClass, is_production=True)
             except Exception as e:
-                self.logger.warning("Could register strategy to TSORM", e)
+                self.logger.warning("Could not register strategy to TSORM", e)
 
         # Register rebalance strategies
         rebalance_classes = RebalanceFactory.get_rebalance_strategies()
@@ -161,7 +161,7 @@ class VirtualFundLauncher:
             try:
                 _send_strategy_to_registry(StrategyType.REBALANCE_STRATEGY, RebalanceClass, is_production=True)
             except Exception as e:
-                self.logger.warning("Couldnt register strategy to TSORM", e)
+                self.logger.warning("Could mpt register strategy to TSORM", e)
 
 
     def send_default_configuration(self):

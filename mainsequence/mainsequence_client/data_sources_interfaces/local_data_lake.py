@@ -16,7 +16,7 @@ import pytz
 from tqdm import tqdm
 import shutil
 
-from mainsequence.tdag_client.utils import set_types_in_table
+from mainsequence.mainsequence_client.utils import set_types_in_table
 from mainsequence.logconf import logger
 TIME_PARTITION = "TIME_PARTITION"
 

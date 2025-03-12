@@ -7,11 +7,11 @@ import datetime
 import pandas_market_calendars as mcal
 
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList, APITimeSerie,data_source_pickle_path
-from mainsequence.tdag_client import( CONSTANTS, LocalTimeSeriesDoesNotExist,LocalTimeSerie,DynamicTableDataSource,
+from mainsequence.mainsequence_client import( CONSTANTS, LocalTimeSeriesDoesNotExist,LocalTimeSerie,DynamicTableDataSource,
 BACKEND_DETACHED,DataUpdates
                                       )
-from mainsequence.vam_client import CONSTANTS as ASSET_ORM_CONSTANTS, ExecutionVenue
-from mainsequence.vam_client import HistoricalBarsSource,DoesNotExist, Asset
+from mainsequence.mainsequence_client import VAM_CONSTANTS as ASSET_ORM_CONSTANTS, ExecutionVenue
+from mainsequence.mainsequence_client import HistoricalBarsSource, DoesNotExist, Asset
 from mainsequence.tdag.time_series.utils import (
     string_frequency_to_minutes,
     string_freq_to_time_delta,
@@ -25,7 +25,6 @@ from mainsequence.virtualfundbuilder.models import AssetsConfiguration, AssetUni
 from mainsequence.virtualfundbuilder.utils import logger
 
 FULL_CALENDAR = "24/7"
-
 
 def get_prices_timeseries(assets_configuration: AssetsConfiguration):
     """

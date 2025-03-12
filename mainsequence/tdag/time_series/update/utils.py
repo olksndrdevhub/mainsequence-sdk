@@ -1,16 +1,12 @@
 import socket
 from typing import Union
-from mainsequence.tdag_client import LocalTimeSerie
+from mainsequence.mainsequence_client import LocalTimeSerie, LocalTimeSeriesHistoricalUpdate
 import datetime
 import pytz
 import logging
 from mainsequence.logconf import logger
 import time
 import pandas as pd
-from mainsequence.tdag_client.models import LocalTimeSeriesHistoricalUpdate
-
-
-
 
 def wait_for_update_time(local_hash_id, data_source_id, logger, force_next_start_of_minute=False):
     time_to_wait, next_update = get_time_to_wait_from_hash_id(local_hash_id=local_hash_id,
@@ -25,6 +21,7 @@ def wait_for_update_time(local_hash_id, data_source_id, logger, force_next_start
         time.sleep(time_to_wait)
     if force_next_start_of_minute == True:
         logger.info(f"Forcing Next Udpdate at start of minte")
+
 def get_node_time_to_wait(local_metadata):
 
     next_update = local_metadata.localtimeserieupdatedetails.next_update
@@ -35,7 +32,7 @@ def get_node_time_to_wait(local_metadata):
     return time_to_wait, next_update
 def get_time_to_wait_from_hash_id(local_hash_id: str,data_source_id:int):
     
-    local_metadata = LocalTimeSerie.get(local_hash_id=local_hash_id,
+    local_metadata = LocalTimeSerie.get_or_none(local_hash_id=local_hash_id,
                                               data_source_id=data_source_id
                                               )
     time_to_wait, next_update = get_node_time_to_wait(local_metadata=local_metadata)

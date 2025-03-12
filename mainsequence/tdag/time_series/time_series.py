@@ -23,7 +23,7 @@ from mainsequence.tdag.config import (
 import structlog.contextvars as cvars
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager, DataLakePersistManager
-from mainsequence.tdag_client.models import (none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate,
+from mainsequence.mainsequence_client.models_tdag import (none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate,
                                              DataUpdates,UniqueIdentifierRangeMap
                                              )
 from numpy.f2py.auxfuncs import isint1
@@ -37,7 +37,7 @@ from typing import Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-from mainsequence.tdag_client import LocalTimeSerie, LocalTimeSerieUpdateDetails, CONSTANTS, \
+from mainsequence.mainsequence_client import LocalTimeSerie, LocalTimeSerieUpdateDetails, CONSTANTS, \
     DynamicTableDataSource
 from enum import Enum
 from functools import wraps
@@ -62,7 +62,7 @@ def rebuild_with_type(value, rebuild_function):
         raise NotImplementedError
 
 
-from mainsequence.vam_client.models_helpers import get_model_class
+from mainsequence.mainsequence_client.models_helpers import get_model_class
 
 build_model = lambda model_data: get_model_class(model_data["orm_class"])(**model_data)
 
@@ -291,7 +291,7 @@ class ConfigSerializer:
         Serializes signature argument
         """
         from types import SimpleNamespace
-        from mainsequence.vam_client import BaseObjectOrm
+        from mainsequence.mainsequence_client import BaseObjectOrm
 
         if issubclass(value.__class__, TimeSerie):
             if pickle_ts == True:
@@ -1555,7 +1555,7 @@ class APITimeSerie(CommonMethodsMixin):
         self._local_persist_manager = APIPersistManager(data_source_id=self.data_source_id,
                                                         local_hash_id=self.local_hash_id,
                                                         )
-        local_metadata = LocalTimeSerie.get(local_hash_id=self.local_hash_id,
+        local_metadata = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
                                             remote_table__data_source__id=self.data_source_id,
                                             )
         assert local_metadata is not None, f"Verify that  {self.local_hash_id} exists if you are not the author reach to the author"
@@ -1900,7 +1900,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         self.pre_load_routines_run = True
 
     def get_data_source_from_orm(self):
-        from mainsequence.tdag_client import POD_DEFAULT_DATA_SOURCE
+        from mainsequence.mainsequence_client import POD_DEFAULT_DATA_SOURCE
 
         pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
 
@@ -2004,7 +2004,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         from mainsequence.tdag.config import configuration
         from mainsequence.tdag.time_series.update.utils import UpdateInterface, wait_for_update_time
         from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
-        from mainsequence.tdag_client import Scheduler
+        from mainsequence.mainsequence_client import Scheduler
         import gc
         global logger
         if update_tree:

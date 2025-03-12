@@ -5,7 +5,7 @@ import time
 
 from ray.util.client.common import ClientActorHandle
 
-from mainsequence.tdag_client import (Scheduler, SourceTableConfigurationDoesNotExist,
+from mainsequence.mainsequence_client import (Scheduler, SourceTableConfigurationDoesNotExist,
                                       LocalTimeSerie, SchedulerDoesNotExist
                                       )
 
@@ -20,17 +20,10 @@ import gc
 from mainsequence.logconf import  logger
 
 from contextlib import contextmanager
-from mainsequence.tdag_client import  DynamicTableDataSource
-
-
-
+from mainsequence.mainsequence_client import  DynamicTableDataSource
 
 USE_PICKLE = os.environ.get('TDAG_USE_PICKLE', True)
 USE_PICKLE = USE_PICKLE in ["True", "true", True]
-
-
-
-
 
 class TimeSerieHeadUpdateActor:
     TRACE_ID = "NO_TRACE"

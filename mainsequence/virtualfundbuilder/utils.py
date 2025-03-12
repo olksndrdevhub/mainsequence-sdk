@@ -7,10 +7,10 @@ from typing import Optional, Union, get_origin, get_args
 from pydantic.fields import PydanticUndefined, FieldInfo
 
 import pandas as pd
-from mainsequence.vam_client import CONSTANTS, Asset
+from mainsequence.mainsequence_client import CONSTANTS, Asset
 from mainsequence.tdag.time_series import ModelList, TimeSerie
-from mainsequence.tdag_client import CONSTANTS as TDAG_CONSTANTS
-from mainsequence.tdag_client.models import register_strategy
+from mainsequence.mainsequence_client import CONSTANTS as TDAG_CONSTANTS
+from mainsequence.mainsequence_client.models_tdag import register_strategy
 import numpy as np
 from tqdm import tqdm
 from numpy.linalg import LinAlgError
@@ -34,8 +34,6 @@ def get_vfb_logger():
 
     # If the logger doesn't have any handlers, create it using the custom function
     logger.bind(sub_application="virtualfundbuilder")
-
-
     return logger
 
 
@@ -684,7 +682,7 @@ def _send_strategy_to_registry(strategy_type, strategy_class, is_jupyter=False, 
         if response.status_code not in [200, 201]:
             print(response.text)
     except Exception as e:
-        logger.warning("Could register strategy to TSORM", e)
+        logger.warning(f"Could register strategy to TSORM {e}")
 
 def is_jupyter_environment():
     try:

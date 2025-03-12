@@ -5,12 +5,12 @@ import os
 from mainsequence.logconf import logger
 
 
-from mainsequence.tdag_client import (LocalTimeSerie,UniqueIdentifierRangeMap,
+from mainsequence.mainsequence_client import (LocalTimeSerie,UniqueIdentifierRangeMap,
                                       LocalTimeSeriesDoesNotExist, PodLocalLake,
-                                      DynamicTableDoesNotExist, DynamicTableDataSource, CONSTANTS, DynamicTableMetaData,
-                                      DataUpdates)
+                                      DynamicTableDoesNotExist, DynamicTableDataSource, TDAG_CONSTANTS as CONSTANTS, DynamicTableMetaData,
+                                      DataUpdates, DoesNotExist)
 
-from mainsequence.tdag_client.models import BACKEND_DETACHED, none_if_backend_detached, DynamicTableHelpers
+from mainsequence.mainsequence_client.models_tdag import BACKEND_DETACHED, none_if_backend_detached, DynamicTableHelpers
 import json
 
 class APIPersistManager:
@@ -19,7 +19,7 @@ class APIPersistManager:
         self.data_source_id = data_source_id
         self.local_hash_id = local_hash_id
 
-        local_metadata = LocalTimeSerie.get(local_hash_id=self.local_hash_id,
+        local_metadata = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
                                                   remote_table__data_source__id=self.data_source_id
                                                   )
         self.local_metadata=local_metadata
@@ -119,10 +119,9 @@ class PersistManager:
             meta_data = {}
 
             local_metadata = {}  # set to empty in case not exist
-            local_metadata = LocalTimeSerie.get(local_hash_id=self.local_hash_id,
+            local_metadata = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
                                                 remote_table__data_source__id=self.data_source.id
                                                       )
-
 
         if local_metadata is not None:
             self.local_build_configuration = local_metadata.build_configuration
@@ -394,7 +393,7 @@ class PersistManager:
             local_build_configuration, local_build_metadata = self.local_build_configuration, self.local_build_metadata
         if local_build_configuration is None:
             local_table_exist=False
-            local_update = LocalTimeSerie.get(local_hash_id=self.local_hash_id,
+            local_update = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
                                                        remote_table__data_source__id=self.data_source.id)
             if local_update is None:
                 local_build_metadata = local_configuration[
@@ -472,12 +471,12 @@ class PersistManager:
         """
         if local_hash_id is not None:
             kwargs["use_local_hash_id"]=local_hash_id
-            metadata=self.dth.build_or_update_update_details(metadata=self.metadata,**kwargs)
+            metadata = self.dth.build_or_update_update_details(metadata=self.metadata,**kwargs)
             return metadata
-        kwargs["local_metadata"]=self.local_metadata
-        metadatas=self.dth.build_or_update_update_details(metadata=self.metadata,**kwargs)
-        self.metadata=metadatas["metadata"]
-        self.local_metadata=metadatas["local_metadata"]
+        kwargs["local_metadata"] = self.local_metadata
+        metadatas = self.dth.build_or_update_update_details(metadata=self.metadata,**kwargs)
+        self.metadata = metadatas["metadata"]
+        self.local_metadata = metadatas["local_metadata"]
 
     def patch_table(self,**kwargs):
         self.metadata.patch( **kwargs)

@@ -4,13 +4,9 @@ import os
 
 import pandas as pd
 
-from mainsequence.vam_client import CONSTANTS, get_right_asset_class
-from .contrib.templates.asset_groups import SP500_MAP, SP500_HIGH_ESG, SP500_LOW_ESG
-from .utils import get_vfb_logger
+from mainsequence.mainsequence_client import VAM_CONSTANTS as CONSTANTS, get_right_asset_class
 from .models import *
 logger = get_vfb_logger()
-
-
 
 class AssetUniverseParser:
     

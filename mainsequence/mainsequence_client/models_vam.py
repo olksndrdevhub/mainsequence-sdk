@@ -15,55 +15,10 @@ import time
 
 from enum import IntEnum, Enum
 
-
-
-from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, CONSTANTS, VAM_API_ENDPOINT, TDAG_ENDPOINT
+from .models_base import BasePydanticModel, BaseObjectOrm, VAM_CONSTANTS as CONSTANTS, TDAG_ENDPOINT
+from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, DATE_FORMAT
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field, validator,root_validator
-import time
-import inspect
-
-loaders = AuthLoaders()
-
-DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
-
-
-class HtmlSaveException(Exception):
-    def __init__(self, message):
-        super().__init__(message)
-        self.message = message
-        self.file_path = None
-
-        if 'html' in message.lower():
-            self.file_path = self.save_as_html_file()
-
-    def save_as_html_file(self):
-        # Get the name of the method that raised the exception
-        caller_method = inspect.stack()[2].function
-
-        # Get the current timestamp
-        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-
-        # Create the directory to save HTML files if it doesn't exist
-        folder_path = 'html_exceptions'
-        os.makedirs(folder_path, exist_ok=True)
-
-        # Create the filename
-        filename = f"{caller_method}_{timestamp}.html"
-        file_path = os.path.join(folder_path, filename)
-
-        # Save the message as an HTML file
-        with open(file_path, 'w') as file:
-            file.write(self.message)
-
-        return file_path
-
-    def __str__(self):
-        if self.file_path:
-            return f"HTML content saved to {self.file_path}"
-        else:
-            return self.message
-
 
 def validator_for_string(value):
     if isinstance(value, str):
@@ -72,30 +27,6 @@ def validator_for_string(value):
             return datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
         except ValueError:
             raise ValueError(f"Invalid datetime format: {value}. Expected format is 'YYYY-MM-DDTHH:MM:SSZ'.")
-
-
-
-DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
-
-
-class BaseVamPydanticModel(BaseModel):
-    orm_class: str = None  # This will be set to the class that inherits
-
-    @classmethod
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        # Set orm_class to the class itself
-        cls.orm_class = cls.__name__
-
-
-
-    def to_serialized_dict(self):
-        new_dict=json.loads(self.model_dump_json())
-        if hasattr(self,'unique_identifier'):
-            new_dict['unique_identifier'] = self.unique_identifier
-
-        return new_dict
-
 
 def get_correct_asset_class(asset_type):
     if asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_SPOT, CONSTANTS.ASSET_TYPE_CASH_EQUITY,CONSTANTS.ASSET_TYPE_CURRENCY]:
@@ -108,304 +39,13 @@ def get_correct_asset_class(asset_type):
         raise NotImplementedError
 
 def resolve_asset(asset_dict:dict):
-
-    AssetClass=get_correct_asset_class(asset_dict['asset_type'])
-    asset=AssetClass(**asset_dict)
-
+    AssetClass = get_correct_asset_class(asset_dict['asset_type'])
+    asset = AssetClass(**asset_dict)
     return asset
-def build_session(loaders):
-    from requests.adapters import HTTPAdapter, Retry
-    s = requests.Session()
-    s.headers.update(loaders.auth_headers)
-
-
-    retries = Retry(total=2, backoff_factor=2, )
-    s.mount('http://', HTTPAdapter(max_retries=retries))
-    return s
-
-session=build_session(loaders=loaders)
-
-class BaseObjectOrm:
-    END_POINTS = {
-        "User":"user",
-        "TargetPortfolio": 'target_portfolio',
-
-        "Asset": "asset",
-        "IndexAsset": "index_asset",
-        "AssetFutureUSDM": "asset_future_usdm",
-        "VirtualFund": "virtualfund",
-        "OrderManager": "order_manager",
-        "ExecutionVenue": "execution_venue",
-        "Order": "order",
-        "OrderEvent": "order_event",
-        "Account": "account",
-        "Trade": "trade",
-        "VirtualFundHistoricalHoldings": "historical_holdings",
-        "AccountHistoricalHoldings": "account_historical_holdings",
-        "AccountRiskFactors":"account_risk_factors",
-        "AccountPortfolioScheduledRebalance": "account_portfolio_scheduled_rebalance",
-        "AccountPortfolioHistoricalPositions":"account_portfolio_historical_positions",
-        "ExecutionPrediction": "execution_predictions",
-        "ExecutionPositions": "execution_positions",
-        "AccountCoolDown": "account_cooldown",
-        "HistoricalWeights": "portfolio_weights",
-        "TargetPortfolioIndexAsset":"target_portfolio_index_asset",
-
-        "HistoricalBarsSource":"data_sources/historical-bars-source",
-        "TDAGAPIDataSource": "data_sources/tdag-api-data-source",
-        "AssetCategory":"asset-category",
-        "TargetPortfolioFrontEndDetails": "target-portfolio-details",
-
-    }
-    ROOT_URL = VAM_API_ENDPOINT
-    LOADERS = loaders
-
-
-    @staticmethod
-    def request_to_datetime(string_date: str):
-        return request_to_datetime(string_date=string_date)
-    
-    @staticmethod
-    def date_to_string(target_date:datetime.datetime):
-        return target_date.strftime(DATE_FORMAT)
-
-
-    @classmethod
-    def class_name(cls):
-        if hasattr(cls,"CLASS_NAME"):
-            return cls.CLASS_NAME
-        return cls.__name__
-
-
-    @classmethod
-    def build_session(cls):
-        s=session
-        return s
-
-    @property
-    def s(self):
-        s = self.build_session()
-        return s
-
-    def ___hash__(self):
-
-        if hasattr(self, "unique_identifier"):
-            return self.unique_identifier
-
-        return self.id
-    def __repr__(self):
-        object_id=self.id if hasattr(self, "id") else None
-        return f"{self.class_name()}: {object_id}"
-
-    @classmethod
-    def get_object_url(cls):
-        url=f"{cls.ROOT_URL}/{cls.END_POINTS[cls.class_name()]}"
-        return  url
-    
-    @staticmethod
-    def _parse_parameters_filter(parameters):
-        for key, value in parameters.items():
-            if "__in" in key:
-                assert isinstance(value, list)
-                value = [str(v) for v in value]
-                parameters[key] = ",".join(value)
-        return parameters
-
-    @classmethod
-    def filter(cls, timeout=None, **kwargs):
-        """
-        Fetches *all pages* from a DRF-paginated endpoint.
-        Accumulates results from each page until 'next' is None.
-
-        Returns a list of `cls` objects (not just one page).
-
-        DRF's typical paginated response looks like:
-            {
-              "count": <int>,
-              "next": <str or null>,
-              "previous": <str or null>,
-              "results": [ ...items... ]
-            }
-        """
-        base_url = cls.get_object_url()  # e.g. "https://api.example.com/assets"
-        params = cls._parse_parameters_filter(kwargs)
-
-        # We'll handle pagination by following the 'next' links from DRF.
-        accumulated = []
-        next_url = f"{base_url}/"  # Start with the main endpoint (list)
-
-        while next_url:
-            # For each page, do a GET request
-            r = make_request(
-                s=cls.build_session(),
-                loaders=cls.LOADERS,
-                r_type="GET",
-                url=next_url,  # next_url changes each iteration
-                payload={"params": params},
-                timeout=timeout
-            )
-
-            if r.status_code != 200:
-                # Handle errors or break out
-                if r.status_code == 401:
-                    raise Exception("Unauthorized. Please add credentials to environment.")
-                elif r.status_code == 500:
-                    raise Exception("Server Error.")
-                else:
-                    raise Exception(f"{r.status_code} - {r.text}")
-
-            data = r.json()
-            # data should be a dict with "count", "next", "previous", and "results".
-
-            # DRF returns the next page URL in `data["next"]`
-            next_url = data["next"]  # either a URL string or None
-
-            # data["results"] should be a list of objects
-            for item in data["results"]:
-                # Insert "orm_class" if you still need that
-                item["orm_class"] = cls.__name__
-                try:
-                    accumulated.append(cls(**item) if issubclass(cls,BaseVamPydanticModel) else item)
-                except Exception as e:
-                    raise e
-
-
-            # We set `params = None` (or empty) after the first loop to avoid appending repeatedly
-            # but only if DRF's `next` doesn't contain the query parameters.
-            # Usually, DRF includes them, so you don't need to do anything special here.
-            params = None
-
-        return accumulated
-
-
-    @classmethod
-    def get(cls, pk=None, timeout=None, **filters):
-        """
-        Retrieves exactly one object by primary key: GET /base_url/<pk>/
-        Raises `DoesNotExist` if 404 or the response is empty.
-        Raises Exception if multiple or unexpected data is returned.
-        """
-        if pk is not None:
-            base_url = cls.get_object_url()
-            detail_url = f"{base_url}/{pk}/"
-
-            r = make_request(
-                s=cls.build_session(),
-                loaders=cls.LOADERS,
-                r_type="GET",
-                url=detail_url,
-                payload={},
-                timeout=timeout
-            )
-
-            if r.status_code == 404:
-                raise DoesNotExist(f"No object found for pk={pk}")
-            elif r.status_code == 401:
-                raise Exception("Unauthorized. Please add credentials to environment.")
-            elif r.status_code == 500:
-                raise Exception("Server Error")
-            elif r.status_code != 200:
-                raise Exception(f"Unexpected status code: {r.status_code}")
-
-            data = r.json()
-            data["orm_class"] = cls.__name__
-            return cls(**data)
-
-        # Otherwise, do the filter approach
-        candidates = cls.filter(timeout=timeout, **filters)
-
-        if not candidates:
-            raise DoesNotExist(f"No {cls.class_name()} found matching {filters}")
-
-        if len(candidates) > 1:
-            raise Exception(
-                f"Multiple {cls.class_name()} objects found for filters {filters}. "
-                f"Expected exactly one."
-            )
-
-        return candidates[0]
-
-    @staticmethod
-    def serialize_for_json(kwargs):
-        new_data={}
-        for key,value in kwargs.items():
-            new_value=copy.deepcopy(value)
-            if isinstance(value,datetime.datetime):
-                new_value=str(value)
-
-            new_data[key]=new_value
-        return new_data
-    @classmethod
-    def create(cls,timeout=None,*args,**kwargs):
-        """
-
-        :return:
-        :rtype:
-        """
-        base_url = cls.get_object_url()
-        data =cls.serialize_for_json(kwargs)
-        payload={"json":data}
-
-        r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="POST", url=f"{base_url}/", payload=payload,
-                         timeout=timeout
-                         )
-        if r.status_code not in [201]:
-           raise Exception(r.text)
-        return cls(** r.json())
-
-    @classmethod
-    def update_or_create(cls, timeout=None, *args, **kwargs):
-        """
-
-        :return:
-        :rtype:
-        """
-        url = f"{cls.get_object_url()}/update_or_create/"
-        data = cls.serialize_for_json(kwargs)
-        payload={"json":data}
-
-        r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="POST", url=url, payload=payload,
-                         timeout=timeout
-                         )
-        if r.status_code not in [201, 200]:
-           raise Exception(r.text)
-        return cls(** r.json())
-    
-    @classmethod
-    def destroy_by_id(cls, instance_id,*args,**kwargs):
-        base_url = cls.get_object_url()
-        data = cls.serialize_for_json(kwargs)
-        payload = {"json": data}
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="DELETE", url=f"{base_url}/{instance_id}/",
-                         payload=payload)
-        if r.status_code != 204:
-            raise Exception(r.text)
-
-    @classmethod
-    def patch_by_id(cls,instance_id, *args, **kwargs):
-        """
-
-        :return:
-        :rtype:
-        """
-        base_url = cls.get_object_url()
-        data = cls.serialize_for_json(kwargs)
-        payload = {"json": data}
-        r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="PATCH", url=f"{base_url}/{instance_id}/", payload=payload)
-        if r.status_code != 200:
-            raise HtmlSaveException(r.text)
-        return cls(**r.json())
-
-    def patch(self,*args,**kwargs):
-        return self.__class__.patch_by_id(self.id,*args,**kwargs)
-    
-    def delete(self,*args,**kwargs):
-        return self.__class__.destroy_by_id(self.id)
 
 
 
-
-class ExecutionPositions(BaseObjectOrm,BaseVamPydanticModel):
+class ExecutionPositions(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
     positions:List["WeightExecutionPosition"]
     target_portfolio:Union["TargetPortfolio",int]
@@ -431,29 +71,37 @@ class ExecutionPositions(BaseObjectOrm,BaseVamPydanticModel):
         return self.execution_configuration.orders_execution_configuration.broker_class
 
     @classmethod
-    def add_from_time_serie(cls, time_serie_signal_hash_id: str, positions_list: list,
-                            positions_time: datetime.datetime,
-                            comments: Union[str, None] = None, timeout=None):
-        """
-
-        :param session:
-        :return:
-        """
+    def add_from_time_serie(
+            cls,
+            time_serie_signal_hash_id: str,
+            positions_list: list,
+            positions_time: datetime.datetime,
+            comments: Union[str, None] = None,
+            timeout=None
+    ):
         url = f"{cls.get_object_url()}/add_from_time_serie/"
-        payload = {"json": {"time_serie_signal_hash_id": time_serie_signal_hash_id,
-                            "positions_time": positions_time.strftime(DATE_FORMAT),
-                            "positions_list": positions_list,
+        payload = {
+            "json": {
+                "time_serie_signal_hash_id": time_serie_signal_hash_id,
+                "positions_time": positions_time.strftime(DATE_FORMAT),
+                "positions_list": positions_list,
+            },
+        }
 
-                            }, }
-
-        r = make_request(s=cls.build_session(),
-                         loaders=cls.LOADERS, r_type="POST", url=url, payload=payload, timeout=timeout)
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            payload=payload,
+            timeout=timeout
+        )
         if r.status_code not in [201, 204] :
             raise HtmlSaveException(r.text)
         return [cls(**e) for e in r.json()]
 
 
-class WeightExecutionPosition(BaseObjectOrm,BaseVamPydanticModel):
+class WeightExecutionPosition(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = None
     parent_execution_positions: int
     asset: Union["Asset", "AssetFutureUSDM",int]
@@ -474,14 +122,12 @@ class WeightExecutionPosition(BaseObjectOrm,BaseVamPydanticModel):
         return values
 
 class AccountCoolDown(BaseObjectOrm):
-    
     pass
-class Calendar(BaseObjectOrm,BaseVamPydanticModel):
+
+class Calendar(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = None
     name: str
     calendar_dates:Optional[dict]=None
-
-
 
 class Organization(BaseModel):
     id: int
@@ -494,7 +140,7 @@ class Group(BaseModel):
     name: str
     permissions: List[Any]  # Adjust the type for permissions as needed
 
-class User(BaseObjectOrm,BaseVamPydanticModel):
+class User(BaseObjectOrm,BasePydanticModel):
     id: int
     password: str
     is_superuser: bool
@@ -519,10 +165,10 @@ class User(BaseObjectOrm,BaseVamPydanticModel):
     def get_object_url(cls):
         url = f"{cls.ROOT_URL.replace('orm/api', 'users/api')}/{cls.END_POINTS[cls.class_name()]}"
         return url
+
     @classmethod
     def get_authenticated_user_details(cls):
         url = f"{cls.get_object_url()}/get_user_details/"
-
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="GET", url=url,)
         if r.status_code not in [200, 201]:
             raise Exception(f" {r.text()}")
@@ -530,8 +176,7 @@ class User(BaseObjectOrm,BaseVamPydanticModel):
         return cls(**r.json())
 
 
-class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
-
+class AssetMixin(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
     symbol: str
     name: str
@@ -554,8 +199,7 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
     @classmethod
     def switch_cash_asset(cls,asset_id,target_currency_asset:object):
         url = f"{cls.get_object_url()}/{asset_id}/switch_cash_asset"
-        payload=dict(params={"target_currency_asset_id":target_currency_asset.id
-                                      })
+        payload=dict(params={"target_currency_asset_id":target_currency_asset.id})
         r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
 
         if r.status_code != 200:
@@ -565,41 +209,38 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
     @classmethod
     def switch_cash_in_asset_list(cls, asset_id_list:list, target_currency_asset_id: int,timeout=None):
         url = f"{cls.get_object_url()}/switch_cash_in_asset_list/"
-        payload = dict(json={"asset_id_list": asset_id_list,"target_currency_asset_id":target_currency_asset_id
-                               })
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS,r_type="POST", url=url, payload=payload,
-                         timeout=timeout)
+        payload = dict(json={"asset_id_list": asset_id_list,"target_currency_asset_id": target_currency_asset_id})
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            payload=payload,
+            timeout=timeout
+        )
 
         if r.status_code != 200:
             raise Exception("Error switching cash asset")
         return r.json()
 
     @classmethod
-    def batch_upsert(cls,asset_config_list:list, execution_venue_symbol:str,asset_type:str,timeout=None):
-        """
-
-        Parameters
-        ----------
-        asset_config_list
-        execution_venue_symbol
-        asset_type
-
-        Returns
-        -------
-
-        """
-
+    def batch_upsert(cls, asset_config_list:list, execution_venue_symbol:str, asset_type:str, timeout=None):
         url = f"{cls.get_object_url()}/batch_upsert/"
-        payload = dict(json={"asset_config_list": asset_config_list,"execution_venue_symbol":execution_venue_symbol,
-                             "asset_type":asset_type
+        payload = dict(json={"asset_config_list": asset_config_list,"execution_venue_symbol": execution_venue_symbol,
+                             "asset_type": asset_type
                                })
-        r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="POST", url=url, timeout=timeout,
-                         payload=payload)
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            timeout=timeout,
+            payload=payload
+        )
 
         if r.status_code != 200:
             raise Exception("Error inserting assets")
         return r.json()
-
 
     def get_ccxt_symbol(self,settlement_symbol:Union[str,None]=None):
         """
@@ -614,13 +255,15 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
             return  f"{self.symbol}/{settlement_symbol}:{settlement_symbol}"
 
     @classmethod
-    def get_all_assets_on_positions(cls, execution_venue_symbol:str, asset_type: str,
-                                    switch_to_currency_pair_with_quote:Union[str,None]=None,):
+    def get_all_assets_on_positions(
+            cls,
+            execution_venue_symbol: str,
+            asset_type: str,
+            switch_to_currency_pair_with_quote: Union[str,None]=None,
+    ):
         url = f"{Asset.get_object_url()}/get_all_assets_on_positions"
         payload = dict(params={"execution_venue_symbol": execution_venue_symbol,
-                               "asset_type":asset_type,
-
-                               })
+                               "asset_type": asset_type})
         if switch_to_currency_pair_with_quote is not None:
             payload["params"]["switch_to_currency_pair_with_quote"]=switch_to_currency_pair_with_quote
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
@@ -689,7 +332,7 @@ class AssetMixin(BaseObjectOrm, BaseVamPydanticModel):
         # Convert the accumulated raw data into asset instances with correct classes
         return create_from_serializer_with_class(all_results)
         
-class AssetCategory(BaseObjectOrm, BaseVamPydanticModel):
+class AssetCategory(BaseObjectOrm, BasePydanticModel):
     id:int
     unique_id:str
     name:str
@@ -741,8 +384,6 @@ class AssetCategory(BaseObjectOrm, BaseVamPydanticModel):
 class Asset(AssetMixin, BaseObjectOrm):
 
     def get_spot_reference_asset_symbol(self):
-        """"
-        """
         return self.symbol
     
     @classmethod
@@ -753,12 +394,22 @@ class Asset(AssetMixin, BaseObjectOrm):
                                                      calendar:str,timeout=None
                                                      )->"TargetPortfolioIndexAsset":
         url = f"{cls.get_object_url()}/create_or_update_index_asset_from_portfolios/"
-        payload = {"json": dict(  live_portfolio=live_portfolio,
-                                                     backtest_portfolio=backtest_portfolio,
-                                                     valuation_asset=valuation_asset,
-                                                     calendar=calendar)}
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload,
-                         timeout=timeout)
+        payload = {
+            "json": dict(
+                live_portfolio=live_portfolio,
+                backtest_portfolio=backtest_portfolio,
+                valuation_asset=valuation_asset,
+                calendar=calendar
+            )
+        }
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            payload=payload,
+            timeout=timeout
+        )
         if r.status_code not in [200,201]:
             raise Exception(f" {r.text()}")
 
@@ -779,20 +430,17 @@ class TargetPortfolioIndexAsset(IndexAsset):
 
     @property
     def live_portfolio_details_url(self):
-
         return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.live_portfolio.id}"
 
     @property
     def backtest_portfolio_details_url(self):
-
         return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.backtest_portfolio.id}"
 
-class CurrencyPairMixin(AssetMixin, BaseVamPydanticModel):
+class CurrencyPairMixin(AssetMixin, BasePydanticModel):
     base_asset: Union[AssetMixin, int]
     quote_asset: Union[AssetMixin, int]
 
     def get_spot_reference_asset_symbol(self):
-
         base_asset_symbol = self.symbol.replace(self.quote_asset.symbol, "")
         return base_asset_symbol
 
@@ -800,7 +448,7 @@ class CurrencyPairMixin(AssetMixin, BaseVamPydanticModel):
 class CurrencyPair(CurrencyPairMixin):
   pass
 
-class FutureUSDMMixin(AssetMixin, BaseVamPydanticModel):
+class FutureUSDMMixin(AssetMixin, BasePydanticModel):
     maturity_code: str = Field(..., max_length=50)
     last_trade_time: Optional[datetime.datetime] = None
     currency_pair:CurrencyPair
@@ -819,12 +467,9 @@ class AssetFutureUSDM(FutureUSDMMixin,BaseObjectOrm):
 
 
 class AccountPortfolioScheduledRebalance(BaseObjectOrm):
-
     pass
 
-
-
-class AccountExecutionConfiguration(BaseVamPydanticModel):
+class AccountExecutionConfiguration(BasePydanticModel):
     related_account: int  # Assuming related_account is represented by its ID
     rebalance_tolerance_percent: float = Field(0.02, ge=0)
     minimum_notional_for_a_rebalance: float = Field(15.00, ge=0)
@@ -833,8 +478,7 @@ class AccountExecutionConfiguration(BaseVamPydanticModel):
     orders_execution_configuration: Dict[str, Any]
     cooldown_configuration: Dict[str, Any]
 
-
-class AccountPortfolioPosition(BaseVamPydanticModel):
+class AccountPortfolioPosition(BasePydanticModel):
     id: Optional[int]
     parent_positions: int
     target_portfolio: int
@@ -843,14 +487,13 @@ class AccountPortfolioPosition(BaseVamPydanticModel):
     single_asset_quantity: Optional[float]=0.0
     assets_in_position: list["WeightPosition"]
 
-class AccountPortfolioHistoricalPositions(BaseObjectOrm,BaseVamPydanticModel):
+class AccountPortfolioHistoricalPositions(BaseObjectOrm, BasePydanticModel):
     id: Optional[int]
     positions_date: datetime.datetime
     comments: Optional[str]
     positions: list[AccountPortfolioPosition]
-  
 
-class AccountTargetPortfolio(BaseObjectOrm,BaseVamPydanticModel):
+class AccountTargetPortfolio(BaseObjectOrm, BasePydanticModel):
     related_account:Optional[int]
     latest_positions:Optional[AccountPortfolioHistoricalPositions]=None
     @property
@@ -858,7 +501,7 @@ class AccountTargetPortfolio(BaseObjectOrm,BaseVamPydanticModel):
         return self.related_account_id
 
 
-class AccountMixin(BaseVamPydanticModel):
+class AccountMixin(BasePydanticModel):
     id: Optional[int] = None
     execution_venue: "ExecutionVenue"
     account_is_active: bool
@@ -872,19 +515,13 @@ class AccountMixin(BaseVamPydanticModel):
     account_target_portfolio: AccountTargetPortfolio
     latest_holdings:Union["AccountLatestHoldingsSerializer",None]=None
 
-
     @property
     def account_target_portfolio(self):
         return self.accounttargetportfolio
 
-
     @property
     def execution_venue_symbol(self):
         return self.execution_venue.symbol
-    
-    
-    
-    
 
     def get_latest_income_record(self):
         base_url = self.get_object_url()
@@ -902,25 +539,12 @@ class AccountMixin(BaseVamPydanticModel):
             raise Exception(f"Error Getting NAV in account {r.text}")
         return r.json()
 
-    def build_rebalance(self, latest_holdings: "AccountHistoricalHoldings",
-                        tolerance: float,
-                        change_cash_asset_to_currency_asset: Union[Asset, None] = None,
-                        ):
-        """
-
-        :param latest_holdings:
-        :type latest_holdings:
-        :param tolerance:
-        :type tolerance:
-        :param change_cash_asset_to_currency_asset:
-        :type change_cash_asset_to_currency_asset:
-        :return:
-
-         rebalance[<ASSET_ID>] = {"rebalance":{"quantity":, "reference_price":, "reference_notional":}, "asset":Asset}
-
-        :rtype:
-        """
-
+    def build_rebalance(
+            self,
+            latest_holdings: "AccountHistoricalHoldings",
+            tolerance: float,
+            change_cash_asset_to_currency_asset: Union[Asset, None] = None,
+        ):
         nav = self.get_nav()
         nav, nav_date = nav["nav"], nav["nav_date"]
         related_expected_asset_exposure_df = latest_holdings.related_expected_asset_exposure_df
@@ -995,23 +619,21 @@ class AccountMixin(BaseVamPydanticModel):
         if r.status_code != 200:
             raise Exception(r.text)
         
-        asset_list=[]
+        asset_list = []
         for a in r.json():
             asset_list.append(resolve_asset(a))
         
         return  asset_list
 
-class Account(AccountMixin,BaseObjectOrm,BaseVamPydanticModel):
-
+class Account(AccountMixin,BaseObjectOrm, BasePydanticModel):
     ...
 
 
-class AccountLatestHoldingsSerializer(BaseObjectOrm,BaseVamPydanticModel):
+class AccountLatestHoldingsSerializer(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = Field(None, primary_key=True)
     holdings_date: datetime.datetime
     comments: Optional[str] = Field(None, max_length=150)
     nav: Optional[float] = None
-
 
     is_trade_snapshot: bool = Field(default=False)
     target_trade_time: Optional[datetime.datetime] = None
@@ -1020,11 +642,9 @@ class AccountLatestHoldingsSerializer(BaseObjectOrm,BaseVamPydanticModel):
     holdings: list
 
 class AccountRiskFactors(BaseObjectOrm):
-
     ...
 
-
-class AccountHistoricalHoldings(BaseObjectOrm,BaseVamPydanticModel):
+class AccountHistoricalHoldings(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = Field(None, primary_key=True)
     holdings_date: datetime.datetime
     comments: Optional[str] = Field(None, max_length=150)
@@ -1045,13 +665,15 @@ class AccountHistoricalHoldings(BaseObjectOrm,BaseVamPydanticModel):
                             "keep_trade_snapshots":keep_trade_snapshots}}
 
 
-        r = make_request(s=cls.build_session(),
-                         loaders=cls.LOADERS,r_type="POST", url=f"{base_url}/destroy_holdings_before_date/", payload=payload)
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=f"{base_url}/destroy_holdings_before_date/",
+            payload=payload
+        )
         if r.status_code != 204:
             raise Exception(r.text)
-
-
-
 
 class FundingFeeTransaction(BaseObjectOrm):
     pass
@@ -1059,10 +681,7 @@ class FundingFeeTransaction(BaseObjectOrm):
 class AccountPortfolioHistoricalWeights(BaseObjectOrm):
     pass
 
-
-
-
-class WeightPosition(BaseObjectOrm, BaseVamPydanticModel):
+class WeightPosition(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
     parent_weights: int
     asset: Union[AssetMixin,int]
@@ -1082,7 +701,7 @@ class WeightPosition(BaseObjectOrm, BaseVamPydanticModel):
          
         return values
 
-class HistoricalWeights(BaseObjectOrm,BaseVamPydanticModel):
+class HistoricalWeights(BaseObjectOrm,BasePydanticModel):
     id: int
     weights_date: datetime.datetime
     comments: Optional[str] = None
@@ -1112,15 +731,14 @@ class HistoricalWeights(BaseObjectOrm,BaseVamPydanticModel):
      
         return cls(**r.json())
 
-
-class ExecutionVenue(BaseObjectOrm,BaseVamPydanticModel):
+class ExecutionVenue(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = None
     symbol: str
     name: str
+
     @property
     def unique_identifier(self):
         return f"{self.symbol}"
-
 
 class DataFrequency(str, Enum):
     one_m = "1m"
@@ -1129,8 +747,8 @@ class DataFrequency(str, Enum):
     one_w = "1w"
     one_month ="1mo"
 
-class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
-    id:Optional[int]
+class TDAGAPIDataSource(BaseObjectOrm, BasePydanticModel):
+    id: Optional[int]
     unique_identifier: str = Field(..., description="Unique identifier for the api")
     data_source_id: int = Field(..., description="Unique identifier for the data source")
     local_hash_id: str = Field(..., max_length=64, description="Local hash ID of the data source")
@@ -1141,7 +759,6 @@ class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
     def __str__(self):
         return self.class_name() +f"{self.unique_identifier}"
 
-
     def append_assets(self,asset_id_list:list,timeout=None):
         url = f"{self.get_object_url()}/{self.id}/append_assets/"
 
@@ -1151,7 +768,6 @@ class TDAGAPIDataSource(BaseObjectOrm, BaseVamPydanticModel):
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
         return self.__class__(**r.json())
-
 
 class HistoricalBarsSource(TDAGAPIDataSource):
     execution_venues: list
@@ -1173,13 +789,11 @@ class Trade(BaseObjectOrm):
             raise Exception(f" {r.text()}")
         return r
 
-
-
 class OrdersExecutionConfiguration(BaseModel):
     broker_class: str
     broker_configuration: dict
 
-class TargetPortfolioExecutionConfiguration(BaseObjectOrm,BaseVamPydanticModel):
+class TargetPortfolioExecutionConfiguration(BaseObjectOrm,BasePydanticModel):
     related_portfolio: Optional[int]=None
     portfolio_build_configuration: Optional[Dict[str, Any]] = None
     orders_execution_configuration: Optional[OrdersExecutionConfiguration] = None
@@ -1192,15 +806,13 @@ class TargetPortfolioExecutionConfiguration(BaseObjectOrm,BaseVamPydanticModel):
     rebalance_step_every_seconds: Optional[float] = None
     max_data_latency_seconds: Optional[float] = None
 
-
-class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
+class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     id: Optional[Union[int,str]] = None
     portfolio_name: str = Field(..., max_length=255)
     portfolio_ticker: str = Field(..., max_length=150)
     latest_rebalance: Optional[datetime.datetime] = None
     calendar:Calendar
-    
-    
+
     is_asset_only: bool = False
     build_purpose:str
     is_active: bool = False
@@ -1217,8 +829,6 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
 
     creation_date: Optional[datetime.datetime] = None
     execution_configuration: Union[int, TargetPortfolioExecutionConfiguration]
-
-
 
     @classmethod
     def create_from_time_series(cls,  portfolio_name: str,
@@ -1263,13 +873,12 @@ class TargetPortfolio(BaseObjectOrm, BaseVamPydanticModel):
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
 
-
-class PortfolioTags(BaseVamPydanticModel):
+class PortfolioTags(BasePydanticModel):
     id:Optional[int]=None
     name:str
     color:str
     
-class TargetPortfolioFrontEndDetails(BaseObjectOrm, BaseVamPydanticModel):
+class TargetPortfolioFrontEndDetails(BaseObjectOrm, BasePydanticModel):
     target_portfolio: Optional[TargetPortfolio]=None
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_time_index_name: Optional[str] = Field(None, max_length=20)
@@ -1291,11 +900,6 @@ class TargetPortfolioFrontEndDetails(BaseObjectOrm, BaseVamPydanticModel):
 
     @classmethod
     def create(cls, *args, **kwargs):
-        """
-
-        :return:
-        :rtype:
-        """
         base_url = cls.get_base_endpoint()+"target-portfolio-details"
         data = cls.serialize_for_json(kwargs)
         payload = {"json": data}
@@ -1307,11 +911,6 @@ class TargetPortfolioFrontEndDetails(BaseObjectOrm, BaseVamPydanticModel):
 
     @classmethod
     def create_or_update(cls, *args, **kwargs):
-        """
-
-        :return:
-        :rtype:
-        """
         base_url = cls.get_base_endpoint() + "target-portfolio-details/create_or_update"
         data = cls.serialize_for_json(kwargs)
         payload = {"json": data}
@@ -1330,26 +929,26 @@ class TargetPortfolioFrontEndDetails(BaseObjectOrm, BaseVamPydanticModel):
         if r.status_code not in [200, 201, 204]:
             raise Exception(f"Error inserting new prediction{r.text}")
         return r.json()
+
 class AssetOnlyPortfolio(BaseObjectOrm):
     pass
 
 class ExecutionPrediction(BaseObjectOrm):
     @classmethod
-    def add_prediction_from_time_serie(cls, time_serie_hash_id: str,
-                                    prediction_time: datetime.datetime, symbol_to_search_map,
-                                    predictions: dict, human_readable_name: Union[None, str] = None,timeout=None):
-        """
-
-        :param session:
-        :return:
-        """
+    def add_prediction_from_time_serie(
+            cls,
+            time_serie_hash_id: str,
+            prediction_time: datetime.datetime,
+            symbol_to_search_map,
+            predictions: dict,
+            human_readable_name: Union[None, str] = None,
+            timeout=None
+    ):
         url = f"{cls.get_object_url()}/add_prediction_from_time_serie/"
         payload = {"json": {"time_serie_hash_id": time_serie_hash_id,
-
                             "prediction_time": prediction_time.strftime(DATE_FORMAT),
                             "symbol_to_search_map": symbol_to_search_map,
                             "predictions": predictions, "human_readable_name": human_readable_name,
-
                             }, }
 
         r = make_request(s=cls.build_session(),
@@ -1358,8 +957,7 @@ class ExecutionPrediction(BaseObjectOrm):
             raise Exception(f"Error inserting new prediction{r.text}")
         return r.json()
 
-
-class VirtualFundPositionDetail(BaseObjectOrm, BaseVamPydanticModel):
+class VirtualFundPositionDetail(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
     asset: Union[Asset,AssetFutureUSDM,int]
     price: float
@@ -1380,7 +978,7 @@ class VirtualFundPositionDetail(BaseObjectOrm, BaseVamPydanticModel):
 
         return values
 
-class VirtualFundHistoricalHoldings(BaseObjectOrm, BaseVamPydanticModel):
+class VirtualFundHistoricalHoldings(BaseObjectOrm, BasePydanticModel):
     related_fund: Union["VirtualFund",int]  # assuming VirtualFund is another Pydantic model
     target_trade_time: Optional[datetime.datetime] = None
     target_weights: Optional[dict] = Field(default=None)
@@ -1407,7 +1005,6 @@ class ExecutionQuantity(BaseModel):
 
         return values
 
-
 class TargetRebalance(BaseModel):
     target_execution_positions: ExecutionPositions
     execution_target: List[ExecutionQuantity]
@@ -1416,8 +1013,7 @@ class TargetRebalance(BaseModel):
     def rebalance_asset_map(self):
         return  {e.asset.id: e.asset for e in self.execution_target}
 
-
-class VirtualFund(BaseObjectOrm, BaseVamPydanticModel):
+class VirtualFund(BaseObjectOrm, BasePydanticModel):
     id: Optional[float] = None
     target_portfolio: Union[int,"TargetPortfolio"]
     target_account: AccountMixin
@@ -1461,25 +1057,16 @@ class VirtualFund(BaseObjectOrm, BaseVamPydanticModel):
 
         return new_target_weights
 
-
-
-
-    def build_rebalance_from_target_weights(self, target_execution_postitions: ExecutionPositions,
-                                            positions_prices: dict(), absolute_rebalance_weight_limit=.02
-                                            ) -> TargetRebalance:
-        """
-
-        Returns
-        -------
-
-        """
+    def build_rebalance_from_target_weights(
+            self,
+            target_execution_postitions: ExecutionPositions,
+            positions_prices: dict(),
+            absolute_rebalance_weight_limit=.02
+    ) -> TargetRebalance:
         actual_positions = {}
         target_weights = {p.asset_id: p for p in target_execution_postitions.positions}
         #substitute target weights in case of testnets
-        target_weights=self.sanitize_target_weights_for_execution_venue(target_weights)
-
-
-
+        target_weights = self.sanitize_target_weights_for_execution_venue(target_weights)
 
         positions_to_rebalance = []
         if self.latest_holdings is not None:
@@ -1488,12 +1075,16 @@ class VirtualFund(BaseObjectOrm, BaseVamPydanticModel):
             # positions to unwind first
             positions_to_unwind=[]
             for position in self.latest_holdings.holdings:
-                if position.quantity==0.0:
+                if position.quantity == 0.0:
                     continue
                 if position.asset_id not in target_weights.keys():
-                    positions_to_unwind.append(ExecutionQuantity(asset=position.asset,
-                                                     reference_price=None,
-                                                     quantity=-position.quantity))
+                    positions_to_unwind.append(
+                        ExecutionQuantity(
+                            asset=position.asset,
+                            reference_price=None,
+                            quantity=-position.quantity
+                        )
+                    )
 
             positions_to_rebalance.extend(positions_to_unwind)
 
@@ -1549,14 +1140,13 @@ class VirtualFund(BaseObjectOrm, BaseVamPydanticModel):
             return None
         return VirtualFundHistoricalHoldings(**r.json())
 
-
-
 class OrderStatus(str, Enum):
     LIVE = "live"
     FILLED = "filled"
     PARTIALLY_FILLED = "partially_filled"
     CANCELED = "canceled"
     NOT_PLACED = "not_placed"
+
 class OrderSide(IntEnum):
     SELL = -1
     BUY = 1
@@ -1566,7 +1156,7 @@ class OrderType(str, Enum):
     LIMIT = "limit"
     NOT_PLACED = "not_placed"
 
-class Order(BaseObjectOrm,BaseVamPydanticModel):
+class Order(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = Field(None, primary_key=True)
     order_remote_id: str
     order_time: datetime.datetime
@@ -1587,7 +1177,7 @@ class Order(BaseObjectOrm,BaseVamPydanticModel):
         use_enum_values = True  # This allows using enum values directly
 
     @classmethod
-    def create_or_update(cls,*args,**kwargs):
+    def create_or_update(cls, *args, **kwargs):
         base_url = cls.get_object_url()
         payload = {"json": kwargs }
         r = make_request(s=cls.build_session(),
@@ -1596,15 +1186,12 @@ class Order(BaseObjectOrm,BaseVamPydanticModel):
             raise Exception(r.text)
         return cls(**r.json())
 
-
-
-class OrderManagerTargetQuantity(BaseObjectOrm,BaseVamPydanticModel):
-
+class OrderManagerTargetQuantity(BaseObjectOrm, BasePydanticModel):
     id:Optional[int]=None
     asset:Union[Asset,int]
     quantity:float
 
-class OrderManager(BaseObjectOrm,BaseVamPydanticModel):
+class OrderManager(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
     target_time: datetime.datetime
     target_rebalance: list[OrderManagerTargetQuantity]
@@ -1613,11 +1200,10 @@ class OrderManager(BaseObjectOrm,BaseVamPydanticModel):
     related_account: Union[Account,int]  # Representing the ForeignKey field with the related account ID
 
     @classmethod
-    def destroy_before_date(cls,target_date:datetime.datetime):
+    def destroy_before_date(cls, target_date: datetime.datetime):
         base_url = cls.get_object_url()
         payload = {"json": {"target_date": target_date.strftime(DATE_FORMAT),
                          },}
-
 
         r = make_request(s=cls.build_session(),
                          loaders=cls.LOADERS,r_type="POST", url=f"{base_url}/destroy_before_date/", payload=payload)
@@ -1625,8 +1211,10 @@ class OrderManager(BaseObjectOrm,BaseVamPydanticModel):
         if r.status_code != 204:
             raise Exception(r.text)
 
-
 class ExecutionError(BaseObjectOrm):
     pass
+
 class InterfaceError(BaseObjectOrm):
     pass
+
+

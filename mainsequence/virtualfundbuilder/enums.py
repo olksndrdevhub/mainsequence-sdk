@@ -1,5 +1,5 @@
 from enum import Enum
-from mainsequence.vam_client import CONSTANTS
+from mainsequence.mainsequence_client import VAM_CONSTANTS as CONSTANTS
 
 class RebalanceFrequencyStrategyName(Enum):
     DAILY = "daily"

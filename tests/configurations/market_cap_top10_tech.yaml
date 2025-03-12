@@ -1,0 +1,67 @@
+Configuration Name: ""
+portfolio_build_configuration:
+  assets_configuration:
+    asset_universe:
+      asset_filters:
+      - asset_type: cash_equity
+        execution_venue__symbol: alpaca
+        symbol: AAPL
+      - asset_type: cash_equity
+        execution_venue__symbol: alpaca
+        symbol: GOOG
+      - asset_type: cash_equity
+        execution_venue__symbol: alpaca
+        symbol: NVDA
+    price_type: vwap
+    prices_configuration:
+      bar_frequency_id: 1d
+      intraday_bar_interpolation_rule: ffill
+      upsample_frequency_id: 1d
+  backtesting_weights_configuration:
+    rebalance_strategy_configuration:
+      calendar: 24/7
+    rebalance_strategy_name: ImmediateSignal
+    signal_weights_configuration:
+      num_top_assets: None
+      signal_assets_configuration:
+        asset_universe:
+          asset_filters:
+          - asset_type: cash_equity
+            execution_venue__symbol: alpaca
+            symbol: AAPL
+          - asset_type: cash_equity
+            execution_venue__symbol: alpaca
+            symbol: GOOG
+          - asset_type: cash_equity
+            execution_venue__symbol: alpaca
+            symbol: NVDA
+        price_type: vwap
+        prices_configuration:
+          bar_frequency_id: 1d
+          intraday_bar_interpolation_rule: ffill
+          upsample_frequency_id: 1d
+      source_frequency: 1d
+    signal_weights_name: MarketCap
+  execution_configuration:
+    commission_fee: 0.00018
+  portfolio_prices_frequency: 1d
+  valuation_asset:
+    asset_type: cash_equity
+    execution_venue_symbol: alpaca
+    symbol: USD
+portfolio_vam_configuration:
+  execution_configuration:
+    max_data_latency_seconds: 60
+    max_latency_in_cdc_seconds: 300
+    minimum_notional_for_a_rebalance: 15.0
+    minimum_positions_holding_seconds: 600
+    orders_execution_configuration:
+      broker_class: PriceChaserBroker
+      broker_configuration:
+        execution_time_out_seconds: 300
+        max_order_life_time_seconds: 2
+    rebalance_step_every_seconds: 300
+    rebalance_tolerance_percent: 0.005
+    unwind_funds_hanging_limit_seconds: 3600
+  front_end_details: ''
+  portfolio_name: Portfolio Strategy Title

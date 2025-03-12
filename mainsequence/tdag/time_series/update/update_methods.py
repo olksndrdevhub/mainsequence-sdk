@@ -3,21 +3,11 @@ import datetime
 import pytz
 import time
 
-from mainsequence.tdag_client import LocalTimeSerieUpdateDetails,request_to_datetime
+from mainsequence.mainsequence_client import LocalTimeSerieUpdateDetails,request_to_datetime
 from mainsequence.tdag.config import bcolors, configuration
-from typing import Union
 from mainsequence.instrumentation import tracer
 import ray
-from mainsequence.tdag_client import CONSTANTS,LocalTimeSerie
-
 from mainsequence.tdag.time_series import TimeSerie
-from concurrent.futures import ThreadPoolExecutor
-from mainsequence.logconf import logger
-from mainsequence.tdag_client.models import LocalTimeSeriesHistoricalUpdate
-
-
-
-
 
 def update_remote_from_hash_id_local(
                          telemetry_carrier: str,

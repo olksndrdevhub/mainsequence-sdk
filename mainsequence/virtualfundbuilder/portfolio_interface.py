@@ -1,39 +1,18 @@
 import copy
-import glob
-import tempfile
-from datetime import datetime
-import json
-
 from mainsequence.tdag.utils import write_yaml
-from mainsequence.tdag_client.models import BACKEND_DETACHED
-from ray.workflow import run_async
-from mainsequence.tdag.config import ogm
-from mainsequence.tdag.time_series.update.scheduler import (
-    SchedulerUpdater
-
-)
-from mainsequence.tdag.time_series import ModelList
+from mainsequence.mainsequence_client import BACKEND_DETACHED
 import os
 from typing import Dict, Any, List, Union, Optional
 import yaml
 import re
-import logging
-import pandas as pd
-import time
-from mainsequence.tdag_client import Scheduler, LocalTimeSerie
 
 from .config_handling import configuration_sanitizer
 from .time_series import PortfolioStrategy
-from mainsequence.vam_client import Asset, AssetFutureUSDM, CONSTANTS, TargetPortfolio, TargetPortfolioFrontEndDetails,Calendar
+from mainsequence.mainsequence_client import Asset, AssetFutureUSDM, VAM_CONSTANTS as CONSTANTS, TargetPortfolio, TargetPortfolioFrontEndDetails,Calendar
 
 from .models import PortfolioConfiguration
 from .utils import find_ts_recursively, get_vfb_logger, is_jupyter_environment
-from mainsequence.tdag import ogm
-from mainsequence.tdag.time_series.update.scheduler import set_data_source
-from mainsequence.tdag_client import POD_DEFAULT_DATA_SOURCE
-from mainsequence.tdag_client import CONSTANTS as TDAG_CONSTANTS
-from pprint import pprint
-
+from mainsequence.mainsequence_client import TDAG_CONSTANTS
 
 class PortfolioInterface():
     """

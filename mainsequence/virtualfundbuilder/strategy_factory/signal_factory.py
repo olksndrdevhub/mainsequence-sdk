@@ -10,7 +10,7 @@ from mainsequence.virtualfundbuilder.strategy_factory.base_factory import BaseSt
 from mainsequence.virtualfundbuilder.models import AssetsConfiguration
 
 import pandas as pd
-from mainsequence.vam_client import (Asset, ExecutionPositions)
+from mainsequence.mainsequence_client import (Asset, ExecutionPositions)
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger,_send_strategy_to_registry
 
 logger = get_vfb_logger()

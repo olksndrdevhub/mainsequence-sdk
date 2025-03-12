@@ -438,7 +438,7 @@ def process_and_update_table(
     recompress = False
     if overwrite:
         url = f"{base_url}/{metadata.id}/decompress_chunks/"
-        from ..models import BaseObject
+        from ..models_vam import BaseObject
         s = BaseObject.build_session()
 
         r = make_request(
