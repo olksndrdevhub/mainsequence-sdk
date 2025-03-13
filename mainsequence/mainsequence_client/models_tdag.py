@@ -582,7 +582,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             chunk_df = serialized_data_frame.iloc[start_idx:end_idx]
 
             # Compute grouped_dates for this chunk
-            chunk_stats, _ = get_chunk_stats(chunk_df=chunk_df, index_names=index_names,
+            chunk_stats, _, last_observation = get_chunk_stats(chunk_df=chunk_df, index_names=index_names,
                                              time_index_name=time_index_name)
 
             # Convert the chunk to JSON
@@ -598,6 +598,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                 "overwrite": overwrite,
                 "chunk_index": i,
                 "total_chunks": total_chunks,
+                "last_observation": last_observation,
             })
             try:
                 r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url, time_out=60 * 15)
@@ -1105,22 +1106,39 @@ class DataUpdates(BasePydanticModel):
 
 
 def get_chunk_stats(chunk_df, time_index_name, index_names):
-    chunk_stats = {"_GLOBAL_": {"max": chunk_df[time_index_name].max().timestamp(),
-                                "min": chunk_df[time_index_name].min().timestamp()}}
+    # Global min and max
+    global_min = chunk_df[time_index_name].min().timestamp()
+    global_max = chunk_df[time_index_name].max().timestamp()
 
+    chunk_stats = {
+        "_GLOBAL_": {
+            "min": global_min,
+            "max": global_max
+        }
+    }
+
+    # Group once on unique_identifier
+    grouped = chunk_df.groupby("unique_identifier")[time_index_name].agg(["min", "max"])
+
+    # _PER_ASSET_ only if we have multiple index names
     grouped_dates = None
     if len(index_names) > 1:
-        grouped_dates = chunk_df.groupby(["unique_identifier"])[
-            time_index_name].agg(
-            ["min", "max"])
+        grouped_dates = grouped
         chunk_stats["_PER_ASSET_"] = {
-            row["unique_identifier"]: {
-                "max": row["max"].timestamp(),
+            uid: {
                 "min": row["min"].timestamp(),
+                "max": row["max"].timestamp()
             }
-            for _, row in grouped_dates.reset_index().iterrows()
+            for uid, row in grouped_dates.iterrows()
         }
-    return chunk_stats, grouped_dates
+
+    # last_observation: dictionary { uid: {"time_index": max_timestamp} }
+    last_observation = {
+        uid: {"time_index": row["max"].timestamp()}
+        for uid, row in grouped.iterrows()
+    }
+
+    return chunk_stats, grouped_dates, last_observation
 
 
 class LocalTimeSeriesHistoricalUpdate(BasePydanticModel, BaseObjectOrm):
@@ -1153,7 +1171,6 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             time_index_name: str,
             index_names: list,
             grouped_dates: dict,
-
     ):
         LocalTimeSerie.post_data_frame_in_chunks(
             serialized_data_frame=serialized_data_frame,
@@ -1848,6 +1865,7 @@ class DynamicTableHelpers:
                                ):
         overwrite = True  # ALWAYS OVERWRITE
         metadata = local_metadata.remote_table
+
         data, column_index_names, index_names, column_dtypes_map, time_index_name = cls._break_pandas_dataframe(
             data)
 
@@ -1855,20 +1873,24 @@ class DynamicTableHelpers:
         if not data[time_index_name].is_monotonic_increasing:
             data = data.sort_values(time_index_name)
 
-        metadata, data = (result if (result := cls._handle_source_table_configuration(metadata=metadata, column_dtypes_map=column_dtypes_map,
-                                                                                      index_names=index_names,
-                                                                                      time_index_name=time_index_name,
-                                                                                      column_index_names=column_index_names, data=data,
-                                                                                      overwrite=overwrite
-                                                                                      )
-
-                                     ) is not None else (metadata, data))
+        metadata, data = (
+            result if (
+                          result := cls._handle_source_table_configuration(
+                              metadata=metadata, column_dtypes_map=column_dtypes_map,
+                              index_names=index_names,
+                              time_index_name=time_index_name,
+                              column_index_names=column_index_names, data=data,
+                              overwrite=overwrite
+                          )
+            ) is not None
+            else (metadata, data)
+        )
 
         duplicates_exist = data.duplicated(subset=index_names).any()
         if duplicates_exist:
             raise Exception(f"Duplicates found in columns: {index_names}")
 
-        global_stats, grouped_dates = get_chunk_stats(
+        global_stats, grouped_dates, global_last_observation = get_chunk_stats(
             chunk_df=data,
             index_names=index_names,
             time_index_name=time_index_name
@@ -1880,7 +1902,7 @@ class DynamicTableHelpers:
             overwrite=overwrite,
             time_index_name=time_index_name,
             index_names=index_names,
-            grouped_dates=grouped_dates
+            grouped_dates=grouped_dates,
         )
 
         if BACKEND_DETACHED() == True:
@@ -1895,7 +1917,7 @@ class DynamicTableHelpers:
         local_metadata = local_metadata.set_last_update_index_time_from_update_stats(
             max_per_asset_symbol=max_per_asset_symbol,
             last_time_index_value=last_time_index_value,
-            last_observation=max(max_per_asset_symbol.values())
+            last_observation=global_last_observation
         )
         return local_metadata
 
