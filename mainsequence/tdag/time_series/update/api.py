@@ -13,7 +13,7 @@ app.add_middleware(
 def startup():
 
     from mainsequence.tdag.time_series.update.scheduler import SchedulerUpdater
-    from mainsequence.tdag_client import Scheduler
+    from mainsequence.mainsequence_client import Scheduler
 
     new_scheduler = Scheduler.get(uid=app.state.scheduler_uid)
 

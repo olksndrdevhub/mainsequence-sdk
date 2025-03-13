@@ -320,13 +320,8 @@ class SchedulerUpdater:
                                              ):
         """
         Queries ts_orm scheduler and build update actors if not exist
-        Returns
-        Returns
-        -------
-
         """
-
-        from mainsequence.tdag_client import DynamicTableHelpers
+        from mainsequence.mainsequence_client import DynamicTableHelpers
         dth = DynamicTableHelpers()
         self.refresh_node_scheduler()
         local_to_remote = {t.uid: {"updates_to":t.updates_to,"local_hash_id":t.hash_id} for t in self.node_scheduler.schedules_to}
@@ -420,7 +415,7 @@ class SchedulerUpdater:
         return next_update
 
     def refresh_node_scheduler(self):
-        from mainsequence.tdag_client.models import BACKEND_DETACHED
+        from mainsequence.mainsequence_client import BACKEND_DETACHED
         if BACKEND_DETACHED()==True:
             return None
         error_in_request = True
@@ -507,8 +502,6 @@ class SchedulerUpdater:
                 The port on which any exposed APIs should run. If None, no API is exposed.
                 Defaults to None.
         """
-
-        from mainsequence.tdag_client import CONSTANTS as TDAG_CONSTANTS
         self._debug_mode = debug
         self._api_port = api_port
 

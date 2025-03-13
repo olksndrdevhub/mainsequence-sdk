@@ -698,7 +698,7 @@ class DataLakePersistManager(PersistManager):
         :param ts:
         :return:
         """
-        from mainsequence.tdag_client.models import BACKEND_DETACHED
+        from mainsequence.mainsequence_client import BACKEND_DETACHED
         from mainsequence.tdag.time_series import WrapperTimeSerie
         if self.already_run== True or self.is_introspecting ==True:
             return None
@@ -768,7 +768,7 @@ class DataLakePersistManager(PersistManager):
         self.already_run = already_run
 
     def _get_local_lake_update_statistics(self,remote_table_hash_id,time_serie):
-        from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
+        from mainsequence.mainsequence_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         assert self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
         if self.already_run == False:
             self.verify_if_already_run(time_serie)
@@ -783,13 +783,13 @@ class DataLakePersistManager(PersistManager):
         return last_index_value, last_multiindex
 
     def table_exist(self,table_name):
-        from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
+        from mainsequence.mainsequence_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         assert self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
         return DataLakeInterface(data_lake_source=self.data_source.related_resource,
                                                               ).table_exist(
             table_name=table_name)
     def get_table_schema(self,table_name):
-        from mainsequence.tdag_client.data_sources_interfaces.local_data_lake import DataLakeInterface
+        from mainsequence.mainsequence_client.data_sources_interfaces.local_data_lake import DataLakeInterface
         dli=DataLakeInterface(data_lake_source=self.data_source,
                          logger=self.logger)
         schema=dli.get_table_schema(table_name=table_name)

@@ -202,8 +202,7 @@ class PortfolioStrategy(TimeSerie):
         earliest_last_value = [v._max_time_in_update_statistics for v in update_statics_from_dependencies if 
                                v._max_time_in_update_statistics is not None]  # filter out None
 
-        
-        if len(earliest_last_value)==0:
+        if len(earliest_last_value) == 0:
             raise Exception("Prices are empty")
 
         # Determine the last value where all assets have data
@@ -211,7 +210,6 @@ class PortfolioStrategy(TimeSerie):
 
         # Handle case when latest_value is None
         start_date = update_statistics._max_time_in_update_statistics
-     
 
         # Adjust end_date based on max time difference variable if set
         max_td_env = os.getenv("MAX_TD_FROM_LATEST_VALUE", None)

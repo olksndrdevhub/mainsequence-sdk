@@ -1,7 +1,6 @@
 from importlib.metadata import metadata
 
-from .models_base import BasePydanticModel
-from .models_helpers import BaseObjectOrm, TDAG_ENDPOINT
+from .base import BasePydanticModel, BaseObjectOrm, TDAG_ENDPOINT
 from .utils import (is_process_running, get_network_ip,
                     TDAG_CONSTANTS,
                     DATE_FORMAT, AuthLoaders, make_request, set_types_in_table, request_to_datetime, serialize_to_json)
@@ -221,20 +220,6 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
         du._max_time_in_update_statistics = self.last_time_index_value
         return du
 
-    @classmethod
-    def create(cls, *args, **kwargs):
-        url = cls.get_object_url() + "/source_table_config/"
-        data = serialize_to_json(kwargs)
-        payload = {"json": data, }
-        s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
-            if r.status_code == 409:
-                raise AlreadyExist(r.text)
-            else:
-                raise Exception(r.text)
-        return cls(**r.json())
-
     def get_time_scale_extra_table_indices(self) -> dict:
         url = self.get_object_url() + f"/source_table_config/{self.id}/get_time_scale_extra_table_indices/"
         s = self.build_session()
@@ -254,6 +239,10 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     description: Optional[str] = Field(None, description="Optional HTML description")
     localtimeserieupdatedetails: Optional["LocalTimeSerieUpdateDetails"] = None
     run_configuration: "RunConfiguration"
+
+    @property
+    def data_source(self):
+        return self.remote_table.data_source
 
     @classmethod
     def get_or_create(cls, **kwargs):
@@ -371,13 +360,22 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             raise Exception(f"{metadata['local_hash_id']}{r.text}")
         return r
 
-    def set_last_update_index_time_from_update_stats(self,
-                                                     last_time_index_value: float, max_per_asset_symbol,
-                                                     timeout=None) -> "LocalTimeSerie":
+    def set_last_update_index_time_from_update_stats(
+            self,
+            last_time_index_value: float,
+            max_per_asset_symbol,
+            last_observation,
+            timeout=None
+    ) -> "LocalTimeSerie":
         s = self.build_session()
         url = self.get_object_url() + f"/{self.id}/set_last_update_index_time_from_update_stats/"
         payload = {
-            "json": {"last_time_index_value": last_time_index_value, "max_per_asset_symbol": max_per_asset_symbol}}
+            "json": {
+                "last_time_index_value": last_time_index_value,
+                "max_per_asset_symbol": max_per_asset_symbol,
+                "last_observation": last_observation,
+            }
+        }
         print(f"Set last update index with {payload['json']}")
         r = make_request(s=s, loaders=self.LOADERS, payload=payload, r_type="POST", url=url, time_out=timeout)
 
@@ -401,7 +399,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     @classmethod
     def get_mermaid_dependency_diagram(cls, local_hash_id, data_source_id, desc=True, timeout=None) -> dict:
         s = cls.build_session()
-        url = cls.ENDPOINTS["LocalTimeSerie"] + f"/{local_hash_id}/dependencies_graph_mermaid?desc={desc}&data_source_id={data_source_id}"
+        url = cls.get_object_url("TimeSerie") + f"/{local_hash_id}/dependencies_graph_mermaid?desc={desc}&data_source_id={data_source_id}"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url,
                          time_out=timeout)
         if r.status_code != 200:
@@ -422,7 +420,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     @classmethod
     def get_upstream_nodes(cls, hash_id, data_source_id, timeout=None):
         s = cls.build_session()
-        url = cls.ENDPOINTS["LocalTimeSerie"] + f"/{hash_id}/get_upstream_nodes?data_source_id={data_source_id}"
+        url = cls.get_object_url("TimeSerie") + f"/{hash_id}/get_upstream_nodes?data_source_id={data_source_id}"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -432,7 +430,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
     @classmethod
     def create(cls, timeout=None, *args, **kwargs):
-        url = cls.ENDPOINTS["LocalTimeSerie"] + "/"
+        url = cls.get_object_url("TimeSerie") + "/"
         payload = {"json": serialize_to_json(kwargs)}
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload, time_out=timeout)
@@ -443,7 +441,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
     def set_ogm_dependencies_linked(self):
         s = self.build_session()
-        url = self.ENDPOINTS["LocalTimeSerie"] + f"/{self.id}/set_ogm_dependencies_linked"
+        url = self.get_object_url("LocalTimeSerieNodesMethods") + f"/{self.id}/set_ogm_dependencies_linked"
         r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, )
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -603,7 +601,8 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             })
             try:
                 r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url, time_out=60 * 15)
-                r.raise_for_status()  # Raise if 4xx/5xx
+                if r.status_code not in [200, 204]:
+                    logger.warning(f"Error in request: {r.text}")
                 logger.info(f"Chunk {i + 1}/{total_chunks} uploaded successfully.")
             except requests.exceptions.RequestException as e:
                 logger.exception(f"Error uploading chunk {i + 1}/{total_chunks}: {e}")
@@ -652,7 +651,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                                         target_data_source_id: id,
                                         target_local_hash_id: str):
         s = cls.build_session()
-        url = cls.ENDPOINTS["TimeSerie"] + "/depends_on_connect_remote_table/"
+        url = cls.get_object_url("TimeSerie") + "/depends_on_connect_remote_table/"
         payload = dict(json={"source_hash_id": source_hash_id,
                              "source_local_hash_id": source_local_hash_id,
                              "source_data_source_id": source_data_source_id,
@@ -672,7 +671,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                            target_human_readable: str):
 
         s = cls.build_session()
-        url = cls.ENDPOINTS["TimeSerie"] + "/depends_on_connect/"
+        url = cls.get_object_url("TimeSerie") + "/depends_on_connect/"
         payload = dict(json={"target_class_name": target_class_name,
                              "source_local_hash_id": source_local_hash_id, "target_local_hash_id": target_local_hash_id,
                              "target_human_readable": target_human_readable,
@@ -757,7 +756,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             data_source_id: int,
             local_table_patch: dict
     ) -> "LocalTimeSerie":
-        url = cls.ENDPOINTS["TimeSerie"] + "/patch_build_configuration"
+        url = cls.get_object_url("TimeSerie") + "/patch_build_configuration"
         payload = {"json": {"remote_table_patch": remote_table_patch, "local_table_patch": local_table_patch,
                             "build_meta_data": build_meta_data, "data_source_id": data_source_id,
                             }}
@@ -1896,6 +1895,7 @@ class DynamicTableHelpers:
         local_metadata = local_metadata.set_last_update_index_time_from_update_stats(
             max_per_asset_symbol=max_per_asset_symbol,
             last_time_index_value=last_time_index_value,
+            last_observation=max(max_per_asset_symbol.values())
         )
         return local_metadata
 

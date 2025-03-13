@@ -1,6 +1,6 @@
 from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import MARKET_CAP_SIGNAL
 from mainsequence.virtualfundbuilder.strategy_factory.rebalance_factory import TIME_WEIGHTED
-from mainsequence.vam_client import Asset, CONSTANTS
+from mainsequence.mainsequence_client import Asset, CONSTANTS
 from examples.utils import TOP_50
 
 asset_list = [

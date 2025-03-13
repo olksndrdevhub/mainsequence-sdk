@@ -108,6 +108,18 @@ class BaseObjectOrm:
         "AssetCategory": "assets/asset-category",
         "TargetPortfolioFrontEndDetails": "assets/target-portfolio-details",
 
+        "BinanceFuturesUSDMTrade": 'binance/trade/futureusdm',
+        "BinanceSpotAccount": 'binance/account/spot',
+        "BinanceFuturesAccount": 'binance/account/futures',
+        "BinanceAsset": 'binance/asset/spot',
+        "BinanceAssetFutureUSDM": 'binance/asset/futureusdm',
+        "BinanceCurrencyPair": 'binance/asset/currency_pair',
+                               
+        "AlpacaAssetTrade": 'alpaca/trade/spot',
+        "AlpacaAccount": 'alpaca/account',
+        "AlpacaAsset": 'alpaca/asset/spot',
+        "AlpacaCurrencyPair": 'alpaca/asset/currency_pair',
+
         # TDAG
         "TimeSerie": "ogm/time_serie",
         "Scheduler": "ogm/scheduler",
@@ -119,7 +131,8 @@ class BaseObjectOrm:
         "LocalTimeSerieUpdateDetails": "ts_manager/local_time_serie_update_details",
         "LocalTimeSerieHistoricalUpdate": "ts_manager/lts_historical_update",
         "DynamicTableDataSource": "ts_manager/dynamic_table_data_source",
-        "Project": "pods/projects"
+        "Project": "pods/projects",
+        "SourceTableConfiguration": "ts_manager/source_table_config",
     }
     ROOT_URL = API_ENDPOINT
     LOADERS = loaders
@@ -158,9 +171,9 @@ class BaseObjectOrm:
         return f"{self.class_name()}: {object_id}"
 
     @classmethod
-    def get_object_url(cls):
-        url = f"{cls.ROOT_URL}/{cls.END_POINTS[cls.class_name()]}"
-        return url
+    def get_object_url(cls, custom_endpoint_name=None):
+        endpoint_name = custom_endpoint_name or cls.class_name()
+        return f"{cls.ROOT_URL}/{cls.END_POINTS[endpoint_name]}"
 
     @staticmethod
     def _parse_parameters_filter(parameters):
@@ -255,7 +268,7 @@ class BaseObjectOrm:
                 r_type="GET",
                 url=detail_url,
                 payload={},
-                timeout=timeout
+                time_out=timeout
             )
 
             if r.status_code == 404:
@@ -312,7 +325,7 @@ class BaseObjectOrm:
             r_type="POST",
             url=f"{base_url}/",
             payload=payload,
-            timeout=timeout
+            time_out=timeout
         )
         if r.status_code not in [201]:
             raise Exception(r.text)
@@ -330,7 +343,7 @@ class BaseObjectOrm:
             r_type="POST",
             url=url,
             payload=payload,
-            timeout=timeout
+            time_out=timeout
         )
         if r.status_code not in [201, 200]:
             raise Exception(r.text)

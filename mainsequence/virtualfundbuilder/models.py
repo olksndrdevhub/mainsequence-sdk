@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 from pydantic import (BaseModel, validator, model_validator)
 import os
 import pandas as pd
-from mainsequence.mainsequence_client import TargetPortfolioFrontEndDetails, AssetMixin, Asset
+from mainsequence.mainsequence_client import AssetMixin, Asset
 from mainsequence.mainsequence_client.models_helpers import get_right_asset_class
 from mainsequence.tdag.time_series import ModelList
 import json
@@ -345,7 +345,7 @@ class PortfolioVamConfig(VFBConfigBaseModel):
     """
     portfolio_name: str = "Portfolio Strategy Title"
     execution_configuration: VAMExecutionConfiguration  # TODO should come from VAM
-    front_end_details: TargetPortfolioFrontEndDetails
+    front_end_details: str = ""
     tracking_funds_expected_exposure_from_latest_holdings: bool
     builds_from_target_positions: bool
 
@@ -514,8 +514,7 @@ class PortfolioConfiguration(VFBConfigBaseModel):
             )
         )
         portfolio_vam_configuration["execution_configuration"] = vam_execution_config
-        portfolio_vam_configuration["front_end_details"] = TargetPortfolioFrontEndDetails(
-            **portfolio_vam_configuration['front_end_details'])
+        portfolio_vam_configuration["front_end_details"] = portfolio_vam_configuration['front_end_details']["about_text"]
         portfolio_vam_configuration = PortfolioVamConfig(**portfolio_vam_configuration)
 
         # Combine everything into the final PortfolioConfiguration

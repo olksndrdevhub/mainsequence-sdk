@@ -8,7 +8,7 @@ import re
 
 from .config_handling import configuration_sanitizer
 from .time_series import PortfolioStrategy
-from mainsequence.mainsequence_client import Asset, AssetFutureUSDM, VAM_CONSTANTS as CONSTANTS, TargetPortfolio, TargetPortfolioFrontEndDetails,Calendar
+from mainsequence.mainsequence_client import Asset, AssetFutureUSDM, VAM_CONSTANTS as CONSTANTS, TargetPortfolio, Calendar
 
 from .models import PortfolioConfiguration
 from .utils import find_ts_recursively, get_vfb_logger, is_jupyter_environment
@@ -71,7 +71,7 @@ class PortfolioInterface():
 
         Returns:
         """
-        from mainsequence.vam_client.models import TargetPortfolioIndexAsset
+        from mainsequence.mainsequence_client import TargetPortfolioIndexAsset
         if not self._is_initialized:
             self._initialize_nodes()
 
@@ -79,7 +79,7 @@ class PortfolioInterface():
         backtest_ts = self.portfolio_strategy_time_serie_backtest
 
         def build_vam_portfolio(ts,build_purpose):
-            from mainsequence.tdag_client.models import BACKEND_DETACHED
+            from mainsequence.mainsequence_client import BACKEND_DETACHED
 
             # when is live target portfolio
 
@@ -121,46 +121,32 @@ class PortfolioInterface():
                 standard_kwargs["available_in_venues"] = [0]
                 standard_kwargs["id"] = ts.local_hash_id
                 return TargetPortfolio(**standard_kwargs)
-            
+
+            standard_kwargs["target_portfolio_about"] = {
+                "description": ts.get_portfolio_about_text(),
+                "signal_name": ts.backtesting_weights_config.signal_weights_name,
+                "signal_description": ts.signal_weights.get_explanation(),
+                "rebalance_strategy_name": ts.backtesting_weights_config.rebalance_strategy_name,
+            }
+
+            standard_kwargs["backtest_table_time_index_name"] = "time_index"
+            standard_kwargs["backtest_table_price_column_name"] = "portfolio"
+            standard_kwargs["tags"] = portfolio_tags
+
             target_portfolio = TargetPortfolio.filter(local_time_serie_id=ts.local_metadata.id)
-            front_end_details = copy.deepcopy(self.portfolio_vam_config.front_end_details)
             if len(target_portfolio) == 0:
                 target_portfolio = TargetPortfolio.create_from_time_series(**standard_kwargs)
-
             else:
-                #patch timeserie of portfolio to guaranteed recreation
+                # patch timeserie of portfolio to guaranteed recreation
                 target_portfolio = target_portfolio[0]
                 target_portfolio.patch(**standard_kwargs)
                 self.logger.debug(f"Target portfolio {ts.local_metadata.id} already exists in VAM")
 
-            front_end_detail_portfolio = TargetPortfolioFrontEndDetails.filter(target_portfolio__id=target_portfolio.id)
-            if len(front_end_detail_portfolio) == 0:
-                # build frontend details
-                front_end_details_kwargs = {k: v for k, v in front_end_details.model_dump().items() if v is not None}
-                front_end_details_kwargs.pop('orm_class', None)
-                front_end_details_kwargs["target_portfolio_about"] = {"description":ts.get_portfolio_about_text(),
-                                                                      "signal_name":ts.backtesting_weights_config.signal_weights_name,
-                                                                      "signal_description":ts.signal_weights.get_explanation(),
-                                                                      "rebalance_strategy_name":ts.backtesting_weights_config.rebalance_strategy_name,
-                                                                      }
-                front_end_detail_portfolio = TargetPortfolioFrontEndDetails.create_or_update(
-                    **front_end_details_kwargs,
-                    target_portfolio_id=target_portfolio.id,
-                    backtest_table_time_index_name="time_index",
-                    backtest_table_price_column_name="portfolio",
-                    tags=portfolio_tags
-                )
-            else:
-                front_end_detail_portfolio=front_end_detail_portfolio[0]
+            return target_portfolio
 
+        live_portfolio = build_vam_portfolio(live_ts, build_purpose=CONSTANTS.PORTFOLIO_BUILD_FOR_EXECUTION,)
+        backtest_portfolio = build_vam_portfolio(backtest_ts, build_purpose=CONSTANTS.PORTFOLIO_BUILD_FOR_BACKTEST,)
 
-            return front_end_detail_portfolio
-
-        live_front_end_details = build_vam_portfolio(live_ts,build_purpose=CONSTANTS.PORTFOLIO_BUILD_FOR_EXECUTION,)
-        backtest_front_end_details_portfolio = build_vam_portfolio(backtest_ts,build_purpose=CONSTANTS.PORTFOLIO_BUILD_FOR_BACKTEST,)
-
-        live_portfolio=live_front_end_details.target_portfolio
-        backtest_portfolio=backtest_front_end_details_portfolio.target_portfolio
         # create index Asset
         asset_symbol = f"{live_ts.build_prefix()}_{live_portfolio.id}_{backtest_portfolio.id}"
         
@@ -185,11 +171,8 @@ class PortfolioInterface():
                                                                                  "calendar"]
                                                                              )
         self.index_asset = index_asset
-
-
-        self.live_front_end_details=live_front_end_details
-        self.backtest_front_end_details_portfolio=backtest_front_end_details_portfolio
-
+        self.live_portfolio = live_portfolio
+        self.backtest_portfolio = backtest_portfolio
         return live_portfolio, backtest_portfolio, index_asset
 
     def run(self,portfolio_tags:Optional[List[str]]=None,*args, **kwargs):
@@ -293,4 +276,4 @@ class PortfolioInterface():
         :return:
         """
         #should delete
-        self.live_front_end_details.delete()
+        self.live_portfolio.delete()

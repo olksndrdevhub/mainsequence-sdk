@@ -451,18 +451,16 @@ class ConfigSerializer:
                                  graph_depth_limit: int,
                                  graph_depth: int,
                                  ignore_pydantic=False, data_source_id: Union[DynamicTableDataSource, None] = None, ):
-        from mainsequence.vam_client.models_helpers import get_model_class
         import cloudpickle
 
         new_value = value
-
         state_kwargs = dict(
                             graph_depth_limit=graph_depth_limit,
                             data_source_id=data_source_id,
                             graph_depth=copy.deepcopy(graph_depth),
                             include_vam_client_objects=include_vam_client_objects)
-        if isinstance(value, dict):
 
+        if isinstance(value, dict):
             if "is_time_series_config" in value.keys():
                 new_value = TimeSerieConfigKwargs(**value["config_data"])
             elif "__type__" in value.keys():
@@ -496,9 +494,7 @@ class ConfigSerializer:
             elif "orm_class" in value.keys():
                 new_value = build_model(value)
             elif "pydantic_model_import_path" in value.keys():
-
                 new_value = cls.deserialize_pickle_state(value,
-
                                                           **state_kwargs
                                                          )
                 if ignore_pydantic == False:
@@ -513,6 +509,7 @@ class ConfigSerializer:
                                                                                                                dict) else v
                 for v in value]
             new_value = tuple(new_value)
+
         if isinstance(value, list):
             if len(value) == 0:
                 return new_value
@@ -1145,8 +1142,7 @@ class DataPersistanceMethods(ABC):
 
     # sets
     def get_metadatas_and_set_updates(self, *args, **kwargs):
-        from mainsequence.tdag_client import LocalTimeSerie
-
+        from mainsequence.mainsequence_client import LocalTimeSerie
         return LocalTimeSerie.get_metadatas_and_set_updates(*args, **kwargs)
 
     def patch_update_details(self, local_hash_id=None, *args, **kwargs):
@@ -1496,10 +1492,10 @@ class APITimeSerie(CommonMethodsMixin):
         :param vam_source_name:
         :return:
         """
-        from mainsequence.vam_client import TDAGAPIDataSource
+        from mainsequence.mainsequence_client import TDAGAPIDataSource
         tdag_api_data_source = TDAGAPIDataSource.get(unique_identifier=unique_identifier)
-        ts = cls(data_source_id=tdag_api_data_source.data_source_id,
-                 local_hash_id=tdag_api_data_source.local_hash_id
+        ts = cls(data_source_id=tdag_api_data_source.local_time_serie.data_source.id,
+                 local_hash_id=tdag_api_data_source.local_time_serie.local_hash_id
                  )
         return ts
 
@@ -1533,7 +1529,7 @@ class APITimeSerie(CommonMethodsMixin):
     def _verify_local_data_source(self):
         pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
         if pod_source != None:
-            from mainsequence.tdag_client import models as models
+            from mainsequence.mainsequence_client import models as models
             pod_source = json.loads(pod_source)
             ModelClass = pod_source["tdag_orm_class"]
             pod_source.pop("tdag_orm_class", None)
@@ -1542,7 +1538,6 @@ class APITimeSerie(CommonMethodsMixin):
             self.data_source = pod_source
 
     def build_data_source_from_configuration(self, data_config):
-        from mainsequence.tdag_client import models as models
         ModelClass = DynamicTableDataSource.get_class(data_config['data_type'])
         pod_source = ModelClass.get(data_config["id"])
         return pod_source
@@ -1909,7 +1904,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 raise Exception("This Pod does not have a default data source")
             return POD_DEFAULT_DATA_SOURCE
         # returnn to pod to override with context manager
-        from mainsequence.tdag_client import models as models
+        from mainsequence.mainsequence_client import models_tdag as models
         pod_source = json.loads(pod_source)
         ModelClass = pod_source["tdag_orm_class"]
         pod_source.pop("tdag_orm_class", None)

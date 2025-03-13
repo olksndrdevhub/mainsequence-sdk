@@ -14,8 +14,7 @@ import json
 import time
 
 from enum import IntEnum, Enum
-
-from .models_base import BasePydanticModel, BaseObjectOrm, VAM_CONSTANTS as CONSTANTS, TDAG_ENDPOINT
+from .base import BasePydanticModel, BaseObjectOrm, VAM_CONSTANTS as CONSTANTS, TDAG_ENDPOINT, API_ENDPOINT, HtmlSaveException
 from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, DATE_FORMAT
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field, validator,root_validator
@@ -42,8 +41,6 @@ def resolve_asset(asset_dict:dict):
     AssetClass = get_correct_asset_class(asset_dict['asset_type'])
     asset = AssetClass(**asset_dict)
     return asset
-
-
 
 class ExecutionPositions(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
@@ -94,7 +91,7 @@ class ExecutionPositions(BaseObjectOrm, BasePydanticModel):
             r_type="POST",
             url=url,
             payload=payload,
-            timeout=timeout
+            time_out=timeout
         )
         if r.status_code not in [201, 204] :
             raise HtmlSaveException(r.text)
@@ -216,7 +213,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
             r_type="POST",
             url=url,
             payload=payload,
-            timeout=timeout
+            time_out=timeout
         )
 
         if r.status_code != 200:
@@ -234,7 +231,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
             loaders=cls.LOADERS,
             r_type="POST",
             url=url,
-            timeout=timeout,
+            time_out=timeout,
             payload=payload
         )
 
@@ -300,7 +297,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
                 r_type="GET",
                 url=url,
                 payload=request_kwargs,
-                timeout=timeout
+                time_out=timeout
             )
 
             if r.status_code != 200:
@@ -408,7 +405,7 @@ class Asset(AssetMixin, BaseObjectOrm):
             r_type="POST",
             url=url,
             payload=payload,
-            timeout=timeout
+            time_out=timeout
         )
         if r.status_code not in [200,201]:
             raise Exception(f" {r.text()}")
@@ -615,7 +612,7 @@ class AccountMixin(BasePydanticModel):
         url = f"{base_url}/{self.id}/get_missing_assets_in_exposure/"
         payload = {"json": {"asset_list_ids":asset_list_ids,"asset_type":asset_type}}
         
-        r = make_request(s=self.build_session(),payload=payload, loaders=self.LOADERS, r_type="GET", url=url,timeout=timeout)
+        r = make_request(s=self.build_session(),payload=payload, loaders=self.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
             raise Exception(r.text)
         
@@ -725,7 +722,7 @@ class HistoricalWeights(BaseObjectOrm,BasePydanticModel):
                             }, }
 
         r = make_request(s=cls.build_session(),
-                         loaders=cls.LOADERS, r_type="POST", url=url, payload=payload, timeout=timeout)
+                         loaders=cls.LOADERS, r_type="POST", url=url, payload=payload, time_out=timeout)
         if r.status_code not in [201, 200]:
             raise Exception(f"Error inserting new weights {r.text}")
      
@@ -747,36 +744,6 @@ class DataFrequency(str, Enum):
     one_w = "1w"
     one_month ="1mo"
 
-class TDAGAPIDataSource(BaseObjectOrm, BasePydanticModel):
-    id: Optional[int]
-    unique_identifier: str = Field(..., description="Unique identifier for the api")
-    data_source_id: int = Field(..., description="Unique identifier for the data source")
-    local_hash_id: str = Field(..., max_length=64, description="Local hash ID of the data source")
-    data_source_description: Optional[str] = Field(None, description="Descriptions of the data source")
-    data_frequency_id: str = DataFrequency
-    assets_in_data_source:Optional[List[int]]
-
-    def __str__(self):
-        return self.class_name() +f"{self.unique_identifier}"
-
-    def append_assets(self,asset_id_list:list,timeout=None):
-        url = f"{self.get_object_url()}/{self.id}/append_assets/"
-
-        payload = {"json": {"asset_id_list":asset_id_list}}
-        r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload,
-                         timeout=timeout)
-        if r.status_code in [200] == False:
-            raise Exception(f" {r.text()}")
-        return self.__class__(**r.json())
-
-class HistoricalBarsSource(TDAGAPIDataSource):
-    execution_venues: list
-    data_mode:Literal['live', 'backtest'] = Field(
-
-        description="Indicates whether the source is for live data or backtesting."
-    )
-    adjusted:bool
-
 class Trade(BaseObjectOrm):
     @classmethod
     def create_or_update(cls, trade_kwargs,timeout=None) -> None:
@@ -784,7 +751,7 @@ class Trade(BaseObjectOrm):
         data = cls.serialize_for_json(trade_kwargs)
         payload = {"json": data}
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload,
-                         timeout=timeout)
+                         time_out=timeout)
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
         return r
@@ -805,6 +772,11 @@ class TargetPortfolioExecutionConfiguration(BaseObjectOrm,BasePydanticModel):
     minimum_positions_holding_seconds: Optional[float] = None
     rebalance_step_every_seconds: Optional[float] = None
     max_data_latency_seconds: Optional[float] = None
+
+class PortfolioTags(BasePydanticModel):
+    id:Optional[int]=None
+    name:str
+    color:str
 
 class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     id: Optional[Union[int,str]] = None
@@ -829,6 +801,11 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
 
     creation_date: Optional[datetime.datetime] = None
     execution_configuration: Union[int, TargetPortfolioExecutionConfiguration]
+
+    comparable_portfolios: Optional[List[int]] = None
+    backtest_table_time_index_name: Optional[str] = Field(None, max_length=20)
+    backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
+    tags: Optional[List[PortfolioTags]] = None
 
     @classmethod
     def create_from_time_series(cls,  portfolio_name: str,
@@ -873,63 +850,6 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
 
-class PortfolioTags(BasePydanticModel):
-    id:Optional[int]=None
-    name:str
-    color:str
-    
-class TargetPortfolioFrontEndDetails(BaseObjectOrm, BasePydanticModel):
-    target_portfolio: Optional[TargetPortfolio]=None
-    comparable_portfolios: Optional[List[int]] = None
-    backtest_table_time_index_name: Optional[str] = Field(None, max_length=20)
-    backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
-    tags: Optional[List[PortfolioTags]] = None
-
-    @classmethod
-    def get_object_url(cls):
-        url = f"{cls.ROOT_URL.replace('orm/api', 'api')}/{cls.END_POINTS[cls.class_name()]}"
-        return url
-
-    @property
-    def id(self):
-        return self.target_portfolio.id
-    
-    @staticmethod
-    def get_base_endpoint():
-        return  VAM_API_ENDPOINT.replace("orm/api","api/")
-
-    @classmethod
-    def create(cls, *args, **kwargs):
-        base_url = cls.get_base_endpoint()+"target-portfolio-details"
-        data = cls.serialize_for_json(kwargs)
-        payload = {"json": data}
-
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=f"{base_url}/", payload=payload)
-        if r.status_code not in [201, 200]:
-            raise Exception(r.text)
-        return cls(**r.json())
-
-    @classmethod
-    def create_or_update(cls, *args, **kwargs):
-        base_url = cls.get_base_endpoint() + "target-portfolio-details/create_or_update"
-        data = cls.serialize_for_json(kwargs)
-        payload = {"json": data}
-
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=f"{base_url}/", payload=payload)
-        if r.status_code not in [201, 200]:
-            raise Exception(r.text)
-        return cls(**r.json())
-
-    @classmethod
-    def get_or_build_asset_only_portfolio(cls, timeout=None,*args,**kwargs):
-        url = cls.get_base_endpoint() + "target-portfolio-details/get_or_build_asset_only_portfolio"
-        payload = {"json": kwargs }
-        r = make_request(s=cls.build_session(),
-                         loaders=cls.LOADERS, r_type="POST", url=f"{url}/", payload=payload, timeout=timeout)
-        if r.status_code not in [200, 201, 204]:
-            raise Exception(f"Error inserting new prediction{r.text}")
-        return r.json()
-
 class AssetOnlyPortfolio(BaseObjectOrm):
     pass
 
@@ -952,7 +872,7 @@ class ExecutionPrediction(BaseObjectOrm):
                             }, }
 
         r = make_request(s=cls.build_session(),
-                         loaders=cls.LOADERS, r_type="POST", url=url, payload=payload,timeout=timeout)
+                         loaders=cls.LOADERS, r_type="POST", url=url, payload=payload, time_out=timeout)
         if r.status_code in [201, 204] == False:
             raise Exception(f"Error inserting new prediction{r.text}")
         return r.json()
@@ -1211,10 +1131,138 @@ class OrderManager(BaseObjectOrm, BasePydanticModel):
         if r.status_code != 204:
             raise Exception(r.text)
 
-class ExecutionError(BaseObjectOrm):
+
+# ------------------------------
+# ALPACA
+# ------------------------------
+class AlpacaAssetMixin(AssetMixin, BaseObjectOrm):
+    ticker: str
+    asset_class: str
+    exchange: str
+    status: Literal["active", "inactive"]
+    marginable: bool
+    shortable: bool
+    easy_to_borrow: bool
+    fractionable: bool
+
+    def get_spot_reference_asset_symbol(self):
+        return self.symbol
+
+    @staticmethod
+    def get_properties_from_unique_symbol(unique_symbol: str):
+        if unique_symbol.endswith(CONSTANTS.ALPACA_CRYPTO_POSTFIX):
+            return {"symbol": unique_symbol.replace(CONSTANTS.ALPACA_CRYPTO_POSTFIX, ""), "asset_type": CONSTANTS.ASSET_TYPE_CRYPTO_SPOT}
+
+        return {"symbol": unique_symbol, "asset_type": CONSTANTS.ASSET_TYPE_CASH_EQUITY}
+
+class AlpacaAsset(AlpacaAssetMixin):
     pass
 
-class InterfaceError(BaseObjectOrm):
+class AlpacaCurrencyPair(AlpacaAssetMixin, CurrencyPairMixin):
     pass
 
+class AlapaAccountRiskFactors(AccountRiskFactors):
+    total_initial_margin: float
+    total_maintenance_margin: float
+    last_equity: float
+    buying_power: float
+    cash: float
+    last_maintenance_margin: float
+    long_market_value: float
+    non_marginable_buying_power: float
+    options_buying_power: float
+    portfolio_value:float
+    regt_buying_power: float
+    sma: float
 
+class AlpacaAccount(AccountMixin, BaseObjectOrm):
+    api_key: str
+    secret_key: str
+
+    account_number: str
+    id_hex: str
+    account_blocked: bool
+    multiplier: float
+    options_approved_level: int
+    options_trading_level: int
+    pattern_day_trader: bool
+    trade_suspended_by_user: bool
+    trading_blocked: bool
+    transfers_blocked: bool
+    shorting_enabled: bool
+
+class AlpacaAssetTrade(BasePydanticModel, BaseObjectOrm):
+
+    @classmethod
+    def create_or_update(cls, timeout=None, *args, **kwargs, ):
+        url = f"{cls.get_object_url()}/create_or_update"
+        data = cls.serialize_for_json(kwargs)
+        payload = {"json": data}
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=f"{url}/",
+                         time_out=timeout,
+                         payload=payload)
+        if r.status_code not in [201, 200]:
+            raise Exception(r.text)
+        return cls(**r.json())
+
+# ------------------------------
+# BINANCE
+# ------------------------------
+class BinanceAsset(AssetMixin, BaseObjectOrm):
+    pass
+
+class BinanceCurrencyPair(CurrencyPairMixin, BaseObjectOrm):
+   pass
+
+class BinanceAssetFutureUSDM(FutureUSDMMixin, BaseObjectOrm):
+
+    @classmethod
+    def batch_upsert_from_base_quote(cls, asset_config_list: list, execution_venue_symbol: str, asset_type: str,
+                                     timeout=None):
+        url = f"{cls.get_object_url()}/batch_upsert_from_base_quote/"
+        payload = dict(json={"asset_config_list": asset_config_list, "execution_venue_symbol": execution_venue_symbol,
+                             "asset_type": asset_type
+                             })
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, time_out=timeout,
+                         payload=payload)
+
+        if r.status_code != 200:
+            raise Exception("Error inserting assets")
+        return r.json()
+
+class BinanceFuturesAccountRiskFactors(AccountRiskFactors):
+    total_initial_margin: float
+    total_maintenance_margin: float
+    total_margin_balance: float
+    total_unrealized_profit: float
+    total_cross_wallet_balance: float
+    total_cross_unrealized_pnl: float
+    available_balance: float
+    max_withdraw_amount: float
+
+class BaseFuturesAccount(AccountMixin, BaseObjectOrm):
+    api_key :str
+    secret_key :str
+
+    multi_assets_margin: bool = False
+    fee_burn: bool = False
+    can_deposit: bool = False
+    can_withdraw: bool = False
+
+class BinanceFuturesTestNetAccount(BaseFuturesAccount):
+    pass
+
+class BinanceFuturesAccount(BaseFuturesAccount):
+    pass
+
+class BinanceSpotAccount(BaseObjectOrm):
+    pass
+
+class BinanceSpotTestNetAccount(BaseObjectOrm):
+    pass
+
+class BinanceEarnAccount(BaseObjectOrm):
+    pass
+
+class BinanceAssetFuturesUSDMTrade(Trade):
+   pass
