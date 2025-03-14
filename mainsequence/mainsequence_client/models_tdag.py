@@ -1012,14 +1012,18 @@ class DataUpdates(BasePydanticModel):
     def get_max_latest_value(self, init_fallback_date: datetime = None):
         if not self.update_statistics:
             return init_fallback_date
-        return min(self.update_statistics.values())
+        return max(self.update_statistics.values())
 
     def asset_identifier(self):
         return list(self.update_statistics.keys())
 
-    def update_assets(self, asset_list: Optional[List], *, init_fallback_date: datetime = None,
-                      unique_identifier_list: Union[list, None] = None
-                      ):
+    def update_assets(
+            self,
+            asset_list: Optional[List],
+            *,
+            init_fallback_date: datetime = None,
+            unique_identifier_list: Union[list, None] = None
+    ):
         new_update_statistics = self.update_statistics
 
         if asset_list is not None or unique_identifier_list is not None:
@@ -1037,9 +1041,11 @@ class DataUpdates(BasePydanticModel):
             _max_time_in_update_statistics = max(new_update_statistics.values()) if len(new_update_statistics) > 0 else None
         else:
             _max_time_in_update_statistics = self.max_time_index_value or init_fallback_date
-        du = DataUpdates(update_statistics=new_update_statistics,
-                         max_time_index_value=self.max_time_index_value,
-                         )
+
+        du = DataUpdates(
+            update_statistics=new_update_statistics,
+            max_time_index_value=self.max_time_index_value,
+        )
         du._max_time_in_update_statistics = _max_time_in_update_statistics
         return du
 
