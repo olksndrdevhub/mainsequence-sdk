@@ -37,7 +37,7 @@ def get_tdag_headers():
     return headers
 
 def update_job_status(status_message):
-    url = f"{os.getenv('TDAG_ENDPOINT')}/pods/api/job/job_run_status/"
+    url = f"{os.getenv('TDAG_ENDPOINT')}/orm/api/pods/job/job_run_status/"
 
     payload = {
         "status": status_message,
