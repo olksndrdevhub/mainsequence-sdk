@@ -92,8 +92,6 @@ class WeightsBase(PrivateWeightsBaseArguments, BaseStrategy):
 
         super().__init__()
 
-
-
     def get_explanation(self):
         info = f"""
         <p>{self.__class__.__name__}: Signal weights class.</p>
@@ -122,17 +120,18 @@ class WeightsBase(PrivateWeightsBaseArguments, BaseStrategy):
             last_date = last_observation.index.get_level_values("time_index")[0]
 
             if last_date < new_index.min():
-                self.logger.warning(f"No weights data at start of the portfolio at { new_index.min()}"
+                self.logger.warning(f"No weights data at start of the portfolio at {new_index.min()}"
                                     f" will use last available weights {last_date}")
                 weights = self.get_df_between_dates(start_date=last_date, end_date=new_index.max())
-
 
         if len(weights) == 0 :
             self.logger.warning(f"No weights data in index interpolation")
             return pd.DataFrame()
 
-        weights_pivot = weights.reset_index().pivot(index="time_index", columns=[ "unique_identifier"],
-                                      values="signal_weight").fillna(0)
+        weights_pivot = weights.reset_index().pivot(
+            index="time_index",
+            columns=[ "unique_identifier"],
+            values="signal_weight").fillna(0)
         weights_pivot["last_weights"] = weights_pivot.index.get_level_values(level="time_index")
 
         # combine existing index with new index
@@ -145,8 +144,7 @@ class WeightsBase(PrivateWeightsBaseArguments, BaseStrategy):
         weights_reindex["diff_to_last_weights"] = weights_reindex.index.get_level_values(level="time_index") - \
                                                   weights_reindex["last_weights"]
 
-        invalid_forward_fills = weights_reindex[
-                                    "diff_to_last_weights"] >= self.maximum_forward_fill()  # source_frequency is the duration a weight is valid
+        invalid_forward_fills = weights_reindex["diff_to_last_weights"] >= self.maximum_forward_fill()  # source_frequency is the duration a weight is valid
         weights_reindex.drop(columns=["last_weights", "diff_to_last_weights"], inplace=True)
 
         # forward fill and set dates that are outside of valid range to nan
@@ -159,9 +157,6 @@ class WeightsBase(PrivateWeightsBaseArguments, BaseStrategy):
         weights_reindex = weights_reindex.loc[new_index]
         weights_reindex.index.name = "time_index"
         return weights_reindex
-
-
-
 
 def _get_class_source_code(cls):
     import ast

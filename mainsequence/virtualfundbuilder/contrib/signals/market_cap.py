@@ -99,6 +99,7 @@ class MarketCap(WeightsBase, TimeSerie):
             raise ValueError(
                 f"No support to compare MarketCaps of asset universes {self.execution_venue_symbol}")
         self.execution_venue_symbol=ExecutionVenueNames(self.execution_venue_symbol[0])
+
     def maximum_forward_fill(self):
         return timedelta(days=1) - TIMEDELTA
 
@@ -132,19 +133,17 @@ class MarketCap(WeightsBase, TimeSerie):
 
         market_cap_symbol_map=lambda asset:f"{asset.get_spot_reference_asset_symbol()}-*-{VENUE_MAP[asset.execution_venue.symbol]}"
 
-
-
         asset_universe = self.asset_universe
         execution_venue_symbol = self.execution_venue_symbol
 
         if execution_venue_symbol not in self.EXECUTION_TO_DATA_PROVIDER_MAP: raise ValueError(f"Unknown execution venue symbol {execution_venue_symbol} in market cap")
         if asset_universe.asset_list is None:
-            asset_list=Asset.filter_with_asset_class(**asset_universe.asset_filter,
+            asset_list = Asset.filter_with_asset_class(**asset_universe.asset_filter,
                                                     )
         else:
-            asset_list=asset_universe.asset_list
+            asset_list = asset_universe.asset_list
 
-        update_statistics=update_statistics.update_assets(asset_list,init_fallback_date=datetime(2017,1,1).replace(tzinfo=pytz.utc))
+        update_statistics = update_statistics.update_assets(asset_list, init_fallback_date=datetime(2017,1,1).replace(tzinfo=pytz.utc))
         unique_identifier_range_map = {market_cap_symbol_map(a):{"start_date":update_statistics[a.unique_identifier],
                                                                             "start_date_operand":">"}
                                                                             for a in asset_list}
@@ -153,7 +152,7 @@ class MarketCap(WeightsBase, TimeSerie):
                                                                 great_or_equal=False,)
         if mc.shape[0] == 0:
             return pd.DataFrame()
-        asset_map={a.get_spot_reference_asset_symbol():a.unique_identifier for a in asset_list}
+        asset_map = {a.get_spot_reference_asset_symbol(): a.unique_identifier for a in asset_list}
         mc.index = mc.index.set_levels(
             mc.index.levels[mc.index.names.index("unique_identifier")]
             .str.split('-*-').str[0]
@@ -162,18 +161,15 @@ class MarketCap(WeightsBase, TimeSerie):
             level=1
         )
 
-
-
         mc_pivot = mc.reset_index().pivot(
             index="time_index",
             columns=["unique_identifier"],
             values="market_cap"
         )
-        mc_pivot=mc_pivot.ffill().bfill()
+        mc_pivot = mc_pivot.ffill().bfill()
         assets_excluded = mc_pivot.rank(axis=1, ascending=False) > self.num_top_assets
         mc_pivot[assets_excluded] = 0  # Exclude assets not in the top by setting weight to 0
 
         mc_pivot = mc_pivot.div(mc_pivot.sum(axis=1), axis=0)
         signal_weights = mc_pivot.stack().rename("signal_weight").to_frame()
-
         return signal_weights

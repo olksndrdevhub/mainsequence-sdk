@@ -578,14 +578,13 @@ def get_default_documentation(exclude_arguments=None):
 
     documentation_dict = parse_docsdict_to_defaultconfig(
         data=element_signature,
-        use_examples_for_default=["asset_universe", "front_end_details"],
+        use_examples_for_default=["asset_universe"],
         exclude_attr=exclude_arguments
     )
 
     default_config = default_config_to_yaml(documentation_dict)
 
     markdown = build_markdown(
-        children_to_exclude=["front_end_details"],
         elements_to_exclude=exclude_arguments,
         root_class=PortfolioConfiguration
     )
@@ -629,7 +628,7 @@ def _send_strategy_to_registry(strategy_type, strategy_class, is_jupyter=False, 
     )
     signal_documentation_dict = parse_docsdict_to_defaultconfig(
         data=signal_signature,
-        use_examples_for_default=["asset_universe", "front_end_details"],
+        use_examples_for_default=["asset_universe"],
     )
 
     # get the init signature form class and parent class, might need to be generalized to all parents
@@ -647,7 +646,7 @@ def _send_strategy_to_registry(strategy_type, strategy_class, is_jupyter=False, 
 
     parent_documentation_dict = parse_docsdict_to_defaultconfig(
         data=parent_signature,
-        use_examples_for_default=["asset_universe", "front_end_details"],
+        use_examples_for_default=["asset_universe"],
         exclude_attr=exclude_arguments
     )
     signal_documentation_dict.update(parent_documentation_dict)

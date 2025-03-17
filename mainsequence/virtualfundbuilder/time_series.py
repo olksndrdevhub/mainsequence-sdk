@@ -532,8 +532,10 @@ class PortfolioStrategy(TimeSerie):
         """
         
         self._set_asset_list()
-        update_statistics = update_statistics.update_assets(asset_list=None,
-                                                          init_fallback_date=datetime(2017, 1, 1, tzinfo=pytz.utc))
+        update_statistics = update_statistics.update_assets(
+            asset_list=None,
+            init_fallback_date=datetime(2017, 1, 1, tzinfo=pytz.utc)
+        )
         self.logger.debug("Starting update of portfolio weights.")
         start_date, end_date = self._calculate_start_end_dates(update_statistics)
 
@@ -565,16 +567,19 @@ class PortfolioStrategy(TimeSerie):
         )
 
         # get prices for portfolio and interpolated with new_index
-        raw_prices, interpolated_prices = self._interpolate_bars_index(new_index=new_index, bars_ts=self.bars_ts,
-                                                                       index_freq=index_freq,
-                                                                       unique_identifier_list=list(
-                                                                           signal_weights.columns.get_level_values(
-                                                                               "unique_identifier"))
-                                                                       )
+        raw_prices, interpolated_prices = self._interpolate_bars_index(
+            new_index=new_index,
+            bars_ts=self.bars_ts,
+            index_freq=index_freq,
+            unique_identifier_list=list(
+                signal_weights.columns.get_level_values("unique_identifier")
+            )
+        )
 
-        if update_statistics.is_empty()==False:
+        if update_statistics.is_empty() == False:
             interpolated_prices = interpolated_prices[
-                interpolated_prices.index.get_level_values("time_index") > update_statistics._max_time_in_update_statistics]
+                interpolated_prices.index.get_level_values("time_index") > update_statistics._max_time_in_update_statistics
+            ]
             signal_weights = signal_weights[signal_weights.index > update_statistics._max_time_in_update_statistics]
 
         # Calculate rebalanced weights
@@ -599,7 +604,7 @@ class PortfolioStrategy(TimeSerie):
         portfolio = self._calculate_portfolio_values(portfolio_returns, update_statistics)
 
         # prepare for storage
-        if len(portfolio) > 0 and update_statistics.is_empty() ==False:
+        if len(portfolio) > 0 and update_statistics.is_empty() == False:
             portfolio = portfolio[portfolio.index > update_statistics.max_time_index_value]
 
         portfolio = self._add_serialized_weights(portfolio, weights)
