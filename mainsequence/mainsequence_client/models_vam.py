@@ -808,18 +808,24 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     tags: Optional[List[PortfolioTags]] = None
 
     @classmethod
-    def create_from_time_series(cls,  portfolio_name: str,
-                            build_purpose: str,
-                            local_time_serie_id: int,
-                            local_time_serie_hash_id: str,
-                            local_signal_time_serie_id:int,
-                            is_active: bool ,
-                            available_in_venues__symbols:list[str],
-                            execution_configuration: dict,
-                            calendar_name: str,
-                            tracking_funds_expected_exposure_from_latest_holdings: bool,
-                            *args,
-                            **kwargs
+    def create_from_time_series(
+            cls,
+            portfolio_name: str,
+            build_purpose: str,
+            local_time_serie_id: int,
+            local_time_serie_hash_id: str,
+            local_signal_time_serie_id:int,
+            is_active: bool ,
+            available_in_venues__symbols:list[str],
+            execution_configuration: dict,
+            calendar_name: str,
+            tracking_funds_expected_exposure_from_latest_holdings: bool,
+            is_asset_only: bool,
+            builds_from_target_positions: bool,
+            target_portfolio_about: dict,
+            backtest_table_time_index_name: str,
+            backtest_table_price_column_name: str,
+            tags: Optional[list] = None,  # or Optional[List[str]] if you prefer
     ) -> "PortfolioType":
         url = f"{cls.get_object_url()}/create_from_time_series/"
         # Build the payload with the required arguments.
@@ -834,7 +840,13 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             "available_in_venues__symbols": available_in_venues__symbols,
             "execution_configuration": execution_configuration,
             "calendar_name": calendar_name,
-            "tracking_funds_expected_exposure_from_latest_holdings":tracking_funds_expected_exposure_from_latest_holdings
+            "tracking_funds_expected_exposure_from_latest_holdings": tracking_funds_expected_exposure_from_latest_holdings,
+            "is_asset_only": is_asset_only,
+            "builds_from_target_positions": builds_from_target_positions,
+            "target_portfolio_about": target_portfolio_about,
+            "backtest_table_time_index_name": backtest_table_time_index_name,
+            "backtest_table_price_column_name": backtest_table_price_column_name,
+            "tags": tags,
         }
 
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": payload_data},)
@@ -846,7 +858,7 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     def add_venue(self,venue_id)->None:
         url = f"{self.get_object_url()}/{self.id}/add_venue/"
         payload = {"json": {"venue_id": venue_id}}
-        r = make_request(s=self.build_session(),loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
+        r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
 
