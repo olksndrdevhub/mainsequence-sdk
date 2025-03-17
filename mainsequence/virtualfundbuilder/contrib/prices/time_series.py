@@ -98,7 +98,7 @@ def get_prices_source(source:str, bar_frequency_id,
         except DoesNotExist as e:
             logger.exception(f"HistoricalBarsSource does not exist for {source} -{bar_frequency_id} {data_mode}")
             raise e
-        api_ts = APITimeSerie(data_source_id=hbs.local_time_serie.data_source.id, local_hash_id=hbs.local_time_serie.local_hash_id)
+        api_ts = APITimeSerie(data_source_id=hbs.local_time_serie.data_source_id, local_hash_id=hbs.local_time_serie.local_hash_id)
         return api_ts
 
 
@@ -723,10 +723,12 @@ class InterpolatedPrices(TimeSerie):
         """
         from mainsequence.virtualfundbuilder.time_series import PortfolioStrategy
 
-        unique_identifier_range_map = {unique_identifier: {"start_date": last_update, "start_date_operand": '>=',
-
-                                                            } for
-                                       unique_identifier, last_update in update_statistics.update_statistics.items()}
+        unique_identifier_range_map = {
+            unique_identifier: {
+                "start_date": last_update,
+                "start_date_operand": '>=',
+            } for unique_identifier, last_update in update_statistics.update_statistics.items()
+        }
 
         if isinstance(self.bars_ts, WrapperTimeSerie):
             raw_data_df = []

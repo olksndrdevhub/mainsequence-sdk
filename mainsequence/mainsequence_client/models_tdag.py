@@ -213,9 +213,10 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
             max_per_asset = self.multi_index_stats["max_per_asset_symbol"]
             max_per_asset = {k: request_to_datetime(v) for k, v in max_per_asset.items()}
 
-        du = DataUpdates(max_time_index_value=self.last_time_index_value,
-                         update_statistics=max_per_asset
-                         )
+        du = DataUpdates(
+            max_time_index_value=self.last_time_index_value,
+            update_statistics=max_per_asset
+        )
 
         du._max_time_in_update_statistics = self.last_time_index_value
         return du
@@ -241,8 +242,11 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     run_configuration: "RunConfiguration"
 
     @property
-    def data_source(self):
-        return self.remote_table.data_source
+    def data_source_id(self):
+        if isinstance(self.remote_table.data_source, int):
+            return self.remote_table.data_source
+        else:
+            return self.remote_table.data_source.data_source.id
 
     @classmethod
     def get_or_create(cls, **kwargs):
@@ -1123,12 +1127,11 @@ def get_chunk_stats(chunk_df, time_index_name, index_names):
         }
     }
 
-    # Group once on unique_identifier
-    grouped = chunk_df.groupby("unique_identifier")[time_index_name].agg(["min", "max"])
-
     # _PER_ASSET_ only if we have multiple index names
     grouped_dates = None
     if len(index_names) > 1:
+        grouped = chunk_df.groupby("unique_identifier")[time_index_name].agg(["min", "max"])
+
         grouped_dates = grouped
         chunk_stats["_PER_ASSET_"] = {
             uid: {
@@ -1138,11 +1141,13 @@ def get_chunk_stats(chunk_df, time_index_name, index_names):
             for uid, row in grouped_dates.iterrows()
         }
 
-    # last_observation: dictionary { uid: {"time_index": max_timestamp} }
-    last_observation = {
-        uid: {"time_index": row["max"].timestamp()}
-        for uid, row in grouped.iterrows()
-    }
+        # last_observation: dictionary { uid: {"time_index": max_timestamp} }
+        last_observation = {
+            uid: {time_index_name: row["max"].timestamp()}
+            for uid, row in grouped.iterrows()
+        }
+    else:
+        last_observation = chunk_df[time_index_name].max().timestamp()
 
     return chunk_stats, grouped_dates, last_observation
 

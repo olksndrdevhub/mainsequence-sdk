@@ -1226,22 +1226,13 @@ class DataPersistanceMethods(ABC):
     def get_update_statistics(self, unique_identifier_list: Optional[list[str]] = None,
                               ) ->DataUpdates:
         """
-        getts latest value directly from querying the DB,
+        gets latest value directly from querying the DB,
         args and kwargs are nedeed for datalake
-        Parameters
-        ----------
-        args :
-        kwargs :
-
-        Returns
-        -------
-
         """
         if self.metadata.sourcetableconfiguration is None:
             return DataUpdates()
 
-
-        update_stats=self.metadata.sourcetableconfiguration.get_data_updates()
+        update_stats = self.metadata.sourcetableconfiguration.get_data_updates()
         return update_stats
 
     def get_earliest_value(self) -> datetime.datetime:
@@ -1343,28 +1334,21 @@ class DataPersistanceMethods(ABC):
 
                              )->pd.DataFrame():
         """
-
         (1) Requests last observatiion from local persist manager
         (3) evaluates if last observation is consistent
-        Parameters
-        ----------
-        asset_symbols :
-
-        Returns
-        -------
-
         """
-
         update_statistics = self.get_update_statistics(unique_identifier_list=unique_identifier_list)
         if update_statistics.is_empty():
-            return pd.DataFrame()
+            return None
 
-
-        #todo request specific endpoint
+        # todo request specific endpoint
         last_observation = self.get_df_between_dates(
             start_date=update_statistics._max_time_in_update_statistics, great_or_equal=True,
             unique_identifier_list=unique_identifier_list
         )
+
+        if last_observation.empty:
+            return None
 
         return last_observation
 
@@ -1494,9 +1478,10 @@ class APITimeSerie(CommonMethodsMixin):
         """
         from mainsequence.mainsequence_client import TDAGAPIDataSource
         tdag_api_data_source = TDAGAPIDataSource.get(unique_identifier=unique_identifier)
-        ts = cls(data_source_id=tdag_api_data_source.local_time_serie.data_source.id,
-                 local_hash_id=tdag_api_data_source.local_time_serie.local_hash_id
-                 )
+        ts = cls(
+            data_source_id=tdag_api_data_source.local_time_serie.data_source_id,
+            local_hash_id=tdag_api_data_source.local_time_serie.local_hash_id
+        )
         return ts
 
     def __init__(self, data_source_id: int, local_hash_id: str, data_source_local_lake: Union[None, DataSource] = None):

@@ -590,7 +590,7 @@ class PersistManager:
                                                         less_or_equal=less_or_equal,
                                                         unique_identifier_list=unique_identifier_list,
                                                         columns=columns,
-                                                                unique_identifier_range_map=unique_identifier_range_map
+                                                        unique_identifier_range_map=unique_identifier_range_map
                                                         )
 
         return filtered_data

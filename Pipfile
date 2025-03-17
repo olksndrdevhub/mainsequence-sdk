@@ -46,6 +46,7 @@ scipy = "*"
 structlog = "*"
 tqdm = "*"
 uvicorn = "*"
+colorama = "*"
 
 [dev-packages]
 mkdocs = "*"
