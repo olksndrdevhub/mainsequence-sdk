@@ -1709,6 +1709,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         - set_graph node
 
     """
+    OFFSET_START = datetime.datetime.now(pytz.utc)-datetime.timedelta(days=30)
 
     def __init__(self, init_meta=None,
                  build_meta_data: Union[dict, None] = None, local_kwargs_to_ignore: Union[List[str], None] = None,
@@ -2498,7 +2499,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 latest_value = overwrite_latest_value
 
                 self.logger.info(f'Updating Local Time Series for  {self}  since {latest_value}')
-                temp_df = self.update(update_statistics=update_statistics)
+                temp_df = self.set_update_statistics_and_update(update_statistics=update_statistics)
 
                 if temp_df.shape[0] == 0:
                     # concatenate empty
@@ -2517,7 +2518,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 if not update_statistics:
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
                 try:
-                    temp_df = self.update(update_statistics=update_statistics)
+                    temp_df = self.set_update_statistics_and_update(update_statistics=update_statistics)
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
@@ -2547,6 +2548,27 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
     def _run_post_update_routines(self, error_on_last_update: bool):
         pass
+
+    def set_update_statistics_and_update(self, update_statistics: DataUpdates):
+        update_statistics = self.set_update_statistics(update_statistics)
+        return self.update(update_statistics)
+
+    def set_update_statistics(self, update_statistics: DataUpdates):
+        """
+        Default method to narrow down update statistics un local time series,
+        the method will filter using asset_list if the attribute exists as well as the init fallback date
+        :param update_statistics:
+        :return:
+        """
+        # Filter update_statistics to include only assets in self.asset_list.
+        asset_list = None
+        if hasattr(self, "asset_list"):
+            asset_list = self.asset_list
+
+        update_statistics = update_statistics.update_assets(
+            asset_list, init_fallback_date=self.OFFSET_START
+        )
+        return update_statistics
 
     def update(self, update_statistics: DataUpdates, ) -> pd.DataFrame:
         """

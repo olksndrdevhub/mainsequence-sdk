@@ -47,6 +47,8 @@ structlog = "*"
 tqdm = "*"
 uvicorn = "*"
 colorama = "*"
+fredapi = "*"
+polygon-api-client = "*"
 
 [dev-packages]
 mkdocs = "*"

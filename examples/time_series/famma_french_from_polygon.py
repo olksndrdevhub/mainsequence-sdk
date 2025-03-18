@@ -75,7 +75,7 @@ class FamaFrenchTimeSerie(TimeSerie):
         page_cursor = None
         has_more = True
 
-        DEBUG_LIMIT=2
+        DEBUG_LIMIT = 2
 
         while has_more:
             try:
