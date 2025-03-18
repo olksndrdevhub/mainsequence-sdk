@@ -142,47 +142,6 @@ class PortfolioStrategy(TimeSerie):
         self.asset_list = asset_universe.asset_list
         self.asset_list_map = asset_universe.get_assets_per_execution_venue()
 
-    def _send_weights_to_portfolio_in_vam(self, backtesting_weights: pd.DataFrame):
-        """
-        Sends the calculated backtesting weights to the portfolio management system in VAM.
-
-        Args:
-            backtesting_weights (pd.DataFrame): DataFrame containing the backtesting weights to be sent.
-
-        Returns:
-            None
-        """
-        MIN_DATE_FOR_HISTORICAL_WEIGHTS = backtesting_weights.index.get_level_values("time_index").max() - timedelta(
-            days=7)
-        try:
-            target_weights = backtesting_weights.reset_index().pivot(
-                index="time_index",
-                values="weights_current",
-                columns=[ "unique_identifier"]
-            )
-        except Exception as e:
-            raise e
-        self.logger.debug(f"Sending weights for portfolio {self.hash_id} to VAM.")
-
-        target_weights = target_weights[target_weights.index > MIN_DATE_FOR_HISTORICAL_WEIGHTS]
-        weights_diff = target_weights.diff().abs().fillna(1).sum(axis=1)
-        if target_weights.shape[0] == 0:
-            return None
-        target_weights = target_weights[weights_diff != 0.0]
-        all_weights = target_weights.stack().to_frame("weight_notional_exposure").groupby("time_index")
-
-        try:
-            for weights_date, target_weights in tqdm(all_weights, desc="Sending weights to VAM"):
-                target_weights = target_weights.reset_index().drop(columns=["time_index"]).dropna()
-                target_weights=target_weights[target_weights.weight_notional_exposure.abs() > 0]
-                HistoricalWeights.add_from_time_serie(
-                    local_time_serie_id=self.local_metadata.id,
-                    weights_date=weights_date,
-                    positions_list=target_weights.to_dict('records')
-                )
-        except Exception as e:
-            self.logger.exception(f"Couldn't send weights to VAM - error {e}")
-
     def _calculate_start_end_dates(self, update_statistics:DataUpdates):
         """
         Calculates the start and end dates for processing based on the latest value and available data.
@@ -276,9 +235,7 @@ class PortfolioStrategy(TimeSerie):
         if  update_statistics._max_time_in_update_statistics is not None:
             weights = weights[weights.index.get_level_values("time_index") > update_statistics._max_time_in_update_statistics]
 
-        # Send weights to portfolio management system if applicable
-        if self.data_source.related_resource_class_type not in [CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE]:
-            self._send_weights_to_portfolio_in_vam(backtesting_weights=weights)
+       
 
         # Prepare the weights before by using the last weights used for the portfolio and the new weights
         if  update_statistics.is_empty() ==False:

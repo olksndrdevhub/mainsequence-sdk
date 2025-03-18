@@ -524,8 +524,7 @@ class InterpolatedPrices(TimeSerie):
     """
     Handles interpolated prices for assets.
     """
-    EARLIEST_VALUE_BACKTEST = datetime.datetime(2017, 7, 20).replace(tzinfo=pytz.utc)
-
+    OFFSET_START = datetime.datetime(2017, 7, 20).replace(tzinfo=pytz.utc)
     @TimeSerie._post_init_routines()
     def __init__(
             self,
@@ -781,9 +780,7 @@ class InterpolatedPrices(TimeSerie):
         """
         Updates the series from the source based on the latest value.
         """
-        self.set_asset_details()
-        update_statistics = update_statistics.update_assets(self.asset_list, init_fallback_date=self.EARLIEST_VALUE_BACKTEST)
-        # control update size to avoid ram explosion
+
 
         prices = self.get_upsampled_data(
             update_statistics=update_statistics,
