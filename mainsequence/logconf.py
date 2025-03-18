@@ -184,6 +184,9 @@ def build_application_logger(application_name:str="ms-sdk",
         response = requests.get(project_info_endpoint, headers=headers)
         json_response = response.json()
 
+        if "project_id" not in json_response:
+            raise ValueError(f"Project ID not found, server response {json_response}")
+
         logger = logger.bind(project_id=json_response["project_id"], **metadata)
         logger = logger.bind(data_source_id=json_response["data_source_id"], **metadata)
         logger = logger.bind(job_run_id=json_response["job_run_id"], **metadata)

@@ -21,7 +21,7 @@ class SimulatedPrices(TimeSerie):
       - Otherwise, simulate data per asset from one hour after its last update until
         yesterday at midnight (UTC).
     """
-    SIMULATION_OFFSET_START = datetime.timedelta(days=30)
+    OFFSET_START = datetime.datetime.now(pytz.utc)-datetime.timedelta(days=30)
 
     @TimeSerie._post_init_routines()
     def __init__(self, asset_list: ModelList, *args, **kwargs):
@@ -62,6 +62,10 @@ class SimulatedPrices(TimeSerie):
         except (KeyError, IndexError):
             # KeyError if unique_id not present, IndexError if slice is empty
             return fallback
+
+
+
+
     def update(self, update_statistics: DataUpdates)->pd.DataFrame:
         """
         Mocks price updates for assets with stochastic lognormal returns.
@@ -83,16 +87,10 @@ class SimulatedPrices(TimeSerie):
         sigma = 0.01  # volatility component for lognormal returns
 
         df_list = []
-        now = datetime.datetime.now(pytz.utc)
-        # Filter update_statistics to include only assets in self.asset_list.
-        update_statistics = update_statistics.update_assets(
-            self.asset_list, init_fallback_date=now - self.SIMULATION_OFFSET_START
-        )
-
 
         # Get the latest historical observations; assumed to be a DataFrame with a multi-index:
         # (time_index, unique_identifier) and a column "feature_1" for the last observed price.
-        last_observation = self.get_last_observation()
+        last_observation = update_statistics.last_observation
         # Define simulation end: yesterday at midnight (UTC)
         yesterday_midnight = datetime.datetime.now(pytz.utc).replace(
             hour=0, minute=0, second=0, microsecond=0
@@ -131,7 +129,7 @@ class SimulatedPrices(TimeSerie):
         return data
 
 # Mocking DataUpdates and Running the Test
-def test_simple_crypto_feature():
+def test_simulated_prices():
     from mainsequence.vam_client import Asset
     from mainsequence import VAM_CONSTANTS
 
@@ -143,9 +141,12 @@ def test_simple_crypto_feature():
     )
     ts = SimulatedPrices(asset_list=ModelList(assets))
 
+    #remove bellow
+    ts.run(debug_mode=True,force_update=True)
+    ts.run(debug_mode=True, force_update=True)
     # CASE 1: Run simulation with an empty DataUpdates instance.
     print("=== Simulation using empty DataUpdates ===")
-    data_update_df = ts.update(DataUpdates())
+    data_update_df = ts.set_update_statistics_and_update(DataUpdates())
     print(data_update_df)
 
     # Efficiently extract the latest time per unique_identifier using groupby.
@@ -162,7 +163,7 @@ def test_simple_crypto_feature():
                           max_time_index_value=data_update_df.index.get_level_values("time_index").max())
     # CASE 2: Run simulation using the provided update_statistics instance.
     print("=== Simulation using extracted update_statistics ===")
-    df_updates = ts.update(updates)
+    df_updates = ts.set_update_statistics_and_update(updates)
     print(df_updates)
 
 
@@ -176,7 +177,7 @@ class TAFeature(TimeSerie):
 
     The name of the TA feature (ta_feature) and the lookback period (ta_length) are provided as parameters.
     """
-    SIMULATION_OFFSET_START=datetime.timedelta(days=50)
+    OFFSET_START=datetime.timedelta(days=50)
     @TimeSerie._post_init_routines()
     def __init__(self, asset_list: ModelList, ta_feature: str, ta_length: int = 14, *args, **kwargs):
         """
@@ -206,7 +207,7 @@ class TAFeature(TimeSerie):
         It does NOT skip if update_statistics is empty. Instead, for each asset:
 
           1. Determine the asset's last update from update_statistics. If none exists,
-             fallback to (now - SIMULATION_OFFSET_START).
+             fallback to (now - OFFSET_START).
           2. Subtract a rolling window (based on ta_length) from the last update to ensure
              enough history is retrieved for the TA calculation.
           3. Build a unique_identifier_range_map so the base feature only returns data
@@ -233,7 +234,7 @@ class TAFeature(TimeSerie):
         #    This ensures update_statistics.update_statistics is never None for these assets.
         update_statistics = update_statistics.update_assets(
             self.asset_list,
-            init_fallback_date=now - self.SIMULATION_OFFSET_START
+            init_fallback_date=now - self.OFFSET_START
         )
 
         # 2. Construct a unique_identifier_range_map using (last_update - rolling_window).
@@ -349,12 +350,12 @@ def test_ta_feature_simulated_crypto_prices():
     ts.prices_time_serie.get_df_between_dates = get_df_between_dates_patch.__get__( ts.prices_time_serie, type( ts.prices_time_serie))
 
 
-    result = ts.update(DataUpdates())
+    result = ts.set_update_statistics_and_update(DataUpdates())
     print(result)
 
 
 # Run the test.
-test_ta_feature_simulated_crypto_prices()
+test_simulated_prices()
 
 
 

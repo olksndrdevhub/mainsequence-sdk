@@ -317,11 +317,22 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         if result['update_statistics'] is not None:
             result['update_statistics'] = {k: request_to_datetime(v) for k, v in result['update_statistics'].items()}
 
+        last_observation = pd.DataFrame()
+        if result["last_observation"] is not None:
+            last_observation = pd.DataFrame(result["last_observation"]).T
+            last_observation[result["time_index_name"]] = pd.to_datetime(last_observation.loc[:, result["time_index_name"]], unit='s', utc=True)
+            if len(result["index_names"]) > 1:
+                last_observation.index.name="unique_identifier"
+            else:
+                raise NotImplementedError
+            last_observation = last_observation.reset_index().set_index(result["index_names"])
+
         hu = LocalTimeSeriesHistoricalUpdate(
             **result["historical_update"],
             update_statistics=DataUpdates(
                 update_statistics=result['update_statistics'],
-                max_time_index_value=result["last_time_index_value"]
+                max_time_index_value=result["last_time_index_value"],
+                last_observation=last_observation,
             ),
             must_update=result["must_update"],
             direct_dependencies_ids=result["direct_dependencies_ids"]
@@ -368,7 +379,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             self,
             last_time_index_value: float,
             max_per_asset_symbol,
-            last_observation,
+            last_observation: dict,
             timeout=None
     ) -> "LocalTimeSerie":
         s = self.build_session()
@@ -586,8 +597,11 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             chunk_df = serialized_data_frame.iloc[start_idx:end_idx]
 
             # Compute grouped_dates for this chunk
-            chunk_stats, _, last_observation = get_chunk_stats(chunk_df=chunk_df, index_names=index_names,
-                                             time_index_name=time_index_name)
+            chunk_stats, grouped_dates, last_chunk_observation = get_chunk_stats(
+                chunk_df=chunk_df,
+                index_names=index_names,
+                time_index_name=time_index_name
+            )
 
             # Convert the chunk to JSON
             chunk_json_str = chunk_df.to_json(orient="records", date_format="iso")
@@ -602,7 +616,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                 "overwrite": overwrite,
                 "chunk_index": i,
                 "total_chunks": total_chunks,
-                "last_observation": last_observation,
+                "last_observation": last_chunk_observation
             })
             try:
                 r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url, time_out=60 * 15)
@@ -986,20 +1000,23 @@ class LocalTimeSerieUpdateDetails(BasePydanticModel, BaseObjectOrm):
 
     @staticmethod
     def _parse_parameters_filter(parameters):
-
         for key, value in parameters.items():
             if "__in" in key:
                 assert isinstance(value, list)
                 parameters[key] = ",".join(value)
         return parameters
 
-class DataUpdates(BasePydanticModel):
+class DataUpdates(BaseModel):
     """
     TODO WIP Helper function to work with the table updates
     """
     update_statistics: Optional[Dict[str, Union[datetime.datetime, None]]] = None
     max_time_index_value: Optional[datetime.datetime] = None  # does not include fitler
     _max_time_in_update_statistics: Optional[datetime.datetime] = None  # include filter
+    last_observation: Optional[pd.DataFrame] = Field(default_factory=pd.DataFrame)
+
+    class Config:
+        arbitrary_types_allowed = True
 
     @classmethod
     def return_empty(cls):
@@ -1028,8 +1045,10 @@ class DataUpdates(BasePydanticModel):
             init_fallback_date: datetime = None,
             unique_identifier_list: Union[list, None] = None
     ):
-        new_update_statistics = self.update_statistics
+        logger.warning("TODO: show last obeservation")
 
+        new_update_statistics = self.update_statistics
+        last_observation = self.last_observation
         if asset_list is not None or unique_identifier_list is not None:
             new_update_statistics = {}
             unique_identifier_list = [a.unique_identifier for a in asset_list] if unique_identifier_list is None else unique_identifier_list
@@ -1043,12 +1062,14 @@ class DataUpdates(BasePydanticModel):
                     new_update_statistics[unique_identifier] = init_fallback_date
 
             _max_time_in_update_statistics = max(new_update_statistics.values()) if len(new_update_statistics) > 0 else None
+            last_observation = last_observation[last_observation.index.get_level_values("unique_identifier").isin(unique_identifier_list)]
         else:
             _max_time_in_update_statistics = self.max_time_index_value or init_fallback_date
 
         du = DataUpdates(
             update_statistics=new_update_statistics,
             max_time_index_value=self.max_time_index_value,
+            last_observation=last_observation
         )
         du._max_time_in_update_statistics = _max_time_in_update_statistics
         return du
@@ -1114,43 +1135,37 @@ class DataUpdates(BasePydanticModel):
                 ]
         return df
 
-
 def get_chunk_stats(chunk_df, time_index_name, index_names):
-    # Global min and max
-    global_min = chunk_df[time_index_name].min().timestamp()
-    global_max = chunk_df[time_index_name].max().timestamp()
-
     chunk_stats = {
         "_GLOBAL_": {
-            "min": global_min,
-            "max": global_max
+            "max": chunk_df[time_index_name].max().timestamp(),
+            "min": chunk_df[time_index_name].min().timestamp()
         }
     }
 
-    # _PER_ASSET_ only if we have multiple index names
+    last_observation = chunk_df.loc[[chunk_df['time_index'].idxmax()]]
+    last_observation[time_index_name] = last_observation[time_index_name].apply(lambda x: x.timestamp())
+    last_observation = last_observation.set_index(time_index_name).to_dict("index")
+
     grouped_dates = None
     if len(index_names) > 1:
-        grouped = chunk_df.groupby("unique_identifier")[time_index_name].agg(["min", "max"])
-
-        grouped_dates = grouped
+        grouped_dates = chunk_df.groupby(["unique_identifier"])[
+            time_index_name].agg(
+            ["min", "max"])
         chunk_stats["_PER_ASSET_"] = {
-            uid: {
+            row["unique_identifier"]: {
+                "max": row["max"].timestamp(),
                 "min": row["min"].timestamp(),
-                "max": row["max"].timestamp()
             }
-            for uid, row in grouped_dates.iterrows()
+            for _, row in grouped_dates.reset_index().iterrows()
         }
 
-        # last_observation: dictionary { uid: {"time_index": max_timestamp} }
-        last_observation = {
-            uid: {time_index_name: row["max"].timestamp()}
-            for uid, row in grouped.iterrows()
-        }
-    else:
-        last_observation = chunk_df[time_index_name].max().timestamp()
+        idx = chunk_df.groupby('unique_identifier')[time_index_name].idxmax()
+        last_observation = chunk_df.loc[idx].reset_index(drop=True)
+        last_observation[time_index_name] = last_observation[time_index_name].apply(lambda x: x.timestamp())
+        last_observation = last_observation.set_index("unique_identifier").to_dict("index")
 
     return chunk_stats, grouped_dates, last_observation
-
 
 class LocalTimeSeriesHistoricalUpdate(BasePydanticModel, BaseObjectOrm):
     id: Optional[int] = None
@@ -1886,13 +1901,13 @@ class DynamicTableHelpers:
 
         metadata, data = (
             result if (
-                          result := cls._handle_source_table_configuration(
-                              metadata=metadata, column_dtypes_map=column_dtypes_map,
-                              index_names=index_names,
-                              time_index_name=time_index_name,
-                              column_index_names=column_index_names, data=data,
-                              overwrite=overwrite
-                          )
+                result := cls._handle_source_table_configuration(
+                    metadata=metadata, column_dtypes_map=column_dtypes_map,
+                    index_names=index_names,
+                    time_index_name=time_index_name,
+                    column_index_names=column_index_names, data=data,
+                    overwrite=overwrite
+                )
             ) is not None
             else (metadata, data)
         )
@@ -1932,12 +1947,13 @@ class DynamicTableHelpers:
         )
         return local_metadata
 
-    def filter_by_assets_ranges(self,
-                                metadata: dict,
-                                asset_ranges_map: dict,
-                                data_source: object,
-                                local_hash_id: str
-                                ):
+    def filter_by_assets_ranges(
+            self,
+            metadata: dict,
+            asset_ranges_map: dict,
+            data_source: object,
+            local_hash_id: str
+    ):
         df = data_source.filter_by_assets_ranges(
             metadata=metadata,
             asset_ranges_map=asset_ranges_map,
