@@ -1479,8 +1479,8 @@ class APITimeSerie(CommonMethodsMixin):
         from mainsequence.client import MarketsTimeSeriesDetails
         tdag_api_data_source = MarketsTimeSeriesDetails.get(unique_identifier=unique_identifier)
         ts = cls(
-            data_source_id=tdag_api_data_source.local_time_serie.data_source_id,
-            local_hash_id=tdag_api_data_source.local_time_serie.local_hash_id
+            data_source_id=tdag_api_data_source.related_local_time_serie.data_source_id,
+            local_hash_id=tdag_api_data_source.related_local_time_serie.local_hash_id
         )
         return ts
 
@@ -1709,7 +1709,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         - set_graph node
 
     """
-    OFFSET_START = datetime.datetime.now(pytz.utc)-datetime.timedelta(days=30)
+    OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
 
     def __init__(self, init_meta=None,
                  build_meta_data: Union[dict, None] = None, local_kwargs_to_ignore: Union[List[str], None] = None,

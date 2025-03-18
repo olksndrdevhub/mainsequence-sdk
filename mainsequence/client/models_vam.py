@@ -14,6 +14,9 @@ import json
 import time
 
 from enum import IntEnum, Enum
+
+from mainsequence.client.models_tdag import LocalTimeSerie
+
 from .base import BasePydanticModel, BaseObjectOrm, VAM_CONSTANTS as CONSTANTS, TDAG_ENDPOINT, API_ENDPOINT, HtmlSaveException
 from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, DATE_FORMAT
 from typing import List, Optional, Dict, Any, Tuple
@@ -783,14 +786,13 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     portfolio_name: str = Field(..., max_length=255)
     portfolio_ticker: str = Field(..., max_length=150)
     latest_rebalance: Optional[datetime.datetime] = None
-    calendar:Calendar
+    calendar: Optional[Calendar]
 
     is_asset_only: bool = False
-    build_purpose:str
+    build_purpose: str
     is_active: bool = False
-    local_time_serie_id: int = Field(...,)
-    local_time_serie_hash_id: str = Field(...)
-    local_signal_time_serie_id:int = Field(...,)
+    local_time_serie: Optional[LocalTimeSerie]
+    weights_signal_local_time_serie: Optional[LocalTimeSerie]
 
     builds_from_predictions: bool = False
     builds_from_target_positions: bool = False
@@ -800,7 +802,7 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     latest_weights:Optional[HistoricalWeights] =None
 
     creation_date: Optional[datetime.datetime] = None
-    execution_configuration: Union[int, TargetPortfolioExecutionConfiguration]
+    execution_configuration: Optional[Union[int, TargetPortfolioExecutionConfiguration]]
 
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_time_index_name: Optional[str] = Field(None, max_length=20)
@@ -813,7 +815,6 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             portfolio_name: str,
             build_purpose: str,
             local_time_serie_id: int,
-            local_time_serie_hash_id: str,
             local_signal_time_serie_id:int,
             is_active: bool ,
             available_in_venues__symbols:list[str],
@@ -834,7 +835,6 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             "build_purpose": build_purpose,
             "is_active": is_active,
             "local_time_serie_id": local_time_serie_id,
-            "local_time_serie_hash_id": local_time_serie_hash_id,
             # Using the same ID for local_signal_time_serie_id as specified.
             "local_signal_time_serie_id": local_signal_time_serie_id,
             "available_in_venues__symbols": available_in_venues__symbols,
