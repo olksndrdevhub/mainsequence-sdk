@@ -29,14 +29,14 @@ def create_from_serializer_with_class(asset_list: List[dict]):
     return new_list
 
 def get_right_account_class(account: Account):
-    from mainsequence.mainsequence_client import models_vam as model_module
+    from mainsequence.client import models_vam as model_module
     execution_venue_symbol = account.execution_venue.symbol
     AccountClass = getattr(model_module, VAM_CONSTANTS.ACCOUNT_VENUE_FACTORY[execution_venue_symbol])
     account, _ = AccountClass.get(id=account.id)
     return account
 
 def get_right_asset_class(execution_venue_symbol:str, asset_type:str):
-    from mainsequence.mainsequence_client import models_vam as model_module
+    from mainsequence.client import models_vam as model_module
     try:
         AssetClass = getattr(model_module, VAM_CONSTANTS.ASSET_VENUE_FACTORY[execution_venue_symbol][asset_type])
     except Exception as e:

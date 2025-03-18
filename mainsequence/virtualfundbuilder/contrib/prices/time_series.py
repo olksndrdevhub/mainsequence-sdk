@@ -7,11 +7,11 @@ import datetime
 import pandas_market_calendars as mcal
 
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList, APITimeSerie,data_source_pickle_path
-from mainsequence.mainsequence_client import( CONSTANTS, LocalTimeSeriesDoesNotExist,LocalTimeSerie,DynamicTableDataSource,
-BACKEND_DETACHED,DataUpdates
-                                      )
-from mainsequence.mainsequence_client import VAM_CONSTANTS as ASSET_ORM_CONSTANTS, ExecutionVenue
-from mainsequence.mainsequence_client import HistoricalBarsSource, DoesNotExist, Asset
+from mainsequence.client import(CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
+                                BACKEND_DETACHED, DataUpdates
+                                )
+from mainsequence.client import VAM_CONSTANTS as ASSET_ORM_CONSTANTS, ExecutionVenue
+from mainsequence.client import HistoricalBarsSource, DoesNotExist, Asset
 from mainsequence.tdag.time_series.utils import (
     string_frequency_to_minutes,
     string_freq_to_time_delta,

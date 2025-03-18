@@ -1,7 +1,7 @@
 import copy
 import os
 
-from mainsequence.mainsequence_client import TDAG_CONSTANTS as CONSTANTS, DataUpdates, HistoricalWeights
+from mainsequence.client import TDAG_CONSTANTS as CONSTANTS, DataUpdates, HistoricalWeights
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie
 from datetime import datetime, timedelta
 import numpy as np

@@ -8,7 +8,7 @@ import pandas as pd
 import pytz
 
 from mainsequence.tdag.time_series import TimeSerie
-from mainsequence.mainsequence_client import CONSTANTS,Asset
+from mainsequence.client import CONSTANTS,Asset
 from mainsequence.virtualfundbuilder.enums import ExecutionVenueNames
 
 from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel

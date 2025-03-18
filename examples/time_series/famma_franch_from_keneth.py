@@ -11,7 +11,7 @@ import dotenv
 
 dotenv.load_dotenv('../../.env')  # Load environment variables from .env
 from mainsequence.tdag import TimeSerie
-from mainsequence.tdag_client.models import DataUpdates
+from mainsequence.client.models import DataUpdates
 
 
 class KennethFrenchTimeSerie(TimeSerie):

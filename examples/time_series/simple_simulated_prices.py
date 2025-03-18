@@ -7,7 +7,7 @@ import dotenv
 dotenv.load_dotenv('../../.env')
 
 from mainsequence.tdag import TimeSerie, ModelList
-from mainsequence.tdag_client.models import DataUpdates
+from mainsequence.client.models import DataUpdates
 import pandas_ta as ta
 from typing import Union,Optional
 
@@ -132,7 +132,7 @@ class SimulatedPrices(TimeSerie):
 
 # Mocking DataUpdates and Running the Test
 def test_simple_crypto_feature():
-    from mainsequence.vam_client import Asset
+    from mainsequence.client import Asset
     from mainsequence import VAM_CONSTANTS
 
     # Filter assets for BTCUSDT and ETHUSDT.
@@ -315,7 +315,7 @@ def test_ta_feature_simulated_crypto_prices():
       - Creating a base simulation of crypto prices.
       - Calculating a TA feature (e.g., SMA) on the simulated prices.
     """
-    from mainsequence.vam_client import Asset
+    from mainsequence.client import Asset
     from mainsequence import VAM_CONSTANTS
 
     # Filter assets for BTCUSDT and ETHUSDT.

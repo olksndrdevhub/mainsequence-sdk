@@ -1,6 +1,6 @@
 import socket
 from typing import Union
-from mainsequence.mainsequence_client import LocalTimeSerie, LocalTimeSeriesHistoricalUpdate
+from mainsequence.client import LocalTimeSerie, LocalTimeSeriesHistoricalUpdate
 import datetime
 import pytz
 import logging

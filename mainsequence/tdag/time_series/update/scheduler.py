@@ -5,9 +5,9 @@ import time
 
 from ray.util.client.common import ClientActorHandle
 
-from mainsequence.mainsequence_client import (Scheduler, SourceTableConfigurationDoesNotExist,
-                                      LocalTimeSerie, SchedulerDoesNotExist
-                                      )
+from mainsequence.client import (Scheduler, SourceTableConfigurationDoesNotExist,
+                                 LocalTimeSerie, SchedulerDoesNotExist
+                                 )
 
 from .utils import get_time_to_wait_from_hash_id
 from .ray_manager import RayUpdateManager
@@ -20,7 +20,7 @@ import gc
 from mainsequence.logconf import  logger
 
 from contextlib import contextmanager
-from mainsequence.mainsequence_client import  DynamicTableDataSource
+from mainsequence.client import  DynamicTableDataSource
 
 USE_PICKLE = os.environ.get('TDAG_USE_PICKLE', True)
 USE_PICKLE = USE_PICKLE in ["True", "true", True]
@@ -321,7 +321,7 @@ class SchedulerUpdater:
         """
         Queries ts_orm scheduler and build update actors if not exist
         """
-        from mainsequence.mainsequence_client import DynamicTableHelpers
+        from mainsequence.client import DynamicTableHelpers
         dth = DynamicTableHelpers()
         self.refresh_node_scheduler()
         local_to_remote = {t.uid: {"updates_to":t.updates_to,"local_hash_id":t.hash_id} for t in self.node_scheduler.schedules_to}
@@ -415,7 +415,7 @@ class SchedulerUpdater:
         return next_update
 
     def refresh_node_scheduler(self):
-        from mainsequence.mainsequence_client import BACKEND_DETACHED
+        from mainsequence.client import BACKEND_DETACHED
         if BACKEND_DETACHED()==True:
             return None
         error_in_request = True

@@ -1,6 +1,6 @@
 from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import MOMENTUM_SIGNAL, LONG_SHORT_MOMENTUM
 from mainsequence.virtualfundbuilder.strategy_factory.rebalance_factory import VOLUME_PARTICIPATION
-from mainsequence.mainsequence_client import Asset, CONSTANTS
+from mainsequence.client import Asset, CONSTANTS
 from examples.utils import TOP_50
 
 asset_list = [

@@ -3,15 +3,15 @@ from typing import Dict, List, Optional
 from pydantic import (BaseModel, validator, model_validator)
 import os
 import pandas as pd
-from mainsequence.mainsequence_client import AssetMixin, Asset
-from mainsequence.mainsequence_client.models_helpers import get_right_asset_class
+from mainsequence.client import AssetMixin, Asset
+from mainsequence.client.models_helpers import get_right_asset_class
 from mainsequence.tdag.time_series import ModelList
 import json
 from pydantic import FieldValidationInfo, field_validator, root_validator, Field
 
 from mainsequence.virtualfundbuilder.enums import (ExecutionVenueNames, PriceTypeNames, BrokerClassName, AssetTypes)
 
-from mainsequence.mainsequence_client.models_tdag import RunConfiguration
+from mainsequence.client.models_tdag import RunConfiguration
 import yaml
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 from mainsequence.tdag.utils import write_yaml

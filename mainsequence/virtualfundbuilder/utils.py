@@ -7,10 +7,10 @@ from typing import Optional, Union, get_origin, get_args
 from pydantic.fields import PydanticUndefined, FieldInfo
 
 import pandas as pd
-from mainsequence.mainsequence_client import CONSTANTS, Asset
+from mainsequence.client import CONSTANTS, Asset
 from mainsequence.tdag.time_series import ModelList, TimeSerie
-from mainsequence.mainsequence_client import CONSTANTS as TDAG_CONSTANTS
-from mainsequence.mainsequence_client.models_tdag import register_strategy
+from mainsequence.client import CONSTANTS as TDAG_CONSTANTS
+from mainsequence.client.models_tdag import register_strategy
 import numpy as np
 from tqdm import tqdm
 from numpy.linalg import LinAlgError

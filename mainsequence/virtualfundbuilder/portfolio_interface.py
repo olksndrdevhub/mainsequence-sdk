@@ -1,6 +1,6 @@
 import copy
 from mainsequence.tdag.utils import write_yaml
-from mainsequence.mainsequence_client import BACKEND_DETACHED
+from mainsequence.client import BACKEND_DETACHED
 import os
 from typing import Dict, Any, List, Union, Optional
 import yaml
@@ -8,11 +8,11 @@ import re
 
 from .config_handling import configuration_sanitizer
 from .time_series import PortfolioStrategy
-from mainsequence.mainsequence_client import Asset, AssetFutureUSDM, VAM_CONSTANTS as CONSTANTS, TargetPortfolio, Calendar
+from mainsequence.client import Asset, AssetFutureUSDM, VAM_CONSTANTS as CONSTANTS, TargetPortfolio, Calendar
 
 from .models import PortfolioConfiguration
 from .utils import find_ts_recursively, get_vfb_logger, is_jupyter_environment
-from mainsequence.mainsequence_client import TDAG_CONSTANTS
+from mainsequence.client import TDAG_CONSTANTS
 
 class PortfolioInterface():
     """
@@ -71,7 +71,7 @@ class PortfolioInterface():
 
         Returns:
         """
-        from mainsequence.mainsequence_client import TargetPortfolioIndexAsset
+        from mainsequence.client import TargetPortfolioIndexAsset
         if not self._is_initialized:
             self._initialize_nodes()
 
@@ -79,7 +79,7 @@ class PortfolioInterface():
         backtest_ts = self.portfolio_strategy_time_serie_backtest
 
         def build_vam_portfolio(ts,build_purpose):
-            from mainsequence.mainsequence_client import BACKEND_DETACHED
+            from mainsequence.client import BACKEND_DETACHED
 
             # when is live target portfolio
 

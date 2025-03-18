@@ -7,7 +7,7 @@ import importlib
 from mainsequence.virtualfundbuilder.enums import RunStrategy, StrategyType
 from mainsequence.virtualfundbuilder.utils import _send_strategy_to_registry, _convert_unknown_to_string
 import uvicorn
-from mainsequence.mainsequence_client.models_tdag import register_default_configuration
+from mainsequence.client.models_tdag import register_default_configuration
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger, get_default_documentation
 
 import os

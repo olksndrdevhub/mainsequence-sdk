@@ -43,7 +43,7 @@ class TDAGAgent:
         self.logger.info(f"Get configuration for {cls.__name__} ...")
         payload = json.loads(json.dumps(payload))
         try:
-            from mainsequence.mainsequence_client.models_tdag import create_configuration_for_strategy
+            from mainsequence.client.models_tdag import create_configuration_for_strategy
             response = create_configuration_for_strategy(json_payload=payload)
             if response.status_code not in [200, 201]:
                 raise Exception(response.text)

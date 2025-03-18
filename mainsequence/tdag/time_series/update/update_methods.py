@@ -3,7 +3,7 @@ import datetime
 import pytz
 import time
 
-from mainsequence.mainsequence_client import LocalTimeSerieUpdateDetails,request_to_datetime
+from mainsequence.client import LocalTimeSerieUpdateDetails,request_to_datetime
 from mainsequence.tdag.config import bcolors, configuration
 from mainsequence.instrumentation import tracer
 import ray

@@ -7,8 +7,8 @@ import dotenv
 
 dotenv.load_dotenv('../../.env')  # Load environment variables from .env
 from mainsequence.tdag import TimeSerie, ModelList
-from mainsequence.tdag_client.models import DataUpdates
-from mainsequence.vam_client import Asset,Calendar, ExecutionVenue
+from mainsequence.client.models import DataUpdates
+from mainsequence.client import Asset,Calendar, ExecutionVenue
 from mainsequence import VAM_CONSTANTS
 
 class FREDTimeSerie(TimeSerie):

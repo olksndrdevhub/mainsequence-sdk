@@ -9,7 +9,7 @@ dotenv.load_dotenv('../../.env')  # Load environment variables from .env
 
 from polygon import RESTClient
 from mainsequence.tdag import TimeSerie
-from mainsequence.tdag_client.models import DataUpdates
+from mainsequence.client import DataUpdates
 
 
 

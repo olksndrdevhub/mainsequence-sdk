@@ -23,8 +23,8 @@ from mainsequence.tdag.config import (
 import structlog.contextvars as cvars
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager, DataLakePersistManager
-from mainsequence.mainsequence_client.models_tdag import (none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate,
-                                             DataUpdates,UniqueIdentifierRangeMap
+from mainsequence.client.models_tdag import (none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate,
+                                             DataUpdates, UniqueIdentifierRangeMap
                                              )
 from numpy.f2py.auxfuncs import isint1
 
@@ -37,7 +37,7 @@ from typing import Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-from mainsequence.mainsequence_client import LocalTimeSerie, LocalTimeSerieUpdateDetails, CONSTANTS, \
+from mainsequence.client import LocalTimeSerie, LocalTimeSerieUpdateDetails, CONSTANTS, \
     DynamicTableDataSource
 from enum import Enum
 from functools import wraps
@@ -62,7 +62,7 @@ def rebuild_with_type(value, rebuild_function):
         raise NotImplementedError
 
 
-from mainsequence.mainsequence_client.models_helpers import get_model_class
+from mainsequence.client.models_helpers import get_model_class
 
 build_model = lambda model_data: get_model_class(model_data["orm_class"])(**model_data)
 
@@ -291,7 +291,7 @@ class ConfigSerializer:
         Serializes signature argument
         """
         from types import SimpleNamespace
-        from mainsequence.mainsequence_client import BaseObjectOrm
+        from mainsequence.client import BaseObjectOrm
 
         if issubclass(value.__class__, TimeSerie):
             if pickle_ts == True:
@@ -1142,7 +1142,7 @@ class DataPersistanceMethods(ABC):
 
     # sets
     def get_metadatas_and_set_updates(self, *args, **kwargs):
-        from mainsequence.mainsequence_client import LocalTimeSerie
+        from mainsequence.client import LocalTimeSerie
         return LocalTimeSerie.get_metadatas_and_set_updates(*args, **kwargs)
 
     def patch_update_details(self, local_hash_id=None, *args, **kwargs):
@@ -1476,7 +1476,7 @@ class APITimeSerie(CommonMethodsMixin):
         :param vam_source_name:
         :return:
         """
-        from mainsequence.mainsequence_client import TDAGAPIDataSource
+        from mainsequence.client import TDAGAPIDataSource
         tdag_api_data_source = TDAGAPIDataSource.get(unique_identifier=unique_identifier)
         ts = cls(
             data_source_id=tdag_api_data_source.local_time_serie.data_source_id,
@@ -1514,7 +1514,7 @@ class APITimeSerie(CommonMethodsMixin):
     def _verify_local_data_source(self):
         pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
         if pod_source != None:
-            from mainsequence.mainsequence_client import models as models
+            from mainsequence.client import models as models
             pod_source = json.loads(pod_source)
             ModelClass = pod_source["tdag_orm_class"]
             pod_source.pop("tdag_orm_class", None)
@@ -1880,7 +1880,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         self.pre_load_routines_run = True
 
     def get_data_source_from_orm(self):
-        from mainsequence.mainsequence_client import POD_DEFAULT_DATA_SOURCE
+        from mainsequence.client import POD_DEFAULT_DATA_SOURCE
 
         pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
 
@@ -1889,7 +1889,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 raise Exception("This Pod does not have a default data source")
             return POD_DEFAULT_DATA_SOURCE
         # returnn to pod to override with context manager
-        from mainsequence.mainsequence_client import models_tdag as models
+        from mainsequence.client import models_tdag as models
         pod_source = json.loads(pod_source)
         ModelClass = pod_source["tdag_orm_class"]
         pod_source.pop("tdag_orm_class", None)
@@ -1984,7 +1984,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         from mainsequence.tdag.config import configuration
         from mainsequence.tdag.time_series.update.utils import UpdateInterface, wait_for_update_time
         from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
-        from mainsequence.mainsequence_client import Scheduler
+        from mainsequence.client import Scheduler
         import gc
         global logger
         if update_tree:

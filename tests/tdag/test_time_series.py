@@ -9,7 +9,7 @@ dotenv.load_dotenv('../../.env')
 from mainsequence.tdag import ogm
 from mainsequence.tdag import ModelList
 from tests.tdag.time_series import (TestFeature)
-from mainsequence.vam_client import CONSTANTS, Asset
+from mainsequence.client import CONSTANTS, Asset
 
 import unittest
 
