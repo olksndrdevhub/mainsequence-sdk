@@ -104,7 +104,7 @@ class BaseObjectOrm:
         "HistoricalWeights": "assets/portfolio_weights",
         "TargetPortfolioIndexAsset": "assets/target_portfolio_index_asset",
         "HistoricalBarsSource": "data_sources/historical-bars-source",
-        "TDAGAPIDataSource": "data_sources/tdag-api-data-source",
+        "MarketsTimeSeriesDetails": "data_sources/markets-time-series-details",
         "AssetCategory": "assets/asset-category",
         "TargetPortfolioFrontEndDetails": "assets/target-portfolio-details",
 

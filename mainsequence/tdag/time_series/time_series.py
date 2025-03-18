@@ -1476,8 +1476,8 @@ class APITimeSerie(CommonMethodsMixin):
         :param vam_source_name:
         :return:
         """
-        from mainsequence.client import TDAGAPIDataSource
-        tdag_api_data_source = TDAGAPIDataSource.get(unique_identifier=unique_identifier)
+        from mainsequence.client import MarketsTimeSeriesDetails
+        tdag_api_data_source = MarketsTimeSeriesDetails.get(unique_identifier=unique_identifier)
         ts = cls(
             data_source_id=tdag_api_data_source.local_time_serie.data_source_id,
             local_hash_id=tdag_api_data_source.local_time_serie.local_hash_id
@@ -1928,6 +1928,10 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
     def _get_target_time_index(self, idx):
         raise NotImplementedError
+
+    @property
+    def local_time_serie(self):
+        return self.local_persist_manager.local_metadata
 
     @property
     def human_readable(self):

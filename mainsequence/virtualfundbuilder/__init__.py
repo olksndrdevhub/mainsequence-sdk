@@ -25,7 +25,6 @@ from mainsequence.virtualfundbuilder.utils import (
     filter_assets
 )
 
-
 def register_default_strategies():
     # Keep this in a function to not clutter the libs namespace
     import mainsequence.virtualfundbuilder.contrib.signals

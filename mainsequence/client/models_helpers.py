@@ -44,19 +44,18 @@ def get_right_asset_class(execution_venue_symbol:str, asset_type:str):
     return AssetClass
 
 
-class TDAGAPIDataSource(BaseObjectOrm, BasePydanticModel):
-    id: Optional[int]
-    unique_identifier: str = Field(..., description="Unique identifier for the api")
-    local_time_serie: LocalTimeSerie
+class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
+    unique_identifier: str
+    related_local_time_serie: LocalTimeSerie
     data_source_description: Optional[str] = Field(None, description="Descriptions of the data source")
     data_frequency_id: str = DataFrequency
     assets_in_data_source:Optional[List[int]]
 
     def __str__(self):
-        return self.class_name() +f"{self.unique_identifier}"
+        return self.class_name() + f" {self.unique_identifier}"
 
     def append_assets(self, asset_id_list:list, timeout=None):
-        url = f"{self.get_object_url()}/{self.id}/append_assets/"
+        url = f"{self.get_object_url()}/{self.related_local_time_serie.id}/append_assets/"
 
         payload = {"json": {"asset_id_list":asset_id_list}}
         r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload,
@@ -65,7 +64,7 @@ class TDAGAPIDataSource(BaseObjectOrm, BasePydanticModel):
             raise Exception(f" {r.text()}")
         return self.__class__(**r.json())
 
-class HistoricalBarsSource(TDAGAPIDataSource):
+class HistoricalBarsSource(MarketsTimeSeriesDetails):
     execution_venues: list
     data_mode: Literal['live', 'backtest'] = Field(
         description="Indicates whether the source is for live data or backtesting."
