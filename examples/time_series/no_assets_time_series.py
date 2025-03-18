@@ -5,10 +5,10 @@ import numpy as np
 import dotenv
 dotenv.load_dotenv('../../.env')
 from mainsequence.tdag import TimeSerie
-from mainsequence.tdag_client.models import DataUpdates
+from mainsequence.mainsequence_client import DataUpdates
 
 class SingleIndexSimulatedPrices(TimeSerie):
-    OFFSET_START = datetime.datetime.now(pytz.utc)-datetime.timedelta(days=30)
+    OFFSET_START = datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
 
     @TimeSerie._post_init_routines()
     def __init__(self, *args, **kwargs):

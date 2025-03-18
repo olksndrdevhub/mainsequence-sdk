@@ -11,7 +11,7 @@ import dotenv
 
 dotenv.load_dotenv('../../.env')  # Load environment variables from .env
 from mainsequence.tdag import TimeSerie
-from mainsequence.tdag_client.models import DataUpdates
+from mainsequence.mainsequence_client import DataUpdates
 
 
 class KennethFrenchTimeSerie(TimeSerie):
@@ -170,9 +170,6 @@ class KennethFrenchTimeSerie(TimeSerie):
         # 6) Return as a multi-index (time_index, 'KEN_FRENCH_3')
         factor_df["unique_identifier"] = "KEN_FRENCH_3"
         factor_df.set_index(["time_index", "unique_identifier"], inplace=True)
-
-
-
         return factor_df
 
 

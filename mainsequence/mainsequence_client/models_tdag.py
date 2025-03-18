@@ -1045,7 +1045,7 @@ class DataUpdates(BaseModel):
             init_fallback_date: datetime = None,
             unique_identifier_list: Union[list, None] = None
     ):
-        logger.warning("TODO: show last obeservation")
+        logger.warning("TODO: show last observation")
 
         new_update_statistics = self.update_statistics
         last_observation = self.last_observation
@@ -1062,7 +1062,8 @@ class DataUpdates(BaseModel):
                     new_update_statistics[unique_identifier] = init_fallback_date
 
             _max_time_in_update_statistics = max(new_update_statistics.values()) if len(new_update_statistics) > 0 else None
-            last_observation = last_observation[last_observation.index.get_level_values("unique_identifier").isin(unique_identifier_list)]
+            if not last_observation.empty:
+                last_observation = last_observation[last_observation.index.get_level_values("unique_identifier").isin(unique_identifier_list)]
         else:
             _max_time_in_update_statistics = self.max_time_index_value or init_fallback_date
 

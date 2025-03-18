@@ -9,7 +9,7 @@ dotenv.load_dotenv('../../.env')  # Load environment variables from .env
 
 from polygon import RESTClient
 from mainsequence.tdag import TimeSerie
-from mainsequence.tdag_client.models import DataUpdates
+from mainsequence.mainsequence_client import DataUpdates
 
 
 
@@ -75,7 +75,7 @@ class FamaFrenchTimeSerie(TimeSerie):
         page_cursor = None
         has_more = True
 
-        DEBUG_LIMIT=2
+        DEBUG_LIMIT = 2
 
         while has_more:
             try:
