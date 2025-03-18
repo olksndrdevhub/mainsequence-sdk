@@ -15,60 +15,7 @@ from mainsequence.virtualfundbuilder.utils import get_vfb_logger,_send_strategy_
 
 logger = get_vfb_logger()
 
-def send_weights_as_position_to_vam(method):
-    MIN_DATE_FOR_HISTORICAL_WEIGHTS = datetime(2024, 8, 30).replace(tzinfo=pytz.UTC)
 
-    def wrapper(self, update_statistics):
-        signal_weights_df = method(self, update_statistics)
-        if len(signal_weights_df) == 0 or self.send_weights_for_execution_to_vam == False:
-            return signal_weights_df
-
-        try:
-
-            """
-            if weights are send for execution to VAM all the portfolios that have this hash id should get an updated 
-            weights
-            
-            When portfolios are not "LIVE" and are been used for backtesting then only Positions should be created with no execution
-            
-            """
-            target_weights = signal_weights_df[
-                signal_weights_df.index.get_level_values("time_index") >= MIN_DATE_FOR_HISTORICAL_WEIGHTS]
-
-            # do not send repeated weights
-            target_weights = target_weights[
-                target_weights.index.get_level_values(
-                    "time_index") == target_weights.index.get_level_values(
-                    "time_index").max()]
-            positions_time = target_weights.index[0][0]
-
-            if latest_value is not None:
-                if positions_time < latest_value:
-                    return signal_weights_df
-
-            target_weights = target_weights.reset_index().drop(columns=["time_index"]).rename(
-                columns={"signal_weight": "weight_notional_exposure",
-                         "asset_symbol": "asset_id"
-                         }).dropna()
-
-            for ev in target_weights.execution_venue_symbol.unique():
-                ev_index = target_weights[target_weights['execution_venue_symbol'] == ev].index
-                target_weights.loc[ev_index, "asset_id"] = target_weights["asset_id"].map(self.symbol_to_id_map[ev])
-
-            target_weights = target_weights.drop(columns="execution_venue_symbol")
-            # many can be following the same signals
-            r = ExecutionPositions.add_from_time_serie(
-                time_serie_signal_hash_id=self.hash_id,
-                positions_time=positions_time,
-                positions_list=target_weights.to_dict('records')
-            )
-
-        except Exception as e:
-            self.logger.exception(f"Couldn't send weights to VAM - error {e}")
-            raise e
-        return signal_weights_df
-
-    return wrapper
 
 class PrivateWeightsBaseArguments:
     def __init__(self):

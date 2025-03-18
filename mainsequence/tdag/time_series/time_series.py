@@ -1464,8 +1464,8 @@ class APITimeSerie(CommonMethodsMixin):
     PICKLE_PREFIFX = "api-"
 
     @classmethod
-    def build_from_local_time_serie(cls, local_time_serie: "TimeSerieLocalUpdate"):
-        return cls(data_source_id=local_time_serie.remote_table["data_source"]["id"],
+    def build_from_local_time_serie(cls, local_time_serie: "LocalTimeSerie"):
+        return cls(data_source_id=local_time_serie.remote_table.data_source.id,
                    local_hash_id=local_time_serie.local_hash_id
                    )
 
@@ -1479,8 +1479,8 @@ class APITimeSerie(CommonMethodsMixin):
         from mainsequence.client import MarketsTimeSeriesDetails
         tdag_api_data_source = MarketsTimeSeriesDetails.get(unique_identifier=unique_identifier)
         ts = cls(
-            data_source_id=tdag_api_data_source.local_time_serie.data_source_id,
-            local_hash_id=tdag_api_data_source.local_time_serie.local_hash_id
+            data_source_id=tdag_api_data_source.related_local_time_serie.remote_table.data_source,
+            local_hash_id=tdag_api_data_source.related_local_time_serie.local_hash_id
         )
         return ts
 
@@ -1653,7 +1653,7 @@ class APITimeSerie(CommonMethodsMixin):
             last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values()])
         return last_update_in_table
 
-    def update(self, latest_value: Union[None, datetime.datetime], *args, **kwargs) -> pd.DataFrame:
+    def update(self, *args, **kwargs) -> pd.DataFrame:
         self.logger.info("Not updating series")
         pass
 

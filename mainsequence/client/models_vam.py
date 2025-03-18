@@ -14,6 +14,9 @@ import json
 import time
 
 from enum import IntEnum, Enum
+
+from mainsequence.client import LocalTimeSerie
+
 from .base import BasePydanticModel, BaseObjectOrm, VAM_CONSTANTS as CONSTANTS, TDAG_ENDPOINT, API_ENDPOINT, HtmlSaveException
 from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, DATE_FORMAT
 from typing import List, Optional, Dict, Any, Tuple
@@ -42,84 +45,8 @@ def resolve_asset(asset_dict:dict):
     asset = AssetClass(**asset_dict)
     return asset
 
-class ExecutionPositions(BaseObjectOrm, BasePydanticModel):
-    id: Optional[int] = None
-    positions:List["WeightExecutionPosition"]
-    target_portfolio:Union["TargetPortfolio",int]
-    positions_date:datetime.datetime
-    comments:Optional[str]=None
-    received_in_execution_engine: bool
-    execution_configuration:"TargetPortfolioExecutionConfiguration"
-
-    @property
-    def symbol_asset_map(self):
-        return {p.asset.unique_symbol: p.asset.id for p in self.positions}
-
-    @property
-    def symbol_to_id_map(self):
-        return {p.asset.id: Asset(**p.asset.model_dump()) for p in self.positions}
-
-    @property
-    def broker_config(self):
-        return self.execution_configuration.orders_execution_configuration.broker_config
-
-    @property
-    def broker_class(self):
-        return self.execution_configuration.orders_execution_configuration.broker_class
-
-    @classmethod
-    def add_from_time_serie(
-            cls,
-            time_serie_signal_hash_id: str,
-            positions_list: list,
-            positions_time: datetime.datetime,
-            comments: Union[str, None] = None,
-            timeout=None
-    ):
-        url = f"{cls.get_object_url()}/add_from_time_serie/"
-        payload = {
-            "json": {
-                "time_serie_signal_hash_id": time_serie_signal_hash_id,
-                "positions_time": positions_time.strftime(DATE_FORMAT),
-                "positions_list": positions_list,
-            },
-        }
-
-        r = make_request(
-            s=cls.build_session(),
-            loaders=cls.LOADERS,
-            r_type="POST",
-            url=url,
-            payload=payload,
-            time_out=timeout
-        )
-        if r.status_code not in [201, 204] :
-            raise HtmlSaveException(r.text)
-        return [cls(**e) for e in r.json()]
 
 
-class WeightExecutionPosition(BaseObjectOrm,BasePydanticModel):
-    id: Optional[int] = None
-    parent_execution_positions: int
-    asset: Union["Asset", "AssetFutureUSDM",int]
-    weight_notional_exposure: float
-
-    @property
-    def asset_id(self):
-        return self.asset if isinstance(self.asset,int) else self.asset.id
-
-    @root_validator(pre=True)
-    def resolve_assets(cls, values):
-        # Check if 'asset' is a dict and determine its type
-        if isinstance(values.get('asset'), dict):
-            asset = values.get('asset')
-            asset = resolve_asset(asset_dict=asset)
-            values['asset'] = asset
-
-        return values
-
-class AccountCoolDown(BaseObjectOrm):
-    pass
 
 class Calendar(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = None
@@ -788,9 +715,8 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     is_asset_only: bool = False
     build_purpose:str
     is_active: bool = False
-    local_time_serie_id: int = Field(...,)
-    local_time_serie_hash_id: str = Field(...)
-    local_signal_time_serie_id:int = Field(...,)
+    local_time_serie: LocalTimeSerie
+    signal_local_time_serie:LocalTimeSerie
 
     builds_from_predictions: bool = False
     builds_from_target_positions: bool = False
@@ -813,8 +739,7 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             portfolio_name: str,
             build_purpose: str,
             local_time_serie_id: int,
-            local_time_serie_hash_id: str,
-            local_signal_time_serie_id:int,
+            signal_local_time_serie_id:int,
             is_active: bool ,
             available_in_venues__symbols:list[str],
             execution_configuration: dict,
@@ -825,7 +750,8 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             target_portfolio_about: dict,
             backtest_table_time_index_name: str,
             backtest_table_price_column_name: str,
-            tags: Optional[list] = None,  # or Optional[List[str]] if you prefer
+            tags: Optional[list] = None,
+            timeout=None# or Optional[List[str]] if you prefer
     ) -> "PortfolioType":
         url = f"{cls.get_object_url()}/create_from_time_series/"
         # Build the payload with the required arguments.
@@ -834,9 +760,8 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             "build_purpose": build_purpose,
             "is_active": is_active,
             "local_time_serie_id": local_time_serie_id,
-            "local_time_serie_hash_id": local_time_serie_hash_id,
+            "signal_local_time_serie_id": signal_local_time_serie_id,
             # Using the same ID for local_signal_time_serie_id as specified.
-            "local_signal_time_serie_id": local_signal_time_serie_id,
             "available_in_venues__symbols": available_in_venues__symbols,
             "execution_configuration": execution_configuration,
             "calendar_name": calendar_name,
@@ -938,7 +863,7 @@ class ExecutionQuantity(BaseModel):
         return values
 
 class TargetRebalance(BaseModel):
-    target_execution_positions: ExecutionPositions
+    # target_execution_positions: ExecutionPositions
     execution_target: List[ExecutionQuantity]
 
     @property
@@ -989,58 +914,58 @@ class VirtualFund(BaseObjectOrm, BasePydanticModel):
 
         return new_target_weights
 
-    def build_rebalance_from_target_weights(
-            self,
-            target_execution_postitions: ExecutionPositions,
-            positions_prices: dict(),
-            absolute_rebalance_weight_limit=.02
-    ) -> TargetRebalance:
-        actual_positions = {}
-        target_weights = {p.asset_id: p for p in target_execution_postitions.positions}
-        #substitute target weights in case of testnets
-        target_weights = self.sanitize_target_weights_for_execution_venue(target_weights)
-
-        positions_to_rebalance = []
-        if self.latest_holdings is not None:
-            actual_positions = {p.asset_id : p for p in self.latest_holdings.holdings}
-
-            # positions to unwind first
-            positions_to_unwind=[]
-            for position in self.latest_holdings.holdings:
-                if position.quantity == 0.0:
-                    continue
-                if position.asset_id not in target_weights.keys():
-                    positions_to_unwind.append(
-                        ExecutionQuantity(
-                            asset=position.asset,
-                            reference_price=None,
-                            quantity=-position.quantity
-                        )
-                    )
-
-            positions_to_rebalance.extend(positions_to_unwind)
-
-        for target_position in target_execution_postitions.positions:
-            price = positions_prices[target_position.asset_id]
-
-            current_weight, current_position = 0, 0
-            if target_position.asset_id in actual_positions.keys():
-                current_weight = actual_positions[target_position.asset_id].quantity * price / self.notional_exposure_in_account
-                current_position = actual_positions[target_position.asset_id].quantity
-            target_weight = target_position.weight_notional_exposure
-            if abs(target_weight - current_weight) <= absolute_rebalance_weight_limit:
-                continue
-            target_quantity = self.notional_exposure_in_account * target_position.weight_notional_exposure / price
-            rebalance_quantity = target_quantity - current_position
-            positions_to_rebalance.append(ExecutionQuantity(asset=target_position.asset,
-                                                            quantity=rebalance_quantity,
-                                                            reference_price=price
-                                                            ))
-
-        target_rebalance = TargetRebalance(target_execution_positions=target_execution_postitions,
-                                           execution_target=positions_to_rebalance
-                                           )
-        return target_rebalance
+    # def build_rebalance_from_target_weights(
+    #         self,
+    #         target_execution_postitions: ExecutionPositions,
+    #         positions_prices: dict(),
+    #         absolute_rebalance_weight_limit=.02
+    # ) -> TargetRebalance:
+    #     actual_positions = {}
+    #     target_weights = {p.asset_id: p for p in target_execution_postitions.positions}
+    #     #substitute target weights in case of testnets
+    #     target_weights = self.sanitize_target_weights_for_execution_venue(target_weights)
+    #
+    #     positions_to_rebalance = []
+    #     if self.latest_holdings is not None:
+    #         actual_positions = {p.asset_id : p for p in self.latest_holdings.holdings}
+    #
+    #         # positions to unwind first
+    #         positions_to_unwind=[]
+    #         for position in self.latest_holdings.holdings:
+    #             if position.quantity == 0.0:
+    #                 continue
+    #             if position.asset_id not in target_weights.keys():
+    #                 positions_to_unwind.append(
+    #                     ExecutionQuantity(
+    #                         asset=position.asset,
+    #                         reference_price=None,
+    #                         quantity=-position.quantity
+    #                     )
+    #                 )
+    #
+    #         positions_to_rebalance.extend(positions_to_unwind)
+    #
+    #     for target_position in target_execution_postitions.positions:
+    #         price = positions_prices[target_position.asset_id]
+    #
+    #         current_weight, current_position = 0, 0
+    #         if target_position.asset_id in actual_positions.keys():
+    #             current_weight = actual_positions[target_position.asset_id].quantity * price / self.notional_exposure_in_account
+    #             current_position = actual_positions[target_position.asset_id].quantity
+    #         target_weight = target_position.weight_notional_exposure
+    #         if abs(target_weight - current_weight) <= absolute_rebalance_weight_limit:
+    #             continue
+    #         target_quantity = self.notional_exposure_in_account * target_position.weight_notional_exposure / price
+    #         rebalance_quantity = target_quantity - current_position
+    #         positions_to_rebalance.append(ExecutionQuantity(asset=target_position.asset,
+    #                                                         quantity=rebalance_quantity,
+    #                                                         reference_price=price
+    #                                                         ))
+    #
+    #     target_rebalance = TargetRebalance(target_execution_positions=target_execution_postitions,
+    #                                        execution_target=positions_to_rebalance
+    #                                        )
+    #     return target_rebalance
 
     @validator('last_trade_time', pre=True, always=True)
     def parse_last_trade_time(cls, value):

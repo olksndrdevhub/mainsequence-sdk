@@ -93,7 +93,7 @@ class PortfolioInterface():
                                        local_time_serie_id=0,
                                        local_time_serie_hash_id=ts.local_hash_id,
                                        is_active=True,
-                                       local_signal_time_serie_id=0,
+                                       signal_local_time_serie_id=0,
                                        build_purpose=build_purpose,
 
                                        )
@@ -102,9 +102,8 @@ class PortfolioInterface():
             else:
                 standard_kwargs = dict(is_asset_only=False,
                                        local_time_serie_id=ts.local_metadata.id,
-                                       local_time_serie_hash_id=ts.local_hash_id,
                                        is_active=True,
-                                       local_signal_time_serie_id=signal_weights_ts.local_metadata.id,
+                                       signal_local_time_serie_id=signal_weights_ts.local_metadata.id,
                                        build_purpose=build_purpose,
                                        )
 
@@ -122,6 +121,7 @@ class PortfolioInterface():
                 standard_kwargs["id"] = ts.local_hash_id
                 return TargetPortfolio(**standard_kwargs)
 
+            # front end details
             standard_kwargs["target_portfolio_about"] = {
                 "description": ts.get_portfolio_about_text(),
                 "signal_name": ts.backtesting_weights_config.signal_weights_name,
@@ -129,11 +129,12 @@ class PortfolioInterface():
                 "rebalance_strategy_name": ts.backtesting_weights_config.rebalance_strategy_name,
             }
 
+
             standard_kwargs["backtest_table_time_index_name"] = "time_index"
             standard_kwargs["backtest_table_price_column_name"] = "portfolio"
             standard_kwargs["tags"] = portfolio_tags
 
-            target_portfolio = TargetPortfolio.filter(local_time_serie_id=ts.local_metadata.id)
+            target_portfolio = TargetPortfolio.filter(local_time_serie__id=ts.local_metadata.id)
             if len(target_portfolio) == 0:
                 target_portfolio = TargetPortfolio.create_from_time_series(**standard_kwargs)
             else:
