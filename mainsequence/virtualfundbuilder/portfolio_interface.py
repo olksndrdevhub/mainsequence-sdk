@@ -134,12 +134,11 @@ class PortfolioInterface():
             standard_kwargs["backtest_table_price_column_name"] = "portfolio"
             standard_kwargs["tags"] = portfolio_tags
 
-            target_portfolio = TargetPortfolio.filter(local_time_serie__id=ts.local_metadata.id)
-            if len(target_portfolio) == 0:
+            target_portfolio = TargetPortfolio.get_or_none(local_time_serie__id=ts.local_metadata.id)
+            if target_portfolio is None:
                 target_portfolio = TargetPortfolio.create_from_time_series(**standard_kwargs)
             else:
                 # patch timeserie of portfolio to guaranteed recreation
-                target_portfolio = target_portfolio[0]
                 target_portfolio.patch(**standard_kwargs)
                 self.logger.debug(f"Target portfolio {ts.local_metadata.id} already exists in VAM")
 
