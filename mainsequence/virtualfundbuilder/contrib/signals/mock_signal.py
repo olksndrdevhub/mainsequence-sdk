@@ -3,7 +3,7 @@ from datetime import datetime
 import pytz
 import pandas as pd
 from typing import Union
-from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import WeightsBase, send_weights_as_position_to_vam, register_signal_class
+from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import WeightsBase,  register_signal_class
 
 @register_signal_class(register_in_agent=True)
 class MockSignal(WeightsBase, TimeSerie):
@@ -34,7 +34,6 @@ class MockSignal(WeightsBase, TimeSerie):
     def maximum_forward_fill(self):
         return self.source_frequency
 
-    @send_weights_as_position_to_vam
     def update(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
         """
         Args:

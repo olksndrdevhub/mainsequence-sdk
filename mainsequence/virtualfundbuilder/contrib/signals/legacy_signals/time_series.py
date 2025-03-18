@@ -4,7 +4,7 @@ from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie
 from datetime import datetime
 import pytz
 
-from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import WeightsBase, send_weights_as_position_to_vam
+from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import WeightsBase
 from mainsequence.virtualfundbuilder.utils import (
     reindex_df,
     build_rolling_regression_from_df,
@@ -108,7 +108,6 @@ class LongShortMomentum(WeightsBase, TimeSerie):
         ).stack()
         return top_coins, bottom_coins
 
-    @send_weights_as_position_to_vam
     def update(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
         """
         Calculates signal weights for a long/short momentum strategy using market capitalization.

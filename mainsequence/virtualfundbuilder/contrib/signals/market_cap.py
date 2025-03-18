@@ -12,7 +12,9 @@ from mainsequence.client import CONSTANTS,Asset
 from mainsequence.virtualfundbuilder.enums import ExecutionVenueNames
 
 from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
-from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import WeightsBase, send_weights_as_position_to_vam, register_signal_class
+from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import ( WeightsBase,
+
+                                                                              register_signal_class)
 from mainsequence.virtualfundbuilder.utils import TIMEDELTA
 
 
@@ -52,7 +54,6 @@ class FixedWeights(WeightsBase, TimeSerie):
         info += "</div>"
         return info
 
-    @send_weights_as_position_to_vam
     def update(self, latest_value: Union[datetime, None], *args, **kwargs) -> pd.DataFrame:
         if latest_value is not None:
             return pd.DataFrame()  # No need to store more than one constant weight
@@ -115,7 +116,6 @@ class MarketCap(WeightsBase, TimeSerie):
             f"This strategy focuses on the top {self.num_top_assets} assets, optimizing for performance by selecting the most influential components of the market."
         )
 
-    @send_weights_as_position_to_vam
     def update(self, update_statistics):
         """
         Args:
