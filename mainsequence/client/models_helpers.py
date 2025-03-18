@@ -45,6 +45,7 @@ def get_right_asset_class(execution_venue_symbol:str, asset_type:str):
 
 
 class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
+    id: int
     unique_identifier: str
     related_local_time_serie: LocalTimeSerie
     data_source_description: Optional[str] = Field(None, description="Descriptions of the data source")
@@ -55,7 +56,7 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
         return self.class_name() + f" {self.unique_identifier}"
 
     def append_assets(self, asset_id_list:list, timeout=None):
-        url = f"{self.get_object_url()}/{self.related_local_time_serie.id}/append_assets/"
+        url = f"{self.get_object_url()}/{self.id}/append_assets/"
 
         payload = {"json": {"asset_id_list":asset_id_list}}
         r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload,
