@@ -456,7 +456,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
     def set_ogm_dependencies_linked(self):
         s = self.build_session()
-        url = self.get_object_url("LocalTimeSerieNodesMethods") + f"/{self.id}/set_ogm_dependencies_linked/"
+        url = self.get_object_url("LocalTimeSerieNodesMethods") + f"/{self.id}/set_ogm_dependencies_linked"
         r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, )
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -960,7 +960,7 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
         logger.info("Heartbeat thread stopped.")
 
     def patch(self, time_out=None, *args, **kwargs):
-        url = self.get_object_url() + f"/{self.uid}/update/"
+        url = self.get_object_url() + f"/{self.uid}/update"
         payload = {"json": serialize_to_json(kwargs)}
         s = self.build_session()
         r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload, time_out=time_out)
