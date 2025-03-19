@@ -122,8 +122,8 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
 
     @classmethod
     def switch_cash_asset(cls,asset_id,target_currency_asset:object):
-        url = f"{cls.get_object_url()}/{asset_id}/switch_cash_asset"
-        payload=dict(params={"target_currency_asset_id":target_currency_asset.id})
+        url = f"{cls.get_object_url()}/{asset_id}/switch_cash_asset/"
+        payload=dict(params={"target_currency_asset_id": target_currency_asset.id})
         r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
 
         if r.status_code != 200:
@@ -185,7 +185,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
             asset_type: str,
             switch_to_currency_pair_with_quote: Union[str,None]=None,
     ):
-        url = f"{Asset.get_object_url()}/get_all_assets_on_positions"
+        url = f"{Asset.get_object_url()}/get_all_assets_on_positions/"
         payload = dict(params={"execution_venue_symbol": execution_venue_symbol,
                                "asset_type": asset_type})
         if switch_to_currency_pair_with_quote is not None:
@@ -457,7 +457,7 @@ class AccountMixin(BasePydanticModel):
 
     def get_nav(self):
         base_url = self.get_object_url()
-        url = f"{base_url}/{self.id}/get_nav"
+        url = f"{base_url}/{self.id}/get_nav/"
         r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="GET", url=url)
         if r.status_code != 200:
             raise Exception(f"Error Getting NAV in account {r.text}")
@@ -987,7 +987,7 @@ class VirtualFund(BaseObjectOrm, BasePydanticModel):
         return a
 
     def get_latest_trade_snapshot_holdings(self):
-        url = f"{self.get_object_url()}/{int(self.id)}/get_latest_trade_snapshot_holdings"
+        url = f"{self.get_object_url()}/{int(self.id)}/get_latest_trade_snapshot_holdings/"
         r = make_request(s=self.build_session(),
                          loaders=self.LOADERS, r_type="GET", url=url)
 
@@ -1132,10 +1132,10 @@ class AlpacaAssetTrade(BasePydanticModel, BaseObjectOrm):
 
     @classmethod
     def create_or_update(cls, timeout=None, *args, **kwargs, ):
-        url = f"{cls.get_object_url()}/create_or_update"
+        url = f"{cls.get_object_url()}/create_or_update/"
         data = cls.serialize_for_json(kwargs)
         payload = {"json": data}
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=f"{url}/",
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=f"{url}",
                          time_out=timeout,
                          payload=payload)
         if r.status_code not in [201, 200]:

@@ -456,7 +456,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
     def set_ogm_dependencies_linked(self):
         s = self.build_session()
-        url = self.get_object_url("LocalTimeSerieNodesMethods") + f"/{self.id}/set_ogm_dependencies_linked"
+        url = self.get_object_url("LocalTimeSerieNodesMethods") + f"/{self.id}/set_ogm_dependencies_linked/"
         r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, )
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -775,7 +775,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             data_source_id: int,
             local_table_patch: dict
     ) -> "LocalTimeSerie":
-        url = cls.get_object_url("TimeSerie") + "/patch_build_configuration"
+        url = cls.get_object_url("TimeSerie") + "/patch_build_configuration/"
         payload = {"json": {"remote_table_patch": remote_table_patch, "local_table_patch": local_table_patch,
                             "build_meta_data": build_meta_data, "data_source_id": data_source_id,
                             }}
@@ -817,7 +817,7 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
     def get_scheduler_for_ts(cls, hash_id: str):
 
         s = cls.build_session()
-        url = cls.get_object_url() + "/get_scheduler_for_ts"
+        url = cls.get_object_url() + "/get_scheduler_for_ts/"
         payload = dict(params={"hash_id": hash_id})
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
         if r.status_code == 404:
@@ -960,7 +960,7 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
         logger.info("Heartbeat thread stopped.")
 
     def patch(self, time_out=None, *args, **kwargs):
-        url = self.get_object_url() + f"/{self.uid}/update"
+        url = self.get_object_url() + f"/{self.uid}/update/"
         payload = {"json": serialize_to_json(kwargs)}
         s = self.build_session()
         r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload, time_out=time_out)
@@ -1301,7 +1301,7 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
         global _default_data_source
         if _default_data_source is not None:
             return _default_data_source  # Return cached result if already set
-        url = cls.ROOT_URL + "/get_default_data_source_for_token"
+        url = cls.ROOT_URL + "/get_default_data_source_for_token/"
 
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload={})
