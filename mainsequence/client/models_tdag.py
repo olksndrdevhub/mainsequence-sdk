@@ -131,7 +131,7 @@ class TimeSerieNode(BasePydanticModel, BaseObjectOrm):
     @classmethod
     def get_all_dependencies(cls, hash_id):
         s = cls.build_session()
-        url = cls.get_object_url() + f"/{hash_id}/get_all_dependencies"
+        url = cls.get_object_url() + f"/{hash_id}/get_all_dependencies/"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, )
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -151,7 +151,7 @@ class TimeSerieNode(BasePydanticModel, BaseObjectOrm):
     @classmethod
     def get_max_depth(cls, hash_id, timeout=None):
         s = cls.build_session()
-        url = cls.get_object_url() + f"/{hash_id}/get_max_depth"
+        url = cls.get_object_url() + f"/{hash_id}/get_max_depth/"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -161,7 +161,7 @@ class TimeSerieNode(BasePydanticModel, BaseObjectOrm):
     @classmethod
     def get_upstream_nodes(cls, hash_id):
         s = cls.build_session()
-        url = cls.get_object_url() + f"/{hash_id}/get_upstream_nodes"
+        url = cls.get_object_url() + f"/{hash_id}/get_upstream_nodes/"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, )
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -424,7 +424,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
     def get_all_dependencies_update_priority(self, timeout=None) -> pd.DataFrame:
         s = self.build_session()
-        url = self.get_object_url() + f"/{self.id}/get_all_dependencies_update_priority"
+        url = self.get_object_url() + f"/{self.id}/get_all_dependencies_update_priority/"
         r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
