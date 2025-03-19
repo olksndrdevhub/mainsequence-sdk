@@ -58,6 +58,14 @@ class PortfolioStrategy(TimeSerie):
     Manages the rebalancing of asset weights within a portfolio over time, considering transaction fees
     and rebalancing strategies. Calculates portfolio values and returns while accounting for execution-specific fees.
     """
+    WEIGHTS_TO_PORTFOLIO_COLUMNS = {
+        "rebalance_weights": "weights_current",
+        "rebalance_price": "price_current",
+        "volume": "volume_current",
+        "weights_at_last_rebalance": "weights_before",
+        "price_at_last_rebalance": "price_before",
+        "volume_at_last_rebalance": "volume_before"
+    }
 
     @TimeSerie._post_init_routines()
     def __init__(
@@ -209,7 +217,7 @@ class PortfolioStrategy(TimeSerie):
             new_index = pd.date_range(start=start_date, end=end_date, freq=freq)
         return new_index, freq
 
-    def _postprocess_and_publish_weights(self, weights, update_statistics):
+    def _postprocess_weights(self, weights, update_statistics):
         """
         Prepares backtesting weights DataFrame for storage and sends them to VAM if applicable.
 
@@ -225,20 +233,20 @@ class PortfolioStrategy(TimeSerie):
             weights = weights[weights.index > update_statistics._max_time_in_update_statistics]
         if weights.empty:
             return pd.DataFrame()
+
         # Reshape and validate the DataFrame
         weights = weights.stack()
         required_columns = ["weights_before", "weights_current", "price_current", "price_before"]
         for col in required_columns:
             assert col in weights.columns, f"Column '{col}' is missing in weights"
+
         weights = weights.dropna(subset=["weights_current"])
         # Filter again for dates after latest_value
-        if  update_statistics._max_time_in_update_statistics is not None:
+        if update_statistics._max_time_in_update_statistics is not None:
             weights = weights[weights.index.get_level_values("time_index") > update_statistics._max_time_in_update_statistics]
 
-       
-
         # Prepare the weights before by using the last weights used for the portfolio and the new weights
-        if  update_statistics.is_empty() ==False:
+        if  update_statistics.is_empty() == False:
             last_weights = self._get_last_weights()
             weights = pd.concat([last_weights, weights], axis=0).fillna(0)
 
@@ -251,9 +259,10 @@ class PortfolioStrategy(TimeSerie):
         Returns:
             str: Portfolio description.
         """
-        portfolio_about = f"""Portfolio Created with Main Sequence VirtualFundBuilder engine with the follwing signal and"
-                           rebalance details:"""
-
+        portfolio_about = f"""
+Portfolio created with Main Sequence VirtualFundBuilder engine with the following signal and
+rebalance details:
+        """
         return json.dumps(portfolio_about)
 
     @property
@@ -273,7 +282,6 @@ class PortfolioStrategy(TimeSerie):
         reba_strat = self.rebalance_strategy_name
         signa_name = self.signal_weights_name
         return f"{reba_strat}_{signa_name}"
-
 
 
     def _calculate_portfolio_returns(self, weights: pd.DataFrame, prices: pd.DataFrame, ) -> pd.DataFrame:
@@ -297,9 +305,6 @@ class PortfolioStrategy(TimeSerie):
         price_current = weights.price_current
         weights_before = weights.weights_before.fillna(0)
         weights_current = weights.weights_current.fillna(0)
-        
-
-
 
         prices = prices[self.assets_configuration.price_type.value].unstack()
 
@@ -314,12 +319,9 @@ class PortfolioStrategy(TimeSerie):
 
         # Calculate weighted returns per coin: R_c = w_past_c * r_c
         weights_before = weights_before.reindex(returns.index, method="ffill").dropna()
-        weights_current=weights_current.reindex(returns.index, method="ffill").dropna()
+        weights_current = weights_current.reindex(returns.index, method="ffill").dropna()
 
-
-        
         weighted_returns = (weights_before * returns).dropna()
-
 
         weights_diff = (weights_current - weights_before).fillna(0)
         # Fees = w_diff * fee%
@@ -327,8 +329,7 @@ class PortfolioStrategy(TimeSerie):
 
         # Sum returns over assets
         portfolio_returns = pd.DataFrame({
-            "return": weighted_returns.sum(axis=1),
-            "return_minus_fees": weighted_returns.sum(axis=1) - fees,
+            "return": weighted_returns.sum(axis=1) - fees,
         })
         portfolio_returns=portfolio_returns[portfolio_returns.index>=first_price_date]
 
@@ -348,32 +349,26 @@ class PortfolioStrategy(TimeSerie):
         """
         last_portfolio = 1
         last_portfolio_minus_fees = 1
-        if update_statistics.is_empty()==False:
+        if update_statistics.is_empty() == False:
             last_obs = self.last_observation
             if last_obs is None:
                 assert self.data_configuration_path
                 self.logger.warning(
-                    f"No last observation of PortfolioStrategy for latest_value {latest_value} found, starting new portfolio. This is because of datalake."
+                    f"No last observation of PortfolioStrategy for last_obs {last_obs} found, starting new portfolio. This is because of datalake."
                 )
             else:
-                last_portfolio = last_obs["portfolio"].iloc[0]
-                last_portfolio_minus_fees = last_obs["portfolio_minus_fees"].iloc[0]
+                last_portfolio = last_obs["close"].iloc[0]
 
                 # Keep only new returns
                 portfolio = portfolio[portfolio.index > last_obs.index[0]]
 
         # Apply cumulative returns
-        portfolio["portfolio"] = last_portfolio * np.cumprod(portfolio["return"] + 1)
-        portfolio["portfolio_minus_fees"] = last_portfolio_minus_fees * np.cumprod(
-            portfolio["return_minus_fees"] + 1
-        )
+        portfolio["close"] = last_portfolio * np.cumprod(portfolio["return"] + 1)
         return portfolio
 
     def _add_serialized_weights(self, portfolio, weights):
         # Reset index to get 'time_index' as a column
         weights_reset = weights.reset_index()
-
-      
 
         # Identify the data columns to pivot
         data_columns = weights_reset.columns.difference(
@@ -385,32 +380,23 @@ class PortfolioStrategy(TimeSerie):
             index='time_index', columns='unique_identifier', values=data_columns
         )
 
-        # Flatten the MultiIndex columns
-        weights_pivot.columns = [
-            f"{col[0]}__{col[1]}" for col in weights_pivot.columns
-        ]
-
-        # Convert the pivoted DataFrame to a list of dictionaries
-        dict_list = weights_pivot.to_dict(orient='records')
-
-        # Create a Series of JSON strings
-        rebalance_weights_serialized = pd.Series(
-            (json.dumps(record) for record in dict_list),
-            index=weights_pivot.index,
-            name='rebalance_weights_serialized'
-        )
+        # calculate close metrics
+        rebalance_weights_serialized = pd.DataFrame(index=weights_pivot.index)
+        for portfolio_column, weights_column in self.WEIGHTS_TO_PORTFOLIO_COLUMNS.items():
+            rebalance_weights_serialized[portfolio_column] = weights_pivot[weights_column].to_dict(orient="records")
 
         # Join the serialized weights to the portfolio DataFrame
         portfolio = portfolio.join(rebalance_weights_serialized, how='left')
 
         # Identify rebalance dates where weights are provided
-        is_rebalance_date = portfolio['rebalance_weights_serialized'].notnull()
+        is_rebalance_date = portfolio['weights_at_close'].notnull()
         portfolio.loc[is_rebalance_date, 'last_rebalance_date'] = (
             portfolio.index[is_rebalance_date].astype(str)
         )
 
         # Forward-fill the serialized weights and last rebalance dates
-        portfolio['rebalance_weights_serialized'] = portfolio['rebalance_weights_serialized'].ffill()
+        rebalance_columns = list(self.WEIGHTS_TO_PORTFOLIO_COLUMNS.keys())
+        portfolio[rebalance_columns] = portfolio[rebalance_columns].ffill()
         portfolio['last_rebalance_date'] = portfolio['last_rebalance_date'].ffill()
 
         # Drop rows with any remaining NaN values
@@ -423,6 +409,9 @@ class PortfolioStrategy(TimeSerie):
         if last_obs is None:
             return None
 
+        rebalance_columns = list(self.WEIGHTS_TO_PORTFOLIO_COLUMNS.keys())
+
+        # TODO FIX THIS PART
         last_weights_serialized = json.loads(last_obs["rebalance_weights_serialized"].iloc[0])
         last_weights = pd.DataFrame(last_weights_serialized, index=[0]).T
         last_weights.index = pd.MultiIndex.from_tuples([col.split("__") for col in last_weights.index])
@@ -549,9 +538,7 @@ class PortfolioStrategy(TimeSerie):
             price_type=self.assets_configuration.price_type,
         )
 
-        # Postprocess prices and send to VAM
-        weights = self._postprocess_and_publish_weights(weights, update_statistics)
-
+        weights = self._postprocess_weights(weights, update_statistics)
         if len(weights) == 0:
             self.logger.info("No portfolio weights to update")
             return pd.DataFrame()

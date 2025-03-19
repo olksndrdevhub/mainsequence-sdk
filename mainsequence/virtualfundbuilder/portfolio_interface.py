@@ -129,7 +129,6 @@ class PortfolioInterface():
                 "rebalance_strategy_name": ts.backtesting_weights_config.rebalance_strategy_name,
             }
 
-
             standard_kwargs["backtest_table_time_index_name"] = "time_index"
             standard_kwargs["backtest_table_price_column_name"] = "portfolio"
             standard_kwargs["tags"] = portfolio_tags

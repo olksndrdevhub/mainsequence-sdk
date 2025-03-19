@@ -2568,11 +2568,11 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         asset_list = None
         if hasattr(self, "asset_list"):
             asset_list = self.asset_list
+            self.logger.info(f"{self.human_readable} is updating {len(self.asset_list)} assets")
 
         update_statistics = update_statistics.update_assets(
             asset_list, init_fallback_date=self.OFFSET_START
         )
-        self.logger.info(f"{self.human_readable} is updating {len(self.asset_list)} assets")
         return update_statistics
 
     def update(self, update_statistics: DataUpdates, ) -> pd.DataFrame:
