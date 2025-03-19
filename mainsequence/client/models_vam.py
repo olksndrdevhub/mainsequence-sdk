@@ -723,7 +723,7 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     follow_account_rebalance: bool = False
     tracking_funds_expected_exposure_from_latest_holdings: bool = False
     available_in_venues: List[Union[int, ExecutionVenue]]
-    latest_weights:Optional[HistoricalWeights] =None
+    latest_weights:Optional[List[Dict]] =None
 
     creation_date: Optional[datetime.datetime] = None
     execution_configuration: Union[int, TargetPortfolioExecutionConfiguration]

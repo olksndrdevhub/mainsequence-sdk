@@ -383,13 +383,13 @@ rebalance details:
         # calculate close metrics
         rebalance_weights_serialized = pd.DataFrame(index=weights_pivot.index)
         for portfolio_column, weights_column in self.WEIGHTS_TO_PORTFOLIO_COLUMNS.items():
-            rebalance_weights_serialized[portfolio_column] = weights_pivot[weights_column].to_dict(orient="records")
+            rebalance_weights_serialized[portfolio_column] = [json.dumps(r) for r in weights_pivot[weights_column].to_dict(orient="records")]
 
         # Join the serialized weights to the portfolio DataFrame
         portfolio = portfolio.join(rebalance_weights_serialized, how='left')
 
         # Identify rebalance dates where weights are provided
-        is_rebalance_date = portfolio['weights_at_close'].notnull()
+        is_rebalance_date = portfolio['rebalance_weights'].notnull()
         portfolio.loc[is_rebalance_date, 'last_rebalance_date'] = (
             portfolio.index[is_rebalance_date].astype(str)
         )
@@ -409,18 +409,13 @@ rebalance details:
         if last_obs is None:
             return None
 
-        rebalance_columns = list(self.WEIGHTS_TO_PORTFOLIO_COLUMNS.keys())
+        last_weights = {}
+        for portfolio_column, weights_column in self.WEIGHTS_TO_PORTFOLIO_COLUMNS.items():
+            last_weights[weights_column] = json.loads(last_obs[portfolio_column].iloc[0])
 
-        # TODO FIX THIS PART
-        last_weights_serialized = json.loads(last_obs["rebalance_weights_serialized"].iloc[0])
-        last_weights = pd.DataFrame(last_weights_serialized, index=[0]).T
-        last_weights.index = pd.MultiIndex.from_tuples([col.split("__") for col in last_weights.index])
-        last_weights.index.names = ["weight_column",  "unique_identifier"]
-
-        last_weights = last_weights.unstack("weight_column")
-        last_weights.columns = last_weights.columns.get_level_values("weight_column")
-
-        last_weights["time_index"] = pd.to_datetime(last_obs["last_rebalance_date"].iloc[0])
+        last_weights = pd.DataFrame(last_weights)
+        last_weights.index.names = ["unique_identifier"]
+        last_weights["time_index"] = last_obs.index[0]
         last_weights = last_weights.set_index("time_index", append=True)
         last_weights.index = last_weights.index.reorder_levels(["time_index", "unique_identifier"])
         return last_weights

@@ -300,7 +300,7 @@ class ImmediateSignal(RebalanceStrategyBase):
             #because this function provides backtest weights we can concatenate last observation
             volume_df = pd.concat([last_rebalance_weights.unstack()["volume_current"], volume_df], axis=0)
             prices_df = pd.concat([last_rebalance_weights.unstack()["price_current"], prices_df], axis=0)
-            signal_weights=pd.concat([last_rebalance_weights.unstack()["weights_current"], signal_weights], axis=0)
+            signal_weights = pd.concat([last_rebalance_weights.unstack()["weights_current"], signal_weights], axis=0)
         rebalance_weights  = pd.concat(
             objs=[
                 signal_weights,

@@ -174,13 +174,13 @@ class PortfolioInterface():
         self.backtest_portfolio = backtest_portfolio
         return live_portfolio, backtest_portfolio, index_asset
 
-    def run(self,portfolio_tags:Optional[List[str]]=None,*args, **kwargs):
+    def run(self, portfolio_tags:Optional[List[str]]=None, update_tree=True, *args, **kwargs):
         if not self._is_initialized:
             self._initialize_nodes()
 
         if self.portfolio_strategy_time_serie_backtest.data_source.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+            self.portfolio_strategy_time_serie_backtest.run(debug_mode=True, update_tree=update_tree, force_update=True, **kwargs)
             self.build_target_portfolio_in_vam(portfolio_tags=portfolio_tags)
-            self.portfolio_strategy_time_serie_backtest.run(debug_mode=True, update_tree=True, force_update=True, **kwargs)
         else:
             self.portfolio_strategy_time_serie_backtest.run_local_update(*args, **kwargs)
 
