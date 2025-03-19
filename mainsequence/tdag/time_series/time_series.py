@@ -2572,6 +2572,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         update_statistics = update_statistics.update_assets(
             asset_list, init_fallback_date=self.OFFSET_START
         )
+        self.logger.info(f"{self.human_readable} is updating {len(self.asset_list)} assets")
         return update_statistics
 
     def update(self, update_statistics: DataUpdates, ) -> pd.DataFrame:
