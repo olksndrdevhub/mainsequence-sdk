@@ -182,6 +182,9 @@ def build_application_logger(application_name:str="ms-sdk",
         project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/orm/api/pods/job/get_job_startup_state'
 
         response = requests.get(project_info_endpoint, headers=headers)
+        if response.status_code != 200:
+            print(f"Got Status Code {response.status_code} with response {response.text}")
+
         json_response = response.json()
 
         if "project_id" not in json_response:
