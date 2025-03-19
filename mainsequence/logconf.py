@@ -179,7 +179,7 @@ def build_application_logger(application_name:str="ms-sdk",
         headers["Content-Type"] = "application/json"
         headers["Authorization"] = "Token " + os.getenv("MAINSEQUENCE_TOKEN")
 
-        project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/orm/api/pods/job/get_job_startup_state'
+        project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/orm/api/pods/job/get_job_startup_state/'
 
         response = requests.get(project_info_endpoint, headers=headers)
         if response.status_code != 200:
