@@ -170,6 +170,7 @@ class PortfolioStrategy(TimeSerie):
                                v._max_time_in_update_statistics is not None]  # filter out None
 
         if len(earliest_last_value) == 0:
+            self.logger.warning(f"update_statics_from_dependencies {update_statics_from_dependencies}")
             raise Exception("Prices are empty")
 
         # Determine the last value where all assets have data

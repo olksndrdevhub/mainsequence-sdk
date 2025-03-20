@@ -775,7 +775,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             data_source_id: int,
             local_table_patch: dict
     ) -> "LocalTimeSerie":
-        url = cls.get_object_url("TimeSerie") + "/patch_build_configuration/"
+        url = cls.get_object_url("TimeSerie") + "/patch_build_configuration"
         payload = {"json": {"remote_table_patch": remote_table_patch, "local_table_patch": local_table_patch,
                             "build_meta_data": build_meta_data, "data_source_id": data_source_id,
                             }}
