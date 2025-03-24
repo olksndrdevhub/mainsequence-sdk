@@ -1,7 +1,13 @@
+#!/usr/bin/env bash
+set +e  # Don't abort on error
+
+# Source our new utils
+source "$(dirname "$0")/utils.sh"
+
 echo "======================================================"
 echo "Copy files script invoked at: $(date)"
 echo "Running as user: $(whoami)"
-set +e  # Don't abort on error
+
 mkdir -p /tmp
 
 if [ -z "$HOME_DIR" ]; then
@@ -24,41 +30,13 @@ chmod 600 "$HOME_DIR/.ssh/id_rsa" 2>/dev/null || true
 cd "$ROOT_PROJECT_PATH" || true
 
 # Pull from remote
-if [ "$AUTHENTICATION_METHOD" = "api" ] && [ -n "$GIT_API_TOKEN" ] && [ -n "$GIT_REPO_URL" ]; then
-  echo "Using API token for Git pull..."
-  REMOTE_URL=$(echo "$GIT_REPO_URL" | sed "s|https://|https://$GIT_API_TOKEN@|")
-  git remote set-url origin "$REMOTE_URL" 2>/dev/null || true
-  git pull origin main || true
-else
-  echo "Using SSH-based approach..."
-  GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git fetch origin || true
-  git merge origin/main || true
-fi
+pull_changes
 
+# Copy examples
+cp -a "/opt/code/mainsequence-sdk/examples/time_series" "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy TimeSeries step failed!"
 
-cp -a "/opt/code/mainsequence-sdk/examples/time_series" "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy Notebooks step failed!"
-cp -a "/opt/code/mainsequence-sdk/examples/" "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy Notebooks step failed!"
-
-
-
-
-# update the backend that project is setup
-url="${TDAG_ENDPOINT}/orm/api/pods/job/job_run_status/"
-
-http_code=$(curl -s -o /tmp/update_response.txt -w "%{http_code}" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Token ${MAINSEQUENCE_TOKEN}" \
-  -d "{\"status\": \"SUCCEEDED\"}" \
-  "${url}")
-
-response_body=$(cat /tmp/update_response.txt)
-if [ "${http_code}" -eq 200 ]; then
-  echo "Update success: ${response_body}"
-else
-  echo "Error updating job (HTTP code ${http_code}): ${response_body}"
-fi
+# Update the backend that project is setup
+update_backend_job_status "SUCCEEDED"
 
 echo ">> Copy files script completed."
 echo "======================================================"
-

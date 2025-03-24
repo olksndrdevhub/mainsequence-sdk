@@ -1,7 +1,13 @@
+#!/usr/bin/env bash
+set +e  # Don't abort on error
+
+# Source our new utils
+source "$(dirname "$0")/utils.sh"
+
 echo "======================================================"
 echo "PostStart script invoked at: $(date)"
 echo "Running as user: $(whoami)"
-set +e  # Don't abort on error
+
 mkdir -p /tmp
 
 if [ -z "$HOME_DIR" ]; then
@@ -75,20 +81,18 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   mkdir -p "$VFB_PROJECT_PATH/time_series"
   mkdir -p "$VFB_PROJECT_PATH/rebalance_strategies"
 
-  # Write some boilerplate files if needed
   touch "$VFB_PROJECT_PATH/__init__.py"
   touch "$VFB_PROJECT_PATH/time_series/__init__.py"
   touch "$VFB_PROJECT_PATH/rebalance_strategies/__init__.py"
 
-  # Copy a sample notebook (optional)
   cp -a "/opt/code/mainsequence-sdk/examples/getting_started/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"
   cp -a "/opt/code/mainsequence-sdk/requirements.txt" "${ROOT_PROJECT_PATH}/requirements.txt" || echo "WARNING: Copy requirements step failed!"
 
   chown -R 1000:100 "$HOME_DIR" 2>/dev/null || true
 
   echo "Create initial commit"
-  cd $ROOT_PROJECT_PATH
-  git add $ROOT_PROJECT_PATH
+  cd "$ROOT_PROJECT_PATH"
+  git add "$ROOT_PROJECT_PATH"
   git commit -am "initial commit"
   git push
 else
@@ -98,43 +102,14 @@ else
   chmod 600 "$HOME_DIR/.ssh/id_rsa" 2>/dev/null || true
 
   cd "$ROOT_PROJECT_PATH" || true
-
-  # Pull from remote
-  if [ "$AUTHENTICATION_METHOD" = "api" ] && [ -n "$GIT_API_TOKEN" ] && [ -n "$GIT_REPO_URL" ]; then
-    echo "Using API token for Git pull..."
-    REMOTE_URL=$(echo "$GIT_REPO_URL" | sed "s|https://|https://$GIT_API_TOKEN@|")
-    git remote set-url origin "$REMOTE_URL" 2>/dev/null || true
-    git pull origin main || true
-  else
-    echo "Using SSH-based approach..."
-    GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git fetch origin || true
-    git merge origin/main || true
-  fi
+  pull_changes
 fi
 
-if [ -f "${ROOT_PROJECT_PATH}/requirements.txt" ]; then
-    python -m pip install -r "${ROOT_PROJECT_PATH}/requirements.txt"
-else
-    echo "requirements.txt not found at ${ROOT_PROJECT_PATH}, skipping installation."
-fi
+# Install requirements if they exist
+install_requirements_if_present "${ROOT_PROJECT_PATH}/requirements.txt"
 
-# update the backend that project is setup
-url="${TDAG_ENDPOINT}/orm/api/pods/job/job_run_status/"
-
-http_code=$(curl -s -o /tmp/update_response.txt -w "%{http_code}" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Token ${MAINSEQUENCE_TOKEN}" \
-  -d "{\"status\": \"SUCCEEDED\"}" \
-  "${url}")
-
-response_body=$(cat /tmp/update_response.txt)
-if [ "${http_code}" -eq 200 ]; then
-  echo "Update success: ${response_body}"
-else
-  echo "Error updating job (HTTP code ${http_code}): ${response_body}"
-fi
+# Update backend job status
+update_backend_job_status "SUCCEEDED"
 
 echo ">> PostStart script completed."
 echo "======================================================"
-
