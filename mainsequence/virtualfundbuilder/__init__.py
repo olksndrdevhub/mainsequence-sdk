@@ -27,6 +27,6 @@ from mainsequence.virtualfundbuilder.utils import (
 
 def register_default_strategies():
     # Keep this in a function to not clutter the libs namespace
-    import mainsequence.virtualfundbuilder.contrib.signals
+    import mainsequence.virtualfundbuilder.contrib.time_series
     import mainsequence.virtualfundbuilder.contrib.rebalance_strategies
 register_default_strategies()

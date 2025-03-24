@@ -72,16 +72,16 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   mkdir -p "$VFB_PROJECT_PATH/notebooks"
   mkdir -p "$VFB_PROJECT_PATH/configurations"
   mkdir -p "$VFB_PROJECT_PATH/scripts"
-  mkdir -p "$VFB_PROJECT_PATH/signals"
+  mkdir -p "$VFB_PROJECT_PATH/time_series"
   mkdir -p "$VFB_PROJECT_PATH/rebalance_strategies"
 
   # Write some boilerplate files if needed
   touch "$VFB_PROJECT_PATH/__init__.py"
-  touch "$VFB_PROJECT_PATH/signals/__init__.py"
+  touch "$VFB_PROJECT_PATH/time_series/__init__.py"
   touch "$VFB_PROJECT_PATH/rebalance_strategies/__init__.py"
 
   # Copy a sample notebook (optional)
-  cp -a "/opt/code/mainsequence-sdk/notebooks/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"
+  cp -a "/opt/code/mainsequence-sdk/examples/getting_started/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"
   cp -a "/opt/code/mainsequence-sdk/requirements.txt" "${ROOT_PROJECT_PATH}/requirements.txt" || echo "WARNING: Copy requirements step failed!"
 
   chown -R 1000:100 "$HOME_DIR" 2>/dev/null || true
