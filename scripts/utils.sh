@@ -76,7 +76,8 @@ clone_via_ssh_key() {
 install_requirements_if_present() {
   local req_file="$1"
   if [ -f "$req_file" ]; then
-    python -m pip install -r "$req_file"
+    python -m pip install uv
+    uv pip install -r "$req_file"
   else
     echo "requirements.txt not found at ${req_file}, skipping installation."
   fi
