@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
 ########################################
 # Ensure ~/.ssh/config is set for no host key checks

@@ -192,7 +192,7 @@ class VirtualFundLauncher:
                 run_script(execution_object)
             elif execution_type == "notebook":
                 run_notebook(execution_object)
-            elif execution_type == "chat_job":
+            elif execution_type == "system_job":
                 get_pod_configuration()
             else:
                 raise NotImplementedError(f"Unknown execution type {execution_type}")

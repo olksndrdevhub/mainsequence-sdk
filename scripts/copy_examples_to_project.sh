@@ -35,6 +35,12 @@ pull_changes
 # Copy examples
 cp -a "/opt/code/mainsequence-sdk/examples/time_series" "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy TimeSeries step failed!"
 
+echo "Copy examples commit"
+cd "$ROOT_PROJECT_PATH"
+git add "$ROOT_PROJECT_PATH"
+git commit -am "copy examples commit"
+git push
+
 # Update the backend that project is setup
 update_backend_job_status "SUCCEEDED"
 
