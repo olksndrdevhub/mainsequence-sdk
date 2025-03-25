@@ -87,7 +87,8 @@ class User(BaseObjectOrm,BasePydanticModel):
 
     @classmethod
     def get_object_url(cls):
-        url = f"{cls.ROOT_URL.replace('orm/api', 'users/api')}/{cls.END_POINTS[cls.class_name()]}"
+        # TODO should be also orm/api
+        url = f"{cls.ROOT_URL.replace('orm/api', 'user/api')}/{cls.END_POINTS[cls.class_name()]}"
         return url
 
     @classmethod
