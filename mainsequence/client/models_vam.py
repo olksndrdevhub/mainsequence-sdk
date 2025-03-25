@@ -115,7 +115,10 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
 
     @staticmethod
     def get_properties_from_unique_symbol(unique_symbol: str):
-        return {"symbol": unique_symbol}
+        if unique_symbol.endswith(CONSTANTS.ALPACA_CRYPTO_POSTFIX):
+            return {"symbol": unique_symbol.replace(CONSTANTS.ALPACA_CRYPTO_POSTFIX, ""), "asset_type": CONSTANTS.ASSET_TYPE_CRYPTO_SPOT}
+
+        return {"symbol": unique_symbol, "asset_type": CONSTANTS.ASSET_TYPE_CASH_EQUITY}
 
     @property
     def execution_venue_symbol(self):
