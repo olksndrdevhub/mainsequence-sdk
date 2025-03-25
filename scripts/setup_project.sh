@@ -106,7 +106,7 @@ else
 
   # Fix SSH key perms if re-using SSH
   chmod 600 "$HOME_DIR/.ssh/id_rsa" 2>/dev/null || true
-
+  mkdir -p $ROOT_PROJECT_PATH
   cd "$ROOT_PROJECT_PATH" || true
   pull_changes
 fi
