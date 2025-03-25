@@ -55,10 +55,14 @@ RUN pip install --no-cache-dir ipywidgets
 RUN pip install --no-cache-dir ${CODE_DIR}/mainsequence-sdk
 RUN pip freeze > ${CODE_DIR}/mainsequence-sdk/requirements.txt
 RUN pip uninstall -y mainsequence
+# We can probably optimize to preinstall mainsequence, there seems to be some issue
+# that re-installing the requirements.txt in the container leads to deleting the old libs
+# and installing again
 
 # Make scripts executable, if you need them
 RUN chmod +x ${CODE_DIR}/mainsequence-sdk/scripts/get_git_and_run.sh
 RUN chmod +x ${CODE_DIR}/mainsequence-sdk/scripts/setup_project.sh
+RUN chmod +x ${CODE_DIR}/mainsequence-sdk/scripts/copy_examples_to_project.sh
 
 # Provide any environment variables you need
 ENV TDAG_CONFIG_PATH=${HOME_DIR}/tdag/default_config.yml \

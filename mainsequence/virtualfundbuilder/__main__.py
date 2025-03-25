@@ -1,4 +1,5 @@
 import fire
+import pkgutil
 
 import os
 import json
@@ -74,22 +75,50 @@ def run_script(script_name):
     python_file_path = os.path.join(os.getenv("VFB_PROJECT_PATH"), "scripts", f"{script_name}.py")
     runpy.run_path(python_file_path, run_name="__main__")
 
+def get_py_modules(folder_path):
+    files = os.listdir(folder_path)
+    files = [f for f in files if f[0] not in ["_", "."] and f.endswith(".py")]
+    return [f.split(".")[0] for f in files]
+
 def get_pod_configuration():
     print("Get pod configuration")
-    # create temporary script that imports everything and setups the agent
-    TMP_SCRIPT = f"""
-from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent
-from {os.getenv("PROJECT_LIBRARY_NAME")}.signals import *
-from {os.getenv("PROJECT_LIBRARY_NAME")}.rebalance_strategies import *
-tdag_agent = TDAGAgent()
-"""
+
+    project_library = os.getenv("PROJECT_LIBRARY_NAME")
+    if not project_library:
+        raise RuntimeError("PROJECT_LIBRARY_NAME is not set in environment")
+
+    project_path = os.getenv("VFB_PROJECT_PATH")
+
+    # Gather all submodules in time_series
+    time_series_package = f"{project_library}.time_series"
+    time_series_modules = get_py_modules(os.path.join(project_path, "time_series"))
+
+    # Gather all submodules in rebalance_strategies
+    rebalance_package = f"{project_library}.rebalance_strategies"
+    rebalance_modules = get_py_modules(os.path.join(project_path, "rebalance_strategies"))
+
+    # Build the temporary Python script to import all files
+    script_lines = [
+        "# -- Auto-generated imports for time_series --"
+    ]
+    for mod in time_series_modules:
+        script_lines.append(f"import {time_series_package}.{mod}")
+    script_lines.append("# -- Auto-generated imports for rebalance_strategies --")
+    for mod in rebalance_modules:
+        script_lines.append(f"import {rebalance_package}.{mod}")
+    script_lines.append("")
+    script_lines.append("from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent")
+    script_lines.append("print('Initialize TDAGAgent')")
+    script_lines.append("tdag_agent = TDAGAgent()")
+
+    TMP_SCRIPT = "\n".join(script_lines)
+
+    # Write out to a temporary .py file and run
     temp_dir = tempfile.mkdtemp()
     python_file_path = Path(temp_dir) / "load_pod_configuration.py"
-
     with open(python_file_path, "w", encoding="utf-8") as f:
         f.write(TMP_SCRIPT)
-
-    runpy.run_path(python_file_path, run_name="__main__")
+    runpy.run_path(str(python_file_path), run_name="__main__")
 
 def prerun_routines():
     data = update_job_status("RUNNING")
@@ -192,7 +221,7 @@ class VirtualFundLauncher:
                 run_script(execution_object)
             elif execution_type == "notebook":
                 run_notebook(execution_object)
-            elif execution_type == "chat_job":
+            elif execution_type == "system_job":
                 get_pod_configuration()
             else:
                 raise NotImplementedError(f"Unknown execution type {execution_type}")

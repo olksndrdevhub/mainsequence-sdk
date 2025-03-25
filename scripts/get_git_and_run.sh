@@ -1,66 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Source our new utils
+source "$(dirname "$0")/utils.sh"
+
 # -------------------------------------------------------------
 # Decide whether to clone via SSH or API token
-# If AUTHENTICATION_METHOD=api (and we have GIT_API_TOKEN + GIT_REPO_URL),
-# we clone with HTTPS + embedded token. Otherwise, we use the old SSH approach.
 # -------------------------------------------------------------
+REPO_PATH="/tmp/repo"
+
 if [ "${AUTHENTICATION_METHOD:-ssh}" = "api" ] && [ -n "${GIT_API_TOKEN:-}" ] && [ -n "${GIT_REPO_URL:-}" ]; then
-  echo "Using API token approach..."
-
-  # Make sure we don't get prompted for host key verification
-  mkdir -p ~/.ssh
-  chmod 700 ~/.ssh
-
-  cat <<EOF > ~/.ssh/config
-Host *
-    StrictHostKeyChecking no
-    UserKnownHostsFile /dev/null
-EOF
-
-  chmod 600 ~/.ssh/config
-
-  # Ensure we don't do SSH
-  export GIT_SSH_COMMAND="echo skipping_ssh"
-
-  # Clone the Git repository into /tmp/repo
-  REPO_PATH="/tmp/repo"
-  rm -rf "$REPO_PATH"
-  REMOTE_URL=$(echo "$GIT_REPO_URL" | sed "s|https://|https://${GIT_API_TOKEN}@|")
-  git clone "$REMOTE_URL" "$REPO_PATH"
-
+  clone_via_api_token
 else
-  echo "Using SSH key approach..."
-
-  # Write the private key to a secure file
-  SSH_KEY_FILE="$(mktemp)"
-  echo "$GIT_PRIVATE_KEY" > "$SSH_KEY_FILE"
-  chmod 600 "$SSH_KEY_FILE"
-
-  # Start the SSH agent and add our private key
-  eval "$(ssh-agent -s)"
-  ssh-add "$SSH_KEY_FILE"
-
-  # Make sure we don't get prompted for host key verification
-  mkdir -p ~/.ssh
-  chmod 700 ~/.ssh
-
-  cat <<EOF > ~/.ssh/config
-Host *
-    StrictHostKeyChecking no
-    UserKnownHostsFile /dev/null
-EOF
-
-  chmod 600 ~/.ssh/config
-
-  # Ensure git uses the same SSH options
-  export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-
-  # Clone the Git repository into /tmp/repo
-  REPO_PATH="/tmp/repo"
-  rm -rf "$REPO_PATH"
-  git clone "$GIT_SSH_URL" "$REPO_PATH"
+  clone_via_ssh_key
 fi
 
 # -------------------------------------------------------------
@@ -78,11 +30,8 @@ export MLFLOW_ENDPOINT="http://localhost:5000"
 cd "$REPO_PATH"
 export GIT_HASH="$(git rev-parse HEAD)"
 
-if [ -f "${REPO_PATH}/requirements.txt" ]; then
-    python -m pip install -r "${REPO_PATH}/requirements.txt"
-else
-    echo "requirements.txt not found at ${REPO_PATH}, skipping installation."
-fi
+# Install requirements
+install_requirements_if_present "${REPO_PATH}/requirements.txt"
 
 # -------------------------------------------------------------
 # Execute your script
