@@ -9,6 +9,11 @@ source "$(dirname "$0")/utils.sh"
 # -------------------------------------------------------------
 REPO_PATH="/tmp/repo"
 
+# Configure Git identity
+git config --global user.email "ms_pod@example.com" || true
+git config --global user.name "ms_pod" || true
+git config --global --add safe.directory "$REPO_PATH" || true
+
 if [ "${AUTHENTICATION_METHOD:-ssh}" = "api" ] && [ -n "${GIT_API_TOKEN:-}" ] && [ -n "${GIT_REPO_URL:-}" ]; then
   clone_via_api_token
 else
