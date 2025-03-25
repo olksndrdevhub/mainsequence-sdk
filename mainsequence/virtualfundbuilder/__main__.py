@@ -79,7 +79,7 @@ def get_pod_configuration():
     # create temporary script that imports everything and setups the agent
     TMP_SCRIPT = f"""
 from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent
-from {os.getenv("PROJECT_LIBRARY_NAME")}.signals import *
+from {os.getenv("PROJECT_LIBRARY_NAME")}.time_series import *
 from {os.getenv("PROJECT_LIBRARY_NAME")}.rebalance_strategies import *
 tdag_agent = TDAGAgent()
 """
