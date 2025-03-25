@@ -33,7 +33,7 @@ cd "$ROOT_PROJECT_PATH" || true
 pull_changes
 
 # Copy examples
-cp -a "/opt/code/mainsequence-sdk/examples/time_series" "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy TimeSeries step failed!"
+cp -a "/opt/code/mainsequence-sdk/examples/time_series" "$VFB_PROJECT_PATH/scripts" || echo "WARNING: Copy TimeSeries step failed!"
 
 echo "Copy examples commit"
 cd "$ROOT_PROJECT_PATH"
