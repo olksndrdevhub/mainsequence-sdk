@@ -55,6 +55,8 @@ RUN pip install --no-cache-dir ipywidgets
 RUN pip install --no-cache-dir ${CODE_DIR}/mainsequence-sdk
 RUN pip freeze > ${CODE_DIR}/mainsequence-sdk/requirements.txt
 RUN pip uninstall -y mainsequence
+# We can probably optimize to preinstall mainsequence, there seems to be some issue
+# that re-installing the requirements.txt leads to deleting the old libs and installing again
 
 # Make scripts executable, if you need them
 RUN chmod +x ${CODE_DIR}/mainsequence-sdk/scripts/get_git_and_run.sh
