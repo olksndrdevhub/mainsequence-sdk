@@ -84,6 +84,8 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   touch "$VFB_PROJECT_PATH/__init__.py"
   touch "$VFB_PROJECT_PATH/time_series/__init__.py"
   touch "$VFB_PROJECT_PATH/rebalance_strategies/__init__.py"
+  touch "$VFB_PROJECT_PATH/scripts/__init__.py"
+  touch "$VFB_PROJECT_PATH/notebooks/__init__.py"
 
   echo "Copying Files from mainsequence-sdk"
   cp -a "/opt/code/mainsequence-sdk/examples/getting_started/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"

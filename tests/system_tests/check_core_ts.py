@@ -3,4 +3,5 @@ from mainsequence.tdag.time_series import APITimeSerie
 
 if __name__ == '__main__':
     api_ts = APITimeSerie.build_from_unique_identifier(VAM_CONSTANTS.data_sources_constants.HISTORICAL_MARKET_CAP)
-    api_ts.get_df_between_dates()
+    data = api_ts.get_df_between_dates()
+    assert len(data) > 0
