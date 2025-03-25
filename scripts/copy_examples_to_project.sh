@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set +e  # Don't abort on error
 
 # Source our new utils
 source "$(dirname "$0")/utils.sh"
