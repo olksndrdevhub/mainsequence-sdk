@@ -1134,6 +1134,14 @@ class DataUpdates(BaseModel):
                         (df.index.get_level_values("unique_identifier") != unique_identifier)
                     )
                 ]
+            duplicated = df.index.duplicated(keep='first')
+
+            if duplicated.any():
+                num_duplicates = duplicated.sum()
+                logger.warning(
+                    f"Removed {num_duplicates} duplicated rows for unique_identifier and time_index combinations.")
+                df = df[~duplicated]
+            return df
         return df
 
 def get_chunk_stats(chunk_df, time_index_name, index_names):
