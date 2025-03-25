@@ -75,19 +75,10 @@ def run_script(script_name):
     python_file_path = os.path.join(os.getenv("VFB_PROJECT_PATH"), "scripts", f"{script_name}.py")
     runpy.run_path(python_file_path, run_name="__main__")
 
-def _collect_submodules(package_name: str) -> list:
-    """
-    Given a fully qualified package name (like 'my_project.time_series'),
-    discover all modules in that package directory and return a list of module names.
-    """
-    # Figure out real file-system path for the package
-    package_path = os.path.join(os.path.dirname(__file__), "..", *package_name.split('.'))
-    module_names = []
-    for finder, name, ispkg in pkgutil.iter_modules([package_path]):
-        # e.g. if package_name is 'my_project.time_series' and name is 'foo',
-        #      you'll import as 'my_project.time_series.foo'
-        module_names.append(name)
-    return module_names
+def get_py_modules(folder_path):
+    files = os.listdir(folder_path)
+    files = [f for f in files if f[0] not in ["_", "."] and f.endswith(".py")]
+    return [f.split(".")[0] for f in files]
 
 def get_pod_configuration():
     print("Get pod configuration")
@@ -96,13 +87,15 @@ def get_pod_configuration():
     if not project_library:
         raise RuntimeError("PROJECT_LIBRARY_NAME is not set in environment")
 
+    project_path = os.getenv("VFB_PROJECT_PATH")
+
     # Gather all submodules in time_series
     time_series_package = f"{project_library}.time_series"
-    time_series_modules = _collect_submodules(time_series_package)
+    time_series_modules = get_py_modules(os.path.join(project_path, "time_series"))
 
     # Gather all submodules in rebalance_strategies
     rebalance_package = f"{project_library}.rebalance_strategies"
-    rebalance_modules = _collect_submodules(rebalance_package)
+    rebalance_modules = get_py_modules(os.path.join(project_path, "rebalance_strategies"))
 
     # Build the temporary Python script to import all files
     script_lines = [
@@ -114,6 +107,7 @@ def get_pod_configuration():
     for mod in rebalance_modules:
         script_lines.append(f"import {rebalance_package}.{mod}")
     script_lines.append("")
+    script_lines.append("from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent")
     script_lines.append("print('Initialize TDAGAgent')")
     script_lines.append("tdag_agent = TDAGAgent()")
 
