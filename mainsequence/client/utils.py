@@ -100,7 +100,7 @@ def make_request(
             r.status_code = 500
             break
 
-        logger.debug(f"SLEEPING {TIMEOFF} to trying request again {counter} {url}")
+        logger.debug(f"Trying request again after {TIMEOFF}s - Counter: {counter}/{TRIES} - URL: {url} ")
         time.sleep(TIMEOFF)
     return r
 

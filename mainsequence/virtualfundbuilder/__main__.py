@@ -1,34 +1,14 @@
 import fire
-import pkgutil
 
-import os
 import json
-import importlib
 
-from mainsequence.virtualfundbuilder.enums import RunStrategy, StrategyType
-from mainsequence.virtualfundbuilder.utils import _send_strategy_to_registry, _convert_unknown_to_string
-import uvicorn
-from mainsequence.client.models_tdag import register_default_configuration
-from mainsequence.virtualfundbuilder.utils import get_vfb_logger, get_default_documentation
-
-import os
 import runpy
 import tempfile
-from pathlib import Path
-
-import requests
-import sys
-import logging
-import logging.config
 import os
 from pathlib import Path
 
 import requests
-import structlog
-from typing import Union
-
 from requests.structures import CaseInsensitiveDict
-from structlog.dev import ConsoleRenderer
 
 
 def get_tdag_headers():
@@ -133,43 +113,14 @@ def postrun_routines(error_on_run: bool):
         update_job_status("SUCCEEDED")
 
 class VirtualFundLauncher:
-    logger = get_vfb_logger()
 
-    def run_fund_configuration_from_python(
-            self,
-            configuration_path_py: str, debug=True, run_strategy=RunStrategy.ALL.value
-
-    ):
-        """
-        Creates fund yaml from python configuration and starts fund using the yaml path
-        """
-        module_name = os.path.splitext(os.path.basename(configuration_path_py))[0]
-        spec = importlib.util.spec_from_file_location(module_name, configuration_path_py)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        portfolio_config = getattr(module, "portfolio_config")
-
-        configuration_path = portfolio_config.build_yaml_configuration_file()
-        self.run_fund_configuration_in_scheduler(configuration_path, debug=debug, run_strategy=run_strategy)
-
-
-    def run_fund_configuration_in_scheduler(
-            self,
-            configuration_path: str,
-            scheduler_name="VirtualFundScheduler",
-            debug=True,
-            run_strategy=RunStrategy.BACKTEST.value
-    ):
-        """
-        Creates a portfolio interface using a yaml fund configuration, connects to VAM and runs the fund in the scheduler
-        """
-        from mainsequence.virtualfundbuilder.app.api.api import run_fund_configuration_in_scheduler
-        run_fund_configuration_in_scheduler(configuration_path=configuration_path,scheduler_name=scheduler_name,
-                                            debug=debug, run_strategy=RunStrategy(run_strategy)
-                                            )
+    def __init__(self):
+        from mainsequence.virtualfundbuilder.utils import get_vfb_logger
+        self.logger = get_vfb_logger()
 
     def register_strategies(self):
+        from mainsequence.virtualfundbuilder.utils import _send_strategy_to_registry
+        from mainsequence.virtualfundbuilder.enums import StrategyType
         from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import SignalWeightsFactory
         from mainsequence.virtualfundbuilder.strategy_factory.rebalance_factory import RebalanceFactory
 
@@ -194,6 +145,9 @@ class VirtualFundLauncher:
 
 
     def send_default_configuration(self):
+        from mainsequence.virtualfundbuilder.utils import _convert_unknown_to_string, get_default_documentation
+        from mainsequence.client.models_tdag import register_default_configuration
+
         default_config_dict = get_default_documentation()
         payload = {
             "default_config_dict": default_config_dict,

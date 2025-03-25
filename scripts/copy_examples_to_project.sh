@@ -1,44 +1,47 @@
 #!/usr/bin/env bash
-set +e  # Don't abort on error
+set -euo pipefail
 
 # Source our new utils
 source "$(dirname "$0")/utils.sh"
 
-echo "======================================================"
-echo "Copy files script invoked at: $(date)"
-echo "Running as user: $(whoami)"
+# -------------------------------------------------------------
+# Decide whether to clone via SSH or API token
+# -------------------------------------------------------------
+REPO_PATH="/tmp/repo"
 
-mkdir -p /tmp
+# Configure Git identity
+git config --global user.email "ms_pod@example.com" || true
+git config --global user.name "ms_pod" || true
+git config --global --add safe.directory "$REPO_PATH" || true
 
-if [ -z "$HOME_DIR" ]; then
-  HOME_DIR="/tmp/repo"
+if [ "${AUTHENTICATION_METHOD:-ssh}" = "api" ] && [ -n "${GIT_API_TOKEN:-}" ] && [ -n "${GIT_REPO_URL:-}" ]; then
+  clone_via_api_token
+else
+  clone_via_ssh_key
 fi
-ROOT_PROJECT_PATH="$HOME_DIR/$PROJECT_NAME"
 
-if [ -z "$VFB_PROJECT_PATH" ]; then
-  VFB_PROJECT_PATH=$ROOT_PROJECT_PATH/$PROJECT_LIBRARY_NAME
-fi
+# -------------------------------------------------------------
+# Set necessary variables
+# (Note: the $REPO_PATH above is where we cloned the code)
+# -------------------------------------------------------------
+export VFB_PROJECT_PATH="$REPO_PATH/$PROJECT_LIBRARY_NAME"
+export TDAG_CONFIG_PATH=~/tdag/default_config.yml
+export TDAG_RAY_CLUSTER_ADDRESS="ray://localhost:10001"
+export TDAG_RAY_API_ADDRESS="http://localhost:8265"
+export TDAG_RAY_SERVE_HOST="0.0.0.0"
+export TDAG_RAY_SERVE_PORT="8003"
+export MLFLOW_ENDPOINT="http://localhost:5000"
 
-echo ">> HOME_DIR: $HOME_DIR"
-echo ">> PROJECT_NAME: $PROJECT_NAME"
-echo ">> VFB_PROJECT_PATH: $VFB_PROJECT_PATH"
-echo ">> AUTHENTICATION_METHOD: $AUTHENTICATION_METHOD"
-
-# Fix SSH key perms if re-using SSH
-chmod 600 "$HOME_DIR/.ssh/id_rsa" 2>/dev/null || true
-
-cd "$ROOT_PROJECT_PATH" || true
-
-# Pull from remote
-pull_changes
+cd "$REPO_PATH"
+export GIT_HASH="$(git rev-parse HEAD)"
 
 # Copy examples
 cp -a "/opt/code/mainsequence-sdk/examples/time_series" "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy TimeSeries step failed!"
 cp -a "/opt/code/mainsequence-sdk/tests/system_tests" "$VFB_PROJECT_PATH/scripts" || echo "WARNING: Copy System Tests step failed!"
 
 echo "Copy examples commit"
-cd "$ROOT_PROJECT_PATH"
-git add "$ROOT_PROJECT_PATH"
+cd "$REPO_PATH"
+git add "$REPO_PATH"
 git commit -am "copy examples commit"
 git push
 

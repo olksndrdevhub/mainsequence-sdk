@@ -32,14 +32,6 @@ def get_right_account_class(account: Account):
     account, _ = AccountClass.get(id=account.id)
     return account
 
-def get_right_asset_class(execution_venue_symbol:str, asset_type:str):
-    from mainsequence.client import models_vam as model_module
-    try:
-        AssetClass = getattr(model_module, VAM_CONSTANTS.ASSET_VENUE_FACTORY[execution_venue_symbol][asset_type])
-    except Exception as e:
-        raise Exception(f"There are no assets of type {asset_type} in {execution_venue_symbol}")
-    return AssetClass
-
 
 class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
     id: int
