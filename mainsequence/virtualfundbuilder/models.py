@@ -4,7 +4,6 @@ from pydantic import (BaseModel, validator, model_validator)
 import os
 import pandas as pd
 from mainsequence.client import AssetMixin, Asset
-from mainsequence.client.models_helpers import get_right_asset_class
 from mainsequence.tdag.time_series import ModelList
 import json
 from pydantic import FieldValidationInfo, field_validator, root_validator, Field
@@ -409,11 +408,7 @@ class PortfolioBuildConfiguration(VFBConfigBaseModel):
             else:
                 execution_venue_symbol = values["valuation_asset"]["execution_venue_symbol"]
 
-            AssetClass = get_right_asset_class(asset_type=values["valuation_asset"]["asset_type"],
-                                               execution_venue_symbol=execution_venue_symbol,
-                                               )
-
-            tmp_asset = AssetClass.get(
+            tmp_asset = Asset.get(
                 symbol=values["valuation_asset"]["symbol"],
                 asset_type=values["valuation_asset"]["asset_type"],
                 execution_venue__symbol=execution_venue_symbol,

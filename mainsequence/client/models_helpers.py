@@ -7,13 +7,9 @@ def get_model_class(model_class: str):
     Reverse look from model class by name
     """
     MODEL_CLASS_MAP = {
-        "AlpacaAsset": AlpacaAsset,
-        "AlpacaCurrencyPair": AlpacaCurrencyPair,
         "Asset": Asset,
         "AssetFutureUSDM": AssetFutureUSDM,
-        "BinanceAsset": BinanceAsset,
-        "BinanceAssetFutureUSDM": BinanceAssetFutureUSDM,
-        "BinanceCurrencyPair": BinanceCurrencyPair,
+        "AssetCurrencyPair": AssetCurrencyPair,
         "IndexAsset": IndexAsset,
         "TargetPortfolioIndexAsset": TargetPortfolioIndexAsset,
         "Calendar": Calendar
@@ -34,14 +30,6 @@ def get_right_account_class(account: Account):
     AccountClass = getattr(model_module, VAM_CONSTANTS.ACCOUNT_VENUE_FACTORY[execution_venue_symbol])
     account, _ = AccountClass.get(id=account.id)
     return account
-
-def get_right_asset_class(execution_venue_symbol:str, asset_type:str):
-    from mainsequence.client import models_vam as model_module
-    try:
-        AssetClass = getattr(model_module, VAM_CONSTANTS.ASSET_VENUE_FACTORY[execution_venue_symbol][asset_type])
-    except Exception as e:
-        raise Exception(f"There are no assets of type {asset_type} in {execution_venue_symbol}")
-    return AssetClass
 
 
 class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):

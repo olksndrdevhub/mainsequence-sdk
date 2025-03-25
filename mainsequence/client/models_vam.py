@@ -1072,26 +1072,6 @@ class OrderManager(BaseObjectOrm, BasePydanticModel):
 # ------------------------------
 # ALPACA
 # ------------------------------
-class AlpacaAsset(Asset, ):
-    ticker: str
-    asset_class: str
-    exchange: str
-    status: Literal["active", "inactive"]
-    marginable: bool
-    shortable: bool
-    easy_to_borrow: bool
-    fractionable: bool
-
-    def get_spot_reference_asset_symbol(self):
-        return self.symbol
-
-    @staticmethod
-    def get_properties_from_unique_symbol(unique_symbol: str):
-        if unique_symbol.endswith(CONSTANTS.ALPACA_CRYPTO_POSTFIX):
-            return {"symbol": unique_symbol.replace(CONSTANTS.ALPACA_CRYPTO_POSTFIX, ""), "asset_type": CONSTANTS.ASSET_TYPE_CRYPTO_SPOT}
-
-        return {"symbol": unique_symbol, "asset_type": CONSTANTS.ASSET_TYPE_CASH_EQUITY}
-
 
 class AlapaAccountRiskFactors(AccountRiskFactors):
     total_initial_margin: float
