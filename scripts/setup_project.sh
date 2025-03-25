@@ -85,8 +85,12 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   touch "$VFB_PROJECT_PATH/time_series/__init__.py"
   touch "$VFB_PROJECT_PATH/rebalance_strategies/__init__.py"
 
+  echo "Copying Files from mainsequence-sdk"
   cp -a "/opt/code/mainsequence-sdk/examples/getting_started/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"
   cp -a "/opt/code/mainsequence-sdk/requirements.txt" "${ROOT_PROJECT_PATH}/requirements.txt" || echo "WARNING: Copy requirements step failed!"
+
+  echo "Adding/Updating .gitignore..."
+  echo ".ipynb_checkpoints" > "$ROOT_PROJECT_PATH/.gitignore"
 
   chown -R 1000:100 "$HOME_DIR" 2>/dev/null || true
 
