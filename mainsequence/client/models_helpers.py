@@ -7,13 +7,10 @@ def get_model_class(model_class: str):
     Reverse look from model class by name
     """
     MODEL_CLASS_MAP = {
-        "AlpacaAsset": AlpacaAsset,
-        "AlpacaCurrencyPair": AlpacaCurrencyPair,
+        
         "Asset": Asset,
+        "AssetCurrencyPair": AssetCurrencyPair,
         "AssetFutureUSDM": AssetFutureUSDM,
-        "BinanceAsset": BinanceAsset,
-        "BinanceAssetFutureUSDM": BinanceAssetFutureUSDM,
-        "BinanceCurrencyPair": BinanceCurrencyPair,
         "IndexAsset": IndexAsset,
         "TargetPortfolioIndexAsset": TargetPortfolioIndexAsset,
         "Calendar": Calendar

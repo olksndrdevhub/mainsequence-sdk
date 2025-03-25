@@ -246,7 +246,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         if isinstance(self.remote_table.data_source, int):
             return self.remote_table.data_source
         else:
-            return self.remote_table.data_source.data_source.id
+            return self.remote_table.data_source.id
 
     @classmethod
     def get_or_create(cls, **kwargs):
