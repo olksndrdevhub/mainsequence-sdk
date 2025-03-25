@@ -78,9 +78,11 @@ def get_pod_configuration():
     print("Get pod configuration")
     # create temporary script that imports everything and setups the agent
     TMP_SCRIPT = f"""
-from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent
+print(f"register project resources from {os.getenv("PROJECT_LIBRARY_NAME")} and default resources")
 from {os.getenv("PROJECT_LIBRARY_NAME")}.time_series import *
 from {os.getenv("PROJECT_LIBRARY_NAME")}.rebalance_strategies import *
+
+from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent
 tdag_agent = TDAGAgent()
 """
     temp_dir = tempfile.mkdtemp()
