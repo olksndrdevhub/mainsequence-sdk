@@ -28,8 +28,11 @@ chmod 600 "$HOME_DIR/.ssh/id_rsa" 2>/dev/null || true
 mkdir -p $ROOT_PROJECT_PATH
 cd "$ROOT_PROJECT_PATH" || true
 
-# Pull from remote
-pull_changes
+if [ "${AUTHENTICATION_METHOD:-ssh}" = "api" ] && [ -n "${GIT_API_TOKEN:-}" ] && [ -n "${GIT_REPO_URL:-}" ]; then
+  clone_via_api_token
+else
+  clone_via_ssh_key
+fi
 
 # Copy examples
 cp -a "/opt/code/mainsequence-sdk/examples/time_series" "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy TimeSeries step failed!"
