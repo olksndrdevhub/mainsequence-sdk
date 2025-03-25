@@ -86,6 +86,7 @@ class BaseObjectOrm:
         "Asset": "assets/asset",
         "IndexAsset": "assets/index_asset",
         "AssetFutureUSDM": "assets/asset_future_usdm",
+        "AssetCurrencyPair": "assets/asset_currency_pair",
         "VirtualFund": "assets/virtualfund",
         "OrderManager": "assets/order_manager",
         "ExecutionVenue": "assets/execution_venue",
@@ -108,17 +109,6 @@ class BaseObjectOrm:
         "AssetCategory": "assets/asset-category",
         "TargetPortfolioFrontEndDetails": "assets/target-portfolio-details",
 
-        "BinanceFuturesUSDMTrade": 'binance/trade/futureusdm',
-        "BinanceSpotAccount": 'binance/account/spot',
-        "BinanceFuturesAccount": 'binance/account/futures',
-        "BinanceAsset": 'binance/asset/spot',
-        "BinanceAssetFutureUSDM": 'binance/asset/futureusdm',
-        "BinanceCurrencyPair": 'binance/asset/currency_pair',
-                               
-        "AlpacaAssetTrade": 'alpaca/trade/spot',
-        "AlpacaAccount": 'alpaca/account',
-        "AlpacaAsset": 'alpaca/asset/spot',
-        "AlpacaCurrencyPair": 'alpaca/asset/currency_pair',
 
         # TDAG
         "TimeSerie": "ogm/time_serie",

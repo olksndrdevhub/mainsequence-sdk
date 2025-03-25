@@ -36,7 +36,7 @@ def get_correct_asset_class(asset_type):
     elif asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_USDM]:
         return AssetFutureUSDM
     elif asset_type in [CONSTANTS.ASSET_TYPE_CURRENCY_PAIR]:
-        return CurrencyPair
+        return AssetCurrencyPair
     else:
         raise NotImplementedError
 
@@ -360,7 +360,7 @@ class TargetPortfolioIndexAsset(IndexAsset):
     def backtest_portfolio_details_url(self):
         return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.backtest_portfolio.id}"
 
-class CurrencyPairMixin(AssetMixin, BasePydanticModel):
+class AssetCurrencyPair(AssetMixin, BasePydanticModel):
     base_asset: Union[AssetMixin, int]
     quote_asset: Union[AssetMixin, int]
 
@@ -369,13 +369,12 @@ class CurrencyPairMixin(AssetMixin, BasePydanticModel):
         return base_asset_symbol
 
 
-class CurrencyPair(CurrencyPairMixin):
-  pass
+
 
 class FutureUSDMMixin(AssetMixin, BasePydanticModel):
     maturity_code: str = Field(..., max_length=50)
     last_trade_time: Optional[datetime.datetime] = None
-    currency_pair:CurrencyPair
+    currency_pair:AssetCurrencyPair
 
     def get_spot_reference_asset_symbol(self):
         FUTURE_TO_SPOT_MAP = {
@@ -886,33 +885,33 @@ class VirtualFund(BaseObjectOrm, BasePydanticModel):
     last_trade_time: Optional[datetime.datetime] = None
     latest_holdings_are_only_cash: bool
 
-    def sanitize_target_weights_for_execution_venue(self,target_weights:dict):
-        """
-        This functions switches assets from main net to test net to guarante consistency in the recording
-        of trades and orders
-        Args:
-            target_weights:{asset_id:WeightExecutionPosition}
-
-        Returns:
-
-        """
-        if self.target_account.execution_venue.symbol == CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL:
-            target_ev=CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL
-            new_target_weights={}
-            for _, position in target_weights.items():
-                AssetClass = position.asset.__class__
-                asset,_ = AssetClass.filter(symbol=position.asset.unique_symbol, execution_venue__symbol=target_ev,
-                                        asset_type=position.asset.asset_type,
-                                        )
-                asset = asset[0]
-                new_position = copy.deepcopy(position)
-                new_position.asset=asset
-                new_target_weights[asset.id] = new_position
-                # todo create in DB an execution position
-        else:
-            new_target_weights = target_weights
-
-        return new_target_weights
+    # def sanitize_target_weights_for_execution_venue(self,target_weights:dict):
+    #     """
+    #     This functions switches assets from main net to test net to guarante consistency in the recording
+    #     of trades and orders
+    #     Args:
+    #         target_weights:{asset_id:WeightExecutionPosition}
+    #
+    #     Returns:
+    #
+    #     """
+    #     if self.target_account.execution_venue.symbol == CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL:
+    #         target_ev=CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL
+    #         new_target_weights={}
+    #         for _, position in target_weights.items():
+    #             AssetClass = position.asset.__class__
+    #             asset,_ = AssetClass.filter(symbol=position.asset.unique_symbol, execution_venue__symbol=target_ev,
+    #                                     asset_type=position.asset.asset_type,
+    #                                     )
+    #             asset = asset[0]
+    #             new_position = copy.deepcopy(position)
+    #             new_position.asset=asset
+    #             new_target_weights[asset.id] = new_position
+    #             # todo create in DB an execution position
+    #     else:
+    #         new_target_weights = target_weights
+    #
+    #     return new_target_weights
 
     # def build_rebalance_from_target_weights(
     #         self,
@@ -1072,7 +1071,7 @@ class OrderManager(BaseObjectOrm, BasePydanticModel):
 # ------------------------------
 # ALPACA
 # ------------------------------
-class AlpacaAssetMixin(AssetMixin, BaseObjectOrm):
+class AlpacaAsset(Asset, ):
     ticker: str
     asset_class: str
     exchange: str
@@ -1092,11 +1091,6 @@ class AlpacaAssetMixin(AssetMixin, BaseObjectOrm):
 
         return {"symbol": unique_symbol, "asset_type": CONSTANTS.ASSET_TYPE_CASH_EQUITY}
 
-class AlpacaAsset(AlpacaAssetMixin):
-    pass
-
-class AlpacaCurrencyPair(AlpacaAssetMixin, CurrencyPairMixin):
-    pass
 
 class AlapaAccountRiskFactors(AccountRiskFactors):
     total_initial_margin: float
@@ -1112,7 +1106,7 @@ class AlapaAccountRiskFactors(AccountRiskFactors):
     regt_buying_power: float
     sma: float
 
-class AlpacaAccount(AccountMixin, BaseObjectOrm):
+class AlpacaAccount(AccountMixin,):
     api_key: str
     secret_key: str
 
@@ -1128,44 +1122,12 @@ class AlpacaAccount(AccountMixin, BaseObjectOrm):
     transfers_blocked: bool
     shorting_enabled: bool
 
-class AlpacaAssetTrade(BasePydanticModel, BaseObjectOrm):
 
-    @classmethod
-    def create_or_update(cls, timeout=None, *args, **kwargs, ):
-        url = f"{cls.get_object_url()}/create_or_update/"
-        data = cls.serialize_for_json(kwargs)
-        payload = {"json": data}
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=f"{url}",
-                         time_out=timeout,
-                         payload=payload)
-        if r.status_code not in [201, 200]:
-            raise Exception(r.text)
-        return cls(**r.json())
 
 # ------------------------------
 # BINANCE
 # ------------------------------
-class BinanceAsset(AssetMixin, BaseObjectOrm):
-    pass
 
-class BinanceCurrencyPair(CurrencyPairMixin, BaseObjectOrm):
-   pass
-
-class BinanceAssetFutureUSDM(FutureUSDMMixin, BaseObjectOrm):
-
-    @classmethod
-    def batch_upsert_from_base_quote(cls, asset_config_list: list, execution_venue_symbol: str, asset_type: str,
-                                     timeout=None):
-        url = f"{cls.get_object_url()}/batch_upsert_from_base_quote/"
-        payload = dict(json={"asset_config_list": asset_config_list, "execution_venue_symbol": execution_venue_symbol,
-                             "asset_type": asset_type
-                             })
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, time_out=timeout,
-                         payload=payload)
-
-        if r.status_code != 200:
-            raise Exception("Error inserting assets")
-        return r.json()
 
 class BinanceFuturesAccountRiskFactors(AccountRiskFactors):
     total_initial_margin: float
@@ -1177,7 +1139,7 @@ class BinanceFuturesAccountRiskFactors(AccountRiskFactors):
     available_balance: float
     max_withdraw_amount: float
 
-class BaseFuturesAccount(AccountMixin, BaseObjectOrm):
+class BaseFuturesAccount(Account):
     api_key :str
     secret_key :str
 
@@ -1186,20 +1148,3 @@ class BaseFuturesAccount(AccountMixin, BaseObjectOrm):
     can_deposit: bool = False
     can_withdraw: bool = False
 
-class BinanceFuturesTestNetAccount(BaseFuturesAccount):
-    pass
-
-class BinanceFuturesAccount(BaseFuturesAccount):
-    pass
-
-class BinanceSpotAccount(BaseObjectOrm):
-    pass
-
-class BinanceSpotTestNetAccount(BaseObjectOrm):
-    pass
-
-class BinanceEarnAccount(BaseObjectOrm):
-    pass
-
-class BinanceAssetFuturesUSDMTrade(Trade):
-   pass
