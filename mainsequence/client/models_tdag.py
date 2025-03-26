@@ -391,7 +391,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                 "last_observation": last_observation,
             }
         }
-        print(f"Set last update index with {payload['json']}")
+        logger.debug(f"Set last update index with {payload['json']}")
         r = make_request(s=s, loaders=self.LOADERS, payload=payload, r_type="POST", url=url, time_out=timeout)
 
         if r.status_code == 404:
