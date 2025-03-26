@@ -114,6 +114,8 @@ class AssetUniverse(VFBConfigBaseModel):
         asset_list = []
         for asset_filter in self.asset_filters:
             assets = asset_filter.get_assets()
+            if not assets:
+                logger.debug(f"No assets found for {asset_filter}")
             asset_list.extend(assets)
 
         if len(asset_list) == 0:

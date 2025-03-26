@@ -36,8 +36,8 @@ cd "$REPO_PATH"
 export GIT_HASH="$(git rev-parse HEAD)"
 
 # Copy examples
-cp -a "/opt/code/mainsequence-sdk/examples/time_series" "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy TimeSeries step failed!"
-cp -a "/opt/code/mainsequence-sdk/tests/system_tests" "$VFB_PROJECT_PATH/scripts" || echo "WARNING: Copy System Tests step failed!"
+cp -a "/opt/code/mainsequence-sdk/examples/time_series/*" "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy TimeSeries step failed!"
+cp -a "/opt/code/mainsequence-sdk/tests/system_tests/*" "$VFB_PROJECT_PATH/scripts" || echo "WARNING: Copy System Tests step failed!"
 
 echo "Copy examples commit"
 cd "$REPO_PATH"

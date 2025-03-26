@@ -780,8 +780,6 @@ class InterpolatedPrices(TimeSerie):
         """
         Updates the series from the source based on the latest value.
         """
-
-
         prices = self.get_upsampled_data(
             update_statistics=update_statistics,
         )
