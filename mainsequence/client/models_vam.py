@@ -271,6 +271,10 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
     def __repr__(self):
         return self.name+" source:"+self.source
 
+    def update_assets(self, asset_ids: List[int]):
+        self.remove_assets(self.assets)
+        self.append_assets(asset_ids)
+
     def append_assets(self, asset_ids: List[int]) -> "AssetCategory":
         """
         Append the given asset IDs to this category.
