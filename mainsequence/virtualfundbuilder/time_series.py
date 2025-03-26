@@ -94,7 +94,7 @@ class PortfolioStrategy(TimeSerie):
         self.portfolio_prices_frequency = portfolio_build_configuration.portfolio_prices_frequency
 
         self.assets_configuration = portfolio_build_configuration.assets_configuration
-        self.bars_ts= get_prices_timeseries(copy.deepcopy(self.assets_configuration))
+        self.bars_ts = get_prices_timeseries(copy.deepcopy(self.assets_configuration))
 
         self.required_execution_venues_symbols = self.assets_configuration.asset_universe.get_required_execution_venues()
 

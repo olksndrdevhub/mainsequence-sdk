@@ -1046,8 +1046,6 @@ class DataUpdates(BaseModel):
             init_fallback_date: datetime = None,
             unique_identifier_list: Union[list, None] = None
     ):
-        logger.warning("TODO: show last observation")
-
         new_update_statistics = self.update_statistics
         last_observation = self.last_observation
         if asset_list is not None or unique_identifier_list is not None:

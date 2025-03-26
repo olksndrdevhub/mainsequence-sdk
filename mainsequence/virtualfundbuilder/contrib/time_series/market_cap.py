@@ -93,7 +93,7 @@ class MarketCap(WeightsBase, TimeSerie):
         self.num_top_assets = num_top_assets or 50000
         self.historical_market_cap_ts = APITimeSerie.build_from_unique_identifier(CONSTANTS.data_sources_constants.HISTORICAL_MARKET_CAP)
 
-        self.execution_venue_symbol=self.asset_universe.get_required_execution_venues()
+        self.execution_venue_symbol = self.asset_universe.get_required_execution_venues()
         if len(self.execution_venue_symbol) > 1:
             raise ValueError(
                 f"No support to compare MarketCaps of asset universes {self.execution_venue_symbol}")

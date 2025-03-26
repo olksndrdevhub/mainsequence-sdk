@@ -40,12 +40,11 @@ def get_prices_timeseries(assets_configuration: AssetsConfiguration):
     data_mode = ASSET_ORM_CONSTANTS.DATA_MODE_LIVE if is_live else  ASSET_ORM_CONSTANTS.DATA_MODE_BACKTEST
 
     asset_universe = assets_configuration.asset_universe
-    venue_asset_filters_map = asset_universe.get_filters_per_execution_venue()
-    for execution_venue, asset_filters in venue_asset_filters_map.items():
-        tmp_universe = AssetUniverse(asset_filters=asset_filters)
+    venue_asset_filters_map = asset_universe.get_assets_per_execution_venue()
+    for execution_venue, asset_list in venue_asset_filters_map.items():
         time_series_dict[execution_venue] = InterpolatedPrices(
             execution_venue_symbol=execution_venue,
-            asset_universe=tmp_universe,
+            asset_list=asset_list,
             data_mode=data_mode,
             **prices_configuration_kwargs
         )
@@ -54,9 +53,11 @@ def get_prices_timeseries(assets_configuration: AssetsConfiguration):
 
 
 
-def get_prices_source(source:str, bar_frequency_id,
-                      asset_filters: Optional[List[AssetFilter]]=None,
-                      is_train: bool = True):
+def get_prices_source(
+        source: str,
+        bar_frequency_id,
+        is_train: bool = True
+):
     """
     Returns the appropriate bar time series based on the asset list and source.
     """
@@ -93,8 +94,12 @@ def get_prices_source(source:str, bar_frequency_id,
     else:
         data_mode = ASSET_ORM_CONSTANTS.DATA_MODE_BACKTEST if is_train else ASSET_ORM_CONSTANTS.DATA_MODE_LIVE
         try:
-            hbs = HistoricalBarsSource.get(execution_venues__symbol=source, data_frequency_id=bar_frequency_id,
-                                           data_mode=data_mode, adjusted=True)
+            hbs = HistoricalBarsSource.get(
+                execution_venues__symbol=source,
+                data_frequency_id=bar_frequency_id,
+                data_mode=data_mode,
+                adjusted=True
+            )
         except DoesNotExist as e:
             logger.exception(f"HistoricalBarsSource does not exist for {source} -{bar_frequency_id} {data_mode}")
             raise e
@@ -528,24 +533,23 @@ class InterpolatedPrices(TimeSerie):
     @TimeSerie._post_init_routines()
     def __init__(
             self,
-            execution_venue_symbol:str,
-            asset_universe:AssetUniverse,
+            execution_venue_symbol: str,
+            asset_list: List[Asset],
             bar_frequency_id: str,
             intraday_bar_interpolation_rule: str,
             data_mode: Literal["live", "backtest"],
             upsample_frequency_id: Optional[str] = None,
-            asset_filter:Optional[dict] = None,
-            local_kwargs_to_ignore: List[str] = ["asset_universe"],
+            asset_filter: Optional[dict] = None,
+            local_kwargs_to_ignore: List[str] = ["asset_list"],
             *args,
             **kwargs
     ):
-
         """
         Initializes the InterpolatedPrices object.
         """
         assert "d" in bar_frequency_id or "m" in bar_frequency_id, f"bar_frequency_id={bar_frequency_id} should be 'd for days' or 'm for min'"
         self.data_mode=data_mode
-        self.asset_universe = asset_universe
+        self.asset_list = asset_list
         self.interpolator = UpsampleAndInterpolation(
             bar_frequency_id=bar_frequency_id,
             upsample_frequency_id=upsample_frequency_id,
@@ -556,13 +560,11 @@ class InterpolatedPrices(TimeSerie):
         self.bar_frequency_id = bar_frequency_id
         self.upsample_frequency_id = upsample_frequency_id
 
-
-
         self.execution_venue_symbol = execution_venue_symbol
         price_source = get_prices_source(
-            asset_filters=asset_universe.asset_filters,
             bar_frequency_id=bar_frequency_id,
-            source=self.execution_venue_symbol, is_train=True
+            source=self.execution_venue_symbol,
+            is_train=True
         )
         self.bars_ts = (
             WrapperTimeSerie(time_series_dict=price_source) if isinstance(price_source, dict) else price_source
@@ -576,9 +578,9 @@ class InterpolatedPrices(TimeSerie):
         return description
 
     def set_asset_details(self):
-        asset_list = self.asset_universe.asset_list
+        asset_list = self.asset_list
         if len(asset_list) == 0:
-            raise Exception(f"Asset universe has no assets {self.asset_universe}")
+            raise Exception(f"Asset list has no assets {self.asset_list}")
 
         equal_venue = [a.execution_venue.symbol == self.execution_venue_symbol for a in asset_list]
         assert all(equal_venue), "InterpolatedPrices should have only one type of execution_venue"

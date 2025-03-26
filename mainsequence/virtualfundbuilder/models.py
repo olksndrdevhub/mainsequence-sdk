@@ -43,41 +43,28 @@ class PricesConfiguration(VFBConfigBaseModel):
 
 @lru_cache(maxsize=1028)  # Cache up to 1028 different combinations
 def cached_asset_filter(*args,**kwargs):
-
     tmp_assets = Asset.filter_with_asset_class( *args,**kwargs)
     return tmp_assets
 
 class AssetFilter(VFBConfigBaseModel):
     """
     If the asset is a crypto coin, use 'future_usdm', if it equity, use 'cash_equity'.
-    There is also a special case of asset groups that have the postfix '__group' in the asset_type, for example 'cash_equity__group.
-    The allowed equity asset groups are: 'SP500', 'SP500_HIGH_ESG' (SP500 with the highest ESG scores), 'SP500_LOW_ESG' (SP500 with the lowest ESG scores) and 'US_ADR'.
-    The example assets provided are only for demonstration purposes, the actual assets for the portfolio must be based on user input.
+    There is also a special case of asset categories that include a set of assets, they can be accessed using categories__name
+    The example assets provided are only for demonstration purposes, the actual assets and asset categories for the portfolio must be based on user input.
     """
-    
-    #Asset Properties
+    categories__name: Optional[str] = None
+
+    # Asset Properties
     asset_type: Optional[str] = None
     symbol: Optional[str] = None
-    execution_venue__symbol: str
+    execution_venue__symbol: Optional[str] = None
     
-    #CurrencyAsset
-    quote_asset__symbol: Optional[str]=None
-    base_asset__categories__name:Optional[str]=None
-    base_asset__categories__name_not_in:Optional[str]=None
-
-    def parse_asset_groups(self, symbol):
-        if symbol == "SP500":
-            return SP500_MAP
-        elif symbol == "SP500_LOW_ESG":
-            return SP500_LOW_ESG
-        elif symbol == "SP500_HIGH_ESG":
-            return SP500_HIGH_ESG
-        else:
-            raise NotImplementedError(f"Unknown group '{symbol}'")
+    # CurrencyAsset
+    quote_asset__symbol: Optional[str] = None
+    base_asset__categories__name: Optional[str] = None
+    base_asset__categories__name_not_in: Optional[str] = None
 
     def get_assets(self):
-
-
         return cached_asset_filter(**self.model_dump())
 
 class AssetUniverse(VFBConfigBaseModel):
@@ -101,10 +88,8 @@ class AssetUniverse(VFBConfigBaseModel):
           - symbol: AAPL
             asset_type: cash_equity
             execution_venue__symbol: alpaca
-          - symbol: SP500
-            asset_type: cash_equity__group
-          - symbol: SP500_LOW_ESG
-            asset_type: cash_equity__group
+          - categories__name: SP500
+          - categories__name: SP500
     """
     asset_filters: List[AssetFilter]
 
@@ -132,17 +117,8 @@ class AssetUniverse(VFBConfigBaseModel):
             venue_asset_list_map[ev_symbol].append(asset)
         return venue_asset_list_map
 
-    def get_filters_per_execution_venue(self):
-        venue_filter_map = {}
-        for filter in self.asset_filters:
-            ev_symbol = filter.execution_venue__symbol
-            if ev_symbol not in venue_filter_map:
-                venue_filter_map[ev_symbol] = []
-            venue_filter_map[ev_symbol].append(filter)
-        return venue_filter_map
-
     def get_required_execution_venues(self):
-        return list(self.get_filters_per_execution_venue().keys())
+        return list(self.get_assets_per_execution_venue().keys())
 
     def model_dump(self, **kwargs):
         from mainsequence.tdag.time_series.time_series import serialize_model_list
