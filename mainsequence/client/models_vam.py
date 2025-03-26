@@ -269,7 +269,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
     organization_owner_uid:str
     
     def __repr__(self):
-        return self.name+" source:"+self.source
+        return f"{self.name} source: {self.source}, {len(assets)} assets"
 
     def update_assets(self, asset_ids: List[int]):
         self.remove_assets(self.assets)
@@ -439,12 +439,12 @@ class AccountMixin(BasePydanticModel):
     account_name: Optional[str] = None
     is_account_in_cool_down:bool
     cash_asset: Asset
-    is_paper:bool
+    is_paper: bool
     is_on_manual_rebalance: bool
     user: Optional[int] = None
-    execution_configuration:"AccountExecutionConfiguration"
+    execution_configuration: "AccountExecutionConfiguration"
     account_target_portfolio: AccountTargetPortfolio
-    latest_holdings:Union["AccountLatestHoldingsSerializer",None]=None
+    latest_holdings: Union["AccountLatestHoldingsSerializer",None]=None
 
     @property
     def account_target_portfolio(self):
@@ -556,7 +556,7 @@ class AccountMixin(BasePydanticModel):
         
         return  asset_list
 
-class Account(AccountMixin,BaseObjectOrm, BasePydanticModel):
+class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
     ...
 
 
@@ -613,14 +613,14 @@ class AccountPortfolioHistoricalWeights(BaseObjectOrm):
     pass
 
 class WeightPosition(BaseObjectOrm, BasePydanticModel):
-    id: Optional[int] = None
-    parent_weights: int
-    asset: Union[AssetMixin,int]
+    # id: Optional[int] = None
+    # parent_weights: int
+    asset: Union[AssetMixin, int]
     weight_notional_exposure: float
 
     @property
     def asset_id(self):
-        return self.asset if isinstance(self.asset,int) else self.asset.id
+        return self.asset if isinstance(self.asset, int) else self.asset.id
 
     @root_validator(pre=True)
     def resolve_assets(cls, values):
@@ -637,7 +637,7 @@ class HistoricalWeights(BaseObjectOrm,BasePydanticModel):
     weights_date: datetime.datetime
     comments: Optional[str] = None
     target_portfolio: int
-    weights:Union[List[WeightPosition],List[int]]
+    weights: Union[List[WeightPosition],List[int]]
 
     @classmethod
     def add_from_time_serie(cls, local_time_serie_id: int, positions_list: list,
