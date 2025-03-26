@@ -393,12 +393,19 @@ class FutureUSDMMixin(AssetMixin, BasePydanticModel):
         spot = FUTURE_TO_SPOT_MAP[self.execution_venue_symbol].get(base_asset_symbol, base_asset_symbol)
         return spot
 
-class AssetFutureUSDM(FutureUSDMMixin,BaseObjectOrm):
+class AssetFutureUSDM(FutureUSDMMixin, BaseObjectOrm):
     pass
 
 
-class AccountPortfolioScheduledRebalance(BaseObjectOrm):
-    pass
+class AccountPortfolioScheduledRebalance(BaseObjectOrm, BasePydanticModel):
+    id: int
+    target_account_portfolio: Optional[dict] = None
+    scheduled_time: str = None
+    received_in_execution_engine : bool = False
+    executed : bool = False
+    execution_start: Optional[str] = None
+    execution_end: Optional[datetime.datetime] = None
+    execution_message: Optional[str] = None
 
 class AccountExecutionConfiguration(BasePydanticModel):
     related_account: int  # Assuming related_account is represented by its ID
@@ -557,7 +564,22 @@ class AccountMixin(BasePydanticModel):
         return  asset_list
 
 class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
-    ...
+    def rebalance(
+            self,
+            target_portfolio,
+            weight_notional_exposure,
+            scheduled_time=None
+    ):
+        return AccountPortfolioScheduledRebalance.create(
+            target_positions=json.dumps(
+                {
+                    target_portfolio.id: {
+                        "weight_notional_exposure": 0.5
+                    }
+                }
+            ),
+            target_account_portfolio=self.id
+        )
 
 
 class AccountLatestHoldingsSerializer(BaseObjectOrm,BasePydanticModel):

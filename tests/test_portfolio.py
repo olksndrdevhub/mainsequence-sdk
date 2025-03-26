@@ -1,7 +1,8 @@
+import json
 import os
 from pathlib import Path
 
-from mainsequence.client import TargetPortfolio, Account
+from mainsequence.client import TargetPortfolio, Account, AccountPortfolioScheduledRebalance
 
 os.environ["VFB_PROJECT_PATH"] = str(Path(__file__).parent.absolute())
 
@@ -16,8 +17,11 @@ portfolio._initialize_nodes()
 
 target_portfolio = TargetPortfolio.get_or_none(local_time_serie__id=portfolio.portfolio_strategy_time_serie_backtest.local_metadata.id)
 
-
-
 account = Account.get(account_name="Default MainSequence Portfolios Account")
+
+scheduled_rebalance = account.rebalance(
+    target_portfolio=target_portfolio,
+    weight_notional_exposure=0.5
+)
 
 
