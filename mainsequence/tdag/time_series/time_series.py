@@ -1709,10 +1709,13 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
 
-    def __init__(self, init_meta=None,
-                 build_meta_data: Union[dict, None] = None, local_kwargs_to_ignore: Union[List[str], None] = None,
-
-                 *args, **kwargs):
+    def __init__(
+            self,
+            init_meta=None,
+            build_meta_data: Union[dict, None] = None,
+            local_kwargs_to_ignore: Union[List[str], None] = None,
+            *args,
+            **kwargs):
         """
         Initializes the TimeSerie object with the provided metadata and configurations.
 
@@ -1969,8 +1972,15 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         self.local_persist_manager
         return self.get_df_between_dates()
 
-    def run(self, debug_mode: bool, *, update_tree: bool = True, force_update: bool = False,
-            update_only_tree: bool = False, remote_scheduler: Union[object, None] = None):
+    def run(
+            self,
+            debug_mode: bool,
+            *,
+            update_tree: bool = True,
+            force_update: bool = False,
+            update_only_tree: bool = False,
+            remote_scheduler: Union[object, None] = None
+    ):
         """
 
         Args:
@@ -1979,9 +1989,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             force_update: Force an update even if the time serie schedule does not require an update
             update_only_tree: If set to True then only the dependency graph of the selected time serie will be updated
             remote_scheduler:
-
-        Returns:
-
         """
         from mainsequence.instrumentation import TracerInstrumentator
         from mainsequence.tdag.config import configuration

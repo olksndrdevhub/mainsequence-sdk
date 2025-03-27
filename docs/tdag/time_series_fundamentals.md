@@ -102,7 +102,7 @@ The `update` method performs all the necessary logic to fetch, calculate, and st
 Example:
 
 ```python
-def update(self, latest_value: Union[None, datetime.datetime], *args, **kwargs) -> pd.DataFrame:
+def update(self, update_statistics: DataUpdates, *args, **kwargs) -> pd.DataFrame:
     # Perform update logic based on latest_value
     new_data = self.fetch_new_data_since(latest_value)
     processed_data = self.calculate_metrics(new_data)
