@@ -480,7 +480,8 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     def get_data_between_dates_from_api(
             self,
             start_date: datetime.datetime,
-            end_date: datetime.datetime, great_or_equal: bool,
+            end_date: datetime.datetime,
+            great_or_equal: bool,
             less_or_equal: bool,
             unique_identifier_list: list,
             columns: list,
@@ -1045,8 +1046,6 @@ class DataUpdates(BaseModel):
             init_fallback_date: datetime = None,
             unique_identifier_list: Union[list, None] = None
     ):
-        logger.warning("TODO: show last observation")
-
         new_update_statistics = self.update_statistics
         last_observation = self.last_observation
         if asset_list is not None or unique_identifier_list is not None:

@@ -91,6 +91,8 @@ class BaseObjectOrm:
         "OrderManager": "assets/order_manager",
         "ExecutionVenue": "assets/execution_venue",
         "Order": "assets/order",
+        "MarketOrder": "assets/market_order",
+        "LimitOrder": "assets/limit_order",
         "OrderEvent": "assets/order_event",
         "Account": "assets/account",
         "Trade": "assets/trade",

@@ -91,6 +91,40 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
 
         bar_source.append_asset_list_source(time_serie)
 
+
+    def get_last_observation(self, execution_venue_symbol=None, timeout=None):
+
+        # get the last observation
+        last_observation_date = self.related_local_time_serie.remote_table.sourcetableconfiguration.get_data_updates().max_time_index_value
+        last_obs = self.related_local_time_serie.get_data_between_dates_from_api(
+            start_date=last_observation_date,
+            end_date=None,
+            great_or_equal=True,
+            less_or_equal=False,
+            unique_identifier_list=None,
+            columns=None,
+            unique_identifier_range_map=None
+        )
+
+        if execution_venue_symbol is None:
+            return last_obs
+
+        # get the asset type for the venue
+        VENUE_MAP = {}
+        for v in CONSTANTS.BINANCE_VENUES:
+            VENUE_MAP[v] = CONSTANTS.ASSET_TYPE_CRYPTO_SPOT
+        VENUE_MAP[CONSTANTS.ALPACA_EV_SYMBOL] = CONSTANTS.ASSET_TYPE_CASH_EQUITY
+        asset_type = VENUE_MAP[execution_venue_symbol]
+
+        # parse the combined unique symbol
+        last_obs[['symbol', 'asset_type']] = last_obs['unique_identifier'].str.split('-*-', expand=True).drop(columns=[1])
+        last_obs = last_obs[last_obs["asset_type"] == asset_type]
+        asset_list = Asset.filter(asset_type=asset_type, execution_venue__symbol=execution_venue_symbol, symbol__in=last_obs["symbol"].to_list())
+        last_obs["unique_identifier"] = last_obs["symbol"].map({a.symbol: a.unique_identifier for a in asset_list})
+        return last_obs
+
+
+
 class HistoricalBarsSource(MarketsTimeSeriesDetails):
     execution_venues: list
     data_mode: Literal['live', 'backtest'] = Field(
