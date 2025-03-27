@@ -407,6 +407,8 @@ class AccountPortfolioScheduledRebalance(BaseObjectOrm, BasePydanticModel):
     execution_end: Optional[datetime.datetime] = None
     execution_message: Optional[str] = None
 
+
+
 class AccountExecutionConfiguration(BasePydanticModel):
     related_account: int  # Assuming related_account is represented by its ID
     rebalance_tolerance_percent: float = Field(0.02, ge=0)
@@ -563,22 +565,30 @@ class AccountMixin(BasePydanticModel):
         
         return  asset_list
 
+class RebalanceTargetPosition(BasePydanticModel):
+    target_portfolio_id: int
+    weight_notional_exposure: float
+
 class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
     def rebalance(
-            self,
-            target_portfolio,
-            weight_notional_exposure,
-            scheduled_time=None
-    ):
+        self,
+        target_positions: List[RebalanceTargetPosition],
+        scheduled_time: Optional[datetime.datetime] = None
+    ) -> AccountPortfolioScheduledRebalance:
+
+        parsed_target_positions = {}
+        for target_position in target_positions:
+            if target_position.target_portfolio_id in parsed_target_positions:
+                raise ValueError(f"Duplicate target portfolio id: {target_position.target_portfolio_id}")
+
+            parsed_target_positions[target_position.target_portfolio_id] = {
+                "weight_notional_exposure": target_position.weight_notional_exposure,
+            }
+
         return AccountPortfolioScheduledRebalance.create(
-            target_positions=json.dumps(
-                {
-                    target_portfolio.id: {
-                        "weight_notional_exposure": 0.5
-                    }
-                }
-            ),
-            target_account_portfolio=self.id
+            target_positions=parsed_target_positions,
+            target_account_portfolio=self.id,
+            scheduled_time=scheduled_time,
         )
 
 

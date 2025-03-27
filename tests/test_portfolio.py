@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 
-from mainsequence.client import TargetPortfolio, Account, AccountPortfolioScheduledRebalance
+from mainsequence.client import TargetPortfolio, Account, AccountPortfolioScheduledRebalance, RebalanceTargetPosition
 
 os.environ["VFB_PROJECT_PATH"] = str(Path(__file__).parent.absolute())
 
@@ -19,9 +19,13 @@ target_portfolio = TargetPortfolio.get_or_none(local_time_serie__id=portfolio.po
 
 account = Account.get(account_name="Default MainSequence Portfolios Account")
 
+rebalance_target_position = RebalanceTargetPosition(
+    target_portfolio_id=target_portfolio.id,
+    weight_notional_exposure=0.2
+)
 scheduled_rebalance = account.rebalance(
-    target_portfolio=target_portfolio,
-    weight_notional_exposure=0.5
+    target_positions=[rebalance_target_position],
+    scheduled_time=None
 )
 
 

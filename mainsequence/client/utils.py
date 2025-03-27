@@ -89,7 +89,7 @@ def make_request(
         except requests.exceptions.ConnectionError as errc:
             logger.exception(f"Error connecting {url} ")
         except Exception as e:
-            logger.exception(f"Error connecting {url} ")
+            logger.exception(f"Error connecting {url} exception {e}")
 
         counter = counter + 1
         if counter >= TRIES:

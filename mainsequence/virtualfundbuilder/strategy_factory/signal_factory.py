@@ -59,7 +59,7 @@ class WeightsBase(PrivateWeightsBaseArguments, BaseStrategy):
             raise e
         
         # if we need more data before to interpolate first value of new_index
-        if len(weights) == 0 or (weights.index.get_level_values("time_index").min() > new_index.min()):
+        if len(weights) == 0: # or (weights.index.get_level_values("time_index").min() > new_index.min()):
  
             last_observation = self.get_last_observation()
             if last_observation is None:

@@ -1330,9 +1330,7 @@ class DataPersistanceMethods(ABC):
             last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values()])
         return last_update_in_table
 
-    def get_last_observation(self, unique_identifier_list: Optional[list] = None,
-
-                             )->pd.DataFrame():
+    def get_last_observation(self, unique_identifier_list: Optional[list] = None) -> pd.DataFrame():
         """
         (1) Requests last observatiion from local persist manager
         (3) evaluates if last observation is consistent
