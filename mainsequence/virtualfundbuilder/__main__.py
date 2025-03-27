@@ -56,6 +56,7 @@ def run_script(script_name):
     runpy.run_path(python_file_path, run_name="__main__")
 
 def get_py_modules(folder_path):
+    if not os.path.isdir(folder_path): return []
     files = os.listdir(folder_path)
     files = [f for f in files if f[0] not in ["_", "."] and f.endswith(".py")]
     return [f.split(".")[0] for f in files]
@@ -81,6 +82,7 @@ def get_pod_configuration():
     script_lines = [
         "# -- Auto-generated imports for time_series --"
     ]
+
     for mod in time_series_modules:
         script_lines.append(f"import {time_series_package}.{mod}")
     script_lines.append("# -- Auto-generated imports for rebalance_strategies --")
