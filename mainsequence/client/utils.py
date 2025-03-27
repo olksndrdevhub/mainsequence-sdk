@@ -88,6 +88,9 @@ def make_request(
                 break
         except requests.exceptions.ConnectionError as errc:
             logger.exception(f"Error connecting {url} ")
+        except TypeError as e:
+            logger.exception(f"Type error for {url} exception {e}")
+            raise(e)
         except Exception as e:
             logger.exception(f"Error connecting {url} exception {e}")
 

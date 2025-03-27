@@ -3,8 +3,8 @@ portfolio_build_configuration:
   assets_configuration:
     asset_universe:
       asset_filters:
-      - categories__name: Top50USEquities
-    price_type: vwap
+      - categories__name: Top25USEquities
+    price_type: close
     prices_configuration:
       bar_frequency_id: 1d
       intraday_bar_interpolation_rule: ffill
@@ -18,8 +18,8 @@ portfolio_build_configuration:
       signal_assets_configuration:
         asset_universe:
           asset_filters:
-          - categories__name: Top50USEquities
-        price_type: vwap
+          - categories__name: Top25USEquities
+        price_type: close
         prices_configuration:
           bar_frequency_id: 1d
           intraday_bar_interpolation_rule: ffill

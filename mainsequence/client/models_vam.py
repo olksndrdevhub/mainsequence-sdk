@@ -579,7 +579,7 @@ class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
         parsed_target_positions = {}
         for target_position in target_positions:
             if target_position.target_portfolio_id in parsed_target_positions:
-                raise ValueError(f"Duplicate target portfolio id: {target_position.target_portfolio_id}")
+                raise ValueError(f"Duplicate target portfolio id: {target_position.target_portfolio_id} not allowed")
 
             parsed_target_positions[target_position.target_portfolio_id] = {
                 "weight_notional_exposure": target_position.weight_notional_exposure,
@@ -1052,21 +1052,23 @@ class OrderType(str, Enum):
     LIMIT = "limit"
     NOT_PLACED = "not_placed"
 
-class Order(BaseObjectOrm,BasePydanticModel):
+class Order(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = Field(None, primary_key=True)
     order_remote_id: str
-    order_time: datetime.datetime
-    order_side: OrderSide  # Use int for choices (-1: SELL, 1: BUY)
+    client_order_id: str
     order_type: OrderType
+    order_time: datetime.datetime
+    expires_time: datetime.datetime
+    order_side: OrderSide  # Use int for choices (-1: SELL, 1: BUY)
     quantity: float
-    price: Optional[float] = None  # Price can be None for market orders
     status: OrderStatus = OrderStatus.NOT_PLACED
     filled_quantity: Optional[float] = 0.0
     filled_price: Optional[float] = None
-    order_manager: Optional[int] = None  # Assuming foreign key ID is used
+    order_manager: Union[int, "OrderManager"] = None  # Assuming foreign key ID is used
     asset: int  # Assuming foreign key ID is used
     related_fund: Optional[int] = None  # Assuming foreign key ID is used
     related_account: int  # Assuming foreign key ID is used
+    time_in_force: str
     comments: Optional[str] = None
 
     class Config:
@@ -1082,10 +1084,15 @@ class Order(BaseObjectOrm,BasePydanticModel):
             raise Exception(r.text)
         return cls(**r.json())
 
-class OrderManagerTargetQuantity(BaseObjectOrm, BasePydanticModel):
-    id:Optional[int]=None
-    asset:Union[Asset,int]
-    quantity:float
+class MarketOrder(Order):
+    pass
+
+class LimitOrder(Order):
+    limit_price: float
+
+class OrderManagerTargetQuantity(BaseModel):
+    asset: Union[int, Asset]
+    quantity: float
 
 class OrderManager(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
@@ -1093,16 +1100,24 @@ class OrderManager(BaseObjectOrm, BasePydanticModel):
     target_rebalance: list[OrderManagerTargetQuantity]
     order_received_time: Optional[datetime.datetime] = None
     execution_end: Optional[datetime.datetime] = None
-    related_account: Union[Account,int]  # Representing the ForeignKey field with the related account ID
+    related_account: Union[Account, int]  # Representing the ForeignKey field with the related account ID
 
     @classmethod
     def destroy_before_date(cls, target_date: datetime.datetime):
         base_url = cls.get_object_url()
-        payload = {"json": {"target_date": target_date.strftime(DATE_FORMAT),
-                         },}
+        payload = {
+            "json": {
+                "target_date": target_date.strftime(DATE_FORMAT),
+            },
+        }
 
-        r = make_request(s=cls.build_session(),
-                         loaders=cls.LOADERS,r_type="POST", url=f"{base_url}/destroy_before_date/", payload=payload)
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=f"{base_url}/destroy_before_date/",
+            payload=payload
+        )
 
         if r.status_code != 204:
             raise Exception(r.text)
