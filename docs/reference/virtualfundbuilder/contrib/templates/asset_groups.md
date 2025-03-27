@@ -1,0 +1,1 @@
+::: mainsequence.virtualfundbuilder.contrib.templates.asset_groups

@@ -1,6 +1,10 @@
 site_name: Main Sequence SDK
 nav:
   - Home: index.md
+  - TDAG:
+      - Getting Started: tdag/getting_started.md
+      - Time Series Data Pipelines Fundamentals: tdag/time_series_fundamentals.md
+      - Orchestration & Monitoring: tdag/orchestration_and_monitoring.md
   - About: about.md
   - Getting Started: getting_started/
   - Code Reference: reference/
@@ -19,8 +23,10 @@ theme:
     toggle:
       icon: material/weather-sunny
       name: Switch to light mode
-    features:
-      - navigation.tabs  # This enables navigation tabs for a better user experience
+  features:
+    - navigation.tabs  # This enables navigation tabs for a better user experience
+    - navigation.footer
+    - navigation.indexes
 
 plugins:
 - search

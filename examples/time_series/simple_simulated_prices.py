@@ -7,7 +7,7 @@ import dotenv
 dotenv.load_dotenv('../../.env')
 
 from mainsequence.tdag import TimeSerie, ModelList
-from mainsequence.client.models import DataUpdates
+from mainsequence.client.models_tdag import DataUpdates
 import pandas_ta as ta
 from typing import Union,Optional
 
@@ -21,7 +21,9 @@ class SimulatedPrices(TimeSerie):
       - Otherwise, simulate data per asset from one hour after its last update until
         yesterday at midnight (UTC).
     """
-    SIMULATION_OFFSET_START = datetime.timedelta(days=30)
+    OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
+    CPUS=1
+    GPUS=0
 
     @TimeSerie._post_init_routines()
     def __init__(self, asset_list: ModelList, *args, **kwargs):
@@ -52,7 +54,7 @@ class SimulatedPrices(TimeSerie):
             float: Last observed price or the fallback value.
         """
         # If there's no historical data at all, return fallback immediately
-        if obs_df.empty:
+        if obs_df is None:
             return fallback
 
         # Try to slice for this asset and get the last 'feature_1' value
@@ -83,12 +85,6 @@ class SimulatedPrices(TimeSerie):
         sigma = 0.01  # volatility component for lognormal returns
 
         df_list = []
-        now = datetime.datetime.now(pytz.utc)
-        # Filter update_statistics to include only assets in self.asset_list.
-        update_statistics = update_statistics.update_assets(
-            self.asset_list, init_fallback_date=now - self.SIMULATION_OFFSET_START
-        )
-
 
         # Get the latest historical observations; assumed to be a DataFrame with a multi-index:
         # (time_index, unique_identifier) and a column "feature_1" for the last observed price.
@@ -341,7 +337,7 @@ def test_ta_feature_simulated_crypto_prices():
         For simplicity, this version returns the precomputed all_prices_data.
         """
         # In a more realistic scenario, you could filter all_prices_data based on parameters.
-        prices_data = ts.prices_time_serie.update(DataUpdates())
+        prices_data = ts.prices_time_serie.set_update_statistics_and_update(DataUpdates())
         return prices_data
 
     # Bind the patch to the instance. One way to do this is by using __get__ to

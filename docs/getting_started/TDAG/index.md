@@ -1,43 +1,91 @@
 # Welcome to TDAG
 
-**TDAG**  is a cutting-edge, graph-based library designed specifically for building and managing **time-series data pipelines**. With TDAG, you can create automated, time-based dependency structures that are robust, efficient, and ready for real-world, scalable applications.
+TDAG is a cutting-edge, graph-based workflow orchestration tool specifically designed to simplify the creation, management, and scaling of time-series data pipelines. Unlike general-purpose orchestration tools such as Airflow or Luigi, TDAG is purpose-built with the performance, scalability, and flexibility needed for modern asset management and real-time data processing.
+## Why Another Workflow Orchestration Tool?
 
-At its core, **TDAG** leverages the power of **DAGs** (Directed Acyclic Graphs). A DAG is a graph with nodes connected by edges, where the edges have a direction, and no cycles (loops) exist. In simpler terms, this structure allows data to flow in one direction without any feedback loops, which is essential for building reliable and predictable data pipelines. The "time-directed" aspect in TDAG makes it ideal for handling time-sensitive operations, ensuring that tasks occur in the correct sequence.
+While orchestration tools like Airflow and Luigi are widely used, they weren't originally built to handle the demanding performance and resource constraints required by modern asset management workflows. TDAG addresses these limitations by providing native support for resource management (CPU/GPU), seamless integration with databases, and built-in time-series logic that reduces boilerplate code and development overhead.
+## Key Features of TDAG:
 
-### Why TDAG?
-With TDAG, you can automatically create **time-based data pipelines** that handle complex dependencies. The library provides features such as automatic hashing, seamless scheduling integration, and a structured approach that enhances the reliability and scalability of your pipelines.
+- **Native Time-Series Support:** Built specifically for investment management and real-time data operations, TDAG provides first-class concepts like `TimeSerie` and `update_statistics`, streamlining pipeline creation.
 
-### Key Features:
-- **Automated Time-Based Pipelines**: TDAG allows you to easily build data pipelines where tasks are executed in time order, respecting dependencies.
-- **Built-in Scheduling and Hashing**: Pipelines are automatically hashed and scheduled for efficient execution.
-- **Scalable & Robust**: Whether you're working on small datasets or massive time-series data flows, TDAG scales to meet your needs while ensuring the entire process is fault-tolerant and robust.
+- **Integrated Resource Management:** TDAG enforces CPU and GPU resource constraints directly within workflow definitions, simplifying resource allocation without requiring external schedulers.
 
-### Use Case: Investment Strategies and Beyond
-One of TDAG's main use cases is transforming raw financial data into actionable insights, such as investment strategy predictions or portfolio weights. TDAG simplifies the process of managing complex time-based operations in **financial modeling**, helping you move from data to decisions effortlessly.
+- **Built-in Data Layer:** TDAG offers integrated data-handling features (`update_statistics` and `get_last_observation()`), eliminating the need for extensive custom database interaction code.
 
-However, **TDAG** is not just limited to finance! It's perfect for **any application requiring time-sensitive data pipelines**, particularly in **live and online modes** where real-time decision-making is crucial. For example, TDAG can be used in **online training of machine learning models**, where time-based data flow and immediate processing are essential for model accuracy and performance.
+- **Automated Dependency Management:** TDAG automatically manages complex task dependencies, significantly reducing manual setup and ensuring efficient execution.
 
----
-
-### Why Use a DAG?
-
-A **DAG (Directed Acyclic Graph)** is a graph structure where:
-1. **Directed**: Each connection (edge) between nodes points in a specific direction, indicating the flow of data or dependencies.
-2. **Acyclic**: There are no cycles, meaning that no node in the graph can loop back to itself. This is critical for tasks that need to happen in a specific sequence.
-
-In the context of **TDAG**, a DAG ensures that all data processing happens in the correct order, and no task is repeated or stuck in a loop. When applied to time-series data pipelines, this means that your data will always flow from the past to the present in a structured, predictable manner, ensuring that dependencies are handled properly and efficiently.
-
----
+- **High Performance and Scalability:** Optimized specifically for high-throughput environments, TDAG excels at scaling seamlessly with demanding time-series tasks.
 
 
-### The Power of TDAG
-Whether you’re managing financial data pipelines or real-time machine learning workflows, TDAG is designed to give you the **control**, **scalability**, and **reliability** you need to handle complex, time-sensitive data with ease.
+## Example Use Case: Simple Time Series Pipeline
 
-Start by exploring our [Getting Started Tutorial](tutorial/getting_started/getting_started.md) or jump into the [Code Reference](reference) if you're already familiar with TDAG.
+ Imagine a scenario where each task sequentially processes data:
+  
+  - **Task A:** Inserts an initial value.
+  - **Task B:** Takes the output from Task A, adds 5, and inserts the result.
+  - **Task C:** Takes the output from Task B, adds another 5, and inserts the final result.
+  
+  Each of these tasks requires defined resources (e.g., 2 GPUs and 10 CPUs).
+  
+  While Luigi and Airflow can achieve this, both require significant extra setup, particularly for GPU management 
+  and seamless database integration. 
+  TDAG simplifies this process dramatically, embedding these features directly into workflow definitions, as demonstrated below:
 
-If you are looking for more resources you can also access our vidoe tutorials on TDAG here:
+```python
+from mainsequence.tdag import TimeSerie
+from mainsequence.tdag_client.models import DataUpdates
+import pandas as pd
+import datetime
 
-* [Main Sequence SDK Tutorial:  1 Introduction to TDAG](https://www.loom.com/share/046d733baf2e4ee2ba185c14717bc576?sid=2e934ed3-85b4-4c3a-a8ef-63cfdc440b0b)
-* [Main Sequence SDK Tutorial:  2 Introduction to TimeSeries](https://www.loom.com/share/bb0935c7d05d41ad91b921681f5c7631?sid=4ed62862-4a36-46d4-977b-6d7379bdb33f)
-* [Main Sequence SDK Tutorial:  3 Introduction to Schedulers](https://www.loom.com/share/a27106d450d84509ad879422aed09219?sid=52f9c27d-4498-4779-a85e-f46597c03019)
+class TS1(TimeSerie):
+    REQUIRED_CPUS = 10
+    REQUIRED_GPUS = 2
+
+    def update(self, update_statistics: DataUpdates):
+        data = pd.DataFrame(index=[datetime.datetime.now()], data=[100])
+        return data
+
+class TS2(TimeSerie):
+    REQUIRED_CPUS = 10
+    REQUIRED_GPUS = 2
+
+    def __init__(self):
+        self.ts_dep = TS1()
+
+    def update(self, update_statistics: DataUpdates):
+        last_val = self.ts_dep.get_last_observation().values()[0]
+        data = pd.DataFrame(index=[datetime.datetime.now()], data=[last_val + 5])
+        return data
+
+class TS3(TimeSerie):
+    REQUIRED_CPUS = 10
+    REQUIRED_GPUS = 2
+
+    def __init__(self):
+        self.ts_dep = TS2()
+
+    def update(self, update_statistics: DataUpdates):
+        last_val = self.ts_dep.get_last_observation().values()[0]
+        data = pd.DataFrame(index=[datetime.datetime.now()], data=[last_val + 5])
+        return data
+```
+
+## TDAG vs. Luigi vs. Airflow
+
+| Feature                 | Luigi                               | Airflow                          | TDAG (Main Sequence)                        |
+|-------------------------|-------------------------------------|----------------------------------|---------------------------------------------|
+| **Database**            | SQLite (local file)                 | SQLite (local file)              | TimeScale or any supported database         |
+| **Resources**           | Defined in Task (manual config)     | Defined explicitly in Executors  | Declared directly in classes (`REQUIRED_GPUS`) |
+| **DAG Definition**      | Python Classes with `requires()`    | Python Operators with `>>`       | Python Classes with automatic dependencies  |
+| **Scheduling**          | External scheduler required         | Built-in scheduler (UI)          | Integrated scheduler in Main Sequence platform |
+| **Execution & Monitoring** | CLI                               | Web Interface or CLI             | Main Sequence UI or CLI                     |
+
+
+## Real-World Applications
+
+- Financial modeling and investment strategies
+- Real-time machine learning workflows
+- Online training and predictive analytics
+
+TDAG ensures that your data pipelines are robust, scalable, and easy to maintain, enabling your teams to focus on generating value rather than managing infrastructure.
 

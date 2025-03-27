@@ -39,7 +39,9 @@ class KennethFrenchTimeSerie(TimeSerie):
     # for demonstration, we use the widely known link:
     FAMA_FRENCH_DAILY_ZIP_URL = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_daily_CSV.zip"
 
-    SIM_OFFSET_START = datetime.timedelta(days=365 * 20)  # fallback 20 years
+    OFFSET_START = datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
+    CPUS = 1
+    GPUS = 0
 
     @TimeSerie._post_init_routines()
     def __init__(self, *args, **kwargs):
@@ -49,11 +51,8 @@ class KennethFrenchTimeSerie(TimeSerie):
         # 1) Determine how far back to fetch data using update_statistics
         #    If empty, fallback to 20 years ago.
         now_utc = datetime.datetime.now(pytz.utc)
-        update_statistics = update_statistics.update_assets(
-            asset_list=None,
-            init_fallback_date=now_utc - self.SIM_OFFSET_START
-        )
-        min_date = update_statistics.get_min_latest_value(init_fallback_date=now_utc - self.SIM_OFFSET_START)
+
+        min_date = update_statistics.get_min_latest_value(init_fallback_date=self.OFFSET_START)
 
         # We'll only keep factor observations strictly greater than min_date.
         # So if min_date is 2020-01-01, we only want data from 2020-01-02 onward.
@@ -195,7 +194,7 @@ def test_kenneth_french_time_serie():
 
     # Second run => incremental from the last date
     print("\n=== SECOND RUN (INCREMENTAL) ===")
-    df2 = kfts.update(updates)
+    df2 = kfts.set_update_statistics_and_update(updates)
     print(df2)
 
 

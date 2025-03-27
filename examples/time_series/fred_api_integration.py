@@ -7,7 +7,7 @@ import dotenv
 
 dotenv.load_dotenv('../../.env')  # Load environment variables from .env
 from mainsequence.tdag import TimeSerie, ModelList
-from mainsequence.client.models import DataUpdates
+from mainsequence.client import DataUpdates
 from mainsequence.client import Asset,Calendar, ExecutionVenue
 from mainsequence import VAM_CONSTANTS
 
@@ -18,7 +18,9 @@ class FREDTimeSerie(TimeSerie):
     The FRED API key is retrieved from the environment variable `FRED_API_KEY`.
     """
 
-    SIM_OFFSET_START = datetime.timedelta(days=365)  # For example, 1-year fallback
+    OFFSET_START = datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
+    CPUS = 1
+    GPUS = 0
 
     @TimeSerie._post_init_routines()
     def __init__(self, asset_list: list[str], *args, **kwargs):
@@ -43,11 +45,6 @@ class FREDTimeSerie(TimeSerie):
 
         now_utc = datetime.datetime.now(pytz.utc)
 
-        # 2) Update the last-update statistics for these symbols,
-        #    using a fallback date if no prior data is found
-        update_statistics = update_statistics.update_assets(
-            self.asset_list, init_fallback_date=now_utc - self.SIM_OFFSET_START
-        )
 
         df_list = []
         for asset in self.asset_list:
@@ -108,7 +105,7 @@ def test_fred_time_serie():
     fred_ts = FREDTimeSerie(asset_list=ModelList(assets))
 
     # Call the update method
-    df = fred_ts.update(DataUpdates())
+    df = fred_ts.set_update_statistics_and_update(DataUpdates())
     print(df)
 
 
