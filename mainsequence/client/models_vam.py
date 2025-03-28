@@ -20,7 +20,7 @@ from mainsequence.client import LocalTimeSerie
 from .base import BasePydanticModel, BaseObjectOrm, VAM_CONSTANTS as CONSTANTS, TDAG_ENDPOINT, API_ENDPOINT, HtmlSaveException
 from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, DATE_FORMAT
 from typing import List, Optional, Dict, Any, Tuple
-from pydantic import BaseModel, Field, validator,root_validator
+from pydantic import BaseModel, Field, validator,root_validator,constr
 
 def validator_for_string(value):
     if isinstance(value, str):
@@ -111,7 +111,38 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
     execution_venue: Union["ExecutionVenue", int]
     delisted_datetime: Optional[datetime.datetime] = None
     unique_identifier: str
-    unique_symbol: Optional[str]=None
+    figi: Optional[constr(max_length=12)] = Field(
+        None,
+        description="FIGI identifier (unique to a specific instrument on a particular market/exchange)"
+    )
+    figi_composite: Optional[constr(max_length=12)] = Field(
+        None,
+        description="Composite FIGI identifier (aggregates multiple local listings within one market)"
+    )
+    figi_ticker: Optional[constr(max_length=12)] = Field(
+        None,
+        description="FIGI ticker field (often shorter symbol used by OpenFIGI)"
+    )
+    figi_security_type: Optional[constr(max_length=50)] = Field(
+        None,
+        description="Describes the instrument type (e.g. 'CS' for common stock, 'PS' for preferred, etc.)"
+    )
+    figi_security_market_sector: Optional[constr(max_length=50)] = Field(
+        None,
+        description="High-level sector classification (e.g. 'Equity', 'Corporate Bond') as per FIGI"
+    )
+    figi_share_class: Optional[constr(max_length=50)] = Field(
+        None,
+        description="Share class designation (e.g. 'Common', 'Class A', 'Preferred') as per FIGI"
+    )
+    figi_exchange_code: Optional[constr(max_length=50)] = Field(
+        None,
+        description="Exchange/market MIC code (e.g. XNYS, XNAS) or composite code"
+    )
+    figi_name: Optional[constr(max_length=255)] = Field(
+        None,
+        description="Security name as recorded in the FIGI database"
+    )
 
     @staticmethod
     def get_properties_from_unique_symbol(unique_symbol: str):
