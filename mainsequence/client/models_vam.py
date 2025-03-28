@@ -1105,16 +1105,6 @@ class Order(BaseObjectOrm, BasePydanticModel):
     class Config:
         use_enum_values = True  # This allows using enum values directly
 
-    @classmethod
-    def create_or_update(cls, *args, **kwargs):
-        base_url = cls.get_object_url()
-        payload = {"json": kwargs }
-        r = make_request(s=cls.build_session(),
-                         loaders=cls.LOADERS, r_type="POST", url=f"{base_url}/create_or_update/", payload=payload)
-        if r.status_code <200 or r.status_code>=300:
-            raise Exception(r.text)
-        return cls(**r.json())
-
 class MarketOrder(Order):
     pass
 
