@@ -31,18 +31,18 @@ def validator_for_string(value):
             raise ValueError(f"Invalid datetime format: {value}. Expected format is 'YYYY-MM-DDTHH:MM:SSZ'.")
 
 def get_correct_asset_class(asset_type):
-    if asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_SPOT, CONSTANTS.ASSET_TYPE_CASH_EQUITY,CONSTANTS.ASSET_TYPE_CURRENCY]:
-        return Asset
-    elif asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_USDM]:
-        return AssetFutureUSDM
-    elif asset_type in [CONSTANTS.ASSET_TYPE_CURRENCY_PAIR]:
-        return AssetCurrencyPair
-    else:
-        raise NotImplementedError
+    # if asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_SPOT, CONSTANTS.ASSET_TYPE_CASH_EQUITY,CONSTANTS.ASSET_TYPE_CURRENCY]:
+    #     return Asset
+    # elif asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_USDM]:
+    #     return AssetFutureUSDM
+    # elif asset_type in [CONSTANTS.ASSET_TYPE_CURRENCY_PAIR]:
+    #     return AssetCurrencyPair
+    # else:
+    raise NotImplementedError
 
 def resolve_asset(asset_dict:dict):
-    AssetClass = get_correct_asset_class(asset_dict['asset_type'])
-    asset = AssetClass(**asset_dict)
+    # AssetClass = get_correct_asset_class(asset_dict['asset_type'])
+    # asset = AssetClass(**asset_dict)
     return asset
 
 
@@ -100,6 +100,40 @@ class User(BaseObjectOrm,BasePydanticModel):
 
         return cls(**r.json())
 
+class FigiInfo(BasePydanticModel):
+    real_figi: bool = Field(default=True, description="FIGI identifier is real (default: True)")
+    figi: constr(max_length=12) = Field(
+        ...,
+        description="FIGI identifier (unique to a specific instrument on a particular market/exchange)"
+    )
+    composite: Optional[constr(max_length=12)] = Field(
+        None,
+        description="Composite FIGI identifier (aggregates multiple local listings within one market)"
+    )
+    ticker: Optional[constr(max_length=50)] = Field(
+        None,
+        description="FIGI ticker field (often shorter symbol used by OpenFIGI)"
+    )
+    security_type: Optional[constr(max_length=50)] = Field(
+        None,
+        description="Describes the instrument type (e.g. 'CS' for common stock, 'PS' for preferred, etc.)"
+    )
+    security_market_sector: Optional[constr(max_length=50)] = Field(
+        None,
+        description="High-level sector classification (e.g. 'Equity', 'Corporate Bond') as per FIGI"
+    )
+    share_class: Optional[constr(max_length=12)] = Field(
+        None,
+        description="Share class designation (e.g. 'Common', 'Class A', 'Preferred') as per FIGI"
+    )
+    exchange_code: Optional[constr(max_length=50)] = Field(
+        None,
+        description="Exchange/market MIC code (e.g. XNYS, XNAS) or composite code"
+    )
+    name: Optional[constr(max_length=255)] = Field(
+        None,
+        description="Security name as recorded in the FIGI database"
+    )
 
 class AssetMixin(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
@@ -111,38 +145,8 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
     execution_venue: Union["ExecutionVenue", int]
     delisted_datetime: Optional[datetime.datetime] = None
     unique_identifier: str
-    figi: Optional[constr(max_length=12)] = Field(
-        None,
-        description="FIGI identifier (unique to a specific instrument on a particular market/exchange)"
-    )
-    figi_composite: Optional[constr(max_length=12)] = Field(
-        None,
-        description="Composite FIGI identifier (aggregates multiple local listings within one market)"
-    )
-    figi_ticker: Optional[constr(max_length=12)] = Field(
-        None,
-        description="FIGI ticker field (often shorter symbol used by OpenFIGI)"
-    )
-    figi_security_type: Optional[constr(max_length=50)] = Field(
-        None,
-        description="Describes the instrument type (e.g. 'CS' for common stock, 'PS' for preferred, etc.)"
-    )
-    figi_security_market_sector: Optional[constr(max_length=50)] = Field(
-        None,
-        description="High-level sector classification (e.g. 'Equity', 'Corporate Bond') as per FIGI"
-    )
-    figi_share_class: Optional[constr(max_length=50)] = Field(
-        None,
-        description="Share class designation (e.g. 'Common', 'Class A', 'Preferred') as per FIGI"
-    )
-    figi_exchange_code: Optional[constr(max_length=50)] = Field(
-        None,
-        description="Exchange/market MIC code (e.g. XNYS, XNAS) or composite code"
-    )
-    figi_name: Optional[constr(max_length=255)] = Field(
-        None,
-        description="Security name as recorded in the FIGI database"
-    )
+
+    figi_details:FigiInfo
 
     @staticmethod
     def get_properties_from_unique_symbol(unique_symbol: str):
@@ -383,7 +387,6 @@ class IndexAsset(Asset):
     valuation_asset: AssetMixin
 
 class TargetPortfolioIndexAsset(IndexAsset):
-    asset_type: str = CONSTANTS.ASSET_TYPE_INDEX
     can_trade:bool=False
     live_portfolio : "TargetPortfolio"
     backtest_portfolio : "TargetPortfolio"
@@ -581,10 +584,10 @@ class AccountMixin(BasePydanticModel):
             raise Exception("Error Syncing funds in account")
         return AccountHistoricalHoldings(**r.json())
     
-    def get_missing_assets_in_exposure(self,asset_list_ids,asset_type:str,timeout=None)->list[Asset]:
+    def get_missing_assets_in_exposure(self,asset_list_ids,timeout=None)->list[Asset]:
         base_url = self.get_object_url()
         url = f"{base_url}/{self.id}/get_missing_assets_in_exposure/"
-        payload = {"json": {"asset_list_ids":asset_list_ids,"asset_type":asset_type}}
+        payload = {"json": {"asset_list_ids":asset_list_ids,}}
         
         r = make_request(s=self.build_session(),payload=payload, loaders=self.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
