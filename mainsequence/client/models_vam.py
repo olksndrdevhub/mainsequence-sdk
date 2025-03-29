@@ -139,7 +139,6 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
     symbol: str
     name: str
-    asset_type: str
     can_trade: bool
     calendar: Union[Calendar,int]
     execution_venue: Union["ExecutionVenue", int]
