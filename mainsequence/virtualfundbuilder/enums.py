@@ -12,7 +12,6 @@ class BrokerClassName(Enum):
     MARKET_ONLY = "MarketOnly"
 
 ExecutionVenueNames = Enum("ExecutionVenueNames", {key.upper(): key for key in CONSTANTS.EXECUTION_VENUES_NAMES.keys()})
-AssetTypes = Enum("AssetTypes", {key.upper(): key for key in CONSTANTS.ASSET_TYPES})
 
 class PriceTypeNames(Enum):
     VWAP = "vwap"

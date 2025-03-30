@@ -8,7 +8,7 @@ from mainsequence.tdag.time_series import ModelList
 import json
 from pydantic import FieldValidationInfo, field_validator, root_validator, Field
 
-from mainsequence.virtualfundbuilder.enums import (ExecutionVenueNames, PriceTypeNames, BrokerClassName, AssetTypes)
+from mainsequence.virtualfundbuilder.enums import (ExecutionVenueNames, PriceTypeNames, BrokerClassName)
 
 from mainsequence.client.models_tdag import RunConfiguration
 import yaml
@@ -336,7 +336,7 @@ class AssetMixinOverwrite(VFBConfigBaseModel):
     """
     symbol: str="USD"
     execution_venue_symbol: ExecutionVenueNames=ExecutionVenueNames.ALPACA
-    asset_type: AssetTypes=AssetTypes.CASH_EQUITY
+    # asset_type: AssetTypes=AssetTypes.CASH_EQUITY # TODO
 
 class PortfolioBuildConfiguration(VFBConfigBaseModel):
     """
