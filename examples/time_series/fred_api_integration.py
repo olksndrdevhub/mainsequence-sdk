@@ -9,7 +9,7 @@ dotenv.load_dotenv('../../.env')  # Load environment variables from .env
 from mainsequence.tdag import TimeSerie, ModelList
 from mainsequence.client import DataUpdates
 from mainsequence.client import Asset,Calendar, ExecutionVenue
-from mainsequence import VAM_CONSTANTS
+from mainsequence import MARKETS_CONSTANTS
 
 class FREDTimeSerie(TimeSerie):
     """
@@ -91,7 +91,7 @@ def test_fred_time_serie():
     # Two example FRED series: with synthethic assets ont in the database
     dummy_asset_kwargs=dict(
 
-            asset_type=VAM_CONSTANTS.ASSET_TYPE_INDEX,
+            asset_type=MARKETS_CONSTANTS.ASSET_TYPE_INDEX,
             can_trade= False,
             calendar= Calendar(name="FredCalendar"),
             execution_venue=ExecutionVenue(symbol="FRED",name="FRED EV")

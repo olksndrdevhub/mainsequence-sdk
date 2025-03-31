@@ -7,7 +7,7 @@ from mainsequence.client import TargetPortfolio, Account, AccountPortfolioSchedu
 os.environ["VFB_PROJECT_PATH"] = str(Path(__file__).parent.absolute())
 
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
-from mainsequence import VAM_CONSTANTS
+from mainsequence import MARKETS_CONSTANTS
 
 portfolio = PortfolioInterface.load_from_configuration("market_cap_category")
 portfolio._initialize_nodes()

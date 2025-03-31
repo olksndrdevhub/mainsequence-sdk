@@ -8,7 +8,7 @@ import re
 
 from .config_handling import configuration_sanitizer
 from .time_series import PortfolioStrategy
-from mainsequence.client import Asset, AssetFutureUSDM, VAM_CONSTANTS as CONSTANTS, TargetPortfolio, Calendar
+from mainsequence.client import Asset, AssetFutureUSDM, MARKETS_CONSTANTS as CONSTANTS, TargetPortfolio, Calendar
 
 from .models import PortfolioConfiguration
 from .utils import find_ts_recursively, get_vfb_logger, is_jupyter_environment

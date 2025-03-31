@@ -23,7 +23,7 @@ from functools import wraps
 import math
 import gzip
 import base64
-
+import numpy as np
 _default_data_source = None  # Module-level cache
 BACKEND_DETACHED = lambda: os.environ.get('BACKEND_DETACHED', "false").lower() == "true"
 
@@ -200,6 +200,7 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     related_table: Union[int, "DynamicTableMetaData"]
     time_index_name: str = Field(..., max_length=100, description="Time index name")
     column_dtypes_map: Dict[str, Any] = Field(..., description="Column data types map")
+    column_metadata: Optional[Dict[str, Any]] = Field(..., description="Column metadata")
     index_names: List
     column_index_names: List
     last_time_index_value: Optional[datetime.datetime] = Field(None, description="Last time index value")
@@ -222,9 +223,25 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
         return du
 
     def get_time_scale_extra_table_indices(self) -> dict:
-        url = self.get_object_url() + f"/source_table_config/{self.id}/get_time_scale_extra_table_indices/"
+        url = self.get_object_url() + f"/{self.related_table}/get_time_scale_extra_table_indices/"
         s = self.build_session()
         r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, )
+        if r.status_code != 200:
+            raise Exception(r.text)
+        return r.json()
+
+    def patch_column_metadata(self,column_metadata:dict):
+        """
+        """
+        if column_metadata is not None:
+            for key, value in column_metadata.items():
+                assert key in self.column_dtypes_map, f"Column metadata key '{key}' not found in columns"
+                assert {"label", "description"}.issubset(
+                    value.keys()), f"Metadata for column '{key}' must include both 'label' and 'description'"
+
+        url = self.get_object_url() + f"/{self.related_table}/patch_column_metadata/"
+        s = self.build_session()
+        r = make_request(s=s, loaders=self.LOADERS, r_type="POST", url=url,payload={"json": {"column_metadata":column_metadata}} )
         if r.status_code != 200:
             raise Exception(r.text)
         return r.json()
@@ -1820,6 +1837,8 @@ class DynamicTableHelpers:
         data_frame.columns = [str(c) for c in data_frame.columns]
         data_frame = data_frame.rename(columns={data_frame.columns[time_col_loc]: time_index_name})
         column_dtypes_map = {key: str(value) for key, value in data_frame.dtypes.to_dict().items()}
+
+        data_frame = data_frame.replace({np.nan: None})
 
         return data_frame, column_index_names, index_names, column_dtypes_map, time_index_name
 

@@ -7,7 +7,7 @@ from .models_tdag import (request_to_datetime, LocalTimeSeriesDoesNotExist, Dyna
                            Project, UniqueIdentifierRangeMap, LocalTimeSeriesHistoricalUpdate, BACKEND_DETACHED,
                            DataUpdates)
 
-from .utils import TDAG_CONSTANTS, VAM_CONSTANTS
+from .utils import TDAG_CONSTANTS, MARKETS_CONSTANTS
 from mainsequence.logconf import logger
 
 from .models_helpers import *

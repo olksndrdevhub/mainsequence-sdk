@@ -191,8 +191,8 @@ class LazyConstants(dict):
 if 'TDAG_CONSTANTS' not in locals():
     TDAG_CONSTANTS = LazyConstants("tdag")
 
-if 'VAM_CONSTANTS' not in locals():
-    VAM_CONSTANTS = LazyConstants("vam")
+if 'MARKETS_CONSTANTS' not in locals():
+    MARKETS_CONSTANTS = LazyConstants("vam")
 
 if "BINANCE_CONSTANTS" not in locals():
     BINANCE_CONSTANTS = LazyConstants("binance")

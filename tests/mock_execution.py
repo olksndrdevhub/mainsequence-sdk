@@ -9,12 +9,12 @@ from mainsequence.client import TargetPortfolio, Account, AccountPortfolioSchedu
 os.environ["VFB_PROJECT_PATH"] = str(Path(__file__).parent.absolute())
 
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
-from mainsequence import VAM_CONSTANTS
+from mainsequence import MARKETS_CONSTANTS
 
 account = Account.get(account_name="Default MainSequence Portfolios Account")
 
 
-btc_asset = Asset.get(symbol="BTC", execution_venue__symbol=VAM_CONSTANTS.BINANCE_EV_SYMBOL)
+btc_asset = Asset.get(symbol="BTC", execution_venue__symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL)
 
 # Create Order Manager
 target_order = OrderManagerTargetQuantity(

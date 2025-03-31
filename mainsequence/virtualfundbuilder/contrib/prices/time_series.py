@@ -10,7 +10,7 @@ from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList
 from mainsequence.client import(CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
                                 BACKEND_DETACHED, DataUpdates
                                 )
-from mainsequence.client import VAM_CONSTANTS as ASSET_ORM_CONSTANTS, ExecutionVenue
+from mainsequence.client import MARKETS_CONSTANTS as ASSET_ORM_CONSTANTS, ExecutionVenue
 from mainsequence.client import HistoricalBarsSource, DoesNotExist, Asset
 from mainsequence.tdag.time_series.utils import (
     string_frequency_to_minutes,

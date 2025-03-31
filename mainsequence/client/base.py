@@ -8,7 +8,7 @@ from typing import Union
 import requests
 from pydantic import BaseModel
 from tqdm import tqdm
-from .utils import VAM_CONSTANTS, request_to_datetime, DATE_FORMAT, AuthLoaders, make_request, DoesNotExist
+from .utils import MARKETS_CONSTANTS, request_to_datetime, DATE_FORMAT, AuthLoaders, make_request, DoesNotExist
 
 TDAG_ENDPOINT = os.environ.get('TDAG_ENDPOINT')
 API_ENDPOINT = f"{TDAG_ENDPOINT}/orm/api"

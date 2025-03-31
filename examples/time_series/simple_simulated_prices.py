@@ -129,13 +129,13 @@ class SimulatedPrices(TimeSerie):
 # Mocking DataUpdates and Running the Test
 def test_simple_crypto_feature():
     from mainsequence.client import Asset
-    from mainsequence import VAM_CONSTANTS
+    from mainsequence import MARKETS_CONSTANTS
 
     # Filter assets for BTCUSDT and ETHUSDT.
     assets = Asset.filter(
         symbol__in=["BTCUSDT", "ETHUSDT"],
-        asset_type=VAM_CONSTANTS.ASSET_TYPE_CURRENCY_PAIR,
-        execution_venue__symbol=VAM_CONSTANTS.BINANCE_EV_SYMBOL
+        asset_type=MARKETS_CONSTANTS.ASSET_TYPE_CURRENCY_PAIR,
+        execution_venue__symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL
     )
     ts = SimulatedPrices(asset_list=ModelList(assets))
 
@@ -312,13 +312,13 @@ def test_ta_feature_simulated_crypto_prices():
       - Calculating a TA feature (e.g., SMA) on the simulated prices.
     """
     from mainsequence.client import Asset
-    from mainsequence import VAM_CONSTANTS
+    from mainsequence import MARKETS_CONSTANTS
 
     # Filter assets for BTCUSDT and ETHUSDT.
     assets = Asset.filter(
         symbol__in=["BTCUSDT", "ETHUSDT"],
-        asset_type=VAM_CONSTANTS.ASSET_TYPE_CURRENCY_PAIR,
-        execution_venue__symbol=VAM_CONSTANTS.BINANCE_EV_SYMBOL
+        asset_type=MARKETS_CONSTANTS.ASSET_TYPE_CURRENCY_PAIR,
+        execution_venue__symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL
     )
     ts = TAFeature(asset_list=ModelList(assets), ta_feature="SMA", ta_length=14)
 

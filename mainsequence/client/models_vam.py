@@ -17,7 +17,7 @@ from enum import IntEnum, Enum
 
 from mainsequence.client import LocalTimeSerie
 
-from .base import BasePydanticModel, BaseObjectOrm, VAM_CONSTANTS as CONSTANTS, TDAG_ENDPOINT, API_ENDPOINT, HtmlSaveException
+from .base import BasePydanticModel, BaseObjectOrm, MARKETS_CONSTANTS as CONSTANTS, TDAG_ENDPOINT, API_ENDPOINT, HtmlSaveException
 from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, DATE_FORMAT
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field, validator,root_validator,constr
@@ -742,6 +742,7 @@ class DataFrequency(str, Enum):
     one_d = "1d"
     one_w = "1w"
     one_month ="1mo"
+    one_quarter ="1q"
 
 class Trade(BaseObjectOrm):
     @classmethod

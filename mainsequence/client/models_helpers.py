@@ -1,5 +1,5 @@
 from .models_vam import *
-from .base import VAM_CONSTANTS
+from .base import MARKETS_CONSTANTS
 from .models_tdag import LocalTimeSerie
 
 def get_model_class(model_class: str):
@@ -28,7 +28,7 @@ def create_from_serializer_with_class(asset_list: List[dict]):
 def get_right_account_class(account: Account):
     from mainsequence.client import models_vam as model_module
     execution_venue_symbol = account.execution_venue.symbol
-    AccountClass = getattr(model_module, VAM_CONSTANTS.ACCOUNT_VENUE_FACTORY[execution_venue_symbol])
+    AccountClass = getattr(model_module, MARKETS_CONSTANTS.ACCOUNT_VENUE_FACTORY[execution_venue_symbol])
     account, _ = AccountClass.get(id=account.id)
     return account
 
@@ -37,7 +37,7 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
     id: int
     unique_identifier: str
     related_local_time_serie: LocalTimeSerie
-    data_source_description: Optional[str] = Field(None, description="Descriptions of the data source")
+    description: Optional[str] = Field(None, description="Descriptions of the data source")
     data_frequency_id: str = DataFrequency
     assets_in_data_source:Optional[List[int]]
 
@@ -66,7 +66,7 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
         unique_identifier,
         time_serie,
         data_frequency_id,
-        data_source_description=""
+        description=""
     ):
         try:
             bar_source = MarketsTimeSeriesDetails.get(
@@ -83,7 +83,7 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
                     unique_identifier=unique_identifier,
                     related_local_time_serie__id=time_serie.local_time_serie.id,
                     data_frequency_id=data_frequency_id,
-                    data_source_description=data_source_description,
+                    description=description,
                 )
 
         if bar_source is None:
