@@ -134,6 +134,10 @@ class FigiInfo(BasePydanticModel):
         None,
         description="Security name as recorded in the FIGI database"
     )
+    main_sequence_share_class: Optional[constr(max_length=12)] = Field(
+        None,
+        description="Sepcial Main Sequence class . Should be the maximum level of agroupation"
+    )
 
 class AssetMixin(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
@@ -303,7 +307,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
     organization_owner_uid:str
     
     def __repr__(self):
-        return f"{self.name} source: {self.source}, {len(assets)} assets"
+        return f"{self.name} source: {self.source}, {len(self.assets)} assets"
 
     def update_assets(self, asset_ids: List[int]):
         self.remove_assets(self.assets)
