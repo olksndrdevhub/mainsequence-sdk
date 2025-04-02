@@ -39,7 +39,7 @@ class TDAGAgent:
         else:
             code = inspect.getsource(cls)
         attributes = {"code": code}
-        _send_strategy_to_registry(ResourceType.SIGNAL_WEIGHTS_STRATEGY, cls, is_production=False, attributes=attributes)
+        _send_strategy_to_registry(ResourceType.SIGNAL_WEIGHTS_STRATEGY, cls, attributes=attributes)
 
         payload = {
             "strategy_name": cls.__name__,

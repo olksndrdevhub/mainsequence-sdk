@@ -104,7 +104,7 @@ def insert_in_registry(registry, cls, register_in_agent, name=None, attributes: 
         Thread(
             target=_send_strategy_to_registry,
             args=(cls.TYPE, cls),
-            kwargs={"is_production": True, attributes=attributes}
+            kwargs={attributes=attributes}
         ).start()
 
     return cls
@@ -161,7 +161,7 @@ def send_default_configuration():
 
 
 
-def _send_strategy_to_registry(strategy_type, strategy_class, is_production=False, attributes: Optional[dict]=None):
+def _send_strategy_to_registry(strategy_type, strategy_class, attributes: Optional[dict]=None):
     """Helper function to send the strategy payload to the registry."""
     def _get_wrapped_or_init(strategy_class):
         """Returns the wrapped __init__ method if it exists, otherwise returns the normal __init__."""

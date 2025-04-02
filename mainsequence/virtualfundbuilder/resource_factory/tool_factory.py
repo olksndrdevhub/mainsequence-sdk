@@ -10,7 +10,7 @@ from mainsequence.virtualfundbuilder.resource_factory.base_factory import insert
 class BaseTool(BaseResource):
     TYPE = ResourceType.TOOL
 
-def send_tool_to_registry(strategy_type, strategy_class, is_jupyter=False, is_production=False):
+def send_tool_to_registry(strategy_type, strategy_class):
     """Helper function to send the tool payload to the registry."""
     assert os.environ.get("TDAG_ENDPOINT", None), "TDAG_ENDPOINT is not set"
 
