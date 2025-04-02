@@ -12,7 +12,7 @@ import plotly.graph_objs as go
 
 from pydantic import BaseModel
 from jinja2 import Template
-from weasyprint import HTML
+# from weasyprint import HTML
 
 from mainsequence.virtualfundbuilder.models import ReportConfig
 from mainsequence.virtualfundbuilder.resource_factory.tool_factory import register_tool, BaseTool

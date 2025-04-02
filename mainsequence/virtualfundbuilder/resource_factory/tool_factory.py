@@ -1,18 +1,11 @@
 import os
-from typing import Optional
-
-from pydantic import BaseModel
-
+from mainsequence.virtualfundbuilder.enums import ResourceType
 from mainsequence.virtualfundbuilder.utils import parse_object_signature, object_signature_to_yaml, object_signature_to_yaml, build_markdown
 
-from mainsequence.virtualfundbuilder.enums import ResourceType
 
-from mainsequence.virtualfundbuilder.resource_factory.base_factory import insert_in_registry, BaseResource
+from mainsequence.virtualfundbuilder.resource_factory.base_factory import insert_in_registry, BaseResource, \
+    ResourceConfig
 
-
-class ToolConfig(BaseModel):
-    configuration : BaseModel
-    markdown : Optional[str]=None
 
 class BaseTool(BaseResource):
     TYPE = ResourceType.TOOL
@@ -21,19 +14,30 @@ def send_tool_to_registry(strategy_type, strategy_class, is_jupyter=False, is_pr
     """Helper function to send the tool payload to the registry."""
     assert os.environ.get("TDAG_ENDPOINT", None), "TDAG_ENDPOINT is not set"
 
-    config_class = strategy_class.configuration
-    report_signature = parse_object_signature(config_class)
-    documentation_dict = object_signature_to_yaml(report_signature)
-    example_yaml = object_signature_to_yaml(documentation_dict)
-    markdown = build_markdown(
-        root_class=config_class
-    )
-    # where to register?
+    def _get_wrapped_or_init(strategy_class):
+        """Returns the wrapped __init__ method if it exists, otherwise returns the normal __init__."""
+        init_method = strategy_class.__init__
+        return getattr(init_method, '__wrapped__', init_method)
 
-    tool_config = ToolConfig(
-        tool_configuration=config_class,
-        markdown=markdown,
+
+    init_method = _get_wrapped_or_init(strategy_class)
+
+    object_signature = parse_object_signature(init_method, use_examples_for_default=["asset_universe"])
+    markdown_documentation = build_markdown(
+        children_to_exclude=["front_end_details"],
+        root_class=init_method
     )
+    default_yaml = object_signature_to_yaml(object_signature)
+
+
+    ResourceConfig(
+        name=strategy_class.__name__,
+        type=strategy_type,
+        object_signature=report_signature,
+        markdown_documentation=markdown_documentation,
+        default_yaml=example_yaml,
+    )
+
     tool_config = {"default_config": report_signature, "markdown": markdown, "documentation_dict": documentation_dict}
     print(f"Register with tool_config {tool_config}")
 

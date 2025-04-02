@@ -34,7 +34,12 @@ class TDAGAgent:
         else:
             full_signal_description += f"Use NVDA, AAPL and GOOGL for the assets universe."
 
-        _send_strategy_to_registry(ResourceType.SIGNAL_WEIGHTS_STRATEGY, cls, is_jupyter=is_jupyter_environment(), is_production=False)
+        if is_jupyter_environment():
+            code = cls.get_source_notebook()
+        else:
+            code = inspect.getsource(cls)
+        attributes = {"code": code}
+        _send_strategy_to_registry(ResourceType.SIGNAL_WEIGHTS_STRATEGY, cls, is_production=False, attributes=attributes)
 
         payload = {
             "strategy_name": cls.__name__,

@@ -1576,7 +1576,8 @@ class TimeScaleDB(DataSource):
         return df
 
 
-def register_strategy(json_payload: dict, timeout=None):
+def register_strategy(resource_config: BaseModel, timeout=None):
+    logger.debug(f"Register signal: {resource_config.name}")
     url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/register_strategy/"
     from requests.adapters import HTTPAdapter, Retry
     s = requests.Session()
@@ -1584,9 +1585,11 @@ def register_strategy(json_payload: dict, timeout=None):
     retries = Retry(total=2, backoff_factor=2)
     s.mount('http://', HTTPAdapter(max_retries=retries))
 
-    r = make_request(s=s, r_type="POST", url=url, payload={"json": json_payload},
+    response = make_request(s=s, r_type="POST", url=url, payload={"json": resource_config.model_dump()},
                      loaders=loaders, time_out=timeout)
-    return r
+    if response.status_code not in [200, 201]:
+        print(response.text)
+    return response
 
 def register_default_configuration(json_payload: dict, timeout=None):
     url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/register_default_configuration/"

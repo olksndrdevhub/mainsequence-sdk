@@ -5,7 +5,7 @@ import importlib.util
 from threading import Thread
 
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger, parse_object_signature, build_markdown, object_signature_to_yaml
-from typing import get_type_hints, List
+from typing import get_type_hints, List, Optional
 from pydantic import BaseModel
 from enum import Enum
 from pathlib import Path
@@ -13,6 +13,19 @@ import sys
 import ast
 
 logger = get_vfb_logger()
+from mainsequence.virtualfundbuilder.enums import ResourceType
+
+class ResourceConfig(BaseModel):
+    name: str
+    type: ResourceType
+    object_signature : BaseModel
+    markdown_documentation : str
+    default_yaml: str
+    attributes: dict
+
+    model_config = {
+        "use_enum_values": True
+    }
 
 class BaseResource():
     @classmethod
@@ -75,7 +88,7 @@ class BaseResource():
         return cls( **kwargs)
 
 
-def insert_in_registry(registry, cls, register_in_agent, name=None, custom_registry_function=None):
+def insert_in_registry(registry, cls, register_in_agent, name=None, attributes: Optional[dict]=None):
     """ helper for strategy decorators """
     key = name or cls.__name__  # Use the given name or the class name as the key
 
@@ -87,15 +100,11 @@ def insert_in_registry(registry, cls, register_in_agent, name=None, custom_regis
     logger.debug(f"Registered {cls.TYPE} class '{key}': {cls}")
 
     if register_in_agent:
-        send_strategy_function = _send_strategy_to_registry
-        if custom_registry_function:
-            send_strategy_function = custom_registry_function
 
-        # Run _send_strategy_to_registry in its own thread so it doesn't block
         Thread(
-            target=send_strategy_function,
+            target=_send_strategy_to_registry,
             args=(cls.TYPE, cls),
-            kwargs={"is_production": True}
+            kwargs={"is_production": True, attributes=attributes}
         ).start()
 
     return cls
@@ -152,11 +161,8 @@ def send_default_configuration():
 
 
 
-
-def _send_strategy_to_registry(strategy_type, strategy_class, is_jupyter=False, is_production=False):
+def _send_strategy_to_registry(strategy_type, strategy_class, is_production=False, attributes: Optional[dict]=None):
     """Helper function to send the strategy payload to the registry."""
-    assert os.environ.get("TDAG_ENDPOINT", None), "TDAG_ENDPOINT is not set"
-
     def _get_wrapped_or_init(strategy_class):
         """Returns the wrapped __init__ method if it exists, otherwise returns the normal __init__."""
         init_method = strategy_class.__init__
@@ -165,7 +171,7 @@ def _send_strategy_to_registry(strategy_type, strategy_class, is_jupyter=False, 
     init_method = _get_wrapped_or_init(strategy_class)
 
     object_signature = parse_object_signature(init_method, use_examples_for_default=["asset_universe"])
-    signal_markdown_documentation = build_markdown(
+    markdown_documentation = build_markdown(
         children_to_exclude=["front_end_details"],
         root_class=init_method
     )
@@ -180,35 +186,24 @@ def _send_strategy_to_registry(strategy_type, strategy_class, is_jupyter=False, 
             use_examples_for_default=["is_live"],
             exclude_attr=exclude_args
         )
-        parent_signal_markdown_documentation = build_markdown(
+        parent_markdown_documentation = build_markdown(
             children_to_exclude=["front_end_details"],
             root_class=init_method_parent,
             elements_to_exclude=exclude_args
         )
-        signal_markdown_documentation += parent_signal_markdown_documentation
+        markdown_documentation += parent_markdown_documentation
         object_signature.update(parent_object_signature)
 
     default_yaml = object_signature_to_yaml(object_signature)
-    if is_jupyter:
-        code = strategy_class.get_source_notebook()
-    else:
-        code = inspect.getsource(strategy_class)
 
-    payload = {
-        "strategy_type": strategy_type.value,
-        "strategy_name": strategy_class.__name__,
-        "default_yaml": default_yaml,
-        "signal_markdown_documentation": signal_markdown_documentation,
-        "object_signature": object_signature,
-        "code": code,
-    }
-    logger.debug(f"Register signal: {strategy_class.__name__}")
-    payload = json.loads(json.dumps(payload, default=_convert_unknown_to_string))
-    headers = {"Content-Type": "application/json"}
-    try:
+    resource_config = ResourceConfig(
+        name=strategy_class.__name__,
+        type=strategy_type,
+        object_signature=object_signature,
+        markdown_documentation=markdown_documentation,
+        default_yaml=default_yaml,
+        attributes=attributes,
+    )
+    from mainsequence.client import register_strategy
+    register_strategy(resource_config)
 
-        response = register_strategy(json_payload=payload)
-        if response.status_code not in [200, 201]:
-            print(response.text)
-    except Exception as e:
-        logger.warning(f"Could register strategy to TSORM {e}")

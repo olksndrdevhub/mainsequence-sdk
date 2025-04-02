@@ -1,4 +1,5 @@
 import ast
+import inspect
 
 from mainsequence.tdag.time_series import TimeSerie
 from datetime import datetime, timedelta
@@ -151,7 +152,9 @@ def register_signal_class(name=None, register_in_agent=True):
     If `name` is not provided, the class's name is used as the key.
     """
     def decorator(cls):
-        return insert_in_registry(SIGNAL_CLASS_REGISTRY, cls, register_in_agent, name)
+        code = inspect.getsource(cls)
+        attributes = {"code": code}
+        return insert_in_registry(SIGNAL_CLASS_REGISTRY, cls, register_in_agent, attributes=attributes)
     return decorator
 
 
