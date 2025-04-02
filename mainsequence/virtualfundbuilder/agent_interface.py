@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from mainsequence.virtualfundbuilder.enums import StrategyType
+from mainsequence.virtualfundbuilder.enums import ResourceType
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
 from mainsequence.virtualfundbuilder.utils import _send_strategy_to_registry, is_jupyter_environment
 from .utils import logger
@@ -22,7 +22,7 @@ class TDAGAgent:
 
         # initialize default state once
         if not self.backend_registered:
-            VirtualFundLauncher().send_default_configuration()
+            send_default_configuration()
             self.backend_registered = True
 
         self.logger.info("Setup TDAG Agent successfull")
@@ -34,7 +34,7 @@ class TDAGAgent:
         else:
             full_signal_description += f"Use NVDA, AAPL and GOOGL for the assets universe."
 
-        _send_strategy_to_registry(StrategyType.SIGNAL_WEIGHTS_STRATEGY, cls, is_jupyter=is_jupyter_environment(), is_production=False)
+        _send_strategy_to_registry(ResourceType.SIGNAL_WEIGHTS_STRATEGY, cls, is_jupyter=is_jupyter_environment(), is_production=False)
 
         payload = {
             "strategy_name": cls.__name__,

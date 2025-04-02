@@ -7,7 +7,7 @@ import pandas as pd
 import pytz
 from mainsequence.virtualfundbuilder import TIMEDELTA
 from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_prices_timeseries
-from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import WeightsBase, register_signal_class
+from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
 from mainsequence.tdag.time_series import TimeSerie
 
 import pandas_market_calendars as mcal

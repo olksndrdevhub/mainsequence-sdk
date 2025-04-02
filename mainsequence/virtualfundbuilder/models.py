@@ -511,3 +511,20 @@ class PortfolioConfiguration(VFBConfigBaseModel):
 
         write_yaml(dict_file=json.loads(self.model_dump_json()), path=config_file_name)
         return config_file_name
+
+
+class ReportConfig(BaseModel):
+    """Pydantic model defining the parameters for report generation."""
+    report_id: str = "MC-2025-XYZ"
+    authors: str = "Main Sequence AI"
+    sector: str = "US Equities"
+    region: str = "USA"
+    topics: List[str] = ["Diversification", "Equities", "Fundamentals"]
+    report_title: str = "Global Strategy Views: Diversify to Amplify"
+    summary: str = (
+        "We are entering a more benign phase of the economic cycle characterized by "
+        "sustained economic growth and declining policy interest rates. Historically, "
+        "such an environment supports equities but also highlights the increasing "
+        "importance of broad diversification across regions and sectors."
+    )
+    pdf_path: str = "weasy_output_report.pdf"

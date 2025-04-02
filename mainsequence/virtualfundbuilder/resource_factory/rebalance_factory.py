@@ -3,14 +3,13 @@ import datetime
 import logging
 import pandas_market_calendars as mcal
 
-from mainsequence.virtualfundbuilder.enums import StrategyType
-from mainsequence.virtualfundbuilder.strategy_factory.base_factory import BaseFactory, BaseStrategy, insert_in_registry
-from mainsequence.virtualfundbuilder.utils import _send_strategy_to_registry
-import copy
+from mainsequence.virtualfundbuilder.enums import ResourceType
+from mainsequence.virtualfundbuilder.resource_factory.base_factory import BaseFactory, BaseResource, insert_in_registry
+
 logger = logging.getLogger("virtualfundbuilder")
 
-class RebalanceStrategyBase(BaseStrategy):
-    TYPE = StrategyType.REBALANCE_STRATEGY
+class RebalanceStrategyBase(BaseResource):
+    TYPE = ResourceType.REBALANCE_STRATEGY
 
     def __init__(self,
                  calendar: str='24/7',
