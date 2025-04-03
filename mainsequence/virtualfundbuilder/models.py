@@ -3,6 +3,8 @@ from typing import Dict, List, Optional
 from pydantic import (BaseModel, validator, model_validator)
 import os
 import pandas as pd
+
+from mainsequence import MARKETS_CONSTANTS
 from mainsequence.client import AssetMixin, Asset
 from mainsequence.tdag.time_series import ModelList
 import json
@@ -52,7 +54,8 @@ class AssetFilter(VFBConfigBaseModel):
     There is also a special case of asset categories that include a set of assets, they can be accessed using categories__name
     The example assets provided are only for demonstration purposes, the actual assets and asset categories for the portfolio must be based on user input.
     """
-    categories__name: Optional[str] = None
+    categories__display_name: Optional[str] = None
+    categories__unique_identifier: Optional[str] = None
 
     # Asset Properties
     asset_type: Optional[str] = None
@@ -334,6 +337,7 @@ class AssetMixinOverwrite(VFBConfigBaseModel):
         symbol (str): The symbol of the asset.
         execution_venue_symbol (ExecutionVenueNames): The execution venue where the asset traded. Needs to match with asset universe.
     """
+    unique_identifier: str=""
     symbol: str="USD"
     execution_venue_symbol: ExecutionVenueNames=ExecutionVenueNames.ALPACA
     # asset_type: AssetTypes=AssetTypes.CASH_EQUITY # TODO
@@ -381,15 +385,8 @@ class PortfolioBuildConfiguration(VFBConfigBaseModel):
                     **values['assets_configuration']['prices_configuration'])
             )
         if not isinstance(values["valuation_asset"], AssetMixin):
-            if "execution_venue" in values["valuation_asset"]:
-                execution_venue_symbol = values["valuation_asset"]["execution_venue"]["symbol"]
-            else:
-                execution_venue_symbol = values["valuation_asset"]["execution_venue_symbol"]
-
             tmp_asset = Asset.get(
-                symbol=values["valuation_asset"]["symbol"],
-                asset_type=values["valuation_asset"]["asset_type"],
-                execution_venue__symbol=execution_venue_symbol,
+                unique_identifier=values["valuation_asset"]["unique_identifier"],
             )
             values["valuation_asset"] = tmp_asset
 

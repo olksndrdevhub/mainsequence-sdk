@@ -10,7 +10,7 @@ import pandas as pd
 from typing import Dict, Tuple
 
 from .models import PortfolioBuildConfiguration, AssetsConfiguration
-from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_prices_timeseries
+from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_interpolated_prices_timeseries
 from mainsequence.virtualfundbuilder.strategy_factory.rebalance_factory import RebalanceFactory
 import json
 
@@ -94,7 +94,7 @@ class PortfolioStrategy(TimeSerie):
         self.portfolio_prices_frequency = portfolio_build_configuration.portfolio_prices_frequency
 
         self.assets_configuration = portfolio_build_configuration.assets_configuration
-        self.bars_ts = get_prices_timeseries(copy.deepcopy(self.assets_configuration))
+        self.bars_ts = get_interpolated_prices_timeseries(copy.deepcopy(self.assets_configuration))
 
         self.required_execution_venues_symbols = self.assets_configuration.asset_universe.get_required_execution_venues()
 

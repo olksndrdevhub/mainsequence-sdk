@@ -26,7 +26,7 @@ from mainsequence.virtualfundbuilder.utils import logger
 
 FULL_CALENDAR = "24/7"
 
-def get_prices_timeseries(assets_configuration: AssetsConfiguration):
+def get_interpolated_prices_timeseries(assets_configuration: AssetsConfiguration):
     """
     Creates a Wrapper Timeseries for an asset configuration.
     """
@@ -61,51 +61,20 @@ def get_prices_source(
     """
     Returns the appropriate bar time series based on the asset list and source.
     """
-    if source in [ASSET_ORM_CONSTANTS.MAIN_SEQUENCE_PORTFOLIOS_EV]:
-        raise NotImplementedError
-        if is_train:
-            backtest_time_series={}
-            for asset in asset_list:
-                data_source = DynamicTableDataSource.get(asset.backtest_portfolio_data_source_id)
-                pp = data_source_pickle_path(data_source.id)
-                if os.path.isfile(pp) == False:
-                    data_source.persist_to_pickle(pp)
-                backtest_time_series[asset.id], pickle_path = TimeSerie.rebuild_and_set_from_local_hash_id(
-                    local_hash_id=asset.backtest_portfolio.local_time_serie_hash_id,
-                    data_source_id =data_source.id,
-                    graph_depth_limit=-1,
-                )
-            return WrapperTimeSerie(time_series_dict=backtest_time_series)
-        else:
-            live_time_series = {}
-            for asset in asset_list:
-                data_source = DynamicTableDataSource.get(asset.live_portfolio_data_source_id)
-                pp = data_source_pickle_path(data_source.id)
-                if os.path.isfile(pp) == False:
-                    data_source.persist_to_pickle(pp)
-                live_time_series[asset.id], pickle_path =  TimeSerie.rebuild_and_set_from_local_hash_id(
-                                                            local_hash_id=asset.live_portfolio.local_time_serie_hash_id,
-                                                            data_source_id =data_source.id,
-                                                            graph_depth_limit=-1,
-                                                        )
-
-            return WrapperTimeSerie(time_series_dict=live_time_series)
-
-    else:
-        data_mode = ASSET_ORM_CONSTANTS.DATA_MODE_BACKTEST if is_train else ASSET_ORM_CONSTANTS.DATA_MODE_LIVE
-        try:
-            hbs = HistoricalBarsSource.get(
-                execution_venues__symbol=source,
-                data_frequency_id=bar_frequency_id,
-                data_mode=data_mode,
-                adjusted=True
-            )
-        except DoesNotExist as e:
-            logger.exception(f"HistoricalBarsSource does not exist for {source} -{bar_frequency_id} {data_mode}")
-            raise e
-        api_ts = APITimeSerie(data_source_id=hbs.related_local_time_serie.data_source_id,
-                              local_hash_id=hbs.related_local_time_serie.local_hash_id)
-        return api_ts
+    data_mode = ASSET_ORM_CONSTANTS.DATA_MODE_BACKTEST if is_train else ASSET_ORM_CONSTANTS.DATA_MODE_LIVE
+    try:
+        hbs = HistoricalBarsSource.get(
+            execution_venues__symbol=source,
+            data_frequency_id=bar_frequency_id,
+            data_mode=data_mode,
+            adjusted=True
+        )
+    except DoesNotExist as e:
+        logger.exception(f"HistoricalBarsSource does not exist for {source} -{bar_frequency_id} {data_mode}")
+        raise e
+    api_ts = APITimeSerie(data_source_id=hbs.related_local_time_serie.data_source_id,
+                          local_hash_id=hbs.related_local_time_serie.local_hash_id)
+    return api_ts
 
 
 class UpsampleAndInterpolation:

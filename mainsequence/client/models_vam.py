@@ -299,12 +299,12 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         return create_from_serializer_with_class(all_results)
         
 class AssetCategory(BaseObjectOrm, BasePydanticModel):
-    id:int
-    unique_id:str
-    name:str
-    source:str
-    assets:List[int]
-    organization_owner_uid:str
+    id: int
+    unique_identifier: str
+    display_name: str
+    source: str
+    assets: List[int]
+    organization_owner_uid: str
     
     def __repr__(self):
         return f"{self.name} source: {self.source}, {len(self.assets)} assets"

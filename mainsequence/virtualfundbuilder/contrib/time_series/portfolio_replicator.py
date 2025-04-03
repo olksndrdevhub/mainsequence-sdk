@@ -10,7 +10,7 @@ from sklearn.linear_model import ElasticNet, Lasso, LinearRegression
 from tqdm import tqdm
 
 from mainsequence.virtualfundbuilder import TIMEDELTA
-from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_prices_timeseries
+from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_interpolated_prices_timeseries
 from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import WeightsBase, register_signal_class
 from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
 from mainsequence.tdag.time_series import TimeSerie
@@ -169,7 +169,7 @@ class ETFReplicator(WeightsBase, TimeSerie):
         super().__init__(*args, **kwargs)
 
         self.in_window = in_window
-        self.bars_ts, self.asset_symbols = get_prices_timeseries(copy.deepcopy(self.assets_configuration))
+        self.bars_ts, self.asset_symbols = get_interpolated_prices_timeseries(copy.deepcopy(self.assets_configuration))
         assert len(list(self.asset_symbols.keys())) == 1
         self.symbol_to_replicate = symbol_to_replicate
         self.tracking_strategy = tracking_strategy
