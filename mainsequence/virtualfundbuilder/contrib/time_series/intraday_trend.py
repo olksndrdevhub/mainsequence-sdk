@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytz
 from mainsequence.virtualfundbuilder import TIMEDELTA
-from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_prices_timeseries
+from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_interpolated_prices_timeseries
 from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import WeightsBase, register_signal_class
 from mainsequence.tdag.time_series import TimeSerie
 
@@ -32,7 +32,7 @@ class IntradayTrend(WeightsBase, TimeSerie):
 
         self.source_frequency = source_frequency
         self.calendar = calendar
-        self.bars_ts, self.asset_symbols = get_prices_timeseries(copy.deepcopy(self.assets_configuration))
+        self.bars_ts, self.asset_symbols = get_interpolated_prices_timeseries(copy.deepcopy(self.assets_configuration))
 
 
     def update(self, latest_value: Union[datetime, None], params_for_tree_run=None, *args, **kwargs) -> pd.DataFrame:
