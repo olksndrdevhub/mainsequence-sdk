@@ -1,4 +1,4 @@
-
+from mainsequence import MARKETS_CONSTANTS
 from mainsequence.tdag.time_series import TimeSerie, APITimeSerie
 
 from datetime import datetime, timedelta, tzinfo
@@ -63,7 +63,6 @@ class FixedWeights(WeightsBase, TimeSerie):
 
         signals_weights = pd.concat(
             [df],
-
             axis=0,
             keys=[latest_value]
         ).rename_axis(["time_index", "asset_symbol", "execution_venue_symbol"])
@@ -91,13 +90,19 @@ class MarketCap(WeightsBase, TimeSerie):
         super().__init__(*args, **kwargs)
         self.source_frequency = source_frequency
         self.num_top_assets = num_top_assets or 50000
-        self.historical_market_cap_ts = APITimeSerie.build_from_unique_identifier(CONSTANTS.data_sources_constants.HISTORICAL_MARKET_CAP)
 
-        self.execution_venue_symbol = self.asset_universe.get_required_execution_venues()
-        if len(self.execution_venue_symbol) > 1:
+        execution_venue_symbols = self.asset_universe.get_required_execution_venues()
+        if len(execution_venue_symbols) > 1:
             raise ValueError(
-                f"No support to compare MarketCaps of asset universes {self.execution_venue_symbol}")
-        self.execution_venue_symbol=ExecutionVenueNames(self.execution_venue_symbol[0])
+                f"No support to compare MarketCaps of asset universes {execution_venue_symbols}")
+        self.execution_venue = ExecutionVenueNames(execution_venue_symbols[0])
+
+        if self.execution_venue.value in [ExecutionVenueNames.BINANCE_FUTURES.value, ExecutionVenueNames.BINANCE.value]:
+            self.historical_market_cap_ts = APITimeSerie.build_from_unique_identifier(CONSTANTS.data_sources_constants.HISTORICAL_MARKET_CAP_COINGECKO)
+        elif self.execution_venue.value == ExecutionVenueNames.ALPACA.value:
+            self.historical_market_cap_ts = APITimeSerie.build_from_unique_identifier(CONSTANTS.data_sources_constants.HISTORICAL_MARKET_CAP)
+        else:
+            raise NotImplementedError(f"Unsupported market cap execution venue {self.execution_venue.value}")
 
     def maximum_forward_fill(self):
         return timedelta(days=1) - TIMEDELTA
@@ -122,42 +127,40 @@ class MarketCap(WeightsBase, TimeSerie):
         Returns:
             DataFrame: A DataFrame containing updated signal weights, indexed by time and asset symbol.
         """
+        asset_list_for_exchange = self.asset_universe.asset_list
 
-        VENUE_MAP={}
-        for v in CONSTANTS.BINANCE_VENUES:
-            VENUE_MAP[v] = CONSTANTS.ASSET_TYPE_CRYPTO_SPOT
+        # get assets from mainsequence exchange (which stores all fundamentals data)
+        share_class_to_asset_map = {}
+        for asset in asset_list_for_exchange:
+            share_class_to_asset_map[asset.get_ms_share_class()] = asset.unique_identifier
 
-        VENUE_MAP[CONSTANTS.ALPACA_EV_SYMBOL]= CONSTANTS.ASSET_TYPE_CASH_EQUITY
+        ms_asset_list = Asset.filter(
+            figi_details__main_sequence_share_class__in=list(share_class_to_asset_map.keys()),
+            execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_SHARE_CLASS_EV
+        )
 
-        market_cap_symbol_map=lambda asset:f"{asset.get_spot_reference_asset_symbol()}-*-{VENUE_MAP[asset.execution_venue.symbol]}"
+        update_statistics = update_statistics.update_assets(ms_asset_list, init_fallback_date=datetime(2017,1,1).replace(tzinfo=pytz.utc))
+        unique_identifier_range_map = {
+            a.unique_identifier: {
+                "start_date": update_statistics[a.unique_identifier],
+                "start_date_operand": ">"
+            }
+            for a in ms_asset_list
+        }
 
-        asset_universe = self.asset_universe
-        execution_venue_symbol = self.execution_venue_symbol
+        mc = self.historical_market_cap_ts.get_df_between_dates(
+            unique_identifier_range_map=unique_identifier_range_map,
+            great_or_equal=False,
+        )
 
-        if execution_venue_symbol not in self.EXECUTION_TO_DATA_PROVIDER_MAP: raise ValueError(f"Unknown execution venue symbol {execution_venue_symbol} in market cap")
-        if asset_universe.asset_list is None:
-            asset_list = Asset.filter_with_asset_class(**asset_universe.asset_filter,
-                                                    )
-        else:
-            asset_list = asset_universe.asset_list
-
-        update_statistics = update_statistics.update_assets(asset_list, init_fallback_date=datetime(2017,1,1).replace(tzinfo=pytz.utc))
-        unique_identifier_range_map = {market_cap_symbol_map(a):{"start_date":update_statistics[a.unique_identifier],
-                                                                            "start_date_operand":">"}
-                                                                            for a in asset_list}
-
-        mc = self.historical_market_cap_ts.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map,
-                                                                great_or_equal=False,)
         if mc.shape[0] == 0:
             return pd.DataFrame()
-        asset_map = {a.get_spot_reference_asset_symbol(): a.unique_identifier for a in asset_list}
-        mc.index = mc.index.set_levels(
-            mc.index.levels[mc.index.names.index("unique_identifier")]
-            .str.split('-*-').str[0]
-            .map(asset_map),
-              # split on '-*-' and take [0]
-            level=1
-        )
+
+        # transform the ms unique identifer in the mc data into the actual execution venue identifier
+        transform_uid_map = {a.unique_identifier: share_class_to_asset_map[a.get_ms_share_class()] for a in ms_asset_list}
+        mc = mc.reset_index("unique_identifier")
+        mc["unique_identifier"] = mc["unique_identifier"].map(transform_uid_map)
+        mc.set_index("unique_identifier", append=True, inplace=True)
 
         mc_pivot = mc.reset_index().pivot(
             index="time_index",
