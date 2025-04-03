@@ -26,10 +26,8 @@ class ReportTool(BaseTool):
     2) Embed those charts into an HTML template.
     3) Optionally export the HTML to PDF using WeasyPrint.
     """
-    configuration = ReportConfig
-
-    def run(self, config: ReportConfig):
-        print("running tool")
+    def __init__(self, configuration: ReportConfig):
+        self.configuration = configuration
 
     def _fig_to_base64(self, fig) -> str:
         """
@@ -91,10 +89,11 @@ class ReportTool(BaseTool):
 
         return chart1_base64, chart2_base64
 
-    def run(self, config: ReportConfig, include_pdf: bool = True):
+    def run(self, include_pdf: bool = True):
         """
         Generates an HTML report (and optional PDF) in a minimal, self-contained way.
         """
+        print(f"Running tool with configuration {self.configuration}")
 
         # Create base64-encoded charts
         chart1, chart2 = self._generate_charts()

@@ -18,10 +18,10 @@ from mainsequence.virtualfundbuilder.enums import ResourceType
 class ResourceConfig(BaseModel):
     name: str
     type: ResourceType
-    object_signature : BaseModel
+    object_signature : dict
     markdown_documentation : str
     default_yaml: str
-    attributes: dict
+    attributes: Optional[dict]
 
     model_config = {
         "use_enum_values": True
@@ -100,12 +100,12 @@ def insert_in_registry(registry, cls, register_in_agent, name=None, attributes: 
     logger.debug(f"Registered {cls.TYPE} class '{key}': {cls}")
 
     if register_in_agent:
-
-        Thread(
-            target=_send_strategy_to_registry,
-            args=(cls.TYPE, cls),
-            kwargs={attributes=attributes}
-        ).start()
+        send_resource_to_backend(cls, attributes)
+        # Thread(
+        #     target=_send_strategy_to_registry,
+        #     args=(cls.TYPE, cls),
+        #     kwargs={attributes: attributes}
+        # ).start()
 
     return cls
 
@@ -159,16 +159,18 @@ def send_default_configuration():
     except Exception as e:
         logger.warning("Could register strategy to TSORM", e)
 
-
-
-def _send_strategy_to_registry(strategy_type, strategy_class, attributes: Optional[dict]=None):
-    """Helper function to send the strategy payload to the registry."""
-    def _get_wrapped_or_init(strategy_class):
+def send_resource_to_backend(resource_class, attributes: Optional[dict]=None):
+    """
+    Helper function to send the strategy payload to the registry.
+    Parses the arguments of the classes __init__ function and the __init__ functions of the parent classes
+    """
+    # TODO exclude arguments and example arguments need to come from subclass (or not at all)
+    def _get_wrapped_or_init(resource_class):
         """Returns the wrapped __init__ method if it exists, otherwise returns the normal __init__."""
-        init_method = strategy_class.__init__
+        init_method = resource_class.__init__
         return getattr(init_method, '__wrapped__', init_method)
 
-    init_method = _get_wrapped_or_init(strategy_class)
+    init_method = _get_wrapped_or_init(resource_class)
 
     object_signature = parse_object_signature(init_method, use_examples_for_default=["asset_universe"])
     markdown_documentation = build_markdown(
@@ -178,7 +180,7 @@ def _send_strategy_to_registry(strategy_type, strategy_class, attributes: Option
 
     # get the init signature form class and parent class, might need to be generalized to all parents
     exclude_args = ["is_live", "build_meta_data", "local_kwargs_to_ignore"]
-    for parent_class in strategy_class.__mro__[1:]:
+    for parent_class in resource_class.__mro__[1:]:
         init_method_parent = _get_wrapped_or_init(parent_class)
 
         parent_object_signature = parse_object_signature(
@@ -197,13 +199,13 @@ def _send_strategy_to_registry(strategy_type, strategy_class, attributes: Option
     default_yaml = object_signature_to_yaml(object_signature)
 
     resource_config = ResourceConfig(
-        name=strategy_class.__name__,
-        type=strategy_type,
+        name=resource_class.__name__,
+        type=resource_class.TYPE,
         object_signature=object_signature,
         markdown_documentation=markdown_documentation,
         default_yaml=default_yaml,
         attributes=attributes,
     )
-    from mainsequence.client import register_strategy
-    register_strategy(resource_config)
+    from mainsequence.client import register_strategy_in_backend
+    register_strategy_in_backend(resource_config)
 

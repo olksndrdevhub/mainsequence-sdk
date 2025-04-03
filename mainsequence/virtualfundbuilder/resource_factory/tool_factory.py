@@ -48,5 +48,5 @@ def register_tool(name=None, register_in_agent=True):
     If `name` is not provided, the class's name is used as the key.
     """
     def decorator(cls):
-        return insert_in_registry(TOOL_REGISTRY, cls, register_in_agent, name, custom_registry_function=send_tool_to_registry)
+        return insert_in_registry(TOOL_REGISTRY, cls, register_in_agent, name)
     return decorator

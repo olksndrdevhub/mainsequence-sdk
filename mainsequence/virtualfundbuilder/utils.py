@@ -10,7 +10,7 @@ import pandas as pd
 from mainsequence.client import CONSTANTS, Asset
 from mainsequence.tdag.time_series import ModelList, TimeSerie
 from mainsequence.client import CONSTANTS as TDAG_CONSTANTS
-from mainsequence.client.models_tdag import register_strategy
+from mainsequence.client.models_tdag import register_strategy_in_backend
 import numpy as np
 from tqdm import tqdm
 from numpy.linalg import LinAlgError
