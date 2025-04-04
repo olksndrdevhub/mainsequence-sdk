@@ -297,6 +297,9 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
 
         # Convert the accumulated raw data into asset instances with correct classes
         return create_from_serializer_with_class(all_results)
+
+    def get_ms_share_class(self):
+        return self.figi_details.main_sequence_share_class
         
 class AssetCategory(BaseObjectOrm, BasePydanticModel):
     id: int
@@ -381,7 +384,7 @@ class Asset(AssetMixin, BaseObjectOrm):
             time_out=timeout
         )
         if r.status_code not in [200,201]:
-            raise Exception(f" {r.text()}")
+            raise Exception(f"{r.text}")
 
         return TargetPortfolioIndexAsset(**r.json())
 
@@ -413,8 +416,8 @@ class AssetCurrencyPair(AssetMixin, BasePydanticModel):
         base_asset_symbol = self.symbol.replace(self.quote_asset.symbol, "")
         return base_asset_symbol
 
-
-
+    def get_ms_share_class(self):
+        return self.base_asset.get_ms_share_class()
 
 class FutureUSDMMixin(AssetMixin, BasePydanticModel):
     maturity_code: str = Field(..., max_length=50)

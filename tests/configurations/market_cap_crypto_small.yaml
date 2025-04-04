@@ -3,13 +3,8 @@ portfolio_build_configuration:
   assets_configuration:
     asset_universe:
       asset_filters:
-      - asset_type: currency_pair
-        execution_venue__symbol: binance
-        symbol: BTCUSDT
-      - asset_type: currency_pair
-        execution_venue__symbol: binance
-        symbol: ETHUSDT
-    price_type: vwap
+      - categories__unique_identifier: crypto_test
+    price_type: open
     prices_configuration:
       bar_frequency_id: 1d
       intraday_bar_interpolation_rule: ffill
@@ -23,13 +18,8 @@ portfolio_build_configuration:
       signal_assets_configuration:
         asset_universe:
           asset_filters:
-          - asset_type: currency_pair
-            execution_venue__symbol: binance
-            symbol: BTCUSDT
-          - asset_type: currency_pair
-            execution_venue__symbol: binance
-            symbol: ETHUSDT
-        price_type: vwap
+          - categories__unique_identifier: crypto_test
+        price_type: open
         prices_configuration:
           bar_frequency_id: 1d
           intraday_bar_interpolation_rule: ffill
@@ -40,9 +30,7 @@ portfolio_build_configuration:
     commission_fee: 0.00018
   portfolio_prices_frequency: 1d
   valuation_asset:
-    asset_type: cash_equity
-    execution_venue_symbol: alpaca
-    symbol: USD
+    unique_identifier: USD_alpaca_BBG0013HGBT3
 portfolio_vam_configuration:
   execution_configuration:
     max_data_latency_seconds: 60

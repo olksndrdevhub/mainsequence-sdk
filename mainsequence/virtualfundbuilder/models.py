@@ -337,10 +337,7 @@ class AssetMixinOverwrite(VFBConfigBaseModel):
         symbol (str): The symbol of the asset.
         execution_venue_symbol (ExecutionVenueNames): The execution venue where the asset traded. Needs to match with asset universe.
     """
-    unique_identifier: str=""
-    symbol: str="USD"
-    execution_venue_symbol: ExecutionVenueNames=ExecutionVenueNames.ALPACA
-    # asset_type: AssetTypes=AssetTypes.CASH_EQUITY # TODO
+    unique_identifier: str = MARKETS_CONSTANTS.UNIQUE_IDENTIFIER_USD
 
 class PortfolioBuildConfiguration(VFBConfigBaseModel):
     """
@@ -385,10 +382,9 @@ class PortfolioBuildConfiguration(VFBConfigBaseModel):
                     **values['assets_configuration']['prices_configuration'])
             )
         if not isinstance(values["valuation_asset"], AssetMixin):
-            tmp_asset = Asset.get(
+            values["valuation_asset"] = Asset.get(
                 unique_identifier=values["valuation_asset"]["unique_identifier"],
             )
-            values["valuation_asset"] = tmp_asset
 
         return values
 

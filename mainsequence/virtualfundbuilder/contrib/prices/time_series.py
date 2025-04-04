@@ -72,8 +72,10 @@ def get_prices_source(
     except DoesNotExist as e:
         logger.exception(f"HistoricalBarsSource does not exist for {source} -{bar_frequency_id} {data_mode}")
         raise e
-    api_ts = APITimeSerie(data_source_id=hbs.related_local_time_serie.data_source_id,
-                          local_hash_id=hbs.related_local_time_serie.local_hash_id)
+    api_ts = APITimeSerie(
+        data_source_id=hbs.related_local_time_serie.data_source_id,
+        local_hash_id=hbs.related_local_time_serie.local_hash_id
+    )
     return api_ts
 
 
