@@ -9,7 +9,7 @@ dotenv.load_dotenv('../../.env')
 from mainsequence.tdag import TimeSerie, ModelList
 from mainsequence.client.models_tdag import DataUpdates
 from mainsequence.client.models_vam import Asset
-from typing import Union,Optional
+from mainsequence.client import MARKETS_CONSTANTS
 
 
 def data_from_api(asset):

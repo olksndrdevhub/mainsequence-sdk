@@ -307,7 +307,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
     organization_owner_uid: str
     
     def __repr__(self):
-        return f"{self.name} source: {self.source}, {len(self.assets)} assets"
+        return f"{self.display_name} source: {self.source}, {len(self.assets)} assets"
 
     def update_assets(self, asset_ids: List[int]):
         self.remove_assets(self.assets)
