@@ -4,6 +4,7 @@ import inspect
 import importlib.util
 from threading import Thread
 
+from mainsequence.client.models_tdag import DynamicResource
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger, parse_object_signature, build_markdown, object_signature_to_yaml
 from typing import get_type_hints, List, Optional
 from pydantic import BaseModel
@@ -14,18 +15,6 @@ import ast
 
 logger = get_vfb_logger()
 from mainsequence.virtualfundbuilder.enums import ResourceType
-
-class ResourceConfig(BaseModel):
-    name: str
-    type: ResourceType
-    object_signature : dict
-    markdown_documentation : str
-    default_yaml: str
-    attributes: Optional[dict]
-
-    model_config = {
-        "use_enum_values": True
-    }
 
 class BaseResource():
     @classmethod
@@ -198,14 +187,12 @@ def send_resource_to_backend(resource_class, attributes: Optional[dict]=None):
 
     default_yaml = object_signature_to_yaml(object_signature)
 
-    resource_config = ResourceConfig(
+    resource_config = DynamicResource.create(
         name=resource_class.__name__,
-        type=resource_class.TYPE,
+        type=resource_class.TYPE.value,
         object_signature=object_signature,
         markdown_documentation=markdown_documentation,
         default_yaml=default_yaml,
         attributes=attributes,
     )
-    from mainsequence.client import register_strategy_in_backend
-    register_strategy_in_backend(resource_config)
 

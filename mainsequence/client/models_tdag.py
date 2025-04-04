@@ -1576,26 +1576,14 @@ class TimeScaleDB(DataSource):
         return df
 
 
-def register_strategy_in_backend(resource_config: BaseModel, timeout=None):
-    logger.debug(f"Register signal: {resource_config.name}")
-    url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/register_strategy/"
-    from requests.adapters import HTTPAdapter, Retry
-    s = requests.Session()
-    s.headers.update(loaders.auth_headers)
-    retries = Retry(total=2, backoff_factor=2)
-    s.mount('http://', HTTPAdapter(max_retries=retries))
+class DynamicResource(BasePydanticModel, BaseObjectOrm):
+    name: str
+    type: str
+    object_signature : dict
+    markdown_documentation : str
+    default_yaml: str
+    attributes: Optional[dict]
 
-    response = make_request(
-        s=s,
-        r_type="POST",
-        url=url,
-        payload={"json": resource_config.model_dump()},
-        loaders=loaders,
-        time_out=timeout
-    )
-    if response.status_code not in [200, 201]:
-        print(f"Error in response {response.text}")
-    return response
 
 def register_default_configuration(json_payload: dict, timeout=None):
     url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/register_default_configuration/"

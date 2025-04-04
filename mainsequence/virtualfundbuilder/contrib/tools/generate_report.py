@@ -89,7 +89,7 @@ class ReportTool(BaseTool):
 
         return chart1_base64, chart2_base64
 
-    def run(self, include_pdf: bool = True):
+    def run(self):
         """
         Generates an HTML report (and optional PDF) in a minimal, self-contained way.
         """

@@ -9,8 +9,6 @@ from pydantic.fields import PydanticUndefined, FieldInfo
 import pandas as pd
 from mainsequence.client import CONSTANTS, Asset
 from mainsequence.tdag.time_series import ModelList, TimeSerie
-from mainsequence.client import CONSTANTS as TDAG_CONSTANTS
-from mainsequence.client.models_tdag import register_strategy_in_backend
 import numpy as np
 from tqdm import tqdm
 from numpy.linalg import LinAlgError
@@ -23,10 +21,6 @@ from typing import Any, Dict, List, Union, get_type_hints
 from enum import Enum
 from pydantic import BaseModel
 import yaml
-import os
-from pathlib import Path
-import os
-import tempfile
 from mainsequence.logconf import logger
 
 def get_vfb_logger():
@@ -35,9 +29,6 @@ def get_vfb_logger():
     # If the logger doesn't have any handlers, create it using the custom function
     logger.bind(sub_application="virtualfundbuilder")
     return logger
-
-
-
 
 logger = get_vfb_logger()
 

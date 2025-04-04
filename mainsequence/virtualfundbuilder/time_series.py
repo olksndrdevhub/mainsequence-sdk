@@ -11,10 +11,10 @@ from typing import Dict, Tuple
 
 from .models import PortfolioBuildConfiguration, AssetsConfiguration
 from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_prices_timeseries
-from mainsequence.virtualfundbuilder.strategy_factory.rebalance_factory import RebalanceFactory
+from mainsequence.virtualfundbuilder.resource_factory.rebalance_factory import RebalanceFactory
 import json
 
-from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import SignalWeightsFactory
+from mainsequence.virtualfundbuilder.resource_factory.signal_factory import SignalWeightsFactory
 from tqdm import tqdm
 
 

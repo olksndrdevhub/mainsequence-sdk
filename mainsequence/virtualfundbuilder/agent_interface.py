@@ -1,4 +1,5 @@
 import copy
+import inspect
 import json
 import os
 import traceback
@@ -8,7 +9,8 @@ import yaml
 
 from mainsequence.virtualfundbuilder.enums import ResourceType
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
-from mainsequence.virtualfundbuilder.utils import _send_strategy_to_registry, is_jupyter_environment
+from mainsequence.virtualfundbuilder.utils import is_jupyter_environment
+from .resource_factory.base_factory import send_default_configuration, send_resource_to_backend
 from .utils import logger
 
 
@@ -39,7 +41,7 @@ class TDAGAgent:
         else:
             code = inspect.getsource(cls)
         attributes = {"code": code}
-        _send_strategy_to_registry(ResourceType.SIGNAL_WEIGHTS_STRATEGY, cls, attributes=attributes)
+        send_resource_to_backend(cls, attributes=attributes)
 
         payload = {
             "strategy_name": cls.__name__,
