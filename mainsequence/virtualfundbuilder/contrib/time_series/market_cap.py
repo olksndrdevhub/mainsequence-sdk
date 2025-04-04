@@ -139,7 +139,6 @@ class MarketCap(WeightsBase, TimeSerie):
             execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_SHARE_CLASS_EV
         )
 
-        update_statistics = update_statistics.update_assets(ms_asset_list, init_fallback_date=datetime(2017,1,1).replace(tzinfo=pytz.utc))
         unique_identifier_range_map = {
             a.unique_identifier: {
                 "start_date": update_statistics[a.unique_identifier],
