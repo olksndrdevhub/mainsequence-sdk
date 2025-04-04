@@ -83,7 +83,7 @@ def make_request(
         request_kwargs["json"] = payload["json"]
     else:
         # Fallback: no files, no json → just form fields
-        request_kwargs["data"] = payload
+        pass
 
     req = get_req(session=s)
     keep_request = True
