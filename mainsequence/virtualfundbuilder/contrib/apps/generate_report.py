@@ -15,8 +15,6 @@ from jinja2 import Template
 
 
 from mainsequence.client.models_tdag import Artifact
-# from weasyprint import HTML
-
 from mainsequence.virtualfundbuilder.resource_factory.app_factory import register_app, BaseApp
 
 
@@ -110,7 +108,6 @@ class ReportApp(BaseApp):
         """
         Generates an HTML report (and optional PDF) in a minimal, self-contained way.
         """
-        from weasyprint import HTML
         print(f"Running tool with configuration {self.configuration}")
 
         # Create base64-encoded charts
@@ -181,17 +178,16 @@ class ReportApp(BaseApp):
 
         print(f"HTML report generated: {output_html}")
 
-        pdf_path = "/tmp/report.pdf"
-        if pdf_path:
-            HTML(string=rendered_html).write_pdf(pdf_path)
-            print(f"PDF generated: {pdf_path}")
-
-        pdf_artifact = Artifact.upload_file(filepath=pdf_path, name="Report PDF", created_by_resource_name=self.__class__.__name__, bucket="Reports")
-        html_artifact = Artifact.upload_file(filepath=output_html, name="Report HTML", created_by_resource_name=self.__class__.__name__, bucket="Reports")
-        return pdf_artifact, html_artifact
+        # from weasyprint import HTML
+        # pdf_path = "/tmp/report.pdf"
+        # HTML(string=rendered_html).write_pdf(pdf_path)
+        # print(f"PDF generated: {pdf_path}")
+        # pdf_artifact = Artifact.upload_file(filepath=pdf_path, name="Report PDF", created_by_resource_name=self.__class__.__name__, bucket_name="Reports")
+        html_artifact = Artifact.upload_file(filepath=output_html, name="Report HTML", created_by_resource_name=self.__class__.__name__, bucket_name="Reports")
+        return html_artifact
 
 if __name__ == "__main__":
     # Example usage:
     config = ReportConfig()  # Or override fields as needed
     app = ReportApp(config)
-    pdf_artifact, html_artifact = app.run()  # Creates output_report.html and weasy_output_report.pdf
+    html_artifact = app.run()  # Creates output_report.html and weasy_output_report.pdf
