@@ -1,10 +1,12 @@
+import json
 import os
 import inspect
 import importlib.util
 from threading import Thread
 
-from mainsequence.virtualfundbuilder.utils import get_vfb_logger, _send_strategy_to_registry
-from typing import get_type_hints, List
+from mainsequence.client.models_tdag import DynamicResource
+from mainsequence.virtualfundbuilder.utils import get_vfb_logger, parse_object_signature, build_markdown, object_signature_to_yaml
+from typing import get_type_hints, List, Optional
 from pydantic import BaseModel
 from enum import Enum
 from pathlib import Path
@@ -12,8 +14,9 @@ import sys
 import ast
 
 logger = get_vfb_logger()
+from mainsequence.virtualfundbuilder.enums import ResourceType
 
-class BaseStrategy():
+class BaseResource():
     @classmethod
     def get_source_notebook(cls):
         """Retrieve the exact source code of the class from notebook cells."""
@@ -74,7 +77,7 @@ class BaseStrategy():
         return cls( **kwargs)
 
 
-def insert_in_registry(registry, cls, register_in_agent, name=None):
+def insert_in_registry(registry, cls, register_in_agent, name=None, attributes: Optional[dict]=None):
     """ helper for strategy decorators """
     key = name or cls.__name__  # Use the given name or the class name as the key
 
@@ -86,12 +89,12 @@ def insert_in_registry(registry, cls, register_in_agent, name=None):
     logger.debug(f"Registered {cls.TYPE} class '{key}': {cls}")
 
     if register_in_agent:
-        # Run _send_strategy_to_registry in its own thread so it doesn't block
-        Thread(
-            target=_send_strategy_to_registry,
-            args=(cls.TYPE, cls),
-            kwargs={"is_production": True}
-        ).start()
+        send_resource_to_backend(cls, attributes)
+        # Thread(
+        #     target=_send_strategy_to_registry,
+        #     args=(cls.TYPE, cls),
+        #     kwargs={attributes: attributes}
+        # ).start()
 
     return cls
 
@@ -122,3 +125,72 @@ class BaseFactory:
                     module = importlib.import_module(module_name)
             except Exception as e:
                 logger.warning(f"Error reading code in strategy {filename}: {e}")
+
+def send_default_configuration():
+    # TODO should be a tool
+    from mainsequence.virtualfundbuilder.utils import _convert_unknown_to_string, get_default_documentation
+    from mainsequence.client.models_tdag import register_default_configuration
+
+    default_config_dict = get_default_documentation()
+    payload = {
+        "default_config_dict": default_config_dict,
+    }
+
+    logger.debug(f"Send default documentation to Backend")
+    payload = json.loads(json.dumps(payload, default=_convert_unknown_to_string))
+    headers = {"Content-Type": "application/json"}
+    try:
+        response = register_default_configuration(json_payload=payload)
+        if response.status_code not in [200, 201]:
+            print(response.text)
+    except Exception as e:
+        logger.warning("Could register strategy to TSORM", e)
+
+def send_resource_to_backend(resource_class, attributes: Optional[dict]=None):
+    """
+    Helper function to send the strategy payload to the registry.
+    Parses the arguments of the classes __init__ function and the __init__ functions of the parent classes
+    """
+    # TODO exclude arguments and example arguments need to come from subclass (or not at all)
+    def _get_wrapped_or_init(resource_class):
+        """Returns the wrapped __init__ method if it exists, otherwise returns the normal __init__."""
+        init_method = resource_class.__init__
+        return getattr(init_method, '__wrapped__', init_method)
+
+    init_method = _get_wrapped_or_init(resource_class)
+
+    object_signature = parse_object_signature(init_method, use_examples_for_default=["asset_universe"])
+    markdown_documentation = build_markdown(
+        children_to_exclude=["front_end_details"],
+        root_class=init_method
+    )
+
+    # get the init signature form class and parent class, might need to be generalized to all parents
+    exclude_args = ["is_live", "build_meta_data", "local_kwargs_to_ignore"]
+    for parent_class in resource_class.__mro__[1:]:
+        init_method_parent = _get_wrapped_or_init(parent_class)
+
+        parent_object_signature = parse_object_signature(
+            init_method_parent,
+            use_examples_for_default=["is_live"],
+            exclude_attr=exclude_args
+        )
+        parent_markdown_documentation = build_markdown(
+            children_to_exclude=["front_end_details"],
+            root_class=init_method_parent,
+            elements_to_exclude=exclude_args
+        )
+        markdown_documentation += parent_markdown_documentation
+        object_signature.update(parent_object_signature)
+
+    default_yaml = object_signature_to_yaml(object_signature)
+
+    resource_config = DynamicResource.create(
+        name=resource_class.__name__,
+        type=resource_class.TYPE.value,
+        object_signature=object_signature,
+        markdown_documentation=markdown_documentation,
+        default_yaml=default_yaml,
+        attributes=attributes,
+    )
+

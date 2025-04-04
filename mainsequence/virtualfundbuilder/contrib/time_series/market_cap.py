@@ -12,7 +12,7 @@ from mainsequence.client import CONSTANTS,Asset
 from mainsequence.virtualfundbuilder.enums import ExecutionVenueNames
 
 from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
-from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import WeightsBase, register_signal_class
+from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
 from mainsequence.virtualfundbuilder.utils import TIMEDELTA
 
 

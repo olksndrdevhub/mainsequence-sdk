@@ -1576,17 +1576,14 @@ class TimeScaleDB(DataSource):
         return df
 
 
-def register_strategy(json_payload: dict, timeout=None):
-    url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/register_strategy/"
-    from requests.adapters import HTTPAdapter, Retry
-    s = requests.Session()
-    s.headers.update(loaders.auth_headers)
-    retries = Retry(total=2, backoff_factor=2)
-    s.mount('http://', HTTPAdapter(max_retries=retries))
+class DynamicResource(BasePydanticModel, BaseObjectOrm):
+    name: str
+    type: str
+    object_signature : dict
+    markdown_documentation : str
+    default_yaml: str
+    attributes: Optional[dict]
 
-    r = make_request(s=s, r_type="POST", url=url, payload={"json": json_payload},
-                     loaders=loaders, time_out=timeout)
-    return r
 
 def register_default_configuration(json_payload: dict, timeout=None):
     url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/register_default_configuration/"
@@ -1612,6 +1609,25 @@ def create_configuration_for_strategy(json_payload: dict, timeout=None):
                      loaders=loaders, time_out=200)
     return r
 
+
+class Artifact(BasePydanticModel, BaseObjectOrm):
+    name: str
+    created_by_resource_name: str
+    bucket_name: str
+    content: Any
+
+    @staticmethod
+    def upload_file(filepath, *args, **kwargs):
+
+        with open(filepath, "rb") as f:
+            data = {
+                "name": "My Example Artifact",
+                "created_by_resource_name": "MyCustomResource",
+                "bucket_name": "my-bucket-2023",  # will be created if doesn't exist
+            }
+            files = {"content": (filepath, f, "application/pdf")}
+            artifact = Artifact.create(files=files, **data)
+            return artifact
 
 # TODO can we remove this?? ROOT_URLS does not seem to exist
 class DynamicTableHelpers:
