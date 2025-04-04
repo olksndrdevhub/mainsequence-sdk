@@ -42,6 +42,7 @@ class PricesConfiguration(VFBConfigBaseModel):
     upsample_frequency_id: str = "1d"  # "15m"
     intraday_bar_interpolation_rule: str = "ffill"
     is_live: bool = False
+    markets_time_series_unique_id_list:List[str]
 
 @lru_cache(maxsize=1028)  # Cache up to 1028 different combinations
 def cached_asset_filter(*args,**kwargs):
@@ -58,7 +59,6 @@ class AssetFilter(VFBConfigBaseModel):
     categories__unique_identifier: Optional[str] = None
 
     # Asset Properties
-    asset_type: Optional[str] = None
     symbol: Optional[str] = None
     execution_venue__symbol: Optional[str] = None
     

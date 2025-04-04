@@ -335,7 +335,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
         # Return a new instance of AssetCategory built from the response JSON.
         return AssetCategory(**r.json())
 
-    def remove_assets(self, asset_ids: List[int]) -> "AssetCategory":
+    def remove_assets(self, asset_ids:List[int]) -> "AssetCategory":
         """
         Remove the given asset IDs from this category.
         Expects a payload: {"assets": [<asset_id1>, <asset_id2>, ...]}
@@ -353,7 +353,24 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
             raise Exception(f"Error removing assets: {r.text()}")
         # Return a new instance of AssetCategory built from the response JSON.
         return AssetCategory(**r.json())
-    
+
+    @classmethod
+    def get_or_create(cls,*args,**kwargs):
+        url = f"{cls.get_object_url()}/get-or-create/"
+        payload = {"json": kwargs}
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            payload=payload
+        )
+        if r.status_code not in [200, 201]:
+            raise Exception(f"Error appending creating: {r.text()}")
+        # Return a new instance of AssetCategory built from the response JSON.
+        return AssetCategory(**r.json())
+
+
 class Asset(AssetMixin, BaseObjectOrm):
 
     def get_spot_reference_asset_symbol(self):
