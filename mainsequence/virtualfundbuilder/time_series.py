@@ -71,7 +71,6 @@ class PortfolioStrategy(TimeSerie):
     def __init__(
             self,
             portfolio_build_configuration: PortfolioBuildConfiguration,
-            is_live: bool,
             *args, **kwargs
     ):
         """
@@ -82,9 +81,7 @@ class PortfolioStrategy(TimeSerie):
                 including assets, execution parameters, and backtesting weights.
             is_live (bool): Flag indicating whether the strategy is running in live mode.
         """
-        self.is_live = is_live
 
-        portfolio_build_configuration.assets_configuration.prices_configuration.is_live = self.is_live
         self.execution_configuration = portfolio_build_configuration.execution_configuration
         self.backtesting_weights_config = portfolio_build_configuration.backtesting_weights_configuration
         self.valuation_asset = portfolio_build_configuration.valuation_asset
@@ -117,20 +114,8 @@ class PortfolioStrategy(TimeSerie):
         self.rebalancer_explanation = ""  # TODO: Add rebalancer explanation
         super().__init__(*args, **kwargs)
 
-    def run_after_post_init_routines(self):
-        """
-        Runs routines that should be executed after the TimeSerie post-initialization.
 
-        Adds tags to the local persist manager based on the live status and environment variables.
-        """
-        self.is_live_str = "LIVE" if self.is_live else "BACKTEST"
-        portfolio_tag = os.environ.get("PORTFOLIO_TAG", None)
-        tags = [f"VFB-{self.is_live_str}"]
-        if portfolio_tag is not None:
-            tags.append(portfolio_tag)
 
-        if self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            self.local_persist_manager.add_tags(tags=tags)
 
     def _set_asset_list(self):
         """

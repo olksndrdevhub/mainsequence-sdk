@@ -20,13 +20,16 @@ class PortfolioInterface():
     directly with a full tree update.
     """
 
-    def __init__(self, portfolio_config_template: dict, configuration_name: str=None):
+    def __init__(self, portfolio_config_template: dict,
+                 build_purpose=CONSTANTS.PORTFOLIO_BUILD_FOR_BACKTEST,
+                 configuration_name: str=None):
         """
         Initializes the portfolio strategy with the necessary configurations.
         """
         # persist data source to pickle
         if configuration_name:
             self.check_valid_configuration_name(configuration_name)
+        self.build_purpose=build_purpose
         self.portfolio_config_template = portfolio_config_template
         self.portfolio_config = configuration_sanitizer(portfolio_config_template, auto_complete=True)
         self.configuration_name = configuration_name
@@ -35,7 +38,6 @@ class PortfolioInterface():
         self.portfolio_vam_config = self.portfolio_config.portfolio_vam_configuration
         self.portfolio_build_configuration = self.portfolio_config.portfolio_build_configuration
         self.logger = get_vfb_logger()
-
         self._is_initialized = False
 
     def __str__(self):
@@ -54,14 +56,10 @@ class PortfolioInterface():
         patch = os.environ.get("PATCH_BUILD_CONFIGURATION", "False")
         os.environ[
             "PATCH_BUILD_CONFIGURATION"] = "True"  # It always needs to be true as we always want to overwrite the build
-        self.portfolio_strategy_time_serie_backtest = PortfolioStrategy(
-            is_live=False,
+        self.portfolio_strategy_time_serie = PortfolioStrategy(
             portfolio_build_configuration=copy.deepcopy(self.portfolio_build_configuration)
         )
-        self.portfolio_strategy_time_serie_live = PortfolioStrategy(
-            is_live=True,
-            portfolio_build_configuration=copy.deepcopy(self.portfolio_build_configuration)
-        )
+
         os.environ["PATCH_BUILD_CONFIGURATION"] = patch
         self._is_initialized = True
 
@@ -75,8 +73,7 @@ class PortfolioInterface():
         if not self._is_initialized:
             self._initialize_nodes()
 
-        live_ts = self.portfolio_strategy_time_serie_live
-        backtest_ts = self.portfolio_strategy_time_serie_backtest
+        portfolio_ts = self.portfolio_strategy_time_serie_live
 
         def build_vam_portfolio(ts,build_purpose):
             from mainsequence.client import BACKEND_DETACHED
@@ -143,11 +140,10 @@ class PortfolioInterface():
 
             return target_portfolio
 
-        live_portfolio = build_vam_portfolio(live_ts, build_purpose=CONSTANTS.PORTFOLIO_BUILD_FOR_EXECUTION,)
-        backtest_portfolio = build_vam_portfolio(backtest_ts, build_purpose=CONSTANTS.PORTFOLIO_BUILD_FOR_BACKTEST,)
+        target_portfolio = build_vam_portfolio(portfolio_ts, build_purpose=self.build_purpose)
 
         # create index Asset
-        asset_symbol = f"{live_ts.build_prefix()}_{live_portfolio.id}_{backtest_portfolio.id}"
+        asset_symbol = f"{portfolio_ts.build_prefix()}_{target_portfolio.id}_{self.build_purpose}"
         
         if BACKEND_DETACHED():
             index_asset = TargetPortfolioIndexAsset(symbol=asset_symbol,
@@ -162,29 +158,30 @@ class PortfolioInterface():
                                                         "calendar"])
                                                     )
         else:
-            index_asset = Asset.create_or_update_index_asset_from_portfolios(live_portfolio=live_portfolio.id,
-                                                                             backtest_portfolio=backtest_portfolio.id,
-                                                                             valuation_asset=live_ts.valuation_asset.id,
+            index_asset = Asset.create_or_update_index_asset_from_portfolios(reference_portfolio=target_portfolio.id,
+                                                                             valuation_asset=portfolio_ts.valuation_asset.id,
                                                                              calendar=
                                                                              self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
                                                                                  "calendar"]
                                                                              )
         self.index_asset = index_asset
-        self.live_portfolio = live_portfolio
-        self.backtest_portfolio = backtest_portfolio
-        return live_portfolio, backtest_portfolio, index_asset
+        self.target_portfolio = target_portfolio
 
-    def run(self, portfolio_tags:Optional[List[str]]=None, update_tree=True, *args, **kwargs):
+        return target_portfolio, index_asset
+
+    def run(self,
+            debug_mode=True,force_update=True,
+            update_tree=True, *args, **kwargs):
         if not self._is_initialized:
             self._initialize_nodes()
 
-        if self.portfolio_strategy_time_serie_backtest.data_source.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-            self.portfolio_strategy_time_serie_backtest.run(debug_mode=True, update_tree=update_tree, force_update=True, **kwargs)
+        if self.portfolio_strategy_time_serie.data_source.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+            self.portfolio_strategy_time_serie.run(debug_mode=debug_mode, update_tree=update_tree, force_update=force_update, **kwargs)
             self.build_target_portfolio_in_vam(portfolio_tags=portfolio_tags)
         else:
-            self.portfolio_strategy_time_serie_backtest.run_local_update(*args, **kwargs)
+            self.portfolio_strategy_time_serie.run_local_update(*args, **kwargs)
 
-        res = self.portfolio_strategy_time_serie_backtest.get_df_between_dates()
+        res = self.portfolio_strategy_time_serie.get_df_between_dates()
         if len(res) > 0:
             res = res.sort_values("time_index")
         return res

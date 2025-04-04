@@ -520,6 +520,7 @@ class InterpolatedPrices(TimeSerie):
         self.intraday_bar_interpolation_rule = intraday_bar_interpolation_rule
         self.bar_frequency_id = bar_frequency_id
         self.upsample_frequency_id = upsample_frequency_id
+        self.markets_time_series_unique_id_list=markets_time_series_unique_id_list
 
 
         price_source = {mud: get_time_serie_from_markets_unique_id(
@@ -560,7 +561,7 @@ class InterpolatedPrices(TimeSerie):
         """
         Returns a human-readable string representation of the object.
         """
-        name = f"{self.__class__.__name__} Upsample: {self.upsample_frequency_id} in {self.execution_venue_symbol}"
+        name = f"{self.__class__.__name__} Upsample: {self.upsample_frequency_id} {self.markets_time_series_unique_id_list}"
         return name
 
     def run_after_post_init_routines(self):
@@ -576,13 +577,14 @@ class InterpolatedPrices(TimeSerie):
         except LocalTimeSeriesDoesNotExist:
             return None  # first update
 
-        if self.execution_venue_symbol != MARKETS_CONSTANTS.MAIN_SEQUENCE_EV:
 
-            if not self.metadata.protect_from_deletion:
-                self.local_persist_manager.protect_from_deletion()
 
-            if not self.metadata.open_for_everyone:
-                self.local_persist_manager.open_for_everyone()
+
+        if not self.metadata.protect_from_deletion:
+            self.local_persist_manager.protect_from_deletion()
+
+        if not self.metadata.open_for_everyone:
+            self.local_persist_manager.open_for_everyone()
 
     def _transform_raw_data_to_upsampled_df(
             self,
@@ -690,36 +692,11 @@ class InterpolatedPrices(TimeSerie):
         if isinstance(self.bars_ts, WrapperTimeSerie):
             raw_data_df = []
             for k, ts in self.bars_ts.related_time_series.items():
-                if isinstance(ts, PortfolioStrategy) == False:
-                    raise NotImplementedError
-                tmp_data = unique_identifier_range_map[asset_id_map[k]]
+                tmp_data = ts.filter_by_assets_ranges(
+                    unique_identifier_range_map=unique_identifier_range_map)
+                a=5
 
-                tmp_df = ts.get_df_between_dates(
-                    start_date=tmp_data["start_date"],
-                    great_or_equal=(tmp_data["start_date_operand"] == ">="),
 
-                )
-
-                tmp_df["unique_identifier"] = asset_id_map[k]
-                tmp_df = tmp_df.set_index(["unique_identifier"], append=True)
-
-                tmp_df = tmp_df.rename(columns={"portfolio_minus_fees": "close"})
-                tmp_df["vwap"] = tmp_df["close"]
-                tmp_df["open"] = tmp_df["close"]
-                tmp_df["high"] = tmp_df["close"]
-                tmp_df["low"] = tmp_df["close"]
-                tmp_df["volume"] = 1.0
-                tmp_df["first_trade_time"] = tmp_df.index.get_level_values("time_index")
-                tmp_df["last_trade_time"] = tmp_df.index.get_level_values("time_index")
-                tmp_df["open_time"] = tmp_df.index.get_level_values("time_index") - string_freq_to_time_delta(
-                    ts.assets_configuration.prices_configuration.bar_frequency_id)
-
-                raw_data_df.append(tmp_df[["vwap", "open", "close", "high", "low", "volume", "first_trade_time",
-                                           "last_trade_time", "open_time"]])
-            raw_data_df = pd.concat(raw_data_df, axis=0)
-
-        else:
-            raw_data_df = self.bars_ts.filter_by_assets_ranges(unique_identifier_range_map=unique_identifier_range_map)
 
         if raw_data_df.shape[0] == 0:
             self.logger.info("New new data to interpolate")

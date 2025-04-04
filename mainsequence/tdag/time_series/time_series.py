@@ -678,7 +678,7 @@ class GraphNodeMethods(ABC):
                             is_api = isinstance(tm_ts, APITimeSerie)
                             dependecy_map[(tm_ts.local_hash_id, tm_ts.data_source_id)] = {"is_pickle": False,
                                                                                           "ts": tm_ts}
-                            tm_ts.get_update_map(dependecy_map)
+                            # tm_ts.get_update_map(dependecy_map)
 
                 if isinstance(value, TimeSerie):
                     value.local_persist_manager  # before connection call local persist manager to garantee ts is created
@@ -697,7 +697,7 @@ class GraphNodeMethods(ABC):
                     if "is_api_time_serie_pickled" in value.keys():
                         is_api = isinstance(tm_ts, APITimeSerie)
                         dependecy_map[(value.local_hash_id, value.data_source_id)] = {"is_pickle": False, "ts": tm_ts}
-                        tm_ts.get_update_map(dependecy_map)
+                        # tm_ts.get_update_map(dependecy_map)
             except Exception as e:
                 raise e
         return dependecy_map
