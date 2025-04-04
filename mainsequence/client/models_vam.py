@@ -784,18 +784,7 @@ class OrdersExecutionConfiguration(BaseModel):
     broker_class: str
     broker_configuration: dict
 
-class TargetPortfolioExecutionConfiguration(BaseObjectOrm,BasePydanticModel):
-    related_portfolio: Optional[int]=None
-    portfolio_build_configuration: Optional[Dict[str, Any]] = None
-    orders_execution_configuration: Optional[OrdersExecutionConfiguration] = None
 
-    rebalance_tolerance_percent: float = Field(default=0.02, ge=0)
-    minimum_notional_for_a_rebalance: float = Field(default=15.00, ge=0)
-    max_latency_in_cdc_seconds: float = Field(default=60.00, ge=0)
-    unwind_funds_hanging_limit_seconds: Optional[float] = None
-    minimum_positions_holding_seconds: Optional[float] = None
-    rebalance_step_every_seconds: Optional[float] = None
-    max_data_latency_seconds: Optional[float] = None
 
 class PortfolioTags(BasePydanticModel):
     id:Optional[int]=None
@@ -823,7 +812,6 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     latest_weights:Optional[List[Dict]] =None
 
     creation_date: Optional[datetime.datetime] = None
-    execution_configuration: Union[int, TargetPortfolioExecutionConfiguration]
 
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_time_index_name: Optional[str] = Field(None, max_length=20)

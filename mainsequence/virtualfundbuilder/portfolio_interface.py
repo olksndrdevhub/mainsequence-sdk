@@ -73,7 +73,7 @@ class PortfolioInterface():
         if not self._is_initialized:
             self._initialize_nodes()
 
-        portfolio_ts = self.portfolio_strategy_time_serie_live
+        portfolio_ts = self.portfolio_strategy_time_serie
 
         def build_vam_portfolio(ts,build_purpose):
             from mainsequence.client import BACKEND_DETACHED
@@ -177,7 +177,7 @@ class PortfolioInterface():
 
         if self.portfolio_strategy_time_serie.data_source.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             self.portfolio_strategy_time_serie.run(debug_mode=debug_mode, update_tree=update_tree, force_update=force_update, **kwargs)
-            self.build_target_portfolio_in_vam(portfolio_tags=portfolio_tags)
+            self.build_target_portfolio_in_vam()
         else:
             self.portfolio_strategy_time_serie.run_local_update(*args, **kwargs)
 

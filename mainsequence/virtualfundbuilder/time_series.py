@@ -97,7 +97,6 @@ class PortfolioStrategy(TimeSerie):
 
         self.portfolio_frequency = self.assets_configuration.prices_configuration.upsample_frequency_id
 
-
         self.full_signal_weight_config = copy.deepcopy(self.backtesting_weights_config.signal_weights_configuration)
 
         self.signal_weights_name = self.backtesting_weights_config.signal_weights_name
@@ -106,16 +105,12 @@ class PortfolioStrategy(TimeSerie):
         )
         self.signal_weights = SignalWeightClass.build_and_parse_from_configuration(**self.full_signal_weight_config)
 
-
         self.rebalance_strategy_name = self.backtesting_weights_config.rebalance_strategy_name
         RebalanceClass = RebalanceFactory.get_rebalance_strategy(rebalance_strategy_name=self.rebalance_strategy_name)
         self.rebalancer = RebalanceClass(**self.backtesting_weights_config.rebalance_strategy_configuration)
 
         self.rebalancer_explanation = ""  # TODO: Add rebalancer explanation
         super().__init__(*args, **kwargs)
-
-
-
 
     def _set_asset_list(self):
         """
@@ -133,9 +128,8 @@ class PortfolioStrategy(TimeSerie):
 
         asset_universe = self.assets_configuration.asset_universe
         self.asset_list = asset_universe.asset_list
-        self.asset_list_map = asset_universe.get_assets_per_execution_venue()
 
-    def _calculate_start_end_dates(self, update_statistics:DataUpdates):
+    def _calculate_start_end_dates(self, update_statistics: DataUpdates):
         """
         Calculates the start and end dates for processing based on the latest value and available data.
         The end date is calcualted to get the end dates of the prices of all assets involved, and using the earliest to ensure that all assets have prices.
@@ -147,19 +141,18 @@ class PortfolioStrategy(TimeSerie):
             Tuple[datetime, datetime]: A tuple containing the start date and end date for processing.
         """
         # Get last observations for each exchange
-        update_statics_from_dependencies = [
-            ts.get_update_statistics(unique_identifier_list=[a.unique_identifier for a in self.asset_list_map[exchange]])
-            for exchange, ts in self.bars_ts.related_time_series.items()
-        ]
-        earliest_last_value = [v._max_time_in_update_statistics for v in update_statics_from_dependencies if 
-                               v._max_time_in_update_statistics is not None]  # filter out None
+        update_statics_from_dependencies = self.bars_ts.get_update_statistics(
+            unique_identifier_list=[a.unique_identifier for a in self.asset_list])
 
-        if len(earliest_last_value) == 0:
+
+        earliest_last_value = update_statics_from_dependencies._max_time_in_update_statistics
+
+        if earliest_last_value is None:
             self.logger.warning(f"update_statics_from_dependencies {update_statics_from_dependencies}")
             raise Exception("Prices are empty")
 
         # Determine the last value where all assets have data
-        end_date = min(earliest_last_value)
+        end_date = earliest_last_value
 
         # Handle case when latest_value is None
         start_date = update_statistics._max_time_in_update_statistics
@@ -215,7 +208,7 @@ class PortfolioStrategy(TimeSerie):
             pd.DataFrame: Prepared backtesting weights.
         """
         # Filter for dates after latest_value
-        if update_statistics.is_empty() ==False:
+        if update_statistics.is_empty() == False:
             weights = weights[weights.index > update_statistics._max_time_in_update_statistics]
         if weights.empty:
             return pd.DataFrame()
@@ -229,10 +222,11 @@ class PortfolioStrategy(TimeSerie):
         weights = weights.dropna(subset=["weights_current"])
         # Filter again for dates after latest_value
         if update_statistics._max_time_in_update_statistics is not None:
-            weights = weights[weights.index.get_level_values("time_index") > update_statistics._max_time_in_update_statistics]
+            weights = weights[
+                weights.index.get_level_values("time_index") > update_statistics._max_time_in_update_statistics]
 
         # Prepare the weights before by using the last weights used for the portfolio and the new weights
-        if  update_statistics.is_empty() == False:
+        if update_statistics.is_empty() == False:
             last_weights = self._get_last_weights()
             weights = pd.concat([last_weights, weights], axis=0).fillna(0)
 
@@ -269,7 +263,6 @@ rebalance details:
         signa_name = self.signal_weights_name
         return f"{reba_strat}_{signa_name}"
 
-
     def _calculate_portfolio_returns(self, weights: pd.DataFrame, prices: pd.DataFrame, ) -> pd.DataFrame:
         """
         Calculates the returns for the portfolio based on the asset prices and their respective weights,
@@ -297,8 +290,9 @@ rebalance details:
         # get the first date for prices
         first_price_date = prices.stack().dropna().index.union(price_current.stack().dropna().index)[0][0]
 
-        prices = price_current.combine_first(prices).sort_index().ffill()  # combine raw prices with signal prices for continous price ts
-        prices=prices.reindex(weights.index)
+        prices = price_current.combine_first(
+            prices).sort_index().ffill()  # combine raw prices with signal prices for continous price ts
+        prices = prices.reindex(weights.index)
 
         returns = (prices / prices.shift(1) - 1).fillna(0.0)
         returns.replace([np.inf, -np.inf], 0, inplace=True)
@@ -317,7 +311,7 @@ rebalance details:
         portfolio_returns = pd.DataFrame({
             "return": weighted_returns.sum(axis=1) - fees,
         })
-        portfolio_returns=portfolio_returns[portfolio_returns.index>=first_price_date]
+        portfolio_returns = portfolio_returns[portfolio_returns.index >= first_price_date]
 
         return portfolio_returns
 
@@ -369,7 +363,8 @@ rebalance details:
         # calculate close metrics
         rebalance_weights_serialized = pd.DataFrame(index=weights_pivot.index)
         for portfolio_column, weights_column in self.WEIGHTS_TO_PORTFOLIO_COLUMNS.items():
-            rebalance_weights_serialized[portfolio_column] = [json.dumps(r) for r in weights_pivot[weights_column].to_dict(orient="records")]
+            rebalance_weights_serialized[portfolio_column] = [json.dumps(r) for r in
+                                                              weights_pivot[weights_column].to_dict(orient="records")]
 
         # Join the serialized weights to the portfolio DataFrame
         portfolio = portfolio.join(rebalance_weights_serialized, how='left')
@@ -415,21 +410,15 @@ rebalance details:
         NOTE: prices should be upsampled the same way as new_index, no need to upsample
         """
 
-        def get_prices_helper(start_to_try):
-            " Helper to try out different start times so interpolation can work "
-            return bars_ts.pandas_df_concat_on_rows_by_key_between_dates(
-                start_date=start_to_try,
-                end_date=new_index.max(),
-                great_or_equal=True,
-                less_or_equal=True,
-                unique_identifier_list=unique_identifier_list,
-            ).sort_values("time_index").drop(columns=["key"]) #no need to have the key as they all  have uniqyue)_id
 
-        raw_prices = get_prices_helper(start_to_try=new_index.min() - pd.Timedelta(index_freq))
+
+        raw_prices = bars_ts.get_df_between_dates(start_date=new_index.min() - pd.Timedelta(index_freq),  end_date=new_index.max(), great_or_equal=True,
+                less_or_equal=True, unique_identifier_list=unique_identifier_list,).sort_values("time_index")
 
         # fallback if we need more data before to interpolate first value of new_index
         if len(raw_prices) == 0 or (raw_prices.index.get_level_values("time_index").min() > new_index.min()):
-            raw_prices = get_prices_helper(start_to_try=None)
+            raw_prices =bars_ts.get_df_between_dates(start_date=None,
+                unique_identifier_list=unique_identifier_list,).sort_values("time_index")
 
         if len(raw_prices) == 0:
             self.logger.info(f"No prices data in index interpolation for node {bars_ts.hash_id}")
@@ -457,7 +446,7 @@ rebalance details:
         Returns:
             pd.DataFrame: Updated portfolio values with and without fees and returns.
         """
-        
+
         self._set_asset_list()
         update_statistics = update_statistics.update_assets(
             asset_list=None,
@@ -505,8 +494,9 @@ rebalance details:
 
         if update_statistics.is_empty() == False:
             interpolated_prices = interpolated_prices[
-                interpolated_prices.index.get_level_values("time_index") > update_statistics._max_time_in_update_statistics
-            ]
+                interpolated_prices.index.get_level_values(
+                    "time_index") > update_statistics._max_time_in_update_statistics
+                ]
             signal_weights = signal_weights[signal_weights.index > update_statistics._max_time_in_update_statistics]
 
         # Calculate rebalanced weights
@@ -525,7 +515,7 @@ rebalance details:
             return pd.DataFrame()
 
         # Calculate portfolio returns
-        portfolio_returns = self._calculate_portfolio_returns(weights, raw_prices )
+        portfolio_returns = self._calculate_portfolio_returns(weights, raw_prices)
         portfolio = self._calculate_portfolio_values(portfolio_returns, update_statistics)
 
         # prepare for storage

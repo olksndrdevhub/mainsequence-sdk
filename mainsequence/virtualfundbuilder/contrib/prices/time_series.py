@@ -694,8 +694,8 @@ class InterpolatedPrices(TimeSerie):
             for k, ts in self.bars_ts.related_time_series.items():
                 tmp_data = ts.filter_by_assets_ranges(
                     unique_identifier_range_map=unique_identifier_range_map)
-                a=5
-
+                raw_data_df.append(tmp_data)
+            raw_data_df=pd.concat(raw_data_df,axis=0)
 
 
         if raw_data_df.shape[0] == 0:
