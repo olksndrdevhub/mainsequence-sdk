@@ -42,15 +42,16 @@ def get_interpolated_prices_timeseries(assets_configuration: AssetsConfiguration
 
     asset_universe = assets_configuration.asset_universe
     venue_asset_filters_map = asset_universe.get_assets_per_execution_venue()
-    for execution_venue, asset_list in venue_asset_filters_map.items():
-        time_series_dict[execution_venue] = InterpolatedPrices(
-            execution_venue_symbol=execution_venue,
-            asset_list=asset_list,
-            data_mode=data_mode,
-            **prices_configuration_kwargs
-        )
 
-    return WrapperTimeSerie(time_series_dict=time_series_dict)
+    asset_list = [item for sublist in venue_asset_filters_map.values() for item in sublist]
+
+
+
+    return InterpolatedPrices(
+        asset_list=asset_list,
+        data_mode=data_mode,
+        **prices_configuration_kwargs
+    )
 
 
 def get_time_serie_from_markets_unique_id(market_time_serie_unique_identifier: str):
@@ -497,7 +498,7 @@ class InterpolatedPrices(TimeSerie):
             asset_list: List[Asset],
             bar_frequency_id: str,
             intraday_bar_interpolation_rule: str,
-            markets_time_series_unique_id_list: [List[str]],
+            markets_time_series_unique_id_list: str,
             data_mode: Literal["live", "backtest"],
             upsample_frequency_id: Optional[str] = None,
             asset_filter: Optional[dict] = None,
@@ -522,9 +523,10 @@ class InterpolatedPrices(TimeSerie):
         self.upsample_frequency_id = upsample_frequency_id
 
         self.execution_venue_symbol = execution_venue_symbol
-        price_source ={mud: get_time_serie_from_markets_unique_id(
+
+        price_source = {mud: get_time_serie_from_markets_unique_id(
             market_time_serie_unique_identifier=mud) for mud in markets_time_series_unique_id_list}
-        self.bars_ts =  WrapperTimeSerie(time_series_dict=price_source)
+        self.bars_ts = WrapperTimeSerie(time_series_dict=price_source)
 
 
         self.set_asset_details()
@@ -539,8 +541,7 @@ class InterpolatedPrices(TimeSerie):
         if len(asset_list) == 0:
             raise Exception(f"Asset list has no assets {self.asset_list}")
 
-        equal_venue = [a.execution_venue.symbol == self.execution_venue_symbol for a in asset_list]
-        assert all(equal_venue), "InterpolatedPrices should have only one type of execution_venue"
+
 
         self.asset_calendar_map = {a.unique_identifier: a.calendar for a in asset_list}
         self.asset_list = asset_list
