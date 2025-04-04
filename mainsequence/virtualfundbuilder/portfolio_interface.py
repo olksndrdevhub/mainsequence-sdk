@@ -108,8 +108,7 @@ class PortfolioInterface():
             user_kwargs.pop("front_end_details", None)
 
             standard_kwargs.update(user_kwargs)
-            standard_kwargs['execution_configuration']["orders_execution_configuration"]["broker_class"] = \
-                standard_kwargs['execution_configuration']["orders_execution_configuration"]["broker_class"].value
+
             standard_kwargs["available_in_venues__symbols"] = ts.required_execution_venues_symbols
             standard_kwargs["calendar_name"]=self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
                                                         "calendar"]

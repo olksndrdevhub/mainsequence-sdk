@@ -275,9 +275,7 @@ def configuration_sanitizer(configuration: dict, auto_complete=False) -> Portfol
         portfolio_build_config['backtesting_weights_configuration']['signal_weights_configuration'][
             'signal_assets_configuration']["asset_universe"] = AssetUniverse(**swc__asset_universe_configuration)
 
-    configuration["portfolio_vam_configuration"]['front_end_details'] = {
-        'about_text': configuration["portfolio_vam_configuration"]['front_end_details']
-    }
+    configuration["portfolio_vam_configuration"]['front_end_details'] = configuration["portfolio_vam_configuration"]['front_end_details']
 
     if "portfolio_prices_frequency" not in portfolio_build_config:
         if not auto_complete:
