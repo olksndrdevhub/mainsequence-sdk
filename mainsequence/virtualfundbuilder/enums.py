@@ -26,4 +26,4 @@ class RunStrategy(Enum):
 class ResourceType(Enum):
     SIGNAL_WEIGHTS_STRATEGY = "signal_weights_strategy"
     REBALANCE_STRATEGY = "rebalance_strategy"
-    TOOL = "tool"
+    APP = "app"

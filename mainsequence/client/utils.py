@@ -44,40 +44,57 @@ def get_authorization_headers():
     return headers
 
 def make_request(
-        s,
-        r_type: str,
-        url: str,
-        loaders:Union[AuthLoaders,None],
-        payload: Union[dict, None] = None,
-        time_out=None
+    s,
+    r_type: str,
+    url: str,
+    loaders: Union[AuthLoaders, None],
+    payload: Union[dict, None] = None,
+    time_out=None,
 ):
     from requests.models import Response
     logger.debug(f"Requesting {r_type} from {url}")
 
-    TIMEOFF = .25
-    TRIES = 15 // TIMEOFF
+    TIMEOFF = 0.25
+    TRIES = int(15 // TIMEOFF)
     timeout = 30 if time_out is None else time_out
     payload = {} if payload is None else payload
+
     def get_req(session):
         if r_type == "GET":
-            req = session.get
+            return session.get
         elif r_type == "POST":
-            req = session.post
+            return session.post
         elif r_type == "PATCH":
-            req = session.patch
+            return session.patch
         elif r_type == "DELETE":
-            req = session.delete
+            return session.delete
         else:
-            raise NotImplementedError
-        return  req
+            raise NotImplementedError(f"Unsupported method: {r_type}")
+
+    # --- Prepare kwargs for requests call ---
+    request_kwargs = {}
+    if r_type in ("POST", "PATCH") and "files" in payload:
+        # We have file uploads → use multipart form data
+        request_kwargs["data"] = payload.get("json", {})  # form fields
+        request_kwargs["files"] = payload["files"]        # actual files
+        s.headers.pop("Content-Type", None)
+    elif "json" in payload:
+        # JSON only
+        request_kwargs["json"] = payload["json"]
+    else:
+        # Fallback: no files, no json → just form fields
+        request_kwargs["data"] = payload
+
     req = get_req(session=s)
     keep_request = True
     counter = 0
     headers_refreshed = False
+
+    # Now loop with retry logic
     while keep_request:
         try:
-            r = req(url, timeout=timeout, **payload)
-            if r.status_code  in [403, 401] and not headers_refreshed:
+            r = req(url, timeout=timeout, **request_kwargs)
+            if r.status_code in [403, 401] and not headers_refreshed:
                 logger.warning(f"Error {r.status_code} Refreshing headers")
                 loaders.refresh_headers()
                 s.headers.update(loaders.auth_headers)
@@ -87,14 +104,14 @@ def make_request(
                 keep_request = False
                 break
         except requests.exceptions.ConnectionError as errc:
-            logger.exception(f"Error connecting {url} ")
+            logger.exception(f"Error connecting {url}")
         except TypeError as e:
             logger.exception(f"Type error for {url} exception {e}")
-            raise(e)
+            raise e
         except Exception as e:
             logger.exception(f"Error connecting {url} exception {e}")
 
-        counter = counter + 1
+        counter += 1
         if counter >= TRIES:
             keep_request = False
             r = Response()
@@ -103,7 +120,8 @@ def make_request(
             r.status_code = 500
             break
 
-        logger.debug(f"Trying request again after {TIMEOFF}s - Counter: {counter}/{TRIES} - URL: {url} ")
+        logger.debug(f"Trying request again after {TIMEOFF}s "
+                     f"- Counter: {counter}/{TRIES} - URL: {url}")
         time.sleep(TIMEOFF)
     return r
 

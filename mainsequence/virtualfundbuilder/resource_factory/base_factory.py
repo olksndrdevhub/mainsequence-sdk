@@ -126,8 +126,6 @@ class BaseFactory:
             except Exception as e:
                 logger.warning(f"Error reading code in strategy {filename}: {e}")
 
-
-
 def send_default_configuration():
     # TODO should be a tool
     from mainsequence.virtualfundbuilder.utils import _convert_unknown_to_string, get_default_documentation

@@ -111,7 +111,6 @@ class BaseObjectOrm:
         "AssetCategory": "assets/asset-category",
         "TargetPortfolioFrontEndDetails": "assets/target-portfolio-details",
 
-
         # TDAG
         "TimeSerie": "ogm/time_serie",
         "Scheduler": "ogm/scheduler",
@@ -126,6 +125,7 @@ class BaseObjectOrm:
         "Project": "pods/projects",
         "SourceTableConfiguration": "ts_manager/source_table_config",
         "DynamicResource": "tdag-gpt/dynamic_resource",
+        "Artifact": "pods/artifact",
     }
     ROOT_URL = API_ENDPOINT
     LOADERS = loaders
@@ -308,10 +308,14 @@ class BaseObjectOrm:
         return new_data
 
     @classmethod
-    def create(cls, timeout=None, *args, **kwargs):
+    def create(cls, timeout=None, files=None, *args, **kwargs):
         base_url = cls.get_object_url()
         data = cls.serialize_for_json(kwargs)
-        payload = {"json": data}
+        payload = {
+            "json": data
+        }
+        if files:
+            payload["files"] = files
         r = make_request(
             s=cls.build_session(),
             loaders=cls.LOADERS,

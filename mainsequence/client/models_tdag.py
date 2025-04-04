@@ -1610,6 +1610,25 @@ def create_configuration_for_strategy(json_payload: dict, timeout=None):
     return r
 
 
+class Artifact(BasePydanticModel, BaseObjectOrm):
+    name: str
+    created_by_resource_name: str
+    bucket_name: str
+    content: Any
+
+    @staticmethod
+    def upload_file(filepath, *args, **kwargs):
+
+        with open(filepath, "rb") as f:
+            data = {
+                "name": "My Example Artifact",
+                "created_by_resource_name": "MyCustomResource",
+                "bucket_name": "my-bucket-2023",  # will be created if doesn't exist
+            }
+            files = {"content": (filepath, f, "application/pdf")}
+            artifact = Artifact.create(files=files, **data)
+            return artifact
+
 # TODO can we remove this?? ROOT_URLS does not seem to exist
 class DynamicTableHelpers:
     def set_time_series_orm_uri_db_connection(self, uri: str):

@@ -15,13 +15,13 @@ from jinja2 import Template
 # from weasyprint import HTML
 
 from mainsequence.virtualfundbuilder.models import ReportConfig
-from mainsequence.virtualfundbuilder.resource_factory.tool_factory import register_tool, BaseTool
+from mainsequence.virtualfundbuilder.resource_factory.app_factory import register_app, BaseApp
 
 
-@register_tool()
-class ReportTool(BaseTool):
+@register_app()
+class ReportApp(BaseApp):
     """
-    Minimal example of a 'ReportTool' that can:
+    Minimal example of a 'ReportApp' that can:
     1) Generate dummy data and create charts (line + heatmap).
     2) Embed those charts into an HTML template.
     3) Optionally export the HTML to PDF using WeasyPrint.
@@ -174,5 +174,5 @@ class ReportTool(BaseTool):
 if __name__ == "__main__":
     # Example usage:
     config = ReportConfig()  # Or override fields as needed
-    tool = ReportTool(config)
+    tool = ReportApp(config)
     tool.generate_report()  # Creates output_report.html and weasy_output_report.pdf
