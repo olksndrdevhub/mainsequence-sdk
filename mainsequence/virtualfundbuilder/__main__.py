@@ -120,52 +120,6 @@ class VirtualFundLauncher:
         from mainsequence.virtualfundbuilder.utils import get_vfb_logger
         self.logger = get_vfb_logger()
 
-    def register_strategies(self):
-        from mainsequence.virtualfundbuilder.utils import _send_strategy_to_registry
-        from mainsequence.virtualfundbuilder.enums import StrategyType
-        from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import SignalWeightsFactory
-        from mainsequence.virtualfundbuilder.strategy_factory.rebalance_factory import RebalanceFactory
-
-        TDAG_ENDPOINT = os.getenv('TDAG_ENDPOINT', None)
-        assert TDAG_ENDPOINT, "TDAG_ENDPOINT is not set"
-        self.logger.debug(f"Register strategies to {TDAG_ENDPOINT}")
-
-        subclasses = SignalWeightsFactory.get_signal_weights_strategies()
-        for SignalClass in subclasses.values():
-            try:
-                _send_strategy_to_registry(StrategyType.SIGNAL_WEIGHTS_STRATEGY, SignalClass, is_production=True)
-            except Exception as e:
-                self.logger.warning("Could not register strategy to TSORM", e)
-
-        # Register rebalance strategies
-        rebalance_classes = RebalanceFactory.get_rebalance_strategies()
-        for RebalanceClass in rebalance_classes.values():
-            try:
-                _send_strategy_to_registry(StrategyType.REBALANCE_STRATEGY, RebalanceClass, is_production=True)
-            except Exception as e:
-                self.logger.warning("Could mpt register strategy to TSORM", e)
-
-
-    def send_default_configuration(self):
-        from mainsequence.virtualfundbuilder.utils import _convert_unknown_to_string, get_default_documentation
-        from mainsequence.client.models_tdag import register_default_configuration
-
-        default_config_dict = get_default_documentation()
-        payload = {
-            "default_config_dict": default_config_dict,
-        }
-
-        self.logger.debug(f"Send default documentation to Backend")
-        payload = json.loads(json.dumps(payload, default=_convert_unknown_to_string))
-        headers = {"Content-Type": "application/json"}
-        try:
-            response = register_default_configuration(json_payload=payload)
-            if response.status_code not in [200, 201]:
-                print(response.text)
-        except Exception as e:
-            self.logger.warning("Could register strategy to TSORM", e)
-
-
     def run_resource(self, execution_type, execution_object=None):
         error_on_run = False
 

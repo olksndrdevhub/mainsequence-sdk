@@ -23,7 +23,7 @@ class RunStrategy(Enum):
     LIVE = "live"
     ALL = "all"
 
-
-class StrategyType(Enum):
+class ResourceType(Enum):
     SIGNAL_WEIGHTS_STRATEGY = "signal_weights_strategy"
     REBALANCE_STRATEGY = "rebalance_strategy"
+    APP = "app"

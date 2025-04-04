@@ -1,17 +1,18 @@
 import ast
+import inspect
 
 from mainsequence.tdag.time_series import TimeSerie
 from datetime import datetime, timedelta
 import numpy as np
 import pytz
 
-from mainsequence.virtualfundbuilder.enums import StrategyType
-from mainsequence.virtualfundbuilder.strategy_factory.base_factory import BaseStrategy, BaseFactory, insert_in_registry
+from mainsequence.virtualfundbuilder.enums import ResourceType
+from mainsequence.virtualfundbuilder.resource_factory.base_factory import BaseResource, BaseFactory, insert_in_registry
 from mainsequence.virtualfundbuilder.models import AssetsConfiguration
 
 import pandas as pd
 from mainsequence.client import (Asset)
-from mainsequence.virtualfundbuilder.utils import get_vfb_logger,_send_strategy_to_registry
+from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 
 logger = get_vfb_logger()
 
@@ -21,8 +22,8 @@ class PrivateWeightsBaseArguments:
     def __init__(self):
         self.send_weights_for_execution_to_vam =  self.assets_configuration.prices_configuration.is_live
 
-class WeightsBase(PrivateWeightsBaseArguments, BaseStrategy):
-    TYPE = StrategyType.SIGNAL_WEIGHTS_STRATEGY
+class WeightsBase(PrivateWeightsBaseArguments, BaseResource):
+    TYPE = ResourceType.SIGNAL_WEIGHTS_STRATEGY
 
     def __init__(self,
                  signal_assets_configuration: AssetsConfiguration,
@@ -151,7 +152,9 @@ def register_signal_class(name=None, register_in_agent=True):
     If `name` is not provided, the class's name is used as the key.
     """
     def decorator(cls):
-        return insert_in_registry(SIGNAL_CLASS_REGISTRY, cls, register_in_agent, name)
+        code = inspect.getsource(cls)
+        attributes = {"code": code}
+        return insert_in_registry(SIGNAL_CLASS_REGISTRY, cls, register_in_agent, attributes=attributes)
     return decorator
 
 

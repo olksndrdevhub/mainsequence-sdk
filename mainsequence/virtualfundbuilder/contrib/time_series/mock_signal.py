@@ -3,7 +3,7 @@ from datetime import datetime
 import pytz
 import pandas as pd
 from typing import Union
-from mainsequence.virtualfundbuilder.strategy_factory.signal_factory import WeightsBase,  register_signal_class
+from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase,  register_signal_class
 
 @register_signal_class(register_in_agent=True)
 class MockSignal(WeightsBase, TimeSerie):
