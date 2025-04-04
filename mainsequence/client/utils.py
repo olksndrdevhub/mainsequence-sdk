@@ -78,12 +78,8 @@ def make_request(
         request_kwargs["data"] = payload.get("json", {})  # form fields
         request_kwargs["files"] = payload["files"]        # actual files
         s.headers.pop("Content-Type", None)
-    elif "json" in payload:
-        # JSON only
-        request_kwargs["json"] = payload["json"]
     else:
-        # Fallback: no files, no json → just form fields
-        request_kwargs["data"] = payload
+        request_kwargs = payload
 
     req = get_req(session=s)
     keep_request = True
