@@ -1617,13 +1617,13 @@ class Artifact(BasePydanticModel, BaseObjectOrm):
     content: Any
 
     @staticmethod
-    def upload_file(filepath, *args, **kwargs):
+    def upload_file(filepath, name, created_by_resource_name, bucket_name=None):
 
         with open(filepath, "rb") as f:
             data = {
-                "name": "My Example Artifact",
-                "created_by_resource_name": "MyCustomResource",
-                "bucket_name": "my-bucket-2023",  # will be created if doesn't exist
+                "name": name,
+                "created_by_resource_name": created_by_resource_name,
+                "bucket_name": bucket_name if bucket_name else "default_bucket",
             }
             files = {"content": (filepath, f, "application/pdf")}
             artifact = Artifact.create(files=files, **data)

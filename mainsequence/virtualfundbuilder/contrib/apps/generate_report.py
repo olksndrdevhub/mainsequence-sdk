@@ -12,11 +12,28 @@ import plotly.graph_objs as go
 
 from pydantic import BaseModel
 from jinja2 import Template
+from weasyprint import HTML
+
+from mainsequence.client.models_tdag import Artifact
 # from weasyprint import HTML
 
-from mainsequence.virtualfundbuilder.models import ReportConfig
 from mainsequence.virtualfundbuilder.resource_factory.app_factory import register_app, BaseApp
 
+
+class ReportConfig(BaseModel):
+    """Pydantic model defining the parameters for report generation."""
+    report_id: str = "MC-2025-XYZ"
+    authors: str = "Main Sequence AI"
+    sector: str = "US Equities"
+    region: str = "USA"
+    topics: List[str] = ["Diversification", "Equities", "Fundamentals"]
+    report_title: str = "Global Strategy Views: Diversify to Amplify"
+    summary: str = (
+        "We are entering a more benign phase of the economic cycle characterized by "
+        "sustained economic growth and declining policy interest rates. Historically, "
+        "such an environment supports equities but also highlights the increasing "
+        "importance of broad diversification across regions and sectors."
+    )
 
 @register_app()
 class ReportApp(BaseApp):
@@ -105,13 +122,13 @@ class ReportApp(BaseApp):
             "chart1": chart1,
             "chart2": chart2,
             # Pulling fields from our pydantic config:
-            "report_id": self.config.report_id,
-            "authors": self.config.authors,
-            "sector": self.config.sector,
-            "region": self.config.region,
-            "topics": self.config.topics,
-            "report_title": self.config.report_title,
-            "summary": self.config.summary,
+            "report_id": self.configuration.report_id,
+            "authors": self.configuration.authors,
+            "sector": self.configuration.sector,
+            "region": self.configuration.region,
+            "topics": self.configuration.topics,
+            "report_title": self.configuration.report_title,
+            "summary": self.configuration.summary,
         }
 
         # For this minimal example, we embed the template here as a string:
@@ -155,24 +172,25 @@ class ReportApp(BaseApp):
 </body>
 </html>
 """
-
-        # Render the template:
         rendered_html = Template(template_str).render(context)
 
-        # Write HTML to file
+        output_html = "/tmp/report.html"
         with open(output_html, "w", encoding="utf-8") as f:
             f.write(rendered_html)
 
         print(f"HTML report generated: {output_html}")
 
-        # Optionally convert to PDF with WeasyPrint
-        if include_pdf and self.config.pdf_path:
-            HTML(string=rendered_html).write_pdf(self.config.pdf_path)
-            print(f"PDF generated: {self.config.pdf_path}")
+        pdf_path = "/tmp/report.pdf"
+        if pdf_path:
+            HTML(string=rendered_html).write_pdf(pdf_path)
+            print(f"PDF generated: {pdf_path}")
 
+        pdf_artifact = Artifact.upload_file(filepath=pdf_path, name="Report PDF", created_by_resource_name=self.__class__.__name__, bucket="Reports")
+        html_artifact = Artifact.upload_file(filepath=output_html, name="Report HTML", created_by_resource_name=self.__class__.__name__, bucket="Reports")
+        return pdf_artifact, html_artifact
 
 if __name__ == "__main__":
     # Example usage:
     config = ReportConfig()  # Or override fields as needed
-    tool = ReportApp(config)
-    tool.generate_report()  # Creates output_report.html and weasy_output_report.pdf
+    app = ReportApp(config)
+    pdf_artifact, html_artifact = app.run()  # Creates output_report.html and weasy_output_report.pdf
