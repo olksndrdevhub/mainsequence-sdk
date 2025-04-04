@@ -79,12 +79,10 @@ def make_request(
         request_kwargs["files"] = payload["files"]        # actual files
         s.headers.pop("Content-Type", None)
     else:
-<<<<<<< HEAD
         # Fallback: no files, no json → just form fields
         pass
-=======
-        request_kwargs = payload
->>>>>>> development
+
+    request_kwargs = payload
 
     req = get_req(session=s)
     keep_request = True
