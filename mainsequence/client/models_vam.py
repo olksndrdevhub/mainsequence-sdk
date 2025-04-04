@@ -378,16 +378,14 @@ class Asset(AssetMixin, BaseObjectOrm):
     
     @classmethod
     def create_or_update_index_asset_from_portfolios(cls,
-                                                     live_portfolio:int,
-                                                     backtest_portfolio:int,
+                                                     reference_portfolio:int,
                                                      valuation_asset:int,
                                                      calendar:str,timeout=None
                                                      )->"TargetPortfolioIndexAsset":
         url = f"{cls.get_object_url()}/create_or_update_index_asset_from_portfolios/"
         payload = {
             "json": dict(
-                live_portfolio=live_portfolio,
-                backtest_portfolio=backtest_portfolio,
+                reference_portfolio=reference_portfolio,
                 valuation_asset=valuation_asset,
                 calendar=calendar
             )

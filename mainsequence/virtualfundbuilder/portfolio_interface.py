@@ -127,7 +127,8 @@ class PortfolioInterface():
 
             standard_kwargs["backtest_table_time_index_name"] = "time_index"
             standard_kwargs["backtest_table_price_column_name"] = "portfolio"
-            standard_kwargs["tags"] = portfolio_tags
+            # if portfolio_tags is not None:
+            #     standard_kwargs["tags"] = portfolio_tags
 
             target_portfolio = TargetPortfolio.get_or_none(local_time_serie__id=ts.local_metadata.id)
             if target_portfolio is None:
@@ -142,7 +143,7 @@ class PortfolioInterface():
         target_portfolio = build_vam_portfolio(portfolio_ts, build_purpose=self.build_purpose)
 
         # create index Asset
-        asset_symbol = f"{portfolio_ts.build_prefix()}_{target_portfolio.id}_{self.build_purpose}"
+        asset_symbol = target_portfolio.portfolio_ticker
         
         if BACKEND_DETACHED():
             index_asset = TargetPortfolioIndexAsset(symbol=asset_symbol,
@@ -168,7 +169,7 @@ class PortfolioInterface():
 
         return target_portfolio, index_asset
 
-    def run(self,
+    def run(self,portfolio_tags:List[str],
             debug_mode=True,force_update=True,
             update_tree=True, *args, **kwargs):
         if not self._is_initialized:
@@ -176,7 +177,7 @@ class PortfolioInterface():
 
         if self.portfolio_strategy_time_serie.data_source.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             self.portfolio_strategy_time_serie.run(debug_mode=debug_mode, update_tree=update_tree, force_update=force_update, **kwargs)
-            self.build_target_portfolio_in_vam()
+            self.build_target_portfolio_in_vam(portfolio_tags)
         else:
             self.portfolio_strategy_time_serie.run_local_update(*args, **kwargs)
 

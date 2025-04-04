@@ -291,28 +291,7 @@ class OrderExecutionConfiguration(VFBConfigBaseModel):
     broker_configuration: BrokerConfiguration
 
 
-class VAMExecutionConfiguration(VFBConfigBaseModel):
-    """
-    Configuration for Virtual Asset Management (VAM) execution.
 
-    Attributes:
-        rebalance_tolerance_percent (float): Tolerance percentage for rebalancing.
-        minimum_notional_for_a_rebalance (float): Minimum notional value required for a rebalance.
-        max_latency_in_cdc_seconds (int): Maximum allowed latency in seconds for CDC.
-        unwind_funds_hanging_limit_seconds (int): Time limit for unwinding funds in seconds.
-        minimum_positions_holding_seconds (int): Minimum time to hold positions in seconds.
-        rebalance_step_every_seconds (int): Frequency of rebalance steps in seconds.
-        max_data_latency_seconds (int): Maximum allowed data latency in seconds.
-        orders_execution_configuration (OrderExecutionConfiguration): Configuration for order execution.
-    """
-    rebalance_tolerance_percent: float = 0.005
-    minimum_notional_for_a_rebalance: float = 15.0
-    max_latency_in_cdc_seconds: int = 300
-    unwind_funds_hanging_limit_seconds: int = 3600
-    minimum_positions_holding_seconds: int = 600
-    rebalance_step_every_seconds: int = 300
-    max_data_latency_seconds: int = 60
-    orders_execution_configuration: OrderExecutionConfiguration
 
 
 class PortfolioVamConfig(VFBConfigBaseModel):
@@ -324,7 +303,6 @@ class PortfolioVamConfig(VFBConfigBaseModel):
         execution_configuration (VAMExecutionConfiguration): Execution configuration for VAM.
     """
     portfolio_name: str = "Portfolio Strategy Title"
-    execution_configuration: VAMExecutionConfiguration  # TODO should come from VAM
     front_end_details: str = ""
     tracking_funds_expected_exposure_from_latest_holdings: bool
     builds_from_target_positions: bool
@@ -456,30 +434,6 @@ class PortfolioConfiguration(VFBConfigBaseModel):
             custom_update_details_per_class=portfolio_tdag_update_configuration['custom_update_details_per_class']
         )
 
-        vam_execution_config = VAMExecutionConfiguration(
-            rebalance_tolerance_percent=portfolio_vam_configuration['execution_configuration'][
-                'rebalance_tolerance_percent'],
-            minimum_notional_for_a_rebalance=portfolio_vam_configuration['execution_configuration'][
-                'minimum_notional_for_a_rebalance'],
-            max_latency_in_cdc_seconds=portfolio_vam_configuration['execution_configuration'][
-                'max_latency_in_cdc_seconds'],
-            unwind_funds_hanging_limit_seconds=portfolio_vam_configuration['execution_configuration'][
-                'unwind_funds_hanging_limit_seconds'],
-            minimum_positions_holding_seconds=portfolio_vam_configuration['execution_configuration'][
-                'minimum_positions_holding_seconds'],
-            rebalance_step_every_seconds=portfolio_vam_configuration['execution_configuration'][
-                'rebalance_step_every_seconds'],
-            max_data_latency_seconds=portfolio_vam_configuration['execution_configuration']['max_data_latency_seconds'],
-            orders_execution_configuration=OrderExecutionConfiguration(
-                broker_class=BrokerClassName(
-                    portfolio_vam_configuration['execution_configuration']['orders_execution_configuration'][
-                        'broker_class']),
-                broker_configuration=
-                portfolio_vam_configuration['execution_configuration']['orders_execution_configuration'][
-                    'broker_configuration']
-            )
-        )
-        portfolio_vam_configuration["execution_configuration"] = vam_execution_config
         portfolio_vam_configuration["front_end_details"] = portfolio_vam_configuration['front_end_details']["about_text"]
         portfolio_vam_configuration = PortfolioVamConfig(**portfolio_vam_configuration)
 
