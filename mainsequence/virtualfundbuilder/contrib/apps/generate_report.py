@@ -12,7 +12,7 @@ import plotly.graph_objs as go
 
 from pydantic import BaseModel
 from jinja2 import Template
-from weasyprint import HTML
+
 
 from mainsequence.client.models_tdag import Artifact
 # from weasyprint import HTML
@@ -110,6 +110,7 @@ class ReportApp(BaseApp):
         """
         Generates an HTML report (and optional PDF) in a minimal, self-contained way.
         """
+        from weasyprint import HTML
         print(f"Running tool with configuration {self.configuration}")
 
         # Create base64-encoded charts
