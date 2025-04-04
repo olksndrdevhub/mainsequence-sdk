@@ -494,7 +494,6 @@ class InterpolatedPrices(TimeSerie):
     @TimeSerie._post_init_routines()
     def __init__(
             self,
-            execution_venue_symbol: str,
             asset_list: List[Asset],
             bar_frequency_id: str,
             intraday_bar_interpolation_rule: str,
@@ -522,7 +521,6 @@ class InterpolatedPrices(TimeSerie):
         self.bar_frequency_id = bar_frequency_id
         self.upsample_frequency_id = upsample_frequency_id
 
-        self.execution_venue_symbol = execution_venue_symbol
 
         price_source = {mud: get_time_serie_from_markets_unique_id(
             market_time_serie_unique_identifier=mud) for mud in markets_time_series_unique_id_list}
