@@ -411,19 +411,16 @@ class IndexAsset(Asset):
 
 class TargetPortfolioIndexAsset(IndexAsset):
     can_trade:bool=False
-    live_portfolio : "TargetPortfolio"
-    backtest_portfolio : "TargetPortfolio"
+    reference_portfolio : "TargetPortfolio"
     execution_venue: "ExecutionVenue"= Field(
         default_factory=lambda: ExecutionVenue(**CONSTANTS.VENUE_MAIN_SEQUENCE_PORTFOLIOS)
     )
 
     @property
-    def live_portfolio_details_url(self):
-        return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.live_portfolio.id}"
+    def reference_portfolio_details_url(self):
+        return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.reference_portfolios.id}"
 
-    @property
-    def backtest_portfolio_details_url(self):
-        return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.backtest_portfolio.id}"
+   
 
 class AssetCurrencyPair(AssetMixin, BasePydanticModel):
     base_asset: Union[AssetMixin, int]
