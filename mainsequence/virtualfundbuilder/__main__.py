@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 import requests
+import yaml
 from requests.structures import CaseInsensitiveDict
 
 
@@ -46,7 +47,11 @@ def run_configuration(configuration_name):
 def run_app(app_name, configuration):
     from mainsequence.virtualfundbuilder.resource_factory.app_factory import APP_REGISTRY
     app = APP_REGISTRY[app_name]
-    app(configuration).run()
+
+    configuration_json = yaml.load(configuration, Loader=yaml.UnsafeLoader)
+    configuration_pydantic = app.configuration_class(**configuration_json)
+    results = app(configuration_pydantic).run()
+    print(f"Finished App {app_name} run with results: {results}")
 
 def run_notebook(notebook_name):
     from mainsequence.virtualfundbuilder.notebook_handling import convert_notebook_to_python_file
