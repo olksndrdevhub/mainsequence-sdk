@@ -41,6 +41,7 @@ class ReportApp(BaseApp):
     2) Embed those charts into an HTML template.
     3) Optionally export the HTML to PDF using WeasyPrint.
     """
+    configuration_class = ReportConfig
     def __init__(self, configuration: ReportConfig):
         self.configuration = configuration
 
