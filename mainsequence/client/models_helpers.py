@@ -34,12 +34,12 @@ def get_right_account_class(account: Account):
 
 
 class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
-    id: int
     unique_identifier: str
     related_local_time_serie: LocalTimeSerie
     description: Optional[str] = Field(None, description="Descriptions of the data source")
     data_frequency_id: str = DataFrequency
     assets_in_data_source:Optional[List[int]]
+    extra_properties: Optional[Dict]
 
     def __str__(self):
         return self.class_name() + f" {self.unique_identifier}"

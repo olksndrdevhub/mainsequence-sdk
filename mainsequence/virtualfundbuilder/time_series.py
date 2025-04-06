@@ -93,7 +93,6 @@ class PortfolioStrategy(TimeSerie):
         self.assets_configuration = portfolio_build_configuration.assets_configuration
         self.bars_ts = get_interpolated_prices_timeseries(copy.deepcopy(self.assets_configuration))
 
-        self.required_execution_venues_symbols = self.assets_configuration.asset_universe.get_required_execution_venues()
 
         self.portfolio_frequency = self.assets_configuration.prices_configuration.upsample_frequency_id
 

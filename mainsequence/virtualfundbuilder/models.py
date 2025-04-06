@@ -10,7 +10,7 @@ from mainsequence.tdag.time_series import ModelList
 import json
 from pydantic import FieldValidationInfo, field_validator, root_validator, Field
 
-from mainsequence.virtualfundbuilder.enums import (ExecutionVenueNames, PriceTypeNames, BrokerClassName)
+from mainsequence.virtualfundbuilder.enums import (ExecutionVenueNames, PriceTypeNames)
 
 from mainsequence.client.models_tdag import RunConfiguration
 import yaml
@@ -66,17 +66,7 @@ class AssetsConfiguration(VFBConfigBaseModel):
     price_type: PriceTypeNames = PriceTypeNames.VWAP
     prices_configuration: PricesConfiguration
 
-    def model_dump(self, **kwargs):
-        "serialization is needed to speed tdag reconstruction"
-        from mainsequence.tdag.time_series.time_series import serialize_model_list
 
-        serliazed_list = serialize_model_list(self.asset_universe.asset_list)
-        serialized_asset_universe = self.asset_universe.model_dump(**kwargs)
-        serialized_asset_universe["asset_list"] = serliazed_list
-
-        data = super().model_dump(**kwargs)
-        data["asset_universe"] = serialized_asset_universe
-        return data
 
 
 class BacktestingWeightsConfig(VFBConfigBaseModel):
@@ -129,7 +119,7 @@ class PortfolioExecutionConfiguration(VFBConfigBaseModel):
 
 
 
-class PortfolioVamConfig(VFBConfigBaseModel):
+class PortfolioMarketsConfig(VFBConfigBaseModel):
     """
     Configuration for Virtual Asset Management (VAM) portfolio.
 
@@ -211,10 +201,10 @@ class PortfolioConfiguration(VFBConfigBaseModel):
 
     Attributes:
         portfolio_build_configuration (PortfolioBuildConfiguration): Configuration for building the portfolio.
-        portfolio_markets_configuration (PortfolioVamConfig): VAM execution configuration.
+        portfolio_markets_configuration (PortfolioMarketsConfig): VAM execution configuration.
     """
     portfolio_build_configuration: PortfolioBuildConfiguration
-    portfolio_markets_configuration: PortfolioVamConfig
+    portfolio_markets_configuration: PortfolioMarketsConfig
 
     @staticmethod
     def read_portfolio_configuration_from_yaml(yaml_path: str):
@@ -258,7 +248,7 @@ class PortfolioConfiguration(VFBConfigBaseModel):
 
 
         portfolio_markets_configuration["front_end_details"] = portfolio_markets_configuration['front_end_details']["about_text"]
-        portfolio_markets_configuration = PortfolioVamConfig(**portfolio_markets_configuration)
+        portfolio_markets_configuration = PortfolioMarketsConfig(**portfolio_markets_configuration)
 
         # Combine everything into the final PortfolioConfiguration
         portfolio_config = PortfolioConfiguration(

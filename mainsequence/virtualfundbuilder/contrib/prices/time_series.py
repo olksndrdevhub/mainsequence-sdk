@@ -31,25 +31,14 @@ def get_interpolated_prices_timeseries(assets_configuration: AssetsConfiguration
     """
     Creates a Wrapper Timeseries for an asset configuration.
     """
-    time_series_dict = {}
 
     prices_configuration = copy.deepcopy(assets_configuration).prices_configuration
-    is_live = prices_configuration.is_live
     prices_configuration_kwargs = prices_configuration.model_dump()
     prices_configuration_kwargs.pop("is_live", None)
 
-    data_mode = MARKETS_CONSTANTS.DATA_MODE_LIVE if is_live else MARKETS_CONSTANTS.DATA_MODE_BACKTEST
-
-    asset_universe = assets_configuration.asset_universe
-    venue_asset_filters_map = asset_universe.get_assets_per_execution_venue()
-
-    asset_list = [item for sublist in venue_asset_filters_map.values() for item in sublist]
-
-
 
     return InterpolatedPrices(
-        asset_list=asset_list,
-        data_mode=data_mode,
+        asset_category_unique_id=assets_configuration.assets_category_unique_id,
         **prices_configuration_kwargs
     )
 
@@ -494,14 +483,13 @@ class InterpolatedPrices(TimeSerie):
     @TimeSerie._post_init_routines()
     def __init__(
             self,
-            asset_list: List[Asset],
+            asset_category_unique_id: str,
             bar_frequency_id: str,
             intraday_bar_interpolation_rule: str,
             markets_time_series_unique_id_list: str,
-            data_mode: Literal["live", "backtest"],
             upsample_frequency_id: Optional[str] = None,
             asset_filter: Optional[dict] = None,
-            local_kwargs_to_ignore: List[str] = ["asset_list"],
+            local_kwargs_to_ignore: List[str] = ["asset_category_unique_id"],
             *args,
             **kwargs
     ):
@@ -509,8 +497,7 @@ class InterpolatedPrices(TimeSerie):
         Initializes the InterpolatedPrices object.
         """
         assert "d" in bar_frequency_id or "m" in bar_frequency_id, f"bar_frequency_id={bar_frequency_id} should be 'd for days' or 'm for min'"
-        self.data_mode = data_mode
-        self.asset_list = asset_list
+        self.asset_category_unique_id = asset_category_unique_id
         self.interpolator = UpsampleAndInterpolation(
             bar_frequency_id=bar_frequency_id,
             upsample_frequency_id=upsample_frequency_id,
@@ -528,22 +515,13 @@ class InterpolatedPrices(TimeSerie):
         self.bars_ts = WrapperTimeSerie(time_series_dict=price_source)
 
 
-        self.set_asset_details()
         super().__init__(*args, **kwargs)
 
     def get_html_description(self) -> Union[str, None]:
-        description = f"""<p>{self.data_mode} Time Serie Instance of {self.__class__.__name__} updating table {self.remote_table_hashed_name} for for <b>train</b> prices in <b>{self.execution_venue_symbol}</b> for backtesting</p>"""
+        description = f"""<p>Time Serie Instance of {self.__class__.__name__} updating table {self.remote_table_hashed_name} for for <b>train</b> prices in <b>{self.execution_venue_symbol}</b> for backtesting</p>"""
         return description
 
-    def set_asset_details(self):
-        asset_list = self.asset_list
-        if len(asset_list) == 0:
-            raise Exception(f"Asset list has no assets {self.asset_list}")
 
-
-
-        self.asset_calendar_map = {a.unique_identifier: a.calendar for a in asset_list}
-        self.asset_list = asset_list
 
     def _get_required_cores(self, last_observation_map) -> int:
         """
@@ -706,6 +684,16 @@ class InterpolatedPrices(TimeSerie):
             raw_data_df.reset_index(["unique_identifier"]),
         )
         return upsampled_df
+
+    def _set_asset_list(self):
+        """
+        Creates mappings from symbols to IDs
+
+        """
+
+        asset_category = AssetCategory.get(self.assets_category_unique_id)
+        self.asset_list = Asset.filter_with_asset_class(id__in=[a.id for a in asset_category.assets])
+        self.asset_calendar_map = {a.unique_identifier: a.calendar for a in asset_list}
 
     def update(
             self,

@@ -207,7 +207,7 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     earliest_index_value: Optional[datetime.datetime] = Field(None, description="Earliest index value")
     multi_index_stats: Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field")
     table_partition: Dict[str, Any] = Field(..., description="Table partition settings")
-
+    last_observation:Optional[Dict]
     def get_data_updates(self):
         max_per_asset = None
         if self.multi_index_stats is not None:
@@ -257,6 +257,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     description: Optional[str] = Field(None, description="Optional HTML description")
     localtimeserieupdatedetails: Optional["LocalTimeSerieUpdateDetails"] = None
     run_configuration: "RunConfiguration"
+    data_schema:Optional[Dict] = None
 
     @property
     def data_source_id(self):
@@ -724,7 +725,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     hash_id: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
     table_name: Optional[str] = Field(None, max_length=63, description="Max length of PostgreSQL table name")
     creation_date: datetime.datetime = Field(..., description="Creation timestamp")
-    created_by_user: Optional[int] = Field(None, description="Foreign key reference to AUTH_USER_MODEL")
+    created_by_user: Optional[int] = Field(None, description="Foreign key reference to User")
     organization_owner: int = Field(None, description="Foreign key reference to Organization")
     open_for_everyone: bool = Field(default=False, description="Whether the table is open for everyone")
     data_source_open_for_everyone: bool = Field(default=False,
@@ -739,6 +740,13 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     data_source: Union[int, "DynamicTableDataSource"]
     source_class_name: str
     sourcetableconfiguration: Optional[SourceTableConfiguration] = None
+    table_index_names:Optional[Dict]=None
+
+    #TS specifi
+    compression_policy_config:Optional[dict]
+    retention_policy_config:Optional[dict]
+    table_size: Optional[float]
+
 
     _drop_indices: bool = False  # for direct incertion we can pass this values
     _rebuild_indices: bool = False  # for direct incertion we can pass this values
@@ -987,7 +995,7 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
         return Scheduler(**r.json())
 
 class RunConfiguration(BasePydanticModel, BaseObjectOrm):
-    local_time_serie_update_details_id: Optional[int] = None
+    local_time_serie_update_details: Optional[int] = None
     retry_on_error: int = 0
     seconds_wait_on_retry: float = 50
     required_cpus: int = 1
@@ -1013,8 +1021,10 @@ class LocalTimeSerieUpdateDetails(BasePydanticModel, BaseObjectOrm):
     active_update_scheduler_uid: Optional[str] = Field(None, max_length=100,
                                                        description="Scheduler UID for active update")
     update_priority: int = Field(default=0, description="Priority level of the update")
-    direct_dependencies_ids: List[int] = Field(default=[], description="List of direct upstream dependencies IDs")
-    last_updated_by_user_id: Optional[int] = Field(None, description="Foreign key reference to AUTH_USER_MODEL")
+    direct_dependencies: List = Field(default=[], description="List of direct upstream dependencies IDs")
+    last_updated_by_user: Optional[int] = Field(None, description="Foreign key reference to User")
+
+    run_configuration: "RunConfiguration"
 
     @staticmethod
     def _parse_parameters_filter(parameters):

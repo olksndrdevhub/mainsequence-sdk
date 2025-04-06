@@ -18,11 +18,7 @@ logger = get_vfb_logger()
 
 
 
-class PrivateWeightsBaseArguments:
-    def __init__(self):
-        self.send_weights_for_execution_to_vam =  self.assets_configuration.prices_configuration.is_live
-
-class WeightsBase(PrivateWeightsBaseArguments, BaseResource):
+class WeightsBase(BaseResource):
     TYPE = ResourceType.SIGNAL_WEIGHTS_STRATEGY
 
     def __init__(self,
@@ -36,7 +32,6 @@ class WeightsBase(PrivateWeightsBaseArguments, BaseResource):
         """
         
         self.assets_configuration = signal_assets_configuration
-        self.asset_universe = signal_assets_configuration.asset_universe
 
         super().__init__()
 

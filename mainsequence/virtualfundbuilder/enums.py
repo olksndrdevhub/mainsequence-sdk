@@ -6,10 +6,7 @@ class RebalanceFrequencyStrategyName(Enum):
     MONTHLY = "monthly"
     QUARTERLY = "quarterly"
 
-class BrokerClassName(Enum):
-    # TODO get from VAM
-    PRICE_CHASER_BROKER = "PriceChaserBroker"
-    MARKET_ONLY = "MarketOnly"
+
 
 ExecutionVenueNames = Enum("ExecutionVenueNames", {key.upper(): key for key in CONSTANTS.EXECUTION_VENUES_NAMES.keys()})
 
