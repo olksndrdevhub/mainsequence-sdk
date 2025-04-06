@@ -114,7 +114,7 @@ class PortfolioStrategy(TimeSerie):
     def get_required_execution_venues(self):
         asset_list=self._get_asset_list()
         required_venues={a.execution_venue.symbol for a in asset_list}
-        return required_venues
+        return list(required_venues)
     def _get_asset_list(self):
         """
         Creates mappings from symbols to IDs
