@@ -43,6 +43,11 @@ def run_configuration(configuration_name):
     res = portfolio.run()
     print(res.head())
 
+def run_app(app_name, configuration):
+    from mainsequence.virtualfundbuilder.resource_factory.app_factory import APP_REGISTRY
+    app = APP_REGISTRY[app_name]
+    app(configuration).run()
+
 def run_notebook(notebook_name):
     from mainsequence.virtualfundbuilder.notebook_handling import convert_notebook_to_python_file
     print("Run Notebook")
@@ -133,6 +138,8 @@ class VirtualFundLauncher:
                 run_notebook(execution_object)
             elif execution_type == "system_job":
                 get_pod_configuration()
+            elif execution_type == "app":
+                run_app(app_name=os.getenv("APP_NAME"), configuration=os.getenv("APP_CONFIGURATION"))
             else:
                 raise NotImplementedError(f"Unknown execution type {execution_type}")
 
