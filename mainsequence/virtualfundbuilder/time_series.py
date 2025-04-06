@@ -111,16 +111,20 @@ class PortfolioStrategy(TimeSerie):
         self.rebalancer_explanation = ""  # TODO: Add rebalancer explanation
         super().__init__(*args, **kwargs)
 
-    def _set_asset_list(self):
+    def get_required_execution_venues(self):
+        asset_list=self._get_asset_list()
+        required_venues={a.execution_venue.symbol for a in asset_list}
+        return required_venues
+    def _get_asset_list(self):
         """
         Creates mappings from symbols to IDs
 
         """
 
 
-        asset_category = AssetCategory.get(self.assets_configuration.assets_category_unique_id)
-        self.asset_list = Asset.filter_with_asset_class(id__in=[a.id for a in asset_category.assets])
-
+        asset_category = AssetCategory.get(unique_identifier=self.assets_configuration.assets_category_unique_id)
+        asset_list = Asset.filter_with_asset_class(id__in=asset_category.assets)
+        return asset_list
     def _calculate_start_end_dates(self, update_statistics: DataUpdates):
         """
         Calculates the start and end dates for processing based on the latest value and available data.

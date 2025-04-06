@@ -47,14 +47,14 @@ class PortfolioInterface():
     def __repr__(self):
         return self.__str__()
 
-    def _initialize_nodes(self) -> None:
+    def _initialize_nodes(self,patch_build_configuration=True) -> None:
         """
         Initializes the portfolio strategy for backtesting and for live prediction.
         Also, forces an update of the build configuration in tdag to guarantee that assets are properly rebuilt
         """
         patch = os.environ.get("PATCH_BUILD_CONFIGURATION", "False")
         os.environ[
-            "PATCH_BUILD_CONFIGURATION"] = "True"  # It always needs to be true as we always want to overwrite the build
+            "PATCH_BUILD_CONFIGURATION"] = "True"  if patch_build_configuration else "False" # It always needs to be true as we always want to overwrite the build
         self.portfolio_strategy_time_serie = PortfolioStrategy(
             portfolio_build_configuration=copy.deepcopy(self.portfolio_build_configuration)
         )
@@ -108,7 +108,7 @@ class PortfolioInterface():
 
             standard_kwargs.update(user_kwargs)
 
-            standard_kwargs["available_in_venues__symbols"] = ts.required_execution_venues_symbols
+            standard_kwargs["available_in_venues__symbols"] = ts.get_required_execution_venues()
             standard_kwargs["calendar_name"]=self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
                                                         "calendar"]
             if BACKEND_DETACHED():
@@ -168,11 +168,11 @@ class PortfolioInterface():
 
         return target_portfolio, index_asset
 
-    def run(self,portfolio_tags:List[str],
+    def run(self,portfolio_tags:List[str],patch_build_configuration=True,
             debug_mode=True,force_update=True,
             update_tree=True, *args, **kwargs):
-        if not self._is_initialized:
-            self._initialize_nodes()
+        if not self._is_initialized or patch_build_configuration == True:
+            self._initialize_nodes(patch_build_configuration=True)
 
         if self.portfolio_strategy_time_serie.data_source.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             self.portfolio_strategy_time_serie.run(debug_mode=debug_mode, update_tree=update_tree, force_update=force_update, **kwargs)

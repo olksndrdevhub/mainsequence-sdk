@@ -1024,7 +1024,7 @@ class LocalTimeSerieUpdateDetails(BasePydanticModel, BaseObjectOrm):
     direct_dependencies: List = Field(default=[], description="List of direct upstream dependencies IDs")
     last_updated_by_user: Optional[int] = Field(None, description="Foreign key reference to User")
 
-    run_configuration: "RunConfiguration"
+    run_configuration: Optional["RunConfiguration"]=None
 
     @staticmethod
     def _parse_parameters_filter(parameters):

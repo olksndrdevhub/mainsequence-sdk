@@ -8,7 +8,7 @@ import pandas_market_calendars as mcal
 
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList, APITimeSerie, data_source_pickle_path
 from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
-                                 BACKEND_DETACHED, DataUpdates
+                                 BACKEND_DETACHED, DataUpdates, AssetCategory
                                  )
 from mainsequence.client import MARKETS_CONSTANTS, ExecutionVenue
 from mainsequence.client import HistoricalBarsSource, DoesNotExist, Asset, MarketsTimeSeriesDetails
@@ -685,16 +685,16 @@ class InterpolatedPrices(TimeSerie):
         )
         return upsampled_df
 
-    def _set_asset_list(self):
+    def _get_asset_list(self):
         """
         Creates mappings from symbols to IDs
 
         """
 
-        asset_category = AssetCategory.get(self.assets_category_unique_id)
-        self.asset_list = Asset.filter_with_asset_class(id__in=[a.id for a in asset_category.assets])
+        asset_category = AssetCategory.get(unique_identifier=self.asset_category_unique_id)
+        asset_list = Asset.filter_with_asset_class(id__in= asset_category.assets)
         self.asset_calendar_map = {a.unique_identifier: a.calendar for a in asset_list}
-
+        return asset_list
     def update(
             self,
             update_statistics: DataUpdates

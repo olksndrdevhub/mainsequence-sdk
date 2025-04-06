@@ -864,7 +864,7 @@ class TimeSerieRebuildMethods(ABC):
             pickle_path = cls.get_pickle_path(data_source_id=data_source,
                                               local_hash_id=local_hash_id)
             if os.path.isfile(pickle_path) == False:
-                data_source = DynamicTableDataSource.get(id=data_source)
+                data_source = DynamicTableDataSource.get(pk=data_source)
                 data_source.persist_to_pickle(data_source_pickle_path(data_source.id))
 
             data_source = cls.load_data_source_from_pickle(pickle_path=pickle_path)
@@ -2562,8 +2562,8 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         update_statistics = self.set_update_statistics(update_statistics)
         return self.update(update_statistics)
 
-    def _set_asset_list(self):
-        pass
+    def _get_asset_list(self)->Union[None, list]:
+        return None
     def set_update_statistics(self, update_statistics: DataUpdates):
         """
         Default method to narrow down update statistics un local time series,
@@ -2572,12 +2572,13 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         :return:
         """
         # Filter update_statistics to include only assets in self.asset_list.
-        asset_list = None
+
         if hasattr(self, "asset_list"):
             asset_list = self.asset_list
             self.logger.info(f"{self.human_readable} is updating {len(self.asset_list)} assets")
         else:
-            self._set_asset_list()
+            asset_list=self._get_asset_list()
+            self.asset_list=asset_list
 
 
         update_statistics = update_statistics.update_assets(
