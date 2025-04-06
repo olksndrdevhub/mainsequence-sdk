@@ -101,6 +101,7 @@ class User(BaseObjectOrm,BasePydanticModel):
         return cls(**r.json())
 
 class FigiInfo(BasePydanticModel):
+    id:Optional[int]=None
     real_figi: bool = Field(default=True, description="FIGI identifier is real (default: True)")
     figi: constr(max_length=12) = Field(
         ...,
@@ -308,6 +309,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
     source: str
     assets: List[int]
     organization_owner_uid: str
+    description: Optional[str]=None
     
     def __repr__(self):
         return f"{self.display_name} source: {self.source}, {len(self.assets)} assets"

@@ -6,7 +6,8 @@ from datetime import datetime
 from typing import Union
 
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
 from tqdm import tqdm
 from .utils import MARKETS_CONSTANTS, request_to_datetime, DATE_FORMAT, AuthLoaders, make_request, DoesNotExist
 
@@ -63,7 +64,10 @@ class HtmlSaveException(Exception):
             return self.message
 
 class BasePydanticModel(BaseModel):
+    model_config = ConfigDict(extra='forbid')  # Forbid extra fields in v2
     orm_class: str = None  # This will be set to the class that inherits
+
+
 
     @classmethod
     def __init_subclass__(cls, **kwargs):

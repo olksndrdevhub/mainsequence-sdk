@@ -21,7 +21,7 @@ import os
 from tqdm import tqdm
 from joblib import Parallel, delayed
 
-from mainsequence.virtualfundbuilder.models import AssetsConfiguration, AssetUniverse, AssetFilter
+from mainsequence.virtualfundbuilder.models import AssetsConfiguration
 from mainsequence.virtualfundbuilder.utils import logger
 
 FULL_CALENDAR = "24/7"

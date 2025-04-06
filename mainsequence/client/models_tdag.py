@@ -724,7 +724,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     hash_id: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
     table_name: Optional[str] = Field(None, max_length=63, description="Max length of PostgreSQL table name")
     creation_date: datetime.datetime = Field(..., description="Creation timestamp")
-    created_by_user_id: Optional[int] = Field(None, description="Foreign key reference to AUTH_USER_MODEL")
+    created_by_user: Optional[int] = Field(None, description="Foreign key reference to AUTH_USER_MODEL")
     organization_owner: int = Field(None, description="Foreign key reference to Organization")
     open_for_everyone: bool = Field(default=False, description="Whether the table is open for everyone")
     data_source_open_for_everyone: bool = Field(default=False,
@@ -1577,6 +1577,7 @@ class TimeScaleDB(DataSource):
 
 
 class DynamicResource(BasePydanticModel, BaseObjectOrm):
+    id:Optional[int]=None
     name: str
     type: str
     object_signature : dict
@@ -1584,6 +1585,10 @@ class DynamicResource(BasePydanticModel, BaseObjectOrm):
     default_yaml: str
     attributes: Optional[dict]
 
+    created_at:datetime.datetime
+    updated_at:datetime.datetime
+    is_production:bool
+    pod: int
 
 def register_default_configuration(json_payload: dict, timeout=None):
     url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/register_default_configuration/"

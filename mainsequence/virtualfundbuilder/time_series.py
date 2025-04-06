@@ -1,15 +1,15 @@
 import copy
 import os
 
-from mainsequence.client import TDAG_CONSTANTS as CONSTANTS, DataUpdates, HistoricalWeights
+from mainsequence.client import  DataUpdates, AssetCategory,Asset
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie
-from datetime import datetime, timedelta
+from datetime import datetime
 import numpy as np
 import pytz
 import pandas as pd
 from typing import Dict, Tuple
 
-from .models import PortfolioBuildConfiguration, AssetsConfiguration
+from .models import PortfolioBuildConfiguration
 from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_interpolated_prices_timeseries
 from mainsequence.virtualfundbuilder.resource_factory.rebalance_factory import RebalanceFactory
 import json
@@ -116,18 +116,11 @@ class PortfolioStrategy(TimeSerie):
         """
         Creates mappings from symbols to IDs
 
-        Args:
-            asset_universe (List[AssetUniverse]): List of asset universes.
-
-        Returns:
-            Tuple[Dict[str, Dict[str, int]], Dict[str, Dict[int, int]]]:
-                - symbol_to_id_map: Mapping from execution venue symbol to asset unique identifiers to asset IDs.
         """
-        asset_list = {}
-        all_assets = []
 
-        asset_universe = self.assets_configuration.asset_universe
-        self.asset_list = asset_universe.asset_list
+
+        asset_category = AssetCategory.get(self.assets_configuration.assets_category_unique_id)
+        self.asset_list = Asset.filter_with_asset_class(id__in=[a.id for a in asset_category.assets])
 
     def _calculate_start_end_dates(self, update_statistics: DataUpdates):
         """
@@ -447,11 +440,8 @@ rebalance details:
             pd.DataFrame: Updated portfolio values with and without fees and returns.
         """
 
-        self._set_asset_list()
-        update_statistics = update_statistics.update_assets(
-            asset_list=None,
-            init_fallback_date=datetime(2017, 1, 1, tzinfo=pytz.utc)
-        )
+
+
         self.logger.debug("Starting update of portfolio weights.")
         start_date, end_date = self._calculate_start_end_dates(update_statistics)
 

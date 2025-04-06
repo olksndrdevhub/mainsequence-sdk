@@ -2562,6 +2562,8 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         update_statistics = self.set_update_statistics(update_statistics)
         return self.update(update_statistics)
 
+    def _set_asset_list(self):
+        pass
     def set_update_statistics(self, update_statistics: DataUpdates):
         """
         Default method to narrow down update statistics un local time series,
@@ -2574,6 +2576,9 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         if hasattr(self, "asset_list"):
             asset_list = self.asset_list
             self.logger.info(f"{self.human_readable} is updating {len(self.asset_list)} assets")
+        else:
+            self._set_asset_list()
+
 
         update_statistics = update_statistics.update_assets(
             asset_list, init_fallback_date=self.OFFSET_START

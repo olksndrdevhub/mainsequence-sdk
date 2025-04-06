@@ -31,11 +31,10 @@ class PortfolioInterface():
             self.check_valid_configuration_name(configuration_name)
         self.build_purpose=build_purpose
         self.portfolio_config_template = portfolio_config_template
-        self.portfolio_config = configuration_sanitizer(portfolio_config_template, auto_complete=True)
+        self.portfolio_config = configuration_sanitizer(portfolio_config_template)
         self.configuration_name = configuration_name
 
-        self.portfolio_tdag_update_configuration = self.portfolio_config.portfolio_tdag_update_configuration
-        self.portfolio_vam_config = self.portfolio_config.portfolio_vam_configuration
+        self.portfolio_markets_config = self.portfolio_config.portfolio_markets_configuration
         self.portfolio_build_configuration = self.portfolio_config.portfolio_build_configuration
         self.logger = get_vfb_logger()
         self._is_initialized = False
@@ -63,7 +62,7 @@ class PortfolioInterface():
         os.environ["PATCH_BUILD_CONFIGURATION"] = patch
         self._is_initialized = True
 
-    def build_target_portfolio_in_vam(self,portfolio_tags:Optional[List[str]]=None) -> TargetPortfolio:
+    def build_target_portfolio_in_backend(self,portfolio_tags:Optional[List[str]]=None) -> TargetPortfolio:
         """
         This method creates a portfolio in VAM with configm file settings.
 
@@ -75,7 +74,7 @@ class PortfolioInterface():
 
         portfolio_ts = self.portfolio_strategy_time_serie
 
-        def build_vam_portfolio(ts,build_purpose):
+        def build_markets_portfolio(ts,build_purpose):
             from mainsequence.client import BACKEND_DETACHED
 
             # when is live target portfolio
@@ -104,7 +103,7 @@ class PortfolioInterface():
                                        build_purpose=build_purpose,
                                        )
 
-            user_kwargs = self.portfolio_vam_config.model_dump()
+            user_kwargs = self.portfolio_markets_config.model_dump()
             user_kwargs.pop("front_end_details", None)
 
             standard_kwargs.update(user_kwargs)
@@ -136,11 +135,11 @@ class PortfolioInterface():
             else:
                 # patch timeserie of portfolio to guaranteed recreation
                 target_portfolio.patch(**standard_kwargs)
-                self.logger.debug(f"Target portfolio {ts.local_metadata.id} already exists in VAM")
+                self.logger.debug(f"Target portfolio {ts.local_metadata.id} already exists in Backend")
 
             return target_portfolio
 
-        target_portfolio = build_vam_portfolio(portfolio_ts, build_purpose=self.build_purpose)
+        target_portfolio = build_markets_portfolio(portfolio_ts, build_purpose=self.build_purpose)
 
         # create index Asset
         asset_symbol = target_portfolio.portfolio_ticker
@@ -177,7 +176,7 @@ class PortfolioInterface():
 
         if self.portfolio_strategy_time_serie.data_source.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             self.portfolio_strategy_time_serie.run(debug_mode=debug_mode, update_tree=update_tree, force_update=force_update, **kwargs)
-            self.build_target_portfolio_in_vam(portfolio_tags)
+            self.build_target_portfolio_in_backend(portfolio_tags)
         else:
             self.portfolio_strategy_time_serie.run_local_update(*args, **kwargs)
 

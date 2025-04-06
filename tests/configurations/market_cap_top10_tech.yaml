@@ -49,7 +49,7 @@ portfolio_build_configuration:
     asset_type: cash_equity
     execution_venue_symbol: alpaca
     symbol: USD
-portfolio_vam_configuration:
+portfolio_markets_configuration:
   execution_configuration:
     max_data_latency_seconds: 60
     max_latency_in_cdc_seconds: 300

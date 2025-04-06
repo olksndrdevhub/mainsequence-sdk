@@ -49,123 +49,7 @@ def cached_asset_filter(*args,**kwargs):
     tmp_assets = Asset.filter_with_asset_class( *args,**kwargs)
     return tmp_assets
 
-class AssetFilter(VFBConfigBaseModel):
-    """
-    If the asset is a crypto coin, use 'future_usdm', if it equity, use 'cash_equity'.
-    There is also a special case of asset categories that include a set of assets, they can be accessed using categories__name
-    The example assets provided are only for demonstration purposes, the actual assets and asset categories for the portfolio must be based on user input.
-    """
-    categories__display_name: Optional[str] = None
-    categories__unique_identifier: Optional[str] = None
 
-    # Asset Properties
-    symbol: Optional[str] = None
-    execution_venue__symbol: Optional[str] = None
-    
-    # CurrencyAsset
-    quote_asset__symbol: Optional[str] = None
-    base_asset__categories__name: Optional[str] = None
-    base_asset__categories__name_not_in: Optional[str] = None
-
-    def get_assets(self):
-        return cached_asset_filter(**self.model_dump())
-
-class AssetUniverse(VFBConfigBaseModel):
-    """
-    Configuration for the asset universe in a portfolio.
-
-    Attributes:
-        asset_filters (List[AssetFilter]): Filter Objects for filtering assets.
-
-    Examples:
-      asset_filters:
-          - asset_type: currency_pair
-            quote_asset__symbol: USDT
-            execution_venue__symbol: binance
-          - symbol: BTCUSDT
-            asset_type: future_usdm
-            execution_venue__symbol: binance
-          - symbol: ETHUSDT
-            asset_type: future_usdm
-            execution_venue__symbol: binance
-          - symbol: AAPL
-            asset_type: cash_equity
-            execution_venue__symbol: alpaca
-          - categories__name: SP500
-          - categories__name: SP500
-    """
-    asset_filters: List[AssetFilter]
-
-    @property
-    def asset_list(self) -> ModelList:
-        """ Evaluates the assets in the filters and returns them as ModelList"""
-        asset_list = []
-        for asset_filter in self.asset_filters:
-            assets = asset_filter.get_assets()
-            if not assets:
-                logger.debug(f"No assets found for {asset_filter}")
-            asset_list.extend(assets)
-
-        if len(asset_list) == 0:
-            logger.warning("No asset_filters found. Returning empty ModelList.")
-            return ModelList()
-        return ModelList(asset_list)
-
-    def get_assets_per_execution_venue(self):
-        venue_asset_list_map = {}
-        for asset in self.asset_list:
-            ev_symbol = asset.execution_venue_symbol
-            if ev_symbol not in venue_asset_list_map:
-                venue_asset_list_map[ev_symbol] = []
-            venue_asset_list_map[ev_symbol].append(asset)
-        return venue_asset_list_map
-
-    def get_required_execution_venues(self):
-        return list(self.get_assets_per_execution_venue().keys())
-
-    def model_dump(self, **kwargs):
-        from mainsequence.tdag.time_series.time_series import serialize_model_list
-        asset_list = self.asset_list
-        data = super().model_dump(**kwargs)
-        data["asset_list"] = serialize_model_list(asset_list) if asset_list is not None else None
-        return data
-
-    @staticmethod
-    def parse_serialized_asset_list(execution_venue_symbol: str, asset_list) -> ModelList:
-
-        asset_universe = pd.DataFrame(asset_list)
-
-        for (asset_type,execution_venue__symbol), asset_group in asset_universe.groupby(["asset_type","execution_venue__symbol"]):
-            asset_type = asset_type[0] if isinstance(asset_type, tuple) else asset_type
-            AssetClass = get_right_asset_class(asset_type=asset_type,
-                                               execution_venue_symbol=execution_venue_symbol)
-
-            tmp_assets = AssetClass.filter(
-                symbol__in=asset_group["symbol"].to_list(),
-                asset_type=asset_type,
-                execution_venue__symbol=execution_venue__symbol,
-            )
-
-            if len(tmp_assets) != len(asset_group["symbol"].unique()):
-                raise Exception(
-                    f'{execution_venue_symbol} Error:These assets are not in {set(asset_group["symbol"].to_list()) - set([a.symbol for a in tmp_assets])} DB')
-
-        return tmp_assets
-
-    @classmethod
-    def create_from_serialized_assets(cls, execution_venue_symbol: str, asset_list: list):
-
-        """
-          Parses a configuration dictionary to create a list of asset objects as a ModelList.
-
-          Args:
-              asset_configuration (Dict[str, Any]): Configuration dictionary detailing assets to parse, categorized by venue and type.
-
-          Returns:
-              ModelList: A list of assets initialized from the configuration.
-          """
-        asset_list = cls.parse_serialized_asset_list(execution_venue_symbol, asset_list)
-        return cls(execution_venue_symbol=ExecutionVenueNames(execution_venue_symbol), asset_list=asset_list)
 
 
 class AssetsConfiguration(VFBConfigBaseModel):
@@ -173,12 +57,12 @@ class AssetsConfiguration(VFBConfigBaseModel):
     Configuration for assets included in a portfolio.
 
     Attributes:
-        asset_universe (AssetUniverse):
-            Asset universe categorized by execution venue.
+        assets_category_unique_id (str):
+            Unique Identifier of assets category
         price_type (PriceTypeNames): Type of price used for backtesting.
         prices_configuration (PricesConfiguration): Configuration for price data handling.
     """
-    asset_universe: AssetUniverse
+    assets_category_unique_id: str
     price_type: PriceTypeNames = PriceTypeNames.VWAP
     prices_configuration: PricesConfiguration
 
@@ -224,7 +108,7 @@ class BacktestingWeightsConfig(VFBConfigBaseModel):
             return values
 
         values["signal_weights_configuration"]["signal_assets_configuration"] = AssetsConfiguration(
-            asset_universe=values["signal_weights_configuration"]["signal_assets_configuration"]["asset_universe"],
+            assets_category_unique_id=values["signal_weights_configuration"]["signal_assets_configuration"]["assets_category_unique_id"],
             price_type=PriceTypeNames(
                 values["signal_weights_configuration"]["signal_assets_configuration"]['price_type']),
             prices_configuration=PricesConfiguration(
@@ -241,55 +125,6 @@ class PortfolioExecutionConfiguration(VFBConfigBaseModel):
         commission_fee (float): Commission fee percentage.
     """
     commission_fee: float = 0.00018
-
-
-class BaseRunConfiguration(RunConfiguration):
-    """
-    Configuration for the base dependency tree update details.
-
-    Attributes:
-        update_schedule (str): Cron-like schedule for updates.
-        distributed_num_cpus (int): Number of CPUs for distributed execution.
-        execution_timeout_seconds (int): Timeout for execution in seconds.
-    """
-    retry_on_error: int = 0
-    seconds_wait_on_retry: float = 50
-    required_cpus: int = 1
-    required_gpus: int = 0
-    execution_time_out_seconds: float = 50
-    update_schedule: str = "*/1 * * * *"
-
-
-class PortfolioTdagUpdateConfiguration(VFBConfigBaseModel):
-    """
-    Configuration for TDAG (The Data Analytics Group) updates.
-
-    Attributes:
-        base_dependency_tree_update_details (BaseDependencyTreeUpdateDetails): Details for updating dependencies.
-        base_classes_to_exclude (list): List of classes to exclude from updates.
-        custom_update_details_per_class (dict): Custom update details per class.
-    """
-    run_configuration: BaseRunConfiguration
-    base_classes_to_exclude: list = list()
-    custom_update_details_per_class: dict = dict()
-
-
-class BrokerConfiguration(VFBConfigBaseModel):
-    execution_time_out_seconds: int = 5 * 60
-    max_order_life_time_seconds: int = 2
-
-
-class OrderExecutionConfiguration(VFBConfigBaseModel):
-    """
-    Configuration for order execution.
-
-    Attributes:
-        broker_class (BrokerClassName): The class of the broker to use.
-        broker_configuration (Dict): Configuration dictionary for the selected broker class.
-    """
-    broker_class: BrokerClassName = BrokerClassName.PRICE_CHASER_BROKER
-    broker_configuration: BrokerConfiguration
-
 
 
 
@@ -352,9 +187,8 @@ class PortfolioBuildConfiguration(VFBConfigBaseModel):
     def parse_assets_configuration(cls, values):
 
         if not isinstance(values["assets_configuration"], AssetsConfiguration) and values['assets_configuration'] is not None:
-            asset_universe = values['assets_configuration']['asset_universe']
             values["assets_configuration"] = AssetsConfiguration(
-                asset_universe=values['assets_configuration']['asset_universe'],
+                assets_category_unique_id=values['assets_configuration']['assets_category_unique_id'],
                 price_type=PriceTypeNames(values['assets_configuration']['price_type']),
                 prices_configuration=PricesConfiguration(
                     **values['assets_configuration']['prices_configuration'])
@@ -377,12 +211,10 @@ class PortfolioConfiguration(VFBConfigBaseModel):
 
     Attributes:
         portfolio_build_configuration (PortfolioBuildConfiguration): Configuration for building the portfolio.
-        portfolio_tdag_update_configuration (PortfolioTdagUpdateConfiguration): TDAG update configuration.
-        portfolio_vam_configuration (PortfolioVamConfig): VAM execution configuration.
+        portfolio_markets_configuration (PortfolioVamConfig): VAM execution configuration.
     """
     portfolio_build_configuration: PortfolioBuildConfiguration
-    portfolio_tdag_update_configuration: PortfolioTdagUpdateConfiguration
-    portfolio_vam_configuration: PortfolioVamConfig
+    portfolio_markets_configuration: PortfolioVamConfig
 
     @staticmethod
     def read_portfolio_configuration_from_yaml(yaml_path: str):
@@ -398,8 +230,7 @@ class PortfolioConfiguration(VFBConfigBaseModel):
     @staticmethod
     def parse_portfolio_configurations(
         portfolio_build_configuration: dict,
-        portfolio_tdag_update_configuration: dict,
-        portfolio_vam_configuration: dict,
+        portfolio_markets_configuration: dict,
     ):
         # Parse the individual components
         backtesting_weights_configuration = BacktestingWeightsConfig(
@@ -424,24 +255,15 @@ class PortfolioConfiguration(VFBConfigBaseModel):
             valuation_asset=portfolio_build_configuration["valuation_asset"]
         )
 
-        run_configuration = BaseRunConfiguration(
-            **portfolio_tdag_update_configuration['base_dependency_tree_update_details']
-        )
 
-        portfolio_tdag_update_config = PortfolioTdagUpdateConfiguration(
-            run_configuration=run_configuration,
-            base_classes_to_exclude=portfolio_tdag_update_configuration['base_classes_to_exclude'],
-            custom_update_details_per_class=portfolio_tdag_update_configuration['custom_update_details_per_class']
-        )
 
-        portfolio_vam_configuration["front_end_details"] = portfolio_vam_configuration['front_end_details']["about_text"]
-        portfolio_vam_configuration = PortfolioVamConfig(**portfolio_vam_configuration)
+        portfolio_markets_configuration["front_end_details"] = portfolio_markets_configuration['front_end_details']["about_text"]
+        portfolio_markets_configuration = PortfolioVamConfig(**portfolio_markets_configuration)
 
         # Combine everything into the final PortfolioConfiguration
         portfolio_config = PortfolioConfiguration(
             portfolio_build_configuration=portfolio_build_config,
-            portfolio_tdag_update_configuration=portfolio_tdag_update_config,
-            portfolio_vam_configuration=portfolio_vam_configuration
+            portfolio_markets_configuration=portfolio_markets_configuration
         )
 
         return portfolio_config
