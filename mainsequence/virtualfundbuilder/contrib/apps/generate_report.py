@@ -172,7 +172,7 @@ class ReportApp(BaseApp):
 """
         rendered_html = Template(template_str).render(context)
 
-        output_html = "/tmp/report.html"
+        output_html = "./report.html"
         with open(output_html, "w", encoding="utf-8") as f:
             f.write(rendered_html)
 
@@ -183,7 +183,12 @@ class ReportApp(BaseApp):
         # HTML(string=rendered_html).write_pdf(pdf_path)
         # print(f"PDF generated: {pdf_path}")
         # pdf_artifact = Artifact.upload_file(filepath=pdf_path, name="Report PDF", created_by_resource_name=self.__class__.__name__, bucket_name="Reports")
-        html_artifact = Artifact.upload_file(filepath=output_html, name="Report HTML", created_by_resource_name=self.__class__.__name__, bucket_name="Reports")
+        html_artifact = Artifact.upload_file(
+            filepath=output_html,
+            name="Report HTML",
+            created_by_resource_name=self.__class__.__name__,
+            bucket_name="Reports"
+        )
         return html_artifact
 
 if __name__ == "__main__":

@@ -49,6 +49,7 @@ uvicorn = "*"
 colorama = "*"
 fredapi = "*"
 polygon-api-client = "*"
+kaleido = "*"
 
 [dev-packages]
 mkdocs = "*"

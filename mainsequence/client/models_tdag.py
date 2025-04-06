@@ -1626,6 +1626,7 @@ def create_configuration_for_strategy(json_payload: dict, timeout=None):
 
 
 class Artifact(BasePydanticModel, BaseObjectOrm):
+    id: Optional[int]
     name: str
     created_by_resource_name: str
     bucket_name: str
