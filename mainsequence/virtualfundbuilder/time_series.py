@@ -102,7 +102,10 @@ class PortfolioStrategy(TimeSerie):
         SignalWeightClass = SignalWeightsFactory.get_signal_weights_strategy(
             signal_weights_name=self.signal_weights_name
         )
-        self.signal_weights = SignalWeightClass.build_and_parse_from_configuration(**self.full_signal_weight_config)
+
+        # TODO make this part of the arguments in the signal
+        historical_market_cap_ts_unique_identifier = self.full_signal_weight_config["signal_assets_configuration"].prices_configuration.markets_time_series[0].unique_identifier
+        self.signal_weights = SignalWeightClass.build_and_parse_from_configuration(**self.full_signal_weight_config, historical_market_cap_ts_unique_identifier=historical_market_cap_ts_unique_identifier)
 
         self.rebalance_strategy_name = self.backtesting_weights_config.rebalance_strategy_name
         RebalanceClass = RebalanceFactory.get_rebalance_strategy(rebalance_strategy_name=self.rebalance_strategy_name)
@@ -119,13 +122,11 @@ class PortfolioStrategy(TimeSerie):
     def _get_asset_list(self):
         """
         Creates mappings from symbols to IDs
-
         """
-
-
         asset_category = AssetCategory.get(unique_identifier=self.assets_configuration.assets_category_unique_id)
         asset_list = Asset.filter_with_asset_class(id__in=asset_category.assets)
         return asset_list
+
     def _calculate_start_end_dates(self, update_statistics: DataUpdates):
         """
         Calculates the start and end dates for processing based on the latest value and available data.
@@ -139,8 +140,7 @@ class PortfolioStrategy(TimeSerie):
         """
         # Get last observations for each exchange
         update_statics_from_dependencies = self.bars_ts.get_update_statistics(
-            unique_identifier_list=[a.unique_identifier for a in self.asset_list])
-
+            unique_identifier_list=[a.unique_identifier for a in update_statistics.asset_list])
 
         earliest_last_value = update_statics_from_dependencies._max_time_in_update_statistics
 

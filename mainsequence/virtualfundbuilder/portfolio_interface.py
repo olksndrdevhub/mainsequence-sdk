@@ -62,7 +62,7 @@ class PortfolioInterface():
         os.environ["PATCH_BUILD_CONFIGURATION"] = patch
         self._is_initialized = True
 
-    def build_target_portfolio_in_backend(self,portfolio_tags:Optional[List[str]]=None) -> TargetPortfolio:
+    def build_target_portfolio_in_backend(self) -> TargetPortfolio:
         """
         This method creates a portfolio in VAM with configm file settings.
 
@@ -168,15 +168,20 @@ class PortfolioInterface():
 
         return target_portfolio, index_asset
 
-    def run(self,portfolio_tags:List[str],patch_build_configuration=True,
-            debug_mode=True,force_update=True,
-            update_tree=True, *args, **kwargs):
+    def run(
+            self,
+            patch_build_configuration=True,
+            debug_mode=True,
+            force_update=True,
+            update_tree=True,
+            *args, **kwargs
+    ):
         if not self._is_initialized or patch_build_configuration == True:
             self._initialize_nodes(patch_build_configuration=True)
 
         if self.portfolio_strategy_time_serie.data_source.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             self.portfolio_strategy_time_serie.run(debug_mode=debug_mode, update_tree=update_tree, force_update=force_update, **kwargs)
-            self.build_target_portfolio_in_backend(portfolio_tags)
+            self.build_target_portfolio_in_backend()
         else:
             self.portfolio_strategy_time_serie.run_local_update(*args, **kwargs)
 
