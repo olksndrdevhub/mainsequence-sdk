@@ -12,67 +12,104 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 
+from mainsequence.tdag import APITimeSerie
+from mainsequence.virtualfundbuilder.utils import get_vfb_logger
+
 from pydantic import BaseModel
 from jinja2 import Template
 
-
+from mainsequence.client import DoesNotExist, AssetCategory
 from mainsequence.client.models_tdag import Artifact
 from mainsequence.virtualfundbuilder.resource_factory.app_factory import register_app, BaseApp
 
+logger = get_vfb_logger()
 
-def example_data():
+def example_data(assets):
     """
-    Generates two Plotly figures (line chart + correlation heatmap) from
-    a fabricated 'fundamentals' DataFrame, returning their Base64-encoded PNGs.
-    In a real setting, replace this function to fetch real data from the pylong API.
+    Fetch real data from the 'api_ts.get_df_between_dates()' call, then:
+      1) Build a time-series chart of 'Revenue' vs. time for each asset (ticker).
+      2) Build a correlation heatmap of 'Revenue' vs. 'EPS' for the latest time period.
+      3) Return both figures as Base64-encoded PNGs.
     """
 
     # ------------------------------------------------------------------------------
-    # 1) EXAMPLE DATA
-    #    The index is (datetime, asset_id); columns might include "Revenue" and "EPS".
-    #    Here, we just fabricate random data for demonstration.
+    # 1) GET THE REAL DATA
+    market_time_serie_unique_identifier = "polygon_historical_fundamentals"
+    try:
+        from mainsequence.client import MarketsTimeSeriesDetails
+        hbs = MarketsTimeSeriesDetails.get(unique_identifier=market_time_serie_unique_identifier)
+    except DoesNotExist as e:
+        logger.exception(f"HistoricalBarsSource does not exist for {market_time_serie_unique_identifier}")
+        raise e
 
-    dates = pd.date_range("2024-12-01", periods=5, freq="M")
-    asset_ids = ["AAPL", "GOOG", "MSFT", "AMZN"]
-    index = pd.MultiIndex.from_product([dates, asset_ids], names=["date", "asset_id"])
+    api_ts = APITimeSerie(
+        data_source_id=hbs.related_local_time_serie.data_source_id,
+        local_hash_id=hbs.related_local_time_serie.local_hash_id
+    )
 
-    np.random.seed(42)
-    df_fundamentals = pd.DataFrame({
-        "Revenue": np.random.randint(80, 120, len(index)),  # billions
-        "EPS": np.random.rand(len(index)) * 5,  # earnings per share
-    }, index=index).reset_index()
+    # This returns a DataFrame, indexed by (time_index, unique_identifier)
+    # with columns like: 'is_revenues', 'is_basic_earnings_per_share', etc.
+    data = api_ts.get_df_between_dates()
+
+    # Move the multi-index to columns for easier manipulation
+    df = data.reset_index()
+    # Example: 'unique_identifier' might be "AAPL_ms_share_class_123xyz"
+    # We'll extract the first underscore-delimited part as the 'asset_id'.
+    df["asset_id"] = df["unique_identifier"].str.split("_").str[0]
+
+    df = df[df["unique_identifier"].isin([a.unique_identifier for a in assets])]
+
+    # Rename columns to something more readable in the charts
+    df["Revenue"] = df["is_revenues"]
+    df["EPS"] = df["is_basic_earnings_per_share"]
+
+    # OPTIONAL: If you want to drop rows that have no revenue or EPS data
+    # df.dropna(subset=["Revenue", "EPS"], how="all", inplace=True)
 
     # ------------------------------------------------------------------------------
-    # 2) TIME-SERIES LINE CHART
+    # 2) TIME-SERIES LINE CHART: Revenue over time, color by ticker
+    import plotly.express as px
     fig_line = px.line(
-        df_fundamentals,
-        x="date",
+        df,
+        x="time_index",
         y="Revenue",
         color="asset_id",
         title="Revenue Over Time by Asset"
     )
+    fig_line.update_layout(xaxis_title="Date", yaxis_title="Revenue")
 
     # ------------------------------------------------------------------------------
     # 3) CORRELATION HEATMAP
-    latest_date = df_fundamentals["date"].max()
-    df_latest = df_fundamentals[df_fundamentals["date"] == latest_date]
+    latest_date = df.groupby("unique_identifier")["quarter"].max().min() # latest date where all values are present
+    df_latest = df[df["time_index"] == latest_date].copy()
 
-    # Pivot so each row is an asset, columns are fundamentals:
-    df_pivot = df_latest.pivot_table(index="asset_id", columns=None)[["Revenue", "EPS"]]
+    # Pivot so each row is an asset and columns are the fundamental metrics
+    # (Here, "Revenue" and "EPS").
+    df_pivot = df_latest.pivot_table(
+        index="asset_id",
+        values=["Revenue", "EPS"],
+        aggfunc="mean"  # or 'first' if each (asset, time_index) is unique
+    )
 
     corr_matrix = df_pivot.corr()
-    fig_heatmap = go.Figure(data=go.Heatmap(
-        z=corr_matrix.values,
-        x=corr_matrix.columns,
-        y=corr_matrix.index,
-        colorscale="Blues"
-    ))
+    import plotly.graph_objs as go
+    fig_heatmap = go.Figure(
+        data=go.Heatmap(
+            z=corr_matrix.values,
+            x=corr_matrix.columns,
+            y=corr_matrix.index,
+            colorscale="Blues"
+        )
+    )
     fig_heatmap.update_layout(
-        title=f"Correlation of Fundamentals on {latest_date.strftime('%Y-%m-%d')}"
+        title=f"Correlation of Fundamentals on {latest_date.date()}"
     )
 
     # ------------------------------------------------------------------------------
     # 4) CONVERT PLOTS TO BASE64 STRINGS
+    import base64
+    from io import BytesIO
+
     def fig_to_base64(fig):
         """Render a Plotly figure to a PNG and return a base64 string."""
         buf = BytesIO()
@@ -85,7 +122,6 @@ def example_data():
 
     return chart1_base64, chart2_base64
 
-
 class ReportConfig(BaseModel):
     """Pydantic model defining the parameters for report generation."""
     report_id: str = "MC-2025"
@@ -95,6 +131,7 @@ class ReportConfig(BaseModel):
     sector: str = "US Equities"
     region: str = "USA"
     topics: List[str] = ["Diversification", "Equities", "Fundamentals"]
+    asset_category_unique_identifier: str = "magnificent_7"
     summary: str = (
         "We are entering a more benign phase of the economic cycle characterized by "
         "sustained economic growth and declining policy interest rates. Historically, "
@@ -114,6 +151,10 @@ class ReportApp(BaseApp):
     def __init__(self, configuration: ReportConfig):
         self.configuration = configuration
 
+        category = AssetCategory.get(unique_identifier=self.configuration.asset_category_unique_identifier)
+        self.assets = category.get_assets()
+        self.category_name = category.display_name
+
     def _fig_to_base64(self, fig) -> str:
         """
         Render a Plotly figure to PNG and return a Base64 string.
@@ -130,7 +171,7 @@ class ReportApp(BaseApp):
         print(f"Running tool with configuration {self.configuration}")
 
         # 1) Retrieve the chart images:
-        chart1_base64, chart2_base64 = example_data()
+        chart1_base64, chart2_base64 = example_data(self.assets)
 
         # Build context from config
         template_context = {

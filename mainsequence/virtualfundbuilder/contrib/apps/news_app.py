@@ -2,7 +2,6 @@
 import os
 import base64
 from io import BytesIO
-from pathlib import Path
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
@@ -14,11 +13,9 @@ from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent
 from pydantic import BaseModel, Field
 from polygon import RESTClient
-import dotenv
-# Jinja2 for report generation
 from jinja2 import Environment, FileSystemLoader
 
-from mainsequence.client import AssetCategory, Asset
+from mainsequence.client import AssetCategory
 from mainsequence.client.models_tdag import Artifact
 from mainsequence.virtualfundbuilder.resource_factory.app_factory import BaseApp, register_app
 from newspaper import Article
@@ -32,7 +29,7 @@ if not POLYGON_API_KEY:
 
 class SentimentReportConfig(BaseModel):
     """Pydantic model defining parameters for the Sentiment Report."""
-    asset_category_unique_identifier: str = "top_10_us_equity_market_cap"
+    asset_category_unique_identifier: str = "magnificent_7"
     report_days: int = 14
     report_title: str = "Multi-Ticker News Sentiment & Headlines Report"
     bucket_name: str = "SentimentReports" # Optional: For artifact storage

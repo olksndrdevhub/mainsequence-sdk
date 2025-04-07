@@ -36,21 +36,19 @@ class PricesConfiguration(VFBConfigBaseModel):
         bar_frequency_id (str): The frequency of price bars.
         upsample_frequency_id (str): Frequency to upsample intraday data to.
         intraday_bar_interpolation_rule (str): Rule for interpolating missing intraday bars.
-        is_live bool: Boolean flag indicating if the price feed is live.
+        is_live (bool): Boolean flag indicating if the price feed is live.
+        markets_time_series_unique_id_list List[str]: The list of markets time series unique ids. E.g. ["alpaca_1d_bars"]
     """
     bar_frequency_id: str = "1d"
     upsample_frequency_id: str = "1d"  # "15m"
     intraday_bar_interpolation_rule: str = "ffill"
     is_live: bool = False
-    markets_time_series_unique_id_list:List[str]
+    markets_time_series_unique_id_list: List[str]
 
 @lru_cache(maxsize=1028)  # Cache up to 1028 different combinations
 def cached_asset_filter(*args,**kwargs):
     tmp_assets = Asset.filter_with_asset_class( *args,**kwargs)
     return tmp_assets
-
-
-
 
 class AssetsConfiguration(VFBConfigBaseModel):
     """
@@ -65,9 +63,6 @@ class AssetsConfiguration(VFBConfigBaseModel):
     assets_category_unique_id: str
     price_type: PriceTypeNames = PriceTypeNames.VWAP
     prices_configuration: PricesConfiguration
-
-
-
 
 class BacktestingWeightsConfig(VFBConfigBaseModel):
     """
@@ -115,9 +110,6 @@ class PortfolioExecutionConfiguration(VFBConfigBaseModel):
         commission_fee (float): Commission fee percentage.
     """
     commission_fee: float = 0.00018
-
-
-
 
 class PortfolioMarketsConfig(VFBConfigBaseModel):
     """

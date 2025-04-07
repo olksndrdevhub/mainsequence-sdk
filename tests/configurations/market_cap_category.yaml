@@ -1,9 +1,7 @@
 Configuration Name: ""
 portfolio_build_configuration:
   assets_configuration:
-    asset_universe:
-      asset_filters:
-      - categories__name: Top25USEquities
+    assets_category_unique_id: magnificent_7
     price_type: close
     prices_configuration:
       bar_frequency_id: 1d
@@ -16,9 +14,7 @@ portfolio_build_configuration:
     signal_weights_configuration:
       num_top_assets: None
       signal_assets_configuration:
-        asset_universe:
-          asset_filters:
-          - categories__name: Top25USEquities
+        assets_category_unique_id: magnificent_7
         price_type: close
         prices_configuration:
           bar_frequency_id: 1d
@@ -34,6 +30,9 @@ portfolio_build_configuration:
     execution_venue_symbol: alpaca
     symbol: USD
 portfolio_markets_configuration:
+  builds_from_target_positions: false
+  tracking_funds_expected_exposure_from_latest_holdings: None
+  follow_account_rebalance: None
   execution_configuration:
     max_data_latency_seconds: 60
     max_latency_in_cdc_seconds: 300

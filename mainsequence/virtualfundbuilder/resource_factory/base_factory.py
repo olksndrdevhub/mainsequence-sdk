@@ -89,12 +89,11 @@ def insert_in_registry(registry, cls, register_in_agent, name=None, attributes: 
     logger.debug(f"Registered {cls.TYPE} class '{key}': {cls}")
 
     if register_in_agent:
-        send_resource_to_backend(cls, attributes)
-        # Thread(
-        #     target=_send_strategy_to_registry,
-        #     args=(cls.TYPE, cls),
-        #     kwargs={attributes: attributes}
-        # ).start()
+        # send_resource_to_backend(cls, attributes)
+        Thread(
+            target=send_resource_to_backend,
+            args=(cls, attributes),
+        ).start()
 
     return cls
 
