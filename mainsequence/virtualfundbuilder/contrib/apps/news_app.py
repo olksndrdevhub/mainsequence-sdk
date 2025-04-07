@@ -18,7 +18,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from mainsequence.client import AssetCategory, Asset
 from mainsequence.client.models_tdag import Artifact
-from mainsequence.virtualfundbuilder.resource_factory.app_factory import BaseApp
+from mainsequence.virtualfundbuilder.resource_factory.app_factory import BaseApp, register_app
 from newspaper import Article
 
 dotenv.load_dotenv()
@@ -41,6 +41,7 @@ class SentimentReportConfig(BaseModel):
     news_items_per_day_limit: int = 5
     report_id: Optional[str] = "MS_SentimentReport"
 
+@register_app()
 class SentimentReport(BaseApp):
     """
     Generates an HTML report summarizing news sentiment and headlines
