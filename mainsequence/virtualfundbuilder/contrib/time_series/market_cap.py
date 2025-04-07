@@ -72,12 +72,6 @@ class FixedWeights(WeightsBase, TimeSerie):
 
 @register_signal_class(register_in_agent=True)
 class MarketCap(WeightsBase, TimeSerie):
-    EXECUTION_TO_DATA_PROVIDER_MAP = {
-        ExecutionVenueNames.ALPACA: "polygon",
-        ExecutionVenueNames.BINANCE_FUTURES: "coingecko",
-        ExecutionVenueNames.BINANCE: "coingecko"
-    }
-
     @TimeSerie._post_init_routines()
     def __init__(self, source_frequency: str = "1d", num_top_assets: Union[int, None] = None, *args, **kwargs):
         """

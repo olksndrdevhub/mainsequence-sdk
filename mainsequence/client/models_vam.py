@@ -319,6 +319,8 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
         return f"{self.display_name} source: {self.source}, {len(self.assets)} assets"
 
     def get_assets(self):
+        if not self.assets:
+            raise ValueError(f"No assets in Asset Category {self.display_name}")
         return Asset.filter(id__in=self.assets)
 
     def update_assets(self, asset_ids: List[int]):
