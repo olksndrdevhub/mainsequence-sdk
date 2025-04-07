@@ -92,6 +92,7 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   echo "Copying Files from mainsequence-sdk"
   cp -a "/opt/code/mainsequence-sdk/examples/getting_started/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"
   cp -a "/opt/code/mainsequence-sdk/requirements.txt" "${ROOT_PROJECT_PATH}/requirements.txt" || echo "WARNING: Copy requirements step failed!"
+  tree /opt/code/mainsequence-sdk/
   cp -a "/opt/code/mainsequence-sdk/mainsequence/virtualfundbuilder/contrib/time_series/*" "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy TimeSeries step failed!"
   cp -a "/opt/code/mainsequence-sdk/mainsequence/virtualfundbuilder/contrib/rebalance_strategies/*" "$VFB_PROJECT_PATH/rebalance_strategies" || echo "WARNING: Copy Rebalance Strategies step failed!"
   cp -a "/opt/code/mainsequence-sdk/mainsequence/virtualfundbuilder/contrib/apps/*" "$VFB_PROJECT_PATH/apps" || echo "WARNING: Copy apps step failed!"
