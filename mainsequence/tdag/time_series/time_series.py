@@ -1132,7 +1132,7 @@ class TimeSerieRebuildMethods(ABC):
                 error_on_update=error_on_last_update)
 
             self._run_post_update_routines(error_on_last_update=error_on_last_update,
-                                           update_statistics=self.self._update_statistics
+                                           update_statistics=self._update_statistics
                                            )
 
 
@@ -2557,9 +2557,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
             return persisted
 
-    def _run_post_update_routines(self, error_on_last_update: bool,
-                                  update_statistics:DataUpdates,
-                                  ):
+    def _run_post_update_routines(self, error_on_last_update: bool,update_statistics:DataUpdates,  ):
         pass
 
     def set_update_statistics_and_update(self, update_statistics: DataUpdates):

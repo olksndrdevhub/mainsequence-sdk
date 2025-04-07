@@ -45,9 +45,9 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
     def __str__(self):
         return self.class_name() + f" {self.unique_identifier}"
 
-    def append_asset_list_source(self, time_serie: "TimeSerie"):
-        if time_serie.asset_list:
-            asset_id_list = [a.id for a in time_serie.asset_list]
+    def append_asset_list_source(self, asset_list: List[Asset]):
+        if asset_list:
+            asset_id_list = [a.id for a in asset_list]
             self.append_assets(asset_id_list=asset_id_list)
             print("Added assets to bars")
 
@@ -67,6 +67,7 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
         unique_identifier,
         time_serie,
         data_frequency_id,
+        asset_list:List[Asset],
         description=""
     ):
         try:
@@ -90,7 +91,7 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
         if bar_source is None:
             raise ValueError("No historical bars source found")
 
-        bar_source.append_asset_list_source(time_serie)
+        bar_source.append_asset_list_source(asset_list=asset_list)
 
 
     def get_last_observation(self, execution_venue_symbol=None, timeout=None):
