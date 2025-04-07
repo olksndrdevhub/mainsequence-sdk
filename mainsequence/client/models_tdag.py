@@ -235,7 +235,9 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
         """
         if column_metadata is not None:
             for key, value in column_metadata.items():
-                assert key in self.column_dtypes_map, f"Column metadata key '{key}' not found in columns"
+                if key not in self.column_dtypes_map:
+                    logger.warning(f"Column metadata key '{key}' not found in columns")
+                    continue
                 assert {"label", "description"}.issubset(
                     value.keys()), f"Metadata for column '{key}' must include both 'label' and 'description'"
 
