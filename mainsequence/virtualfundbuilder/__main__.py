@@ -44,20 +44,20 @@ def run_configuration(configuration_name):
     res = portfolio.run()
     print(res.head())
 
+
 def run_app(app_name, configuration):
     from mainsequence.virtualfundbuilder.resource_factory.app_factory import APP_REGISTRY
-    app = APP_REGISTRY[app_name]
-    print(f"App configuration is {configuration}")
+    app_cls = APP_REGISTRY[app_name]
 
     configuration_json = yaml.load(configuration, Loader=yaml.UnsafeLoader)
-    print(f"App configuration_json is {configuration_json}")
+    # Pull out the dict under "configuration" (or flatten it, your choice)
+    actual_config = configuration_json.get("configuration", {})
 
-    configuration_pydantic = app.configuration_class(**configuration_json)
+    # Now pass the unpacked dictionary:
+    pydantic_config = app_cls.configuration_class(**actual_config)
 
-    print(f"App configuration class is {app.configuration_class}")
-    print(f"App configuration_pydantic is {configuration_pydantic.model_dump()}")
-
-    results = app(configuration_pydantic).run()
+    app_instance = app_cls(pydantic_config)
+    results = app_instance.run()
     print(f"Finished App {app_name} run with results: {results}")
 
 def run_notebook(notebook_name):

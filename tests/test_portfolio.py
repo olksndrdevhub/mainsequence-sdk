@@ -10,10 +10,10 @@ os.environ["VFB_PROJECT_PATH"] = str(Path(__file__).parent.absolute())
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
 from mainsequence import MARKETS_CONSTANTS
 
-portfolio = PortfolioInterface.load_from_configuration("market_cap_crypto_small")
+portfolio = PortfolioInterface.load_from_configuration("market_cap_top10_tech")
 portfolio._initialize_nodes()
-res = portfolio.run(update_tree=False)
-# res = portfolio.run()
+# res = portfolio.run(update_tree=False)
+res = portfolio.run()
 
 print(res)
 # target_portfolio = TargetPortfolio.get_or_none(local_time_serie__id=portfolio.portfolio_strategy_time_serie_backtest.local_metadata.id)

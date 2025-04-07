@@ -1,67 +1,43 @@
-Configuration Name: ""
 portfolio_build_configuration:
+  valuation_asset:
+    unique_identifier: USD_alpaca_BBG0013HGBT3
   assets_configuration:
-    asset_universe:
-      asset_filters:
-      - asset_type: cash_equity
-        execution_venue__symbol: alpaca
-        symbol: AAPL
-      - asset_type: cash_equity
-        execution_venue__symbol: alpaca
-        symbol: GOOG
-      - asset_type: cash_equity
-        execution_venue__symbol: alpaca
-        symbol: NVDA
     price_type: vwap
     prices_configuration:
       bar_frequency_id: 1d
-      intraday_bar_interpolation_rule: ffill
       upsample_frequency_id: 1d
-  backtesting_weights_configuration:
-    rebalance_strategy_configuration:
-      calendar: 24/7
-    rebalance_strategy_name: ImmediateSignal
-    signal_weights_configuration:
-      num_top_assets: None
-      signal_assets_configuration:
-        asset_universe:
-          asset_filters:
-          - asset_type: cash_equity
-            execution_venue__symbol: alpaca
-            symbol: AAPL
-          - asset_type: cash_equity
-            execution_venue__symbol: alpaca
-            symbol: GOOG
-          - asset_type: cash_equity
-            execution_venue__symbol: alpaca
-            symbol: NVDA
-        price_type: vwap
-        prices_configuration:
-          bar_frequency_id: 1d
-          intraday_bar_interpolation_rule: ffill
-          upsample_frequency_id: 1d
-      source_frequency: 1d
-    signal_weights_name: MarketCap
+      intraday_bar_interpolation_rule: ffill
+      markets_time_series:
+        - unique_identifier: alpaca_1d_bars
+    assets_category_unique_id: test_alpaca
   execution_configuration:
     commission_fee: 0.00018
   portfolio_prices_frequency: 1d
-  valuation_asset:
-    asset_type: cash_equity
-    execution_venue_symbol: alpaca
-    symbol: USD
+  backtesting_weights_configuration:
+    signal_weights_name: MarketCap
+    rebalance_strategy_name: ImmediateSignal
+    signal_weights_configuration:
+      num_top_assets:
+      source_frequency: 1d
+      signal_assets_configuration:
+        price_type: vwap
+        prices_configuration:
+          bar_frequency_id: 1d
+          upsample_frequency_id: 1d
+          intraday_bar_interpolation_rule: ffill
+          markets_time_series:
+            - unique_identifier: polygon_historical_markecap
+        assets_category_unique_id: test_alpaca
+    rebalance_strategy_configuration:
+      calendar: 24/7
+      rebalance_end: '23:00'
+      total_notional: 50000000
+      rebalance_start: '9:00'
+      max_percent_volume_in_bar: 0.01
+      rebalance_frequency_strategy: daily
 portfolio_markets_configuration:
-  execution_configuration:
-    max_data_latency_seconds: 60
-    max_latency_in_cdc_seconds: 300
-    minimum_notional_for_a_rebalance: 15.0
-    minimum_positions_holding_seconds: 600
-    orders_execution_configuration:
-      broker_class: PriceChaserBroker
-      broker_configuration:
-        execution_time_out_seconds: 300
-        max_order_life_time_seconds: 2
-    rebalance_step_every_seconds: 300
-    rebalance_tolerance_percent: 0.005
-    unwind_funds_hanging_limit_seconds: 3600
+  portfolio_name: Magnificent 7 Market Cap Portfolio
   front_end_details: ''
-  portfolio_name: Portfolio Strategy Title
+  builds_from_target_positions: false
+  tracking_funds_expected_exposure_from_latest_holdings: false
+  follow_account_rebalance: false

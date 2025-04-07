@@ -290,7 +290,7 @@ class SentimentReport(BaseApp):
           5. Render HTML,
           6. Upload artifact.
         """
-        self.logger.info(f"Running Sentiment Report with configuration: {self.configuration.model_dump()}")
+        logger.info(f"Running Sentiment Report with configuration: {self.configuration.model_dump()}")
 
         # Step 1: Fetch sentiment and news data
         all_sentiment_data, all_news_data = self._fetch_data()
