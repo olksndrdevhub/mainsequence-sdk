@@ -1629,6 +1629,20 @@ def create_configuration_for_strategy(json_payload: dict, timeout=None):
     return r
 
 
+def query_agent(json_payload: dict, timeout=None):
+    url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/query_agent/"
+    from requests.adapters import HTTPAdapter, Retry
+    s = requests.Session()
+    s.headers.update(loaders.auth_headers)
+    retries = Retry(total=2, backoff_factor=2)
+    s.mount('http://', HTTPAdapter(max_retries=retries))
+
+    r = make_request(s=s, r_type="POST", url=url, payload={"json": json_payload},
+                     loaders=loaders, time_out=200)
+    return r
+
+
+
 class Artifact(BasePydanticModel, BaseObjectOrm):
     id: Optional[int]
     name: str
