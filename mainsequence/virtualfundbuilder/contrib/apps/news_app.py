@@ -64,7 +64,7 @@ class SentimentReport(BaseApp):
         self.start_date = start_date_dt.strftime("%Y-%m-%d")
         self.end_date = end_date_dt.strftime("%Y-%m-%d")
 
-        category = AssetCategory.get(unique_identifier=self.configuration.asset_category)
+        category = AssetCategory.get(unique_identifier=self.configuration.asset_category_unique_identifier)
         self.tickers = [a.symbol for a in category.get_assets()]
         self.category_name = category.display_name
 
@@ -418,7 +418,7 @@ if __name__ == "__main__":
 
     # Example configuration
     config = SentimentReportConfig(
-        asset_category="magnificent_7",
+        asset_category_unique_identifier="magnificent_7",
         report_days=7,
         report_title="Magnificent 7 News Sentiment & Headlines Report (Last 7 Days)",
         report_id="Mag7_SentimentReport_7d"
