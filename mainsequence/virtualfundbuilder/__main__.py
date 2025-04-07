@@ -88,16 +88,25 @@ def get_pod_configuration():
     rebalance_package = f"{project_library}.rebalance_strategies"
     rebalance_modules = get_py_modules(os.path.join(project_path, "rebalance_strategies"))
 
-    # Build the temporary Python script to import all files
-    script_lines = [
-        "# -- Auto-generated imports for time_series --"
-    ]
+    # Gather all submodules in apps
+    apps_package = f"{project_library}.apps"
+    apps_modules = get_py_modules(os.path.join(project_path, "apps"))
 
+    # Build the temporary Python script to import all files
+    script_lines = []
+
+    script_lines.append("# -- Auto-generated imports for time_series --")
     for mod in time_series_modules:
         script_lines.append(f"import {time_series_package}.{mod}")
+
     script_lines.append("# -- Auto-generated imports for rebalance_strategies --")
     for mod in rebalance_modules:
         script_lines.append(f"import {rebalance_package}.{mod}")
+
+    script_lines.append("# -- Auto-generated imports for apps --")
+    for mod in apps_modules:
+        script_lines.append(f"import {apps_package}.{mod}")
+
     script_lines.append("")
     script_lines.append("from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent")
     script_lines.append("print('Initialize TDAGAgent')")
@@ -131,6 +140,7 @@ class VirtualFundLauncher:
         self.logger = get_vfb_logger()
 
     def run_resource(self, execution_type, execution_object=None):
+        get_pod_configuration() # to make sure all resources are available
         error_on_run = False
 
         try:
@@ -142,7 +152,7 @@ class VirtualFundLauncher:
             elif execution_type == "notebook":
                 run_notebook(execution_object)
             elif execution_type == "system_job":
-                get_pod_configuration()
+                pass # placeholder, get_pod_configuration already called above
             elif execution_type == "app":
                 run_app(app_name=os.getenv("APP_NAME"), configuration=os.getenv("APP_CONFIGURATION"))
             else:
