@@ -119,6 +119,10 @@ class FigiInfo(BasePydanticModel):
         None,
         description="Describes the instrument type (e.g. 'CS' for common stock, 'PS' for preferred, etc.)"
     )
+    security_type_2:Optional[constr(max_length=50)] = Field(
+        None,
+        description="Open Figi Security Type 2"
+    )
     security_market_sector: Optional[constr(max_length=50)] = Field(
         None,
         description="High-level sector classification (e.g. 'Equity', 'Corporate Bond') as per FIGI"

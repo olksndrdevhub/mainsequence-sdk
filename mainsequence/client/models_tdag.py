@@ -1043,6 +1043,8 @@ class DataUpdates(BaseModel):
     _max_time_in_update_statistics: Optional[datetime.datetime] = None  # include filter
     last_observation: Optional[pd.DataFrame] = Field(default_factory=pd.DataFrame)
 
+    asset_list:Optional[List]=None
+
     class Config:
         arbitrary_types_allowed = True
 
@@ -1073,6 +1075,7 @@ class DataUpdates(BaseModel):
             init_fallback_date: datetime = None,
             unique_identifier_list: Union[list, None] = None
     ):
+        self.asset_list=asset_list
         new_update_statistics = self.update_statistics
         last_observation = self.last_observation
         if asset_list is not None or unique_identifier_list is not None:
@@ -1096,7 +1099,8 @@ class DataUpdates(BaseModel):
         du = DataUpdates(
             update_statistics=new_update_statistics,
             max_time_index_value=self.max_time_index_value,
-            last_observation=last_observation
+            last_observation=last_observation,
+            asset_list=asset_list
         )
         du._max_time_in_update_statistics = _max_time_in_update_statistics
         return du

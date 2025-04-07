@@ -34,6 +34,7 @@ def get_right_account_class(account: Account):
 
 
 class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
+    id:Optional[int]=None
     unique_identifier: str
     related_local_time_serie: LocalTimeSerie
     description: Optional[str] = Field(None, description="Descriptions of the data source")

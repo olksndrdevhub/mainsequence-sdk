@@ -1131,7 +1131,9 @@ class TimeSerieRebuildMethods(ABC):
                 historical_update_id=local_time_serie_historical_update.id,
                 error_on_update=error_on_last_update)
 
-            self._run_post_update_routines(error_on_last_update=error_on_last_update)
+            self._run_post_update_routines(error_on_last_update=error_on_last_update,
+                                           update_statistics=self.self._update_statistics
+                                           )
 
 
 
@@ -2555,14 +2557,22 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
             return persisted
 
-    def _run_post_update_routines(self, error_on_last_update: bool):
+    def _run_post_update_routines(self, error_on_last_update: bool,
+                                  update_statistics=self.self._update_statistics
+                                  ):
         pass
 
     def set_update_statistics_and_update(self, update_statistics: DataUpdates):
         update_statistics = self.set_update_statistics(update_statistics)
+        self._update_statistics=update_statistics
         return self.update(update_statistics)
 
     def _get_asset_list(self)->Union[None, list]:
+
+
+        if hasattr(self, "asset_list"):
+            return self.asset_list
+
         return None
     def set_update_statistics(self, update_statistics: DataUpdates):
         """
@@ -2573,12 +2583,8 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         """
         # Filter update_statistics to include only assets in self.asset_list.
 
-        if hasattr(self, "asset_list"):
-            asset_list = self.asset_list
-            self.logger.info(f"{self.human_readable} is updating {len(self.asset_list)} assets")
-        else:
-            asset_list=self._get_asset_list()
-            self.asset_list=asset_list
+        asset_list = self._get_asset_list()
+        self._setted_asset_list = asset_list
 
 
         update_statistics = update_statistics.update_assets(
