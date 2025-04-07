@@ -2558,7 +2558,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             return persisted
 
     def _run_post_update_routines(self, error_on_last_update: bool,
-                                  update_statistics=self.self._update_statistics
+                                  update_statistics:DataUpdates,
                                   ):
         pass
 
