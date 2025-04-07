@@ -90,7 +90,6 @@ def configuration_sanitizer(configuration: dict) -> PortfolioConfiguration:
 
 
     if "signal_weights_configuration" not in portfolio_build_config["backtesting_weights_configuration"]:
-
         raise Exception(
             "Missing 'signal_weights_configuration' in 'backtesting_weights_configuration'"
         )
@@ -107,29 +106,15 @@ def configuration_sanitizer(configuration: dict) -> PortfolioConfiguration:
     if "builds_from_target_positions" not in portfolio_markets_config:
         raise Exception("Missing 'builds_from_target_positions' in portfolio_markets_config")
 
-
     if "tracking_funds_expected_exposure_from_latest_holdings" not in portfolio_markets_config:
         raise Exception(
             "Missing 'tracking_funds_expected_exposure_from_latest_holdings' in portfolio_markets_config"
         )
-        if not auto_complete:
-            raise Exception(
-                "Missing 'tracking_funds_expected_exposure_from_latest_holdings' in portfolio_markets_config"
-            )
         portfolio_markets_config["tracking_funds_expected_exposure_from_latest_holdings"] = False
-
-    if "follow_account_rebalance" not in portfolio_markets_config:
-        raise Exception("Missing 'follow_account_rebalance' in portfolio_markets_config")
-
-
 
     configuration['portfolio_markets_configuration'] = portfolio_markets_config
 
-
-
-
     if "signal_assets_configuration" not in portfolio_build_config['backtesting_weights_configuration']['signal_weights_configuration']:
-
         raise Exception(
             "Missing 'signal_weights_configuration' in 'backtesting_weights_configuration'"
         )
@@ -137,10 +122,8 @@ def configuration_sanitizer(configuration: dict) -> PortfolioConfiguration:
 
 
     configuration["portfolio_markets_configuration"]['front_end_details'] = configuration["portfolio_markets_configuration"]['front_end_details']
-
     if "portfolio_prices_frequency" not in portfolio_build_config:
         raise Exception("Missing 'portfolio_prices_frequency' in 'portfolio_build_config'")
-
 
     return PortfolioConfiguration.parse_portfolio_configurations(
         portfolio_build_configuration=portfolio_build_config,

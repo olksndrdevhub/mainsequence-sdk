@@ -28,6 +28,16 @@ class VFBConfigBaseModel(BaseModel):
         arbitrary_types_allowed = True
 
 
+class MarketsTimeSeries(VFBConfigBaseModel):
+    """
+    MarketsTimeSeries based on their unique id. Used as the data sources for the prices.
+    Values include alpaca_1d_bars, binance_1d_bars etc.
+
+    Attributes:
+        unique_identifier (str): Identfier of the MarketsTimeSeries.
+    """
+    unique_identifier: str = "alpaca_1d_bars"
+
 class PricesConfiguration(VFBConfigBaseModel):
     """
     Configuration for price data handling in a portfolio.
@@ -37,13 +47,13 @@ class PricesConfiguration(VFBConfigBaseModel):
         upsample_frequency_id (str): Frequency to upsample intraday data to.
         intraday_bar_interpolation_rule (str): Rule for interpolating missing intraday bars.
         is_live (bool): Boolean flag indicating if the price feed is live.
-        markets_time_series_unique_id_list List[str]: The list of markets time series unique ids. E.g. ["alpaca_1d_bars"]
+        markets_time_series List[MarketsTimeSeries]: The list of markets time series.
     """
     bar_frequency_id: str = "1d"
     upsample_frequency_id: str = "1d"  # "15m"
     intraday_bar_interpolation_rule: str = "ffill"
     is_live: bool = False
-    markets_time_series_unique_id_list: List[str]
+    markets_time_series: List[MarketsTimeSeries]
 
 @lru_cache(maxsize=1028)  # Cache up to 1028 different combinations
 def cached_asset_filter(*args,**kwargs):
@@ -121,8 +131,8 @@ class PortfolioMarketsConfig(VFBConfigBaseModel):
     """
     portfolio_name: str = "Portfolio Strategy Title"
     front_end_details: str = ""
-    tracking_funds_expected_exposure_from_latest_holdings: bool
-    builds_from_target_positions: bool
+    tracking_funds_expected_exposure_from_latest_holdings: bool = False
+    builds_from_target_positions: bool = False
 
 class AssetMixinOverwrite(VFBConfigBaseModel):
     """
@@ -237,9 +247,7 @@ class PortfolioConfiguration(VFBConfigBaseModel):
             valuation_asset=portfolio_build_configuration["valuation_asset"]
         )
 
-
-
-        portfolio_markets_configuration["front_end_details"] = portfolio_markets_configuration['front_end_details']["about_text"]
+        portfolio_markets_configuration["front_end_details"] = portfolio_markets_configuration['front_end_details']
         portfolio_markets_configuration = PortfolioMarketsConfig(**portfolio_markets_configuration)
 
         # Combine everything into the final PortfolioConfiguration

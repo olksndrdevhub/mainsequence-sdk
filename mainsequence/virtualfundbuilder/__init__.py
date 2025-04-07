@@ -4,6 +4,9 @@ from pathlib import Path
 import os
 import sys
 
+from mainsequence.virtualfundbuilder.__main__ import get_pod_configuration
+
+
 def load_env():
 
     assert os.environ.get("VFB_PROJECT_PATH", None) is not None, "VFB_PROJECT_PATH environment variable not set"
@@ -26,10 +29,13 @@ from mainsequence.virtualfundbuilder.utils import (
 )
 
 # no more default strategies, everything should be for user
-# def register_default_strategies():
-#     # Keep this in a function to not clutter the libs namespace
-#     import mainsequence.virtualfundbuilder.contrib.time_series
-#     import mainsequence.virtualfundbuilder.contrib.rebalance_strategies
-#     import mainsequence.virtualfundbuilder.contrib.apps
-#
-# register_default_strategies()
+def register_default_strategies():
+    # Keep this in a function to not clutter the libs namespace
+    import mainsequence.virtualfundbuilder.contrib.time_series
+    import mainsequence.virtualfundbuilder.contrib.rebalance_strategies
+    import mainsequence.virtualfundbuilder.contrib.apps
+
+
+if os.getenv("PROJECT_LIBRARY_NAME") is None:
+    # TODO workaround for now, hack to make local execution work
+    register_default_strategies()

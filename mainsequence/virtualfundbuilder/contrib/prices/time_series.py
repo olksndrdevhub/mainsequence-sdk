@@ -31,14 +31,15 @@ def get_interpolated_prices_timeseries(assets_configuration: AssetsConfiguration
     """
     Creates a Wrapper Timeseries for an asset configuration.
     """
-
     prices_configuration = copy.deepcopy(assets_configuration).prices_configuration
+    markets_time_series_unique_id_list = [p.unique_identifier for p in prices_configuration.markets_time_series]
+
     prices_configuration_kwargs = prices_configuration.model_dump()
     prices_configuration_kwargs.pop("is_live", None)
-
-
+    prices_configuration_kwargs.pop("markets_time_series", None)
     return InterpolatedPrices(
         asset_category_unique_id=assets_configuration.assets_category_unique_id,
+        markets_time_series_unique_id_list=markets_time_series_unique_id_list,
         **prices_configuration_kwargs
     )
 
