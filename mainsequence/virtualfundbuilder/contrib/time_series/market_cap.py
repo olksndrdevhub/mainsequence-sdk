@@ -206,7 +206,7 @@ class MarketCap(WeightsBase, TimeSerie):
                  rolling_atvr_volume_windows: List[int] = [60, 360],
                  frequency_trading_percent: float = .9,
                  source_frequency: str = "1d",
-                 min_number_of_assets: int = 10,
+                 min_number_of_assets: int = 3,
                  volatility_control_configuration: Optional[VolatilityControlConfiguration] = None,
                  num_top_assets: Optional[int] = None, *args, **kwargs):
         """
@@ -288,7 +288,7 @@ class MarketCap(WeightsBase, TimeSerie):
         Returns:
             DataFrame: A DataFrame containing updated signal weights, indexed by time and asset symbol.
         """
-
+        self.asset_list = update_statistics.asset_list
         if len(self.asset_list) < self.min_number_of_assets:
             raise AssetMistMatch(f"only {len(self.asset_list)} in asset_list minum are{self.min_number_of_assets} ")
 

@@ -54,7 +54,7 @@ class SentimentReport(BaseApp):
         self.configuration = configuration
         self.tdag_agent = TDAGAgent()
 
-        logger.info(f"Running Sentiment Report with configuration {configuration.model_dump()}")
+        logger.info(f"Initializing Sentiment Report with configuration {self.configuration.model_dump()}")
 
         end_date_dt = datetime.now()
         start_date_dt = end_date_dt - timedelta(days=self.configuration.report_days -1)
@@ -290,7 +290,7 @@ class SentimentReport(BaseApp):
           5. Render HTML,
           6. Upload artifact.
         """
-        print(f"Running Sentiment Report with configuration: {self.configuration.report_id}")
+        self.logger.info(f"Running Sentiment Report with configuration: {self.configuration.model_dump()}")
 
         # Step 1: Fetch sentiment and news data
         all_sentiment_data, all_news_data = self._fetch_data()

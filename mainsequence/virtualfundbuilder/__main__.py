@@ -53,6 +53,10 @@ def run_app(app_name, configuration):
     print(f"App configuration_json is {configuration_json}")
 
     configuration_pydantic = app.configuration_class(**configuration_json)
+
+    print(f"App configuration class is {app.configuration_class}")
+    print(f"App configuration_pydantic is {configuration_pydantic.model_dump()}")
+
     results = app(configuration_pydantic).run()
     print(f"Finished App {app_name} run with results: {results}")
 
