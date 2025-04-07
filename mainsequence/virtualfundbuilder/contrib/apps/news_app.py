@@ -8,6 +8,8 @@ from typing import List, Dict, Any, Optional
 
 import pandas as pd
 import plotly.graph_objs as go
+from mainsequence.virtualfundbuilder.utils import get_vfb_logger
+
 # Assuming TDAGAgent is correctly set up and accessible in the execution environment
 from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent
 from pydantic import BaseModel, Field
@@ -21,16 +23,16 @@ from mainsequence.client.models_tdag import Artifact
 from mainsequence.virtualfundbuilder.resource_factory.app_factory import BaseApp, register_app
 from newspaper import Article
 
-dotenv.load_dotenv()
-POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
+logger = get_vfb_logger()
 
+POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
 if not POLYGON_API_KEY:
     print("Warning: POLYGON_API_KEY environment variable not set. Data fetching will fail.")
 
 
 class SentimentReportConfig(BaseModel):
     """Pydantic model defining parameters for the Sentiment Report."""
-    asset_category: str = "top_10_us_equity_market_cap"
+    asset_category_unique_identifier: str = "top_10_us_equity_market_cap"
     report_days: int = 14
     report_title: str = "Multi-Ticker News Sentiment & Headlines Report"
     bucket_name: str = "SentimentReports" # Optional: For artifact storage
@@ -54,6 +56,8 @@ class SentimentReport(BaseApp):
     def __init__(self, configuration: SentimentReportConfig):
         self.configuration = configuration
         self.tdag_agent = TDAGAgent()
+
+        logger.info(f"Running Sentiment Report with configuration {configuration.model_dump()}")
 
         end_date_dt = datetime.now()
         start_date_dt = end_date_dt - timedelta(days=self.configuration.report_days -1)
