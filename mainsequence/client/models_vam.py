@@ -318,6 +318,9 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
     def __repr__(self):
         return f"{self.display_name} source: {self.source}, {len(self.assets)} assets"
 
+    def get_assets(self):
+        return Asset.filter(id__in=self.assets)
+
     def update_assets(self, asset_ids: List[int]):
         self.remove_assets(self.assets)
         self.append_assets(asset_ids)
