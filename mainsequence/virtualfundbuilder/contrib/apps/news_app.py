@@ -8,6 +8,8 @@ from typing import List, Dict, Any, Optional
 
 import pandas as pd
 import plotly.graph_objs as go
+# Assuming TDAGAgent is correctly set up and accessible in the execution environment
+from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent
 from pydantic import BaseModel, Field
 from polygon import RESTClient
 import dotenv
@@ -49,6 +51,7 @@ class SentimentReport(BaseApp):
 
     def __init__(self, configuration: SentimentReportConfig):
         self.configuration = configuration
+        self.tdag_agent = TDAGAgent()
 
         end_date_dt = datetime.now()
         start_date_dt = end_date_dt - timedelta(days=self.configuration.report_days -1)
@@ -79,7 +82,7 @@ class SentimentReport(BaseApp):
         Returns:
             Tuple[Dict[str, pd.DataFrame], Dict[str, Dict[str, List[Dict]]]]:
                 - Sentiment data per ticker.
-                - News items per ticker per date.
+                - News items (title, url) per ticker per date.
         """
         if not self.polygon_client:
             print("Error: Polygon API key not configured. Cannot fetch data.")
@@ -104,22 +107,25 @@ class SentimentReport(BaseApp):
             for day in date_range:
                 day_str = day.strftime("%Y-%m-%d")
                 try:
-                    daily_news = list(
+                    # Fetch news for the day
+                    daily_news_response = list(
                         self.polygon_client.list_ticker_news(
-                            ticker=ticker, published_utc=day_str, limit=100
+                            ticker=ticker, published_utc=day_str, limit=100 # Limit news fetched per day
                         )
                     )
                 except Exception as e:
                     print(f"    Error fetching news for {ticker} on {day_str}: {e}")
-                    daily_news = []
+                    daily_news_response = []
 
                 daily_sentiment = {"date": day, "positive": 0, "negative": 0, "neutral": 0}
-                daily_news_items = []
+                daily_news_items_for_report = [] # Store title/url for the report
 
-                for article in daily_news:
+                for article in daily_news_response:
+                    # Extract headline and URL for the report list
                     if hasattr(article, 'title') and hasattr(article, 'article_url'):
-                        daily_news_items.append({'title': article.title, 'url': article.article_url})
+                        daily_news_items_for_report.append({'title': article.title, 'url': article.article_url})
 
+                    # Extract sentiment from insights
                     if hasattr(article, "insights") and article.insights:
                         for insight in article.insights:
                             if hasattr(insight, 'sentiment'):
@@ -129,8 +135,9 @@ class SentimentReport(BaseApp):
                                 elif sentiment == "neutral": daily_sentiment["neutral"] += 1
 
                 sentiment_count.append(daily_sentiment)
-                if daily_news_items:
-                    ticker_news_by_date[day_str] = daily_news_items
+                # Store the collected headlines/urls for this date
+                if daily_news_items_for_report:
+                    ticker_news_by_date[day_str] = daily_news_items_for_report
 
             if sentiment_count:
                 df_sentiment = pd.DataFrame(sentiment_count)
@@ -139,11 +146,11 @@ class SentimentReport(BaseApp):
                 # Ensure all dates in the range are present, filling missing ones with 0
                 df_sentiment = df_sentiment.reindex(date_range, fill_value=0)
                 results[ticker] = df_sentiment
-                all_news[ticker] = ticker_news_by_date
+                all_news[ticker] = ticker_news_by_date # Store news items (title/url) for this ticker
             else:
                 print(f"    No sentiment data found for {ticker} in the date range.")
                 results[ticker] = pd.DataFrame(index=date_range, columns=['positive', 'negative', 'neutral']).fillna(0)
-                all_news[ticker] = {}
+                all_news[ticker] = {} # No news items stored if no sentiment data
 
         return results, all_news
 
@@ -209,6 +216,7 @@ class SentimentReport(BaseApp):
         print("\nGenerating individual ticker sections...")
         for ticker in self.tickers:
             df_sentiment = all_sentiment_data.get(ticker)
+            # ticker_news contains { "YYYY-MM-DD": [ {'title': '...', 'url': '...'}, ... ], ... }
             ticker_news = all_news_data.get(ticker, {})
             ticker_html = f"<h2>{ticker} Sentiment & News</h2>\n"
             print(f" -> Processing {ticker}")
@@ -223,32 +231,87 @@ class SentimentReport(BaseApp):
             else:
                 ticker_html += f"<p>No plottable sentiment data available for {ticker}.</p>\n"
 
-            ticker_html += "<h3>Recent News Headlines</h3>\n"
+            # Aggregate headlines for summarization
+            all_headlines_for_ticker = []
+            if ticker_news:
+                # Iterate through dates, then news items for that date
+                for date_str in sorted(ticker_news.keys(), reverse=True): # Process recent dates first if needed
+                    for item in ticker_news[date_str]:
+                        all_headlines_for_ticker.append(item.get('title', '')) # Collect titles
+
+            summarized_news_html = "" # Initialize summary HTML block
+            if all_headlines_for_ticker:
+                 # Join headlines into a single string for the agent
+                 # Filter out empty strings just in case
+                news_headlines_text = ". ".join(filter(None, all_headlines_for_ticker))
+
+                # Important assumption: The Polygon API (`list_ticker_news`) does not provide
+                # full news article text, only headlines and metadata.
+                # Therefore, the summary is generated *based on headlines only*.
+                if news_headlines_text:
+                    print(f"    -> Generating summary for {ticker} based on {len(all_headlines_for_ticker)} headlines...")
+                    try:
+                        # Construct the prompt for the agent
+                        summary_prompt = (
+                            f"Review the following news headlines for {ticker} over the last "
+                            f"{self.configuration.report_days} days and provide a concise summary "
+                            f"(around 100-150 words) of the key themes or major news points mentioned. "
+                            f"Headlines: {news_headlines_text}"
+                        )
+                        # Call the agent
+                        summarized_news_text = self.tdag_agent.query_agent(summary_prompt)
+                        # Format the summary for HTML report
+                        # Basic paragraph format, can be enhanced
+                        summarized_news_html = f"<h4>Headlines Summary (AI Generated)</h4><p>{summarized_news_text}</p>\n"
+                        print(f"    -> Summary generated for {ticker}.")
+                    except NameError:
+                        print(f"    Error: TDAGAgent not defined or available. Skipping summary for {ticker}.")
+                        summarized_news_html = "<h4>Headlines Summary (AI Generated)</h4><p>Summary generation failed: TDAGAgent not available.</p>\n"
+                    except Exception as e:
+                        print(f"    Error calling TDAGAgent for {ticker}: {e}")
+                        summarized_news_html = f"<h4>Headlines Summary (AI Generated)</h4><p>Error generating summary: {e}</p>\n"
+                else:
+                    # Case where headlines were collected but resulted in an empty string
+                     summarized_news_html = "<h4>Headlines Summary (AI Generated)</h4><p>No headline text available to generate a summary.</p>\n"
+            else:
+                # Case where no news items were found for the ticker at all
+                summarized_news_html = "<h4>Headlines Summary (AI Generated)</h4><p>No news headlines found for this period to generate a summary.</p>\n"
+
+            # Add the generated summary (or error message) to the ticker's HTML section
+            ticker_html += summarized_news_html
+
+            ticker_html += "<h3>Recent News Headlines (Details)</h3>\n" # Changed title slightly for clarity
             if ticker_news:
                 sorted_dates = sorted(ticker_news.keys(), reverse=True)
                 news_list_html = ""
+                total_listed_count = 0
                 for date_str in sorted_dates:
                     news_items = ticker_news[date_str]
                     if news_items:
-                        news_list_html += f"<h5>{date_str}</h5>\n<ul class='list-unstyled'>\n"
-                        limit = self.configuration.news_items_per_day_limit
-                        for item in news_items[:limit]:
-                            safe_title = item.get('title', 'No Title').replace('<', '&lt;').replace('>', '&gt;')
-                            url = item.get('url', '#')
-                            news_list_html += f"  <li><a href='{url}' target='_blank' rel='noopener noreferrer'>{safe_title}</a></li>\n"
-                        news_list_html += "</ul>\n"
-                ticker_html += news_list_html if news_list_html else "<p>No news headlines found.</p>\n"
-            else:
-                ticker_html += "<p>No news headlines found.</p>\n"
+                        # Limit per day applied here
+                        items_to_show = news_items[:self.configuration.news_items_per_day_limit]
+                        if items_to_show:
+                            news_list_html += f"<h5>{date_str}</h5>\n<ul class='list-unstyled'>\n"
+                            for item in items_to_show:
+                                safe_title = item.get('title', 'No Title').replace('<', '&lt;').replace('>', '&gt;')
+                                url = item.get('url', '#')
+                                news_list_html += f"  <li><a href='{url}' target='_blank' rel='noopener noreferrer'>{safe_title}</a></li>\n"
+                                total_listed_count += 1
+                            news_list_html += "</ul>\n"
 
+                # Add the detailed list or a message if nothing was listed
+                ticker_html += news_list_html if news_list_html else "<p>No recent news headlines found or listed based on limits.</p>\n"
+            else:
+                ticker_html += "<p>No news headlines found for this period.</p>\n" # Message if ticker_news was empty
+
+            # Add the horizontal rule after all content for the ticker
             ticker_sections_html += ticker_html + '<hr style="margin: 30px 0;">\n'
 
         report_content_html = f"""
             <h2>Overview</h2>
             <p>This report summarizes daily sentiment counts (positive/negative/neutral)
             derived from Polygon.io news article insights for each requested ticker,
-            within the date range {self.start_date} to {self.end_date}.
-            It also lists recent headlines (up to {self.configuration.news_items_per_day_limit} per day).</p>
+            within the date range {self.start_date} to {self.end_date}.</p>
             {combined_chart_html}
             {ticker_sections_html}
         """
@@ -263,9 +326,9 @@ class SentimentReport(BaseApp):
             "topics": self.configuration.topics,
             "current_year": datetime.now().year,
             "summary": (
-                f"Daily sentiment analysis and news headlines for in the {self.category_name} category "
+                f"Daily sentiment analysis, AI-generated headline summary, and news headlines for the {self.category_name} category "
                 f"from {self.start_date} to {self.end_date}. "
-                "Includes combined and individual views."
+                "Includes combined and individual ticker views."
             ),
             "report_content": report_content_html,
             "logo_location": f"https://main-sequence.app/static/media/logos/MS_logo_long_white.png",
@@ -282,15 +345,23 @@ class SentimentReport(BaseApp):
             print(f"View the report at: file://{os.path.abspath(output_html_path)}")
         except Exception as e:
             print(f"\nError writing HTML report to file: {e}")
+            return None
 
+        # Upload the generated HTML as an artifact
+        html_artifact = None
+        try:
+             html_artifact = Artifact.upload_file(
+                filepath=output_html_path,
+                name=self.configuration.report_id + f"_{self.category_name}.html", # Added .html extension
+                created_by_resource_name=self.__class__.__name__,
+                bucket_name=self.configuration.bucket_name
+            )
+             print(f"Artifact uploaded successfully: {html_artifact.unique_identifier if html_artifact else 'Failed'}")
+        except Exception as e:
+            print(f"Error uploading artifact: {e}")
 
-        html_artifact = Artifact.upload_file(
-            filepath=output_html_path,
-            name=self.configuration.report_id + f"_{self.category_name}",
-            created_by_resource_name=self.__class__.__name__,
-            bucket_name=self.configuration.bucket_name
-        )
         return html_artifact
+
 
 # --- Main Execution Guard ---
 if __name__ == "__main__":
@@ -300,13 +371,21 @@ if __name__ == "__main__":
         print("Warning: 'kaleido' package not found. Plotly image export might fail.")
         print("Consider installing it: pip install kaleido")
 
+    # Example Configuration: Using Magnificent 7 for 7 days
     config = SentimentReportConfig(
-        asset_category="magnificent_7",
-        report_days=7
+        asset_category="magnificent_7", # Example category
+        report_days=7,
+        report_title="Magnificent 7 News Sentiment & Headlines Report (Last 7 Days)",
+        report_id="Mag7_SentimentReport_7d" # More specific ID
     )
 
     # Create App instance with configuration
     app = SentimentReport(config)
 
-    # Run the report generation
-    app.run()
+    # Run the report generation and get the artifact object
+    generated_artifact = app.run()
+
+    if generated_artifact:
+        print(f"\nReport generation complete. Artifact ID: {generated_artifact.id}")
+    else:
+        print("\nReport generation completed, but artifact upload failed or was skipped.")

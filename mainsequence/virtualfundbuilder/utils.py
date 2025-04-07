@@ -581,7 +581,7 @@ def get_default_documentation(exclude_arguments=None):
         root_class=PortfolioConfiguration
     )
 
-    return {"default_yaml": default_yaml, "markdown_documentation": markdown_documentation, "object_signature": object_signature}
+    return {"default_config": default_yaml, "markdown": markdown_documentation, "documentation_dict": object_signature}
 
 def extract_code(output_string):
     import re

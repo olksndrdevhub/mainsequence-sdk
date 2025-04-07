@@ -29,6 +29,24 @@ class TDAGAgent:
 
         self.logger.info("Setup TDAG Agent successfull")
 
+    def query_agent(self, query):
+        try:
+            from mainsequence.client.models_tdag import query_agent
+            payload = {
+                "query": query,
+            }
+            response = query_agent(json_payload=payload)
+            if response.status_code not in [200, 201]:
+                raise Exception(response.text)
+
+            answer = response.json()["agent_response"]
+        except Exception as e:
+            self.logger.warning(f"Could not get answer from Agent {e}")
+            traceback.print_exc()
+            return None
+
+        return answer
+
     def generate_portfolio(self, cls, signal_description=None):
         full_signal_description = f"Create me a default portfolio using the {cls.__name__} signal."
         if signal_description is not None:
