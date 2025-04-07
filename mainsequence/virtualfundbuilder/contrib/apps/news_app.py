@@ -332,18 +332,18 @@ class SentimentReport(BaseApp):
             try:
                 combined_summary_text = self.tdag_agent.query_agent(summary_prompt)
                 combined_article_snippets_summary_html = f"""
-                    <h3>Combined News Content Summary (AI-Generated)</h3>
+                    <h3>Summary (AI-Generated)</h3>
                     <p>{combined_summary_text}</p>
                     <hr style="margin: 30px 0;">"""
             except Exception as e:
                 print(f"    Error generating combined summary: {e}")
                 combined_article_snippets_summary_html = (
-                    "<h3>Combined News Content Summary (AI-Generated)</h3>"
+                    "<h3>Summary (AI-Generated)</h3>"
                     f"<p>Error generating summary: {e}</p><hr>"
                 )
         else:
             combined_article_snippets_summary_html = (
-                "<h3>Combined News Content Summary (AI-Generated)</h3>"
+                "<h3>Summary (AI-Generated)</h3>"
                 "<p>No article snippets found to summarize.</p>"
                 "<hr>"
             )
