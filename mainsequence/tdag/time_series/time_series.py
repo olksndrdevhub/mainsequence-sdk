@@ -1132,7 +1132,7 @@ class TimeSerieRebuildMethods(ABC):
                 error_on_update=error_on_last_update)
 
             self._run_post_update_routines(error_on_last_update=error_on_last_update,
-                                           update_statistics=self._update_statistics
+                                           update_statistics=update_statistics
                                            )
 
 
@@ -2566,12 +2566,11 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         return self.update(update_statistics)
 
     def _get_asset_list(self)->Union[None, list]:
-
-
         if hasattr(self, "asset_list"):
             return self.asset_list
 
         return None
+
     def set_update_statistics(self, update_statistics: DataUpdates):
         """
         Default method to narrow down update statistics un local time series,
@@ -2583,7 +2582,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
         asset_list = self._get_asset_list()
         self._setted_asset_list = asset_list
-
 
         update_statistics = update_statistics.update_assets(
             asset_list, init_fallback_date=self.OFFSET_START
