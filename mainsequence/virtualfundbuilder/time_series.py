@@ -235,10 +235,8 @@ class PortfolioStrategy(TimeSerie):
         Returns:
             str: Portfolio description.
         """
-        portfolio_about = f"""
-Portfolio created with Main Sequence VirtualFundBuilder engine with the following signal and
-rebalance details:
-        """
+        portfolio_about = f"""Portfolio created with Main Sequence VirtualFundBuilder engine with the following signal and
+rebalance details:"""
         return json.dumps(portfolio_about)
 
     @property
