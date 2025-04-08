@@ -18,7 +18,6 @@ from jinja2 import Environment, FileSystemLoader
 from mainsequence.client import AssetCategory
 from mainsequence.client.models_tdag import Artifact
 from mainsequence.virtualfundbuilder.resource_factory.app_factory import BaseApp, register_app
-from newspaper import Article
 
 logger = get_vfb_logger()
 
@@ -163,6 +162,8 @@ class SentimentReport(BaseApp):
         return results, all_news
 
     def _download_article_previews(self, all_news_data, words_per_article=50, articles_per_day=2):
+        from newspaper import Article
+
         article_snippets = []
         if self.polygon_client and Article is not None:
             print("\nGathering first 50 words from each article...")

@@ -15,6 +15,23 @@ from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
 from mainsequence.virtualfundbuilder.utils import TIMEDELTA
 
+from mainsequence.tdag.time_series import TimeSerie, APITimeSerie
+from mainsequence import MARKETS_CONSTANTS
+from datetime import datetime, timedelta, tzinfo
+from typing import Optional, List, Union
+
+import pandas as pd
+import pytz
+
+from mainsequence.tdag.time_series import TimeSerie
+from mainsequence.client import CONSTANTS, Asset, AssetCategory
+from mainsequence.virtualfundbuilder.enums import ExecutionVenueNames
+
+from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
+from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
+from mainsequence.virtualfundbuilder.utils import TIMEDELTA
+import numpy as np
+from pydantic import BaseModel
 
 class SymbolWeight(VFBConfigBaseModel):
     execution_venue_symbol: str = CONSTANTS.ALPACA_EV_SYMBOL
@@ -70,122 +87,8 @@ class FixedWeights(WeightsBase, TimeSerie):
         signals_weights = signals_weights.dropna()
         return signals_weights
 
-# @register_signal_class(register_in_agent=True)
-# class MarketCap(WeightsBase, TimeSerie):
-#     @TimeSerie._post_init_routines()
-#     def __init__(self, source_frequency: str = "1d", num_top_assets: Union[int, None] = None, *args, **kwargs):
-#         """
-#         Signal Weights using weighting by Market Capitalizations.
-#
-#         Args:
-#             source_frequency (str): Frequency of market cap source.
-#             num_top_assets (Optional[int]): Number of largest assets by market cap to use for signals. Leave empty to include all assets.
-#         """
-#         super().__init__(*args, **kwargs)
-#         self.source_frequency = source_frequency
-#         self.num_top_assets = num_top_assets or 50000
-#
-#         execution_venue_symbols = self.asset_universe.get_required_execution_venues()
-#         if len(execution_venue_symbols) > 1:
-#             raise ValueError(
-#                 f"No support to compare MarketCaps of asset universes {execution_venue_symbols}")
-#         self.execution_venue = ExecutionVenueNames(execution_venue_symbols[0])
-#
-#         if self.execution_venue.value in [ExecutionVenueNames.BINANCE_FUTURES.value, ExecutionVenueNames.BINANCE.value]:
-#             self.historical_market_cap_ts = APITimeSerie.build_from_unique_identifier(CONSTANTS.data_sources_constants.HISTORICAL_MARKET_CAP_COINGECKO)
-#         elif self.execution_venue.value == ExecutionVenueNames.ALPACA.value:
-#             self.historical_market_cap_ts = APITimeSerie.build_from_unique_identifier(CONSTANTS.data_sources_constants.HISTORICAL_MARKET_CAP)
-#         else:
-#             raise NotImplementedError(f"Unsupported market cap execution venue {self.execution_venue.value}")
-#
-#     def maximum_forward_fill(self):
-#         return timedelta(days=1) - TIMEDELTA
-#
-#     def get_explanation(self):
-#         return (
-#             f"{self.__class__.__name__}:\n"
-#             f"The signal strategy leverages market capitalization to construct dynamic weightings for asset selection. By prioritizing assets with higher market value, the signal emphasizes stability and liquidity in its decision-making process.\n"
-#             f"\n"
-#             f"Source Frequency:\n"
-#             f"The signal relies on {self.source_frequency} data updates, ensuring that the weights reflect the most recent market conditions.\n"
-#             f"\n"
-#             f"Number of Top Assets:\n"
-#             f"This strategy focuses on the top {self.num_top_assets} assets, optimizing for performance by selecting the most influential components of the market."
-#         )
-#
-#     def update(self, update_statistics):
-#         """
-#         Args:
-#             latest_value (Union[datetime, None]): The timestamp of the most recent data point.
-#
-#         Returns:
-#             DataFrame: A DataFrame containing updated signal weights, indexed by time and asset symbol.
-#         """
-#         asset_list_for_exchange = self.asset_universe.asset_list
-#
-#         # get assets from mainsequence exchange (which stores all fundamentals data)
-#         share_class_to_asset_map = {}
-#         for asset in asset_list_for_exchange:
-#             share_class_to_asset_map[asset.get_ms_share_class()] = asset.unique_identifier
-#
-#         ms_asset_list = Asset.filter(
-#             figi_details__main_sequence_share_class__in=list(share_class_to_asset_map.keys()),
-#             execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_SHARE_CLASS_EV
-#         )
-#
-#         unique_identifier_range_map = {
-#             a.unique_identifier: {
-#                 "start_date": update_statistics[a.unique_identifier],
-#                 "start_date_operand": ">"
-#             }
-#             for a in ms_asset_list
-#         }
-#
-#         mc = self.historical_market_cap_ts.get_df_between_dates(
-#             unique_identifier_range_map=unique_identifier_range_map,
-#             great_or_equal=False,
-#         )
-#
-#         if mc.shape[0] == 0:
-#             return pd.DataFrame()
-#
-#         # transform the ms unique identifer in the mc data into the actual execution venue identifier
-#         transform_uid_map = {a.unique_identifier: share_class_to_asset_map[a.get_ms_share_class()] for a in ms_asset_list}
-#         mc = mc.reset_index("unique_identifier")
-#         mc["unique_identifier"] = mc["unique_identifier"].map(transform_uid_map)
-#         mc.set_index("unique_identifier", append=True, inplace=True)
-#
-#         mc_pivot = mc.reset_index().pivot(
-#             index="time_index",
-#             columns=["unique_identifier"],
-#             values="market_cap"
-#         )
-#         mc_pivot = mc_pivot.ffill().bfill()
-#         assets_excluded = mc_pivot.rank(axis=1, ascending=False) > self.num_top_assets
-#         mc_pivot[assets_excluded] = 0  # Exclude assets not in the top by setting weight to 0
-#
-#         mc_pivot = mc_pivot.div(mc_pivot.sum(axis=1), axis=0)
-#         signal_weights = mc_pivot.stack().rename("signal_weight").to_frame()
-#         return signal_weights
 
 
-from mainsequence.tdag.time_series import TimeSerie, APITimeSerie
-from mainsequence import MARKETS_CONSTANTS
-from datetime import datetime, timedelta, tzinfo
-from typing import Optional, List, Union
-
-import pandas as pd
-import pytz
-
-from mainsequence.tdag.time_series import TimeSerie
-from mainsequence.client import CONSTANTS, Asset, AssetCategory
-from mainsequence.virtualfundbuilder.enums import ExecutionVenueNames
-
-from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
-from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
-from mainsequence.virtualfundbuilder.utils import TIMEDELTA
-import numpy as np
-from pydantic import BaseModel
 
 
 class AssetMistMatch(Exception):

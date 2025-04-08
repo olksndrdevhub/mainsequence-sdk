@@ -1132,7 +1132,7 @@ class TimeSerieRebuildMethods(ABC):
                 error_on_update=error_on_last_update)
 
             self._run_post_update_routines(error_on_last_update=error_on_last_update,
-                                           update_statistics=update_statistics
+                                           update_statistics=self._update_statistics
                                            )
 
 
