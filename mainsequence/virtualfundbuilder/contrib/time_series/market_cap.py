@@ -193,7 +193,7 @@ class MarketCap(WeightsBase, TimeSerie):
         """
         asset_list = update_statistics.asset_list
         if len(asset_list) < self.min_number_of_assets:
-            raise AssetMistMatch(f"only {len(asset_list)} in asset_list minum are{self.min_number_of_assets} ")
+            raise AssetMistMatch(f"only {len(asset_list)} in asset_list minum are {self.min_number_of_assets} ")
 
         share_class_to_asset_map = {}
         for asset in asset_list:
@@ -262,6 +262,8 @@ class MarketCap(WeightsBase, TimeSerie):
         for window in self.rolling_atvr_volume_windows:
             # Compute the rolling median of volume over the window.
             rolling_median = dollar_volume_df.rolling(window=window, min_periods=1).median()
+
+            print("rolling median", rolling_median)
             # Annualize: assume 252 trading days per year.
             annual_factor = 252 # todo fix when prices are not daily
             annualized_traded_value = rolling_median * annual_factor

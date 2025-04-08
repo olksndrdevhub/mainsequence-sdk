@@ -35,7 +35,6 @@ class SentimentReportConfig(BaseModel):
     authors: str = "Automated Analysis (Main Sequence AI)"
     sector: str = "Technology Focus"
     region: str = "Global"
-    topics: List[str] = Field(default_factory=lambda: ["Sentiment Analysis", "News Aggregation", "Market Data", "Equities"])
     news_items_per_day_limit: int = 5
     report_id: Optional[str] = "MS_SentimentReport"
 
@@ -369,7 +368,7 @@ class SentimentReport(BaseApp):
             "authors": self.configuration.authors,
             "sector": self.configuration.sector,
             "region": self.configuration.region,
-            "topics": self.configuration.topics,
+            "topics": ["Sentiment Analysis", "News Aggregation", "Market Data", "Equities"],
             "current_year": datetime.now().year,
             "summary": (
                 f"Daily sentiment analysis, plus combined and per-ticker summaries, "
