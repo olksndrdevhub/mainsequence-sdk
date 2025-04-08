@@ -104,8 +104,7 @@ class PortfolioStrategy(TimeSerie):
         )
 
         # TODO make this part of the arguments in the signal
-        historical_market_cap_ts_unique_identifier = self.full_signal_weight_config["signal_assets_configuration"].prices_configuration.markets_time_series[0].unique_identifier
-        self.signal_weights = SignalWeightClass.build_and_parse_from_configuration(**self.full_signal_weight_config, historical_market_cap_ts_unique_identifier=historical_market_cap_ts_unique_identifier)
+        self.signal_weights = SignalWeightClass.build_and_parse_from_configuration(**self.full_signal_weight_config)
 
         self.rebalance_strategy_name = self.backtesting_weights_config.rebalance_strategy_name
         RebalanceClass = RebalanceFactory.get_rebalance_strategy(rebalance_strategy_name=self.rebalance_strategy_name)
