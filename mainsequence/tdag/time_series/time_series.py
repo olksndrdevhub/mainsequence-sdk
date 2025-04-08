@@ -1235,6 +1235,7 @@ class DataPersistanceMethods(ABC):
         args and kwargs are nedeed for datalake
         """
         if self.metadata.sourcetableconfiguration is None:
+
             return DataUpdates()
 
         update_stats = self.metadata.sourcetableconfiguration.get_data_updates()
