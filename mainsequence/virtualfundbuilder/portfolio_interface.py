@@ -173,7 +173,7 @@ class PortfolioInterface():
             patch_build_configuration=True,
             debug_mode=True,
             force_update=True,
-            update_tree=True,
+            update_tree=True,portfolio_tags:List[str] = None,
             *args, **kwargs
     ):
         if not self._is_initialized or patch_build_configuration == True:

@@ -191,12 +191,12 @@ class MarketCap(WeightsBase, TimeSerie):
         Returns:
             DataFrame: A DataFrame containing updated signal weights, indexed by time and asset symbol.
         """
-        self.asset_list = update_statistics.asset_list
-        if len(self.asset_list) < self.min_number_of_assets:
-            raise AssetMistMatch(f"only {len(self.asset_list)} in asset_list minum are{self.min_number_of_assets} ")
+        asset_list = update_statistics.asset_list
+        if len(asset_list) < self.min_number_of_assets:
+            raise AssetMistMatch(f"only {len(asset_list)} in asset_list minum are{self.min_number_of_assets} ")
 
         share_class_to_asset_map = {}
-        for asset in self.asset_list:
+        for asset in asset_list:
             share_class_to_asset_map[asset.get_ms_share_class()] = {"original_asset": asset.unique_identifier,
                                                                     "last_update": update_statistics[
                                                                         asset.unique_identifier]
@@ -226,7 +226,7 @@ class MarketCap(WeightsBase, TimeSerie):
 
         unique_in_mc = mc.index.get_level_values("unique_identifier").unique().shape[0]
 
-        if unique_in_mc != len(self.asset_list):
+        if unique_in_mc != len(asset_list):
             self.logger.warning("Market Cap and asset_list does not match missing assets will be set to 0")
 
         # If there is no market cap data, return an empty DataFrame.
@@ -263,7 +263,7 @@ class MarketCap(WeightsBase, TimeSerie):
             # Compute the rolling median of volume over the window.
             rolling_median = dollar_volume_df.rolling(window=window, min_periods=1).median()
             # Annualize: assume 252 trading days per year.
-            annual_factor = 252 / window
+            annual_factor = 252 # todo fix when prices are not daily
             annualized_traded_value = rolling_median * annual_factor
             # Align with market cap dates.
             annualized_traded_value = annualized_traded_value.reindex(mc_raw.index).ffill().bfill()
