@@ -81,7 +81,7 @@ def example_data(assets):
     # ------------------------------------------------------------------------------
     # 3) CORRELATION HEATMAP
     latest_date = df.groupby("unique_identifier")["quarter"].max().min() # latest date where all values are present
-    df_latest = df[df["time_index"] == latest_date].copy()
+    df_latest = df[df["quarter"] == latest_date].copy()
 
     # Pivot so each row is an asset and columns are the fundamental metrics
     # (Here, "Revenue" and "EPS").
@@ -102,7 +102,7 @@ def example_data(assets):
         )
     )
     fig_heatmap.update_layout(
-        title=f"Correlation of Fundamentals on {latest_date.date()}"
+        title=f"Correlation of Fundamentals on {latest_date}"
     )
 
     # ------------------------------------------------------------------------------

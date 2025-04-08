@@ -139,7 +139,7 @@ class MarketCap(WeightsBase, TimeSerie):
         import json
         windows_str = ", ".join(str(window) for window in self.rolling_atvr_volume_windows)
         if self.volatility_control_configuration is not None:
-            volatility_details = self.volatility_control_configuration.model_dump_json()
+            volatility_details = self.volatility_control_configuration
             vol_message = f"The strategy uses the following volatility target configuration:\n{volatility_details}\n"
         else:
             vol_message = "The strategy does not use volatility control.\n"
@@ -310,12 +310,12 @@ class MarketCap(WeightsBase, TimeSerie):
         if self.volatility_control_configuration is not None:
             log_returns = (np.log(mc_raw["price"])).diff()
 
-            ewm_vol = (log_returns * weights).sum(axis=1).ewm(span=self.volatility_control_configuration.ewm_span,
-                                                              adjust=False).std() * np.sqrt(self.volatility_control_configuration.ann_factor)
+            ewm_vol = (log_returns * weights).sum(axis=1).ewm(span=self.volatility_control_configuration["ewm_span"],
+                                                              adjust=False).std() * np.sqrt(self.volatility_control_configuration["ann_factor"])
 
-            scaling_factor = self.volatility_control_configuration.target_volatility / ewm_vol
-            scaling_factor = min(scaling_factor, 1.0)
-            weights = weights * scaling_factor
+            scaling_factor = self.volatility_control_configuration["target_volatility"] / ewm_vol
+            scaling_factor = scaling_factor.clip(upper=1.0)
+            weights = weights.mul(scaling_factor, axis=0)
 
         # 12. Reshape the weights to a long-form DataFrame if desired.
         signal_weights = weights.stack().rename("signal_weight").to_frame()
