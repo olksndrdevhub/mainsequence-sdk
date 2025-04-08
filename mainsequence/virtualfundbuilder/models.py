@@ -121,6 +121,15 @@ class PortfolioExecutionConfiguration(VFBConfigBaseModel):
     """
     commission_fee: float = 0.00018
 
+
+class FrontEndDetails(VFBConfigBaseModel):
+    description: str  # required field; must be provided and cannot be None
+
+    signal_name: Optional[str] = None
+    signal_description: Optional[str] = None
+    rebalance_strategy_name: Optional[str] = None
+    rebalance_strategy_description: Optional[str] = None
+
 class PortfolioMarketsConfig(VFBConfigBaseModel):
     """
     Configuration for Virtual Asset Management (VAM) portfolio.
@@ -130,7 +139,7 @@ class PortfolioMarketsConfig(VFBConfigBaseModel):
         execution_configuration (VAMExecutionConfiguration): Execution configuration for VAM.
     """
     portfolio_name: str = "Portfolio Strategy Title"
-    front_end_details: str = ""
+    front_end_details: Optional[FrontEndDetails]=None
     tracking_funds_expected_exposure_from_latest_holdings: bool = False
     builds_from_target_positions: bool = False
 
@@ -247,7 +256,6 @@ class PortfolioConfiguration(VFBConfigBaseModel):
             valuation_asset=portfolio_build_configuration["valuation_asset"]
         )
 
-        portfolio_markets_configuration["front_end_details"] = portfolio_markets_configuration['front_end_details']
         portfolio_markets_configuration = PortfolioMarketsConfig(**portfolio_markets_configuration)
 
         # Combine everything into the final PortfolioConfiguration
