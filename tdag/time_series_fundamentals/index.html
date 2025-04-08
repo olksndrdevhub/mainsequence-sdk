@@ -5,11 +5,11 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
-<link href="../../about/" rel="prev"/>
-<link href="tutorial/Introduction_part1/" rel="next"/>
+<link href="../getting_started/" rel="prev"/>
+<link href="../orchestration_and_monitoring/" rel="next"/>
 <link href="../../img/favico.ico" rel="icon"/>
 <meta content="mkdocs-1.6.1, mkdocs-material-9.5.44" name="generator"/>
-<title>Welcome to TDAG - Main Sequence SDK</title>
+<title>Time Series Data Pipelines Fundamentals - Main Sequence SDK</title>
 <link href="../../assets/stylesheets/main.0253249f.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.06af60db.min.css" rel="stylesheet"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -24,7 +24,7 @@
 <input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
 <label class="md-overlay" for="__drawer"></label>
 <div data-md-component="skip">
-<a class="md-skip" href="#welcome-to-tdag">
+<a class="md-skip" href="#time-series-fundamentals-in-tdag">
           Skip to content
         </a>
 </div>
@@ -48,7 +48,7 @@
 <div class="md-header__topic" data-md-component="header-topic">
 <span class="md-ellipsis">
             
-              Welcome to TDAG
+              Time Series Data Pipelines Fundamentals
             
           </span>
 </div>
@@ -110,8 +110,8 @@
 
       </a>
 </li>
-<li class="md-tabs__item">
-<a class="md-tabs__link" href="../../tdag/getting_started/">
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../getting_started/">
           
   
     
@@ -130,8 +130,8 @@
 
       </a>
 </li>
-<li class="md-tabs__item md-tabs__item--active">
-<a class="md-tabs__link" href="./">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../getting_started/TDAG/">
           
   
     
@@ -193,36 +193,143 @@
   </span>
 </a>
 </li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle" id="__nav_2" type="checkbox"/>
-<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
 <span class="md-ellipsis">
     TDAG
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<nav aria-expanded="true" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
 <label class="md-nav__title" for="__nav_2">
 <span class="md-nav__icon md-icon"></span>
             TDAG
           </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../tdag/getting_started/">
+<a class="md-nav__link" href="../getting_started/">
 <span class="md-ellipsis">
     Getting Started
   </span>
 </a>
 </li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../tdag/time_series_fundamentals/">
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    Time Series Data Pipelines Fundamentals
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
 <span class="md-ellipsis">
     Time Series Data Pipelines Fundamentals
   </span>
 </a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#understanding-the-update-process">
+<span class="md-ellipsis">
+      Understanding the Update Process
+    </span>
+</a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../tdag/orchestration_and_monitoring/">
+<a class="md-nav__link" href="#initializing-a-timeserie">
+<span class="md-ellipsis">
+      Initializing a TimeSerie
+    </span>
+</a>
+<nav aria-label="Initializing a TimeSerie" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#hashing-mechanism">
+<span class="md-ellipsis">
+      Hashing Mechanism
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#special-constructor-arguments">
+<span class="md-ellipsis">
+      Special Constructor Arguments
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#decorator-usage">
+<span class="md-ellipsis">
+      Decorator Usage
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#managing-dependencies-with-introspection">
+<span class="md-ellipsis">
+      Managing Dependencies with Introspection
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#state-persistence-with-pickles">
+<span class="md-ellipsis">
+      State Persistence with Pickles
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#updating-a-timeserie">
+<span class="md-ellipsis">
+      Updating a TimeSerie
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#essential-helper-methods">
+<span class="md-ellipsis">
+      Essential Helper Methods
+    </span>
+</a>
+<nav aria-label="Essential Helper Methods" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#retrieving-data-between-dates">
+<span class="md-ellipsis">
+      Retrieving Data Between Dates
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#getting-last-observation">
+<span class="md-ellipsis">
+      Getting Last Observation
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#wrappertimeserie-class">
+<span class="md-ellipsis">
+      WrapperTimeSerie Class
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../orchestration_and_monitoring/">
 <span class="md-ellipsis">
     Orchestration &amp; Monitoring
   </span>
@@ -238,33 +345,33 @@
   </span>
 </a>
 </li>
-<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-<input checked="" class="md-nav__toggle md-toggle" id="__nav_4" type="checkbox"/>
-<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
 <span class="md-ellipsis">
     Getting Started
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="true" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
 <label class="md-nav__title" for="__nav_4">
 <span class="md-nav__icon md-icon"></span>
             Getting Started
           </label>
 <ul class="md-nav__list" data-md-scrollfix="">
-<li class="md-nav__item md-nav__item--active md-nav__item--nested">
-<input checked="" class="md-nav__toggle md-toggle" id="__nav_4_1" type="checkbox"/>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1" type="checkbox"/>
 <div class="md-nav__link md-nav__container">
-<a class="md-nav__link md-nav__link--active" href="./">
+<a class="md-nav__link" href="../../getting_started/TDAG/">
 <span class="md-ellipsis">
     TDAG
   </span>
 </a>
-<label class="md-nav__link md-nav__link--active" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+<label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
 <span class="md-nav__icon md-icon"></span>
 </label>
 </div>
-<nav aria-expanded="true" aria-labelledby="__nav_4_1_label" class="md-nav" data-md-level="2">
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_label" class="md-nav" data-md-level="2">
 <label class="md-nav__title" for="__nav_4_1">
 <span class="md-nav__icon md-icon"></span>
             TDAG
@@ -285,21 +392,21 @@
           </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="tutorial/Introduction_part1/">
+<a class="md-nav__link" href="../../getting_started/TDAG/tutorial/Introduction_part1/">
 <span class="md-ellipsis">
     Part 1: TimeSeries
   </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="tutorial/running_time_series_part2/">
+<a class="md-nav__link" href="../../getting_started/TDAG/tutorial/running_time_series_part2/">
 <span class="md-ellipsis">
     Part 2: Running Pipelines
   </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="tutorial/tdag_explorer_part3/">
+<a class="md-nav__link" href="../../getting_started/TDAG/tutorial/tdag_explorer_part3/">
 <span class="md-ellipsis">
     Part 3: TDAG Explorer
   </span>
@@ -947,37 +1054,94 @@
     </label>
 <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#why-another-workflow-orchestration-tool">
+<a class="md-nav__link" href="#understanding-the-update-process">
 <span class="md-ellipsis">
-      Why Another Workflow Orchestration Tool?
+      Understanding the Update Process
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#key-features-of-tdag">
+<a class="md-nav__link" href="#initializing-a-timeserie">
 <span class="md-ellipsis">
-      Key Features of TDAG:
+      Initializing a TimeSerie
+    </span>
+</a>
+<nav aria-label="Initializing a TimeSerie" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#hashing-mechanism">
+<span class="md-ellipsis">
+      Hashing Mechanism
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#example-use-case-simple-time-series-pipeline">
+<a class="md-nav__link" href="#special-constructor-arguments">
 <span class="md-ellipsis">
-      Example Use Case: Simple Time Series Pipeline
+      Special Constructor Arguments
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#tdag-vs-luigi-vs-airflow">
+<a class="md-nav__link" href="#decorator-usage">
 <span class="md-ellipsis">
-      TDAG vs. Luigi vs. Airflow
+      Decorator Usage
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#real-world-applications">
+<a class="md-nav__link" href="#managing-dependencies-with-introspection">
 <span class="md-ellipsis">
-      Real-World Applications
+      Managing Dependencies with Introspection
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#state-persistence-with-pickles">
+<span class="md-ellipsis">
+      State Persistence with Pickles
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#updating-a-timeserie">
+<span class="md-ellipsis">
+      Updating a TimeSerie
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#essential-helper-methods">
+<span class="md-ellipsis">
+      Essential Helper Methods
+    </span>
+</a>
+<nav aria-label="Essential Helper Methods" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#retrieving-data-between-dates">
+<span class="md-ellipsis">
+      Retrieving Data Between Dates
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#getting-last-observation">
+<span class="md-ellipsis">
+      Getting Last Observation
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#wrappertimeserie-class">
+<span class="md-ellipsis">
+      WrapperTimeSerie Class
     </span>
 </a>
 </li>
@@ -988,126 +1152,118 @@
 </div>
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
-<h1 id="welcome-to-tdag">Welcome to TDAG</h1>
-<p>TDAG is a cutting-edge, graph-based workflow orchestration tool specifically designed to simplify the creation, management, and scaling of time-series data pipelines. Unlike general-purpose orchestration tools such as Airflow or Luigi, TDAG is purpose-built with the performance, scalability, and flexibility needed for modern asset management and real-time data processing.</p>
-<h2 id="why-another-workflow-orchestration-tool">Why Another Workflow Orchestration Tool?</h2>
-<p>While orchestration tools like Airflow and Luigi are widely used, they weren't originally built to handle the demanding performance and resource constraints required by modern asset management workflows. TDAG addresses these limitations by providing native support for resource management (CPU/GPU), seamless integration with databases, and built-in time-series logic that reduces boilerplate code and development overhead.</p>
-<h2 id="key-features-of-tdag">Key Features of TDAG:</h2>
+<h1 id="time-series-fundamentals-in-tdag">Time Series Fundamentals in TDAG</h1>
+<p>TDAG's core revolves around the concept of time series, encapsulated in the powerful <code>TimeSerie</code> class. Each <code>TimeSerie</code> object manages the process of updating data, reflecting the most current available information. It interacts seamlessly with databases and maintains a robust internal state, supporting efficient data pipelines.</p>
+<h2 id="understanding-the-update-process">Understanding the Update Process</h2>
+<p>In TDAG, updating involves:</p>
 <ul>
-<li>
-<p><strong>Native Time-Series Support:</strong> Built specifically for investment management and real-time data operations, TDAG provides first-class concepts like <code>TimeSerie</code> and <code>update_statistics</code>, streamlining pipeline creation.</p>
-</li>
-<li>
-<p><strong>Integrated Resource Management:</strong> TDAG enforces CPU and GPU resource constraints directly within workflow definitions, simplifying resource allocation without requiring external schedulers.</p>
-</li>
-<li>
-<p><strong>Built-in Data Layer:</strong> TDAG offers integrated data-handling features (<code>update_statistics</code> and <code>get_last_observation()</code>), eliminating the need for extensive custom database interaction code.</p>
-</li>
-<li>
-<p><strong>Automated Dependency Management:</strong> TDAG automatically manages complex task dependencies, significantly reducing manual setup and ensuring efficient execution.</p>
-</li>
-<li>
-<p><strong>High Performance and Scalability:</strong> Optimized specifically for high-throughput environments, TDAG excels at scaling seamlessly with demanding time-series tasks.</p>
-</li>
+<li><strong>Updating DataRepositories</strong>: Stores the generated data from the update process.</li>
+<li><strong>Updating ORM</strong>: Manages the internal state of the data and the pipeline.</li>
 </ul>
-<h2 id="example-use-case-simple-time-series-pipeline">Example Use Case: Simple Time Series Pipeline</h2>
-<p>Imagine a scenario where each task sequentially processes data:</p>
-<ul>
-<li><strong>Task A:</strong> Inserts an initial value.</li>
-<li><strong>Task B:</strong> Takes the output from Task A, adds 5, and inserts the result.</li>
-<li><strong>Task C:</strong> Takes the output from Task B, adds another 5, and inserts the final result.</li>
-</ul>
-<p>Each of these tasks requires defined resources (e.g., 2 GPUs and 10 CPUs).</p>
-<p>While Luigi and Airflow can achieve this, both require significant extra setup, particularly for GPU management 
-  and seamless database integration. 
-  TDAG simplifies this process dramatically, embedding these features directly into workflow definitions, as demonstrated below:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">mainsequence.tdag</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeSerie</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">mainsequence.tdag_client.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataUpdates</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">datetime</span>
+<p>The following diagram illustrates these interactions:</p>
+<pre class="mermaid"><code>flowchart TD
+    subgraph TDAG_System[TDAG Framework]
+         TimeSerieConstructor["TimeSerie.__init__(*args, **kwargs)"] --&gt;|Defines| TimeSerie["TimeSerie.update(latest_value)"]
+    end
 
-<span class="k">class</span><span class="w"> </span><span class="nc">TS1</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
-    <span class="n">REQUIRED_CPUS</span> <span class="o">=</span> <span class="mi">10</span>
-    <span class="n">REQUIRED_GPUS</span> <span class="o">=</span> <span class="mi">2</span>
+    subgraph DataRepositories["Data Repositories"]
+        DB["TimeScaleDB"]
+        DataLake["DataLake"]
+    end
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">update_statistics</span><span class="p">:</span> <span class="n">DataUpdates</span><span class="p">):</span>
-        <span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()],</span> <span class="n">data</span><span class="o">=</span><span class="p">[</span><span class="mi">100</span><span class="p">])</span>
-        <span class="k">return</span> <span class="n">data</span>
+    subgraph ORM["TDAG ORM"]
+        LocalTimeSerie["LocalTimeSerie (local_hash_id)"]  --&gt;|View of Table| DynamicTable["DynamicTable (hash_id)"]
+    end
 
-<span class="k">class</span><span class="w"> </span><span class="nc">TS2</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
-    <span class="n">REQUIRED_CPUS</span> <span class="o">=</span> <span class="mi">10</span>
-    <span class="n">REQUIRED_GPUS</span> <span class="o">=</span> <span class="mi">2</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">ts_dep</span> <span class="o">=</span> <span class="n">TS1</span><span class="p">()</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">update_statistics</span><span class="p">:</span> <span class="n">DataUpdates</span><span class="p">):</span>
-        <span class="n">last_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ts_dep</span><span class="o">.</span><span class="n">get_last_observation</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()],</span> <span class="n">data</span><span class="o">=</span><span class="p">[</span><span class="n">last_val</span> <span class="o">+</span> <span class="mi">5</span><span class="p">])</span>
-        <span class="k">return</span> <span class="n">data</span>
-
-<span class="k">class</span><span class="w"> </span><span class="nc">TS3</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
-    <span class="n">REQUIRED_CPUS</span> <span class="o">=</span> <span class="mi">10</span>
-    <span class="n">REQUIRED_GPUS</span> <span class="o">=</span> <span class="mi">2</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">ts_dep</span> <span class="o">=</span> <span class="n">TS2</span><span class="p">()</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">update_statistics</span><span class="p">:</span> <span class="n">DataUpdates</span><span class="p">):</span>
-        <span class="n">last_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ts_dep</span><span class="o">.</span><span class="n">get_last_observation</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()],</span> <span class="n">data</span><span class="o">=</span><span class="p">[</span><span class="n">last_val</span> <span class="o">+</span> <span class="mi">5</span><span class="p">])</span>
-        <span class="k">return</span> <span class="n">data</span>
+    TimeSerie --&gt;|Updates| DataRepositories
+    TimeSerie --&gt;|Updates| ORM
+     ORM --&gt;|Manages state of| DataRepositories
+    ORM --&gt;|Updates| DynamicTable
+    ORM --&gt;|Updates| LocalTimeSerie
+</code></pre>
+<h2 id="initializing-a-timeserie">Initializing a TimeSerie</h2>
+<p>The constructor (<code>__init__</code>) defines the initial state and configuration:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init_meta</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+             <span class="n">build_meta_data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+             <span class="n">local_kwargs_to_ignore</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+             <span class="n">data_configuration_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+             <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="o">...</span>
 </code></pre></div>
-<h2 id="tdag-vs-luigi-vs-airflow">TDAG vs. Luigi vs. Airflow</h2>
-<table>
-<thead>
-<tr>
-<th>Feature</th>
-<th>Luigi</th>
-<th>Airflow</th>
-<th>TDAG (Main Sequence)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Database</strong></td>
-<td>SQLite (local file)</td>
-<td>SQLite (local file)</td>
-<td>TimeScale or any supported database</td>
-</tr>
-<tr>
-<td><strong>Resources</strong></td>
-<td>Defined in Task (manual config)</td>
-<td>Defined explicitly in Executors</td>
-<td>Declared directly in classes (<code>REQUIRED_GPUS</code>)</td>
-</tr>
-<tr>
-<td><strong>DAG Definition</strong></td>
-<td>Python Classes with <code>requires()</code></td>
-<td>Python Operators with <code>&gt;&gt;</code></td>
-<td>Python Classes with automatic dependencies</td>
-</tr>
-<tr>
-<td><strong>Scheduling</strong></td>
-<td>External scheduler required</td>
-<td>Built-in scheduler (UI)</td>
-<td>Integrated scheduler in Main Sequence platform</td>
-</tr>
-<tr>
-<td><strong>Execution &amp; Monitoring</strong></td>
-<td>CLI</td>
-<td>Web Interface or CLI</td>
-<td>Main Sequence UI or CLI</td>
-</tr>
-</tbody>
-</table>
-<h2 id="real-world-applications">Real-World Applications</h2>
+<h3 id="hashing-mechanism">Hashing Mechanism</h3>
+<p>The constructor arguments create two essential hashes that facilitate efficient management of data and updates:</p>
 <ul>
-<li>Financial modeling and investment strategies</li>
-<li>Real-time machine learning workflows</li>
-<li>Online training and predictive analytics</li>
+<li>
+<p><strong><code>hash_id</code></strong>: Used to uniquely identify data repositories linked to a specific <code>TimeSerie</code>. This ensures different configurations or datasets are appropriately separated or merged based on their content rather than their names alone.</p>
+</li>
+<li>
+<p><strong><code>local_hash_id</code></strong>: Used to uniquely identify the specific update processes. It enables TDAG to recognize distinct update routines and manage their internal state independently, crucial for parallel updates or workflows that reuse identical data structures with different update logic.</p>
+</li>
 </ul>
-<p>TDAG ensures that your data pipelines are robust, scalable, and easy to maintain, enabling your teams to focus on generating value rather than managing infrastructure.</p>
+<h3 id="special-constructor-arguments">Special Constructor Arguments</h3>
+<p>Some arguments are explicitly excluded from hashing:</p>
+<ul>
+<li><strong><code>init_meta</code></strong>: Arbitrary metadata used during initialization for convenience and clarity.</li>
+<li><strong><code>build_meta_data</code></strong>: Metadata recoverable anytime and editable from interfaces; useful for dynamic or interactive data handling.</li>
+<li><strong><code>local_kwargs_to_ignore</code></strong>: Arguments excluded from the <code>hash_id</code> calculation but included in <code>local_hash_id</code>, allowing flexibility in differentiating between datasets and update processes.</li>
+</ul>
+<h3 id="decorator-usage">Decorator Usage</h3>
+<p>Always decorate the constructor to ensure proper integration with TDAG:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">mainsequence.tdag</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeSerie</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">NewTimeSeries</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
+    <span class="nd">@TimeSerie</span><span class="o">.</span><span class="n">_post_init_routines</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="o">...</span>
+</code></pre></div>
+<h3 id="managing-dependencies-with-introspection">Managing Dependencies with Introspection</h3>
+<p>TDAG simplifies dependency management by automatically detecting dependencies through introspection. Rather than manually managing complex dependency trees, developers only need to explicitly declare direct dependencies as class attributes. TDAG then builds the full dependency graph internally.</p>
+<p>Example:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NewTimeSeries</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
+    <span class="nd">@TimeSerie</span><span class="o">.</span><span class="n">_post_init_routines</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">asset_symbols</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c1"># Explicitly declare direct dependency</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prices_time_serie</span> <span class="o">=</span> <span class="n">PricesTimeSerie</span><span class="p">(</span><span class="n">asset_symbols</span><span class="o">=</span><span class="n">asset_symbols</span><span class="p">)</span>
+</code></pre></div>
+<p>TDAG automatically understands that <code>NewTimeSeries</code> depends on <code>PricesTimeSerie</code> and manages updates accordingly.</p>
+<h3 id="state-persistence-with-pickles">State Persistence with Pickles</h3>
+<p>TDAG pickles each <code>TimeSerie</code> after its first initialization, significantly reducing load times in future updates. The pickle state is automatically updated when the underlying code changes, ensuring consistency and efficiency.</p>
+<h2 id="updating-a-timeserie">Updating a TimeSerie</h2>
+<p>The <code>update</code> method performs all the necessary logic to fetch, calculate, and store new data points in the series. It uses a parameter called <code>latest_value</code>, representing the most recent timestamp from previous updates. If <code>latest_value</code> is <code>None</code>, the series has never been updated successfully before. Otherwise, it continues from the given point.</p>
+<p>Example:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">update_statistics</span><span class="p">:</span> <span class="n">DataUpdates</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+    <span class="c1"># Perform update logic based on latest_value</span>
+    <span class="n">new_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fetch_new_data_since</span><span class="p">(</span><span class="n">latest_value</span><span class="p">)</span>
+    <span class="n">processed_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculate_metrics</span><span class="p">(</span><span class="n">new_data</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">processed_data</span>
+</code></pre></div>
+<p>Returned DataFrame requirements:</p>
+<ul>
+<li><strong>Unidimensional index</strong>: <code>DatetimeIndex</code> in <code>pytz.utc</code>.</li>
+<li><strong>Multidimensional index</strong>: three dimensions: <code>time_index</code>, <code>asset_symbol</code>, and <code>execution_venue_symbol</code>.</li>
+</ul>
+<h2 id="essential-helper-methods">Essential Helper Methods</h2>
+<h3 id="retrieving-data-between-dates">Retrieving Data Between Dates</h3>
+<p>The <code>get_df_between_dates</code> method fetches data from a specified date range:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_df_between_dates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start_date</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                         <span class="n">end_date</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                         <span class="n">unique_identifier_list</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                         <span class="n">great_or_equal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">less_or_equal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                         <span class="n">unique_identifier_range_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">UniqueIdentifierRangeMap</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+                         <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+</code></pre></div>
+<p>This method efficiently retrieves data within a specific range, accommodating various filtering scenarios by asset or time intervals.</p>
+<h3 id="getting-last-observation">Getting Last Observation</h3>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_last_observation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">asset_symbols</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+</code></pre></div>
+<p>Returns the most recent observation in the series.</p>
+<h2 id="wrappertimeserie-class">WrapperTimeSerie Class</h2>
+<p><code>WrapperTimeSerie</code> allows collective management of multiple <code>TimeSerie</code> instances, facilitating scalable and efficient updates:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">WrapperTimeSerie</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
+    <span class="nd">@TimeSerie</span><span class="o">.</span><span class="n">_post_init_routines</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time_series_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">TimeSerie</span><span class="p">],</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</code></pre></div>
+<p>TDAG’s TimeSeries object simplifies managing complex data dependencies, ensuring efficiency, consistency, and maintainability in your data pipelines.</p>
 </article>
 </div>
 <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
@@ -1115,7 +1271,7 @@
 </main>
 <footer class="md-footer">
 <nav aria-label="Footer" class="md-footer__inner md-grid">
-<a aria-label="Previous: About" class="md-footer__link md-footer__link--prev" href="../../about/">
+<a aria-label="Previous: Getting Started" class="md-footer__link md-footer__link--prev" href="../getting_started/">
 <div class="md-footer__button md-icon">
 <svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
 </div>
@@ -1124,17 +1280,17 @@
                 Previous
               </span>
 <div class="md-ellipsis">
-                About
+                Getting Started
               </div>
 </div>
 </a>
-<a aria-label="Next: Part 1: TimeSeries" class="md-footer__link md-footer__link--next" href="tutorial/Introduction_part1/">
+<a aria-label="Next: Orchestration &amp; Monitoring" class="md-footer__link md-footer__link--next" href="../orchestration_and_monitoring/">
 <div class="md-footer__title">
 <span class="md-footer__direction">
                 Next
               </span>
 <div class="md-ellipsis">
-                Part 1: TimeSeries
+                Orchestration &amp; Monitoring
               </div>
 </div>
 <div class="md-footer__button md-icon">
@@ -1162,5 +1318,7 @@
 <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.footer", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
 <script src="../../assets/javascripts/bundle.83f73b43.min.js"></script>
 <script src="https://unpkg.com/mermaid@10.9.0/dist/mermaid.min.js"></script>
-</body>
+<script>window.mermaidConfig = {default: {
+    startOnLoad: false
+}};</script></body>
 </html>
