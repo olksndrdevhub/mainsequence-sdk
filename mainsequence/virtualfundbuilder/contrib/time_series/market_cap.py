@@ -311,10 +311,10 @@ class MarketCap(WeightsBase, TimeSerie):
         if self.volatility_control_configuration is not None:
             log_returns = (np.log(mc_raw["price"])).diff()
 
-            ewm_vol = (log_returns * weights).sum(axis=1).ewm(span=self.volatility_control_configuration["ewm_span"],
-                                                              adjust=False).std() * np.sqrt(self.volatility_control_configuration["ann_factor"])
+            ewm_vol = (log_returns * weights).sum(axis=1).ewm(span=self.volatility_control_configuration.ewm_span,
+                                                              adjust=False).std() * np.sqrt(self.volatility_control_configuration.ann_factor)
 
-            scaling_factor = self.volatility_control_configuration["target_volatility"] / ewm_vol
+            scaling_factor = self.volatility_control_configuration.target_volatility / ewm_vol
             scaling_factor = scaling_factor.clip(upper=1.0)
             weights = weights.mul(scaling_factor, axis=0)
 

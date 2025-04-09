@@ -35,7 +35,7 @@ portfolio_build_configuration:
           intraday_bar_interpolation_rule: ffill
           upsample_frequency_id: 1d
           markets_time_series:
-            - unique_identifier: PRICES_ID
+            - unique_identifier: alpaca_1d_bars
     rebalance_strategy_configuration:
       calendar: 24/7
       rebalance_end: '23:00'
