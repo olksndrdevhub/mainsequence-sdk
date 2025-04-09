@@ -22,9 +22,6 @@ from mainsequence.virtualfundbuilder.resource_factory.app_factory import BaseApp
 logger = get_vfb_logger()
 
 POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
-if not POLYGON_API_KEY:
-    print("Warning: POLYGON_API_KEY environment variable not set. Data fetching will fail.")
-
 
 class SentimentReportConfig(BaseModel):
     """Pydantic model defining parameters for the Sentiment Report."""
@@ -49,6 +46,9 @@ class SentimentReport(BaseApp):
     configuration_class = SentimentReportConfig
 
     def __init__(self, configuration: SentimentReportConfig):
+        if not POLYGON_API_KEY:
+            raise ValueError("Warning: POLYGON_API_KEY environment variable not set. Data fetching will fail.")
+
         self.configuration = configuration
         self.tdag_agent = TDAGAgent()
 
