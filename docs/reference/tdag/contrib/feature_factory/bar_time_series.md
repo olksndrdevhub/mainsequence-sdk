@@ -1,1 +1,0 @@
-::: mainsequence.tdag.contrib.feature_factory.bar_time_series

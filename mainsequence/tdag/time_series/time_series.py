@@ -678,7 +678,7 @@ class GraphNodeMethods(ABC):
                             is_api = isinstance(tm_ts, APITimeSerie)
                             dependecy_map[(tm_ts.local_hash_id, tm_ts.data_source_id)] = {"is_pickle": False,
                                                                                           "ts": tm_ts}
-                            tm_ts.get_update_map(dependecy_map)
+                            # tm_ts.get_update_map(dependecy_map)
 
                 if isinstance(value, TimeSerie):
                     value.local_persist_manager  # before connection call local persist manager to garantee ts is created
@@ -697,7 +697,7 @@ class GraphNodeMethods(ABC):
                     if "is_api_time_serie_pickled" in value.keys():
                         is_api = isinstance(tm_ts, APITimeSerie)
                         dependecy_map[(value.local_hash_id, value.data_source_id)] = {"is_pickle": False, "ts": tm_ts}
-                        tm_ts.get_update_map(dependecy_map)
+                        # tm_ts.get_update_map(dependecy_map)
             except Exception as e:
                 raise e
         return dependecy_map
@@ -864,7 +864,7 @@ class TimeSerieRebuildMethods(ABC):
             pickle_path = cls.get_pickle_path(data_source_id=data_source,
                                               local_hash_id=local_hash_id)
             if os.path.isfile(pickle_path) == False:
-                data_source = DynamicTableDataSource.get(id=data_source)
+                data_source = DynamicTableDataSource.get(pk=data_source)
                 data_source.persist_to_pickle(data_source_pickle_path(data_source.id))
 
             data_source = cls.load_data_source_from_pickle(pickle_path=pickle_path)
@@ -1098,6 +1098,9 @@ class TimeSerieRebuildMethods(ABC):
         if force_update == True or update_statistics.max_time_index_value is None:
             must_update = True
 
+        update_statistics = self.set_update_statistics(update_statistics)
+
+
         try:
         
             if must_update == True:
@@ -1131,7 +1134,9 @@ class TimeSerieRebuildMethods(ABC):
                 historical_update_id=local_time_serie_historical_update.id,
                 error_on_update=error_on_last_update)
 
-            self._run_post_update_routines(error_on_last_update=error_on_last_update)
+            self._run_post_update_routines(error_on_last_update=error_on_last_update,
+                                           update_statistics=update_statistics
+                                           )
 
 
 
@@ -1230,6 +1235,7 @@ class DataPersistanceMethods(ABC):
         args and kwargs are nedeed for datalake
         """
         if self.metadata.sourcetableconfiguration is None:
+
             return DataUpdates()
 
         update_stats = self.metadata.sourcetableconfiguration.get_data_updates()
@@ -1330,9 +1336,7 @@ class DataPersistanceMethods(ABC):
             last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values()])
         return last_update_in_table
 
-    def get_last_observation(self, unique_identifier_list: Optional[list] = None,
-
-                             )->pd.DataFrame():
+    def get_last_observation(self, unique_identifier_list: Optional[list] = None) -> pd.DataFrame():
         """
         (1) Requests last observatiion from local persist manager
         (3) evaluates if last observation is consistent
@@ -1711,10 +1715,13 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
 
-    def __init__(self, init_meta=None,
-                 build_meta_data: Union[dict, None] = None, local_kwargs_to_ignore: Union[List[str], None] = None,
-
-                 *args, **kwargs):
+    def __init__(
+            self,
+            init_meta=None,
+            build_meta_data: Union[dict, None] = None,
+            local_kwargs_to_ignore: Union[List[str], None] = None,
+            *args,
+            **kwargs):
         """
         Initializes the TimeSerie object with the provided metadata and configurations.
 
@@ -1971,8 +1978,15 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         self.local_persist_manager
         return self.get_df_between_dates()
 
-    def run(self, debug_mode: bool, *, update_tree: bool = True, force_update: bool = False,
-            update_only_tree: bool = False, remote_scheduler: Union[object, None] = None):
+    def run(
+            self,
+            debug_mode: bool,
+            *,
+            update_tree: bool = True,
+            force_update: bool = False,
+            update_only_tree: bool = False,
+            remote_scheduler: Union[object, None] = None
+    ):
         """
 
         Args:
@@ -1981,9 +1995,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             force_update: Force an update even if the time serie schedule does not require an update
             update_only_tree: If set to True then only the dependency graph of the selected time serie will be updated
             remote_scheduler:
-
-        Returns:
-
         """
         from mainsequence.instrumentation import TracerInstrumentator
         from mainsequence.tdag.config import configuration
@@ -2497,13 +2508,14 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         #         #there is data but not source table configuration overwrite
         #         overwrite_latest_value=datetime.datetime(2023,6,23).replace(tzinfo=pytz.utc)
 
+
         with tracer.start_as_current_span("Update Calculation") as update_span:
 
             if overwrite_latest_value is not None:  # overwrite latest values is passed form def_update method to reduce calls to api
                 latest_value = overwrite_latest_value
 
                 self.logger.info(f'Updating Local Time Series for  {self}  since {latest_value}')
-                temp_df = self.set_update_statistics_and_update(update_statistics=update_statistics)
+                temp_df = self.update(update_statistics)
 
                 if temp_df.shape[0] == 0:
                     # concatenate empty
@@ -2522,7 +2534,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 if not update_statistics:
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
                 try:
-                    temp_df = self.set_update_statistics_and_update(update_statistics=update_statistics)
+                    temp_df = self.update(update_statistics)
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
@@ -2550,12 +2562,16 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
             return persisted
 
-    def _run_post_update_routines(self, error_on_last_update: bool):
+    def _run_post_update_routines(self, error_on_last_update: bool,update_statistics:DataUpdates,  ):
         pass
 
-    def set_update_statistics_and_update(self, update_statistics: DataUpdates):
-        update_statistics = self.set_update_statistics(update_statistics)
-        return self.update(update_statistics)
+
+
+    def _get_asset_list(self)->Union[None, list]:
+        if hasattr(self, "asset_list"):
+            return self.asset_list
+
+        return None
 
     def set_update_statistics(self, update_statistics: DataUpdates):
         """
@@ -2565,10 +2581,9 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         :return:
         """
         # Filter update_statistics to include only assets in self.asset_list.
-        asset_list = None
-        if hasattr(self, "asset_list"):
-            asset_list = self.asset_list
-            self.logger.info(f"{self.human_readable} is updating {len(self.asset_list)} assets")
+
+        asset_list = self._get_asset_list()
+        self._setted_asset_list = asset_list
 
         update_statistics = update_statistics.update_assets(
             asset_list, init_fallback_date=self.OFFSET_START

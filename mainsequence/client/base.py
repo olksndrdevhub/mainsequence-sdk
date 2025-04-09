@@ -6,9 +6,10 @@ from datetime import datetime
 from typing import Union
 
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
 from tqdm import tqdm
-from .utils import VAM_CONSTANTS, request_to_datetime, DATE_FORMAT, AuthLoaders, make_request, DoesNotExist
+from .utils import MARKETS_CONSTANTS, request_to_datetime, DATE_FORMAT, AuthLoaders, make_request, DoesNotExist
 
 TDAG_ENDPOINT = os.environ.get('TDAG_ENDPOINT')
 API_ENDPOINT = f"{TDAG_ENDPOINT}/orm/api"
@@ -63,7 +64,10 @@ class HtmlSaveException(Exception):
             return self.message
 
 class BasePydanticModel(BaseModel):
+    model_config = ConfigDict(extra='forbid')  # Forbid extra fields in v2
     orm_class: str = None  # This will be set to the class that inherits
+
+
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
@@ -86,10 +90,13 @@ class BaseObjectOrm:
         "Asset": "assets/asset",
         "IndexAsset": "assets/index_asset",
         "AssetFutureUSDM": "assets/asset_future_usdm",
+        "AssetCurrencyPair": "assets/asset_currency_pair",
         "VirtualFund": "assets/virtualfund",
         "OrderManager": "assets/order_manager",
         "ExecutionVenue": "assets/execution_venue",
         "Order": "assets/order",
+        "MarketOrder": "assets/market_order",
+        "LimitOrder": "assets/limit_order",
         "OrderEvent": "assets/order_event",
         "Account": "assets/account",
         "Trade": "assets/trade",
@@ -108,18 +115,6 @@ class BaseObjectOrm:
         "AssetCategory": "assets/asset-category",
         "TargetPortfolioFrontEndDetails": "assets/target-portfolio-details",
 
-        "BinanceFuturesUSDMTrade": 'binance/trade/futureusdm',
-        "BinanceSpotAccount": 'binance/account/spot',
-        "BinanceFuturesAccount": 'binance/account/futures',
-        "BinanceAsset": 'binance/asset/spot',
-        "BinanceAssetFutureUSDM": 'binance/asset/futureusdm',
-        "BinanceCurrencyPair": 'binance/asset/currency_pair',
-                               
-        "AlpacaAssetTrade": 'alpaca/trade/spot',
-        "AlpacaAccount": 'alpaca/account',
-        "AlpacaAsset": 'alpaca/asset/spot',
-        "AlpacaCurrencyPair": 'alpaca/asset/currency_pair',
-
         # TDAG
         "TimeSerie": "ogm/time_serie",
         "Scheduler": "ogm/scheduler",
@@ -133,6 +128,8 @@ class BaseObjectOrm:
         "DynamicTableDataSource": "ts_manager/dynamic_table_data_source",
         "Project": "pods/projects",
         "SourceTableConfiguration": "ts_manager/source_table_config",
+        "DynamicResource": "tdag-gpt/dynamic_resource",
+        "Artifact": "pods/artifact",
     }
     ROOT_URL = API_ENDPOINT
     LOADERS = loaders
@@ -315,10 +312,14 @@ class BaseObjectOrm:
         return new_data
 
     @classmethod
-    def create(cls, timeout=None, *args, **kwargs):
+    def create(cls, timeout=None, files=None, *args, **kwargs):
         base_url = cls.get_object_url()
         data = cls.serialize_for_json(kwargs)
-        payload = {"json": data}
+        payload = {
+            "json": data
+        }
+        if files:
+            payload["files"] = files
         r = make_request(
             s=cls.build_session(),
             loaders=cls.LOADERS,

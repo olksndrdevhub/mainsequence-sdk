@@ -23,7 +23,7 @@ from functools import wraps
 import math
 import gzip
 import base64
-
+import numpy as np
 _default_data_source = None  # Module-level cache
 BACKEND_DETACHED = lambda: os.environ.get('BACKEND_DETACHED', "false").lower() == "true"
 
@@ -200,13 +200,14 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     related_table: Union[int, "DynamicTableMetaData"]
     time_index_name: str = Field(..., max_length=100, description="Time index name")
     column_dtypes_map: Dict[str, Any] = Field(..., description="Column data types map")
+    column_metadata: Optional[Dict[str, Any]] = Field(..., description="Column metadata")
     index_names: List
     column_index_names: List
     last_time_index_value: Optional[datetime.datetime] = Field(None, description="Last time index value")
     earliest_index_value: Optional[datetime.datetime] = Field(None, description="Earliest index value")
     multi_index_stats: Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field")
     table_partition: Dict[str, Any] = Field(..., description="Table partition settings")
-
+    last_observation:Optional[Dict]
     def get_data_updates(self):
         max_per_asset = None
         if self.multi_index_stats is not None:
@@ -222,9 +223,27 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
         return du
 
     def get_time_scale_extra_table_indices(self) -> dict:
-        url = self.get_object_url() + f"/source_table_config/{self.id}/get_time_scale_extra_table_indices/"
+        url = self.get_object_url() + f"/{self.related_table}/get_time_scale_extra_table_indices/"
         s = self.build_session()
         r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, )
+        if r.status_code != 200:
+            raise Exception(r.text)
+        return r.json()
+
+    def patch_column_metadata(self,column_metadata:dict):
+        """
+        """
+        if column_metadata is not None:
+            for key, value in column_metadata.items():
+                if key not in self.column_dtypes_map:
+                    logger.warning(f"Column metadata key '{key}' not found in columns")
+                    continue
+                assert {"label", "description"}.issubset(
+                    value.keys()), f"Metadata for column '{key}' must include both 'label' and 'description'"
+
+        url = self.get_object_url() + f"/{self.related_table}/patch_column_metadata/"
+        s = self.build_session()
+        r = make_request(s=s, loaders=self.LOADERS, r_type="POST", url=url,payload={"json": {"column_metadata":column_metadata}} )
         if r.status_code != 200:
             raise Exception(r.text)
         return r.json()
@@ -240,13 +259,14 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     description: Optional[str] = Field(None, description="Optional HTML description")
     localtimeserieupdatedetails: Optional["LocalTimeSerieUpdateDetails"] = None
     run_configuration: "RunConfiguration"
+    data_schema:Optional[Dict] = None
 
     @property
     def data_source_id(self):
         if isinstance(self.remote_table.data_source, int):
             return self.remote_table.data_source
         else:
-            return self.remote_table.data_source.data_source.id
+            return self.remote_table.data_source.id
 
     @classmethod
     def get_or_create(cls, **kwargs):
@@ -391,7 +411,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                 "last_observation": last_observation,
             }
         }
-        print(f"Set last update index with {payload['json']}")
+        logger.debug(f"Set last update index with {payload['json']}")
         r = make_request(s=s, loaders=self.LOADERS, payload=payload, r_type="POST", url=url, time_out=timeout)
 
         if r.status_code == 404:
@@ -480,7 +500,8 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     def get_data_between_dates_from_api(
             self,
             start_date: datetime.datetime,
-            end_date: datetime.datetime, great_or_equal: bool,
+            end_date: datetime.datetime,
+            great_or_equal: bool,
             less_or_equal: bool,
             unique_identifier_list: list,
             columns: list,
@@ -706,7 +727,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     hash_id: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
     table_name: Optional[str] = Field(None, max_length=63, description="Max length of PostgreSQL table name")
     creation_date: datetime.datetime = Field(..., description="Creation timestamp")
-    created_by_user_id: Optional[int] = Field(None, description="Foreign key reference to AUTH_USER_MODEL")
+    created_by_user: Optional[int] = Field(None, description="Foreign key reference to User")
     organization_owner: int = Field(None, description="Foreign key reference to Organization")
     open_for_everyone: bool = Field(default=False, description="Whether the table is open for everyone")
     data_source_open_for_everyone: bool = Field(default=False,
@@ -721,6 +742,13 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     data_source: Union[int, "DynamicTableDataSource"]
     source_class_name: str
     sourcetableconfiguration: Optional[SourceTableConfiguration] = None
+    table_index_names:Optional[Dict]=None
+
+    #TS specifi
+    compression_policy_config:Optional[dict]
+    retention_policy_config:Optional[dict]
+    table_size: Optional[float]
+
 
     _drop_indices: bool = False  # for direct incertion we can pass this values
     _rebuild_indices: bool = False  # for direct incertion we can pass this values
@@ -969,7 +997,7 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
         return Scheduler(**r.json())
 
 class RunConfiguration(BasePydanticModel, BaseObjectOrm):
-    local_time_serie_update_details_id: Optional[int] = None
+    local_time_serie_update_details: Optional[int] = None
     retry_on_error: int = 0
     seconds_wait_on_retry: float = 50
     required_cpus: int = 1
@@ -995,8 +1023,10 @@ class LocalTimeSerieUpdateDetails(BasePydanticModel, BaseObjectOrm):
     active_update_scheduler_uid: Optional[str] = Field(None, max_length=100,
                                                        description="Scheduler UID for active update")
     update_priority: int = Field(default=0, description="Priority level of the update")
-    direct_dependencies_ids: List[int] = Field(default=[], description="List of direct upstream dependencies IDs")
-    last_updated_by_user_id: Optional[int] = Field(None, description="Foreign key reference to AUTH_USER_MODEL")
+    direct_dependencies: List = Field(default=[], description="List of direct upstream dependencies IDs")
+    last_updated_by_user: Optional[int] = Field(None, description="Foreign key reference to User")
+
+    run_configuration: Optional["RunConfiguration"]=None
 
     @staticmethod
     def _parse_parameters_filter(parameters):
@@ -1014,6 +1044,8 @@ class DataUpdates(BaseModel):
     max_time_index_value: Optional[datetime.datetime] = None  # does not include fitler
     _max_time_in_update_statistics: Optional[datetime.datetime] = None  # include filter
     last_observation: Optional[pd.DataFrame] = Field(default_factory=pd.DataFrame)
+
+    asset_list:Optional[List]=None
 
     class Config:
         arbitrary_types_allowed = True
@@ -1045,8 +1077,7 @@ class DataUpdates(BaseModel):
             init_fallback_date: datetime = None,
             unique_identifier_list: Union[list, None] = None
     ):
-        logger.warning("TODO: show last observation")
-
+        self.asset_list=asset_list
         new_update_statistics = self.update_statistics
         last_observation = self.last_observation
         if asset_list is not None or unique_identifier_list is not None:
@@ -1070,7 +1101,8 @@ class DataUpdates(BaseModel):
         du = DataUpdates(
             update_statistics=new_update_statistics,
             max_time_index_value=self.max_time_index_value,
-            last_observation=last_observation
+            last_observation=last_observation,
+            asset_list=asset_list
         )
         du._max_time_in_update_statistics = _max_time_in_update_statistics
         return du
@@ -1134,6 +1166,14 @@ class DataUpdates(BaseModel):
                         (df.index.get_level_values("unique_identifier") != unique_identifier)
                     )
                 ]
+            duplicated = df.index.duplicated(keep='first')
+
+            if duplicated.any():
+                num_duplicates = duplicated.sum()
+                logger.warning(
+                    f"Removed {num_duplicates} duplicated rows for unique_identifier and time_index combinations.")
+                df = df[~duplicated]
+            return df
         return df
 
 def get_chunk_stats(chunk_df, time_index_name, index_names):
@@ -1552,17 +1592,19 @@ class TimeScaleDB(DataSource):
         return df
 
 
-def register_strategy(json_payload: dict, timeout=None):
-    url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/register_strategy/"
-    from requests.adapters import HTTPAdapter, Retry
-    s = requests.Session()
-    s.headers.update(loaders.auth_headers)
-    retries = Retry(total=2, backoff_factor=2)
-    s.mount('http://', HTTPAdapter(max_retries=retries))
+class DynamicResource(BasePydanticModel, BaseObjectOrm):
+    id:Optional[int]=None
+    name: str
+    type: str
+    object_signature : dict
+    markdown_documentation : str
+    default_yaml: str
+    attributes: Optional[dict]
 
-    r = make_request(s=s, r_type="POST", url=url, payload={"json": json_payload},
-                     loaders=loaders, time_out=timeout)
-    return r
+    created_at:datetime.datetime
+    updated_at:datetime.datetime
+    is_production:bool
+    pod: int
 
 def register_default_configuration(json_payload: dict, timeout=None):
     url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/register_default_configuration/"
@@ -1588,6 +1630,40 @@ def create_configuration_for_strategy(json_payload: dict, timeout=None):
                      loaders=loaders, time_out=200)
     return r
 
+
+def query_agent(json_payload: dict, timeout=None):
+    url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/query_agent/"
+    from requests.adapters import HTTPAdapter, Retry
+    s = requests.Session()
+    s.headers.update(loaders.auth_headers)
+    retries = Retry(total=2, backoff_factor=2)
+    s.mount('http://', HTTPAdapter(max_retries=retries))
+
+    r = make_request(s=s, r_type="POST", url=url, payload={"json": json_payload},
+                     loaders=loaders, time_out=200)
+    return r
+
+
+
+class Artifact(BasePydanticModel, BaseObjectOrm):
+    id: Optional[int]
+    name: str
+    created_by_resource_name: str
+    bucket_name: str
+    content: Any
+
+    @staticmethod
+    def upload_file(filepath, name, created_by_resource_name, bucket_name=None):
+
+        with open(filepath, "rb") as f:
+            data = {
+                "name": name,
+                "created_by_resource_name": created_by_resource_name,
+                "bucket_name": bucket_name if bucket_name else "default_bucket",
+            }
+            files = {"content": (filepath, f, "application/pdf")}
+            artifact = Artifact.create(files=files, **data)
+            return artifact
 
 # TODO can we remove this?? ROOT_URLS does not seem to exist
 class DynamicTableHelpers:
@@ -1813,6 +1889,8 @@ class DynamicTableHelpers:
         data_frame.columns = [str(c) for c in data_frame.columns]
         data_frame = data_frame.rename(columns={data_frame.columns[time_col_loc]: time_index_name})
         column_dtypes_map = {key: str(value) for key, value in data_frame.dtypes.to_dict().items()}
+
+        data_frame = data_frame.replace({np.nan: None})
 
         return data_frame, column_index_names, index_names, column_dtypes_map, time_index_name
 

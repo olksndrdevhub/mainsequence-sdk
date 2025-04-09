@@ -49,6 +49,9 @@ uvicorn = "*"
 colorama = "*"
 fredapi = "*"
 polygon-api-client = "*"
+kaleido = "*"
+newspaper3k = "*"
+lxml-html-clean = "*"
 
 [dev-packages]
 mkdocs = "*"

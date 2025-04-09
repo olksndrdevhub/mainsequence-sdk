@@ -17,10 +17,10 @@ from enum import IntEnum, Enum
 
 from mainsequence.client import LocalTimeSerie
 
-from .base import BasePydanticModel, BaseObjectOrm, VAM_CONSTANTS as CONSTANTS, TDAG_ENDPOINT, API_ENDPOINT, HtmlSaveException
+from .base import BasePydanticModel, BaseObjectOrm, MARKETS_CONSTANTS as CONSTANTS, TDAG_ENDPOINT, API_ENDPOINT, HtmlSaveException
 from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, DATE_FORMAT
 from typing import List, Optional, Dict, Any, Tuple
-from pydantic import BaseModel, Field, validator,root_validator
+from pydantic import BaseModel, Field, validator,root_validator,constr
 
 def validator_for_string(value):
     if isinstance(value, str):
@@ -31,18 +31,18 @@ def validator_for_string(value):
             raise ValueError(f"Invalid datetime format: {value}. Expected format is 'YYYY-MM-DDTHH:MM:SSZ'.")
 
 def get_correct_asset_class(asset_type):
-    if asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_SPOT, CONSTANTS.ASSET_TYPE_CASH_EQUITY,CONSTANTS.ASSET_TYPE_CURRENCY]:
-        return Asset
-    elif asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_USDM]:
-        return AssetFutureUSDM
-    elif asset_type in [CONSTANTS.ASSET_TYPE_CURRENCY_PAIR]:
-        return CurrencyPair
-    else:
-        raise NotImplementedError
+    # if asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_SPOT, CONSTANTS.ASSET_TYPE_CASH_EQUITY,CONSTANTS.ASSET_TYPE_CURRENCY]:
+    #     return Asset
+    # elif asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_USDM]:
+    #     return AssetFutureUSDM
+    # elif asset_type in [CONSTANTS.ASSET_TYPE_CURRENCY_PAIR]:
+    #     return AssetCurrencyPair
+    # else:
+    raise NotImplementedError
 
 def resolve_asset(asset_dict:dict):
-    AssetClass = get_correct_asset_class(asset_dict['asset_type'])
-    asset = AssetClass(**asset_dict)
+    # AssetClass = get_correct_asset_class(asset_dict['asset_type'])
+    # asset = AssetClass(**asset_dict)
     return asset
 
 
@@ -87,7 +87,8 @@ class User(BaseObjectOrm,BasePydanticModel):
 
     @classmethod
     def get_object_url(cls):
-        url = f"{cls.ROOT_URL.replace('orm/api', 'users/api')}/{cls.END_POINTS[cls.class_name()]}"
+        # TODO should be also orm/api
+        url = f"{cls.ROOT_URL.replace('orm/api', 'user/api')}/{cls.END_POINTS[cls.class_name()]}"
         return url
 
     @classmethod
@@ -99,22 +100,68 @@ class User(BaseObjectOrm,BasePydanticModel):
 
         return cls(**r.json())
 
+class FigiInfo(BasePydanticModel):
+    id:Optional[int]=None
+    real_figi: bool = Field(default=True, description="FIGI identifier is real (default: True)")
+    figi: constr(max_length=12) = Field(
+        ...,
+        description="FIGI identifier (unique to a specific instrument on a particular market/exchange)"
+    )
+    composite: Optional[constr(max_length=12)] = Field(
+        None,
+        description="Composite FIGI identifier (aggregates multiple local listings within one market)"
+    )
+    ticker: Optional[constr(max_length=50)] = Field(
+        None,
+        description="FIGI ticker field (often shorter symbol used by OpenFIGI)"
+    )
+    security_type: Optional[constr(max_length=50)] = Field(
+        None,
+        description="Describes the instrument type (e.g. 'CS' for common stock, 'PS' for preferred, etc.)"
+    )
+    security_type_2:Optional[constr(max_length=50)] = Field(
+        None,
+        description="Open Figi Security Type 2"
+    )
+    security_market_sector: Optional[constr(max_length=50)] = Field(
+        None,
+        description="High-level sector classification (e.g. 'Equity', 'Corporate Bond') as per FIGI"
+    )
+    share_class: Optional[constr(max_length=12)] = Field(
+        None,
+        description="Share class designation (e.g. 'Common', 'Class A', 'Preferred') as per FIGI"
+    )
+    exchange_code: Optional[constr(max_length=50)] = Field(
+        None,
+        description="Exchange/market MIC code (e.g. XNYS, XNAS) or composite code"
+    )
+    name: Optional[constr(max_length=255)] = Field(
+        None,
+        description="Security name as recorded in the FIGI database"
+    )
+    main_sequence_share_class: Optional[constr(max_length=12)] = Field(
+        None,
+        description="Sepcial Main Sequence class . Should be the maximum level of agroupation"
+    )
 
 class AssetMixin(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
     symbol: str
     name: str
-    asset_type: str
     can_trade: bool
     calendar: Union[Calendar,int]
     execution_venue: Union["ExecutionVenue", int]
     delisted_datetime: Optional[datetime.datetime] = None
     unique_identifier: str
-    unique_symbol: Optional[str]=None
+
+    figi_details:FigiInfo
 
     @staticmethod
     def get_properties_from_unique_symbol(unique_symbol: str):
-        return {"symbol": unique_symbol}
+        if unique_symbol.endswith(CONSTANTS.ALPACA_CRYPTO_POSTFIX):
+            return {"symbol": unique_symbol.replace(CONSTANTS.ALPACA_CRYPTO_POSTFIX, ""), "asset_type": CONSTANTS.ASSET_TYPE_CRYPTO_SPOT}
+
+        return {"symbol": unique_symbol, "asset_type": CONSTANTS.ASSET_TYPE_CASH_EQUITY}
 
     @property
     def execution_venue_symbol(self):
@@ -255,17 +302,30 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
 
         # Convert the accumulated raw data into asset instances with correct classes
         return create_from_serializer_with_class(all_results)
+
+    def get_ms_share_class(self):
+        return self.figi_details.main_sequence_share_class
         
 class AssetCategory(BaseObjectOrm, BasePydanticModel):
-    id:int
-    unique_id:str
-    name:str
-    source:str
-    assets:List[int]
-    organization_owner_uid:str
+    id: int
+    unique_identifier: str
+    display_name: str
+    source: str
+    assets: List[int]
+    organization_owner_uid: str
+    description: Optional[str]=None
     
     def __repr__(self):
-        return self.name+" source:"+self.source
+        return f"{self.display_name} source: {self.source}, {len(self.assets)} assets"
+
+    def get_assets(self):
+        if not self.assets:
+            raise ValueError(f"No assets in Asset Category {self.display_name}")
+        return Asset.filter(id__in=self.assets)
+
+    def update_assets(self, asset_ids: List[int]):
+        self.remove_assets(self.assets)
+        self.append_assets(asset_ids)
 
     def append_assets(self, asset_ids: List[int]) -> "AssetCategory":
         """
@@ -286,7 +346,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
         # Return a new instance of AssetCategory built from the response JSON.
         return AssetCategory(**r.json())
 
-    def remove_assets(self, asset_ids: List[int]) -> "AssetCategory":
+    def remove_assets(self, asset_ids:List[int]) -> "AssetCategory":
         """
         Remove the given asset IDs from this category.
         Expects a payload: {"assets": [<asset_id1>, <asset_id2>, ...]}
@@ -304,7 +364,24 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
             raise Exception(f"Error removing assets: {r.text()}")
         # Return a new instance of AssetCategory built from the response JSON.
         return AssetCategory(**r.json())
-    
+
+    @classmethod
+    def get_or_create(cls,*args,**kwargs):
+        url = f"{cls.get_object_url()}/get-or-create/"
+        payload = {"json": kwargs}
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            payload=payload
+        )
+        if r.status_code not in [200, 201]:
+            raise Exception(f"Error appending creating: {r.text()}")
+        # Return a new instance of AssetCategory built from the response JSON.
+        return AssetCategory(**r.json())
+
+
 class Asset(AssetMixin, BaseObjectOrm):
 
     def get_spot_reference_asset_symbol(self):
@@ -312,16 +389,14 @@ class Asset(AssetMixin, BaseObjectOrm):
     
     @classmethod
     def create_or_update_index_asset_from_portfolios(cls,
-                                                     live_portfolio:int,
-                                                     backtest_portfolio:int,
+                                                     reference_portfolio:int,
                                                      valuation_asset:int,
                                                      calendar:str,timeout=None
                                                      )->"TargetPortfolioIndexAsset":
         url = f"{cls.get_object_url()}/create_or_update_index_asset_from_portfolios/"
         payload = {
             "json": dict(
-                live_portfolio=live_portfolio,
-                backtest_portfolio=backtest_portfolio,
+                reference_portfolio=reference_portfolio,
                 valuation_asset=valuation_asset,
                 calendar=calendar
             )
@@ -335,7 +410,7 @@ class Asset(AssetMixin, BaseObjectOrm):
             time_out=timeout
         )
         if r.status_code not in [200,201]:
-            raise Exception(f" {r.text()}")
+            raise Exception(f"{r.text}")
 
         return TargetPortfolioIndexAsset(**r.json())
 
@@ -344,23 +419,17 @@ class IndexAsset(Asset):
     valuation_asset: AssetMixin
 
 class TargetPortfolioIndexAsset(IndexAsset):
-    asset_type: str = CONSTANTS.ASSET_TYPE_INDEX
     can_trade:bool=False
-    live_portfolio : "TargetPortfolio"
-    backtest_portfolio : "TargetPortfolio"
+    reference_portfolio : "TargetPortfolio"
     execution_venue: "ExecutionVenue"= Field(
         default_factory=lambda: ExecutionVenue(**CONSTANTS.VENUE_MAIN_SEQUENCE_PORTFOLIOS)
     )
 
     @property
-    def live_portfolio_details_url(self):
-        return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.live_portfolio.id}"
+    def reference_portfolio_details_url(self):
+        return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.reference_portfolios.id}"
 
-    @property
-    def backtest_portfolio_details_url(self):
-        return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.backtest_portfolio.id}"
-
-class CurrencyPairMixin(AssetMixin, BasePydanticModel):
+class AssetCurrencyPair(AssetMixin, BasePydanticModel):
     base_asset: Union[AssetMixin, int]
     quote_asset: Union[AssetMixin, int]
 
@@ -368,14 +437,13 @@ class CurrencyPairMixin(AssetMixin, BasePydanticModel):
         base_asset_symbol = self.symbol.replace(self.quote_asset.symbol, "")
         return base_asset_symbol
 
-
-class CurrencyPair(CurrencyPairMixin):
-  pass
+    def get_ms_share_class(self):
+        return self.base_asset.get_ms_share_class()
 
 class FutureUSDMMixin(AssetMixin, BasePydanticModel):
     maturity_code: str = Field(..., max_length=50)
     last_trade_time: Optional[datetime.datetime] = None
-    currency_pair:CurrencyPair
+    currency_pair:AssetCurrencyPair
 
     def get_spot_reference_asset_symbol(self):
         FUTURE_TO_SPOT_MAP = {
@@ -386,12 +454,21 @@ class FutureUSDMMixin(AssetMixin, BasePydanticModel):
         spot = FUTURE_TO_SPOT_MAP[self.execution_venue_symbol].get(base_asset_symbol, base_asset_symbol)
         return spot
 
-class AssetFutureUSDM(FutureUSDMMixin,BaseObjectOrm):
+class AssetFutureUSDM(FutureUSDMMixin, BaseObjectOrm):
     pass
 
 
-class AccountPortfolioScheduledRebalance(BaseObjectOrm):
-    pass
+class AccountPortfolioScheduledRebalance(BaseObjectOrm, BasePydanticModel):
+    id: int
+    target_account_portfolio: Optional[dict] = None
+    scheduled_time: str = None
+    received_in_execution_engine : bool = False
+    executed : bool = False
+    execution_start: Optional[str] = None
+    execution_end: Optional[datetime.datetime] = None
+    execution_message: Optional[str] = None
+
+
 
 class AccountExecutionConfiguration(BasePydanticModel):
     related_account: int  # Assuming related_account is represented by its ID
@@ -432,12 +509,12 @@ class AccountMixin(BasePydanticModel):
     account_name: Optional[str] = None
     is_account_in_cool_down:bool
     cash_asset: Asset
-    is_paper:bool
+    is_paper: bool
     is_on_manual_rebalance: bool
     user: Optional[int] = None
-    execution_configuration:"AccountExecutionConfiguration"
+    execution_configuration: "AccountExecutionConfiguration"
     account_target_portfolio: AccountTargetPortfolio
-    latest_holdings:Union["AccountLatestHoldingsSerializer",None]=None
+    latest_holdings: Union["AccountLatestHoldingsSerializer",None]=None
 
     @property
     def account_target_portfolio(self):
@@ -534,10 +611,10 @@ class AccountMixin(BasePydanticModel):
             raise Exception("Error Syncing funds in account")
         return AccountHistoricalHoldings(**r.json())
     
-    def get_missing_assets_in_exposure(self,asset_list_ids,asset_type:str,timeout=None)->list[Asset]:
+    def get_missing_assets_in_exposure(self,asset_list_ids,timeout=None)->list[Asset]:
         base_url = self.get_object_url()
         url = f"{base_url}/{self.id}/get_missing_assets_in_exposure/"
-        payload = {"json": {"asset_list_ids":asset_list_ids,"asset_type":asset_type}}
+        payload = {"json": {"asset_list_ids":asset_list_ids,}}
         
         r = make_request(s=self.build_session(),payload=payload, loaders=self.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
@@ -549,8 +626,31 @@ class AccountMixin(BasePydanticModel):
         
         return  asset_list
 
-class Account(AccountMixin,BaseObjectOrm, BasePydanticModel):
-    ...
+class RebalanceTargetPosition(BasePydanticModel):
+    target_portfolio_id: int
+    weight_notional_exposure: float
+
+class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
+    def rebalance(
+        self,
+        target_positions: List[RebalanceTargetPosition],
+        scheduled_time: Optional[datetime.datetime] = None
+    ) -> AccountPortfolioScheduledRebalance:
+
+        parsed_target_positions = {}
+        for target_position in target_positions:
+            if target_position.target_portfolio_id in parsed_target_positions:
+                raise ValueError(f"Duplicate target portfolio id: {target_position.target_portfolio_id} not allowed")
+
+            parsed_target_positions[target_position.target_portfolio_id] = {
+                "weight_notional_exposure": target_position.weight_notional_exposure,
+            }
+
+        return AccountPortfolioScheduledRebalance.create(
+            target_positions=parsed_target_positions,
+            target_account_portfolio=self.id,
+            scheduled_time=scheduled_time,
+        )
 
 
 class AccountLatestHoldingsSerializer(BaseObjectOrm,BasePydanticModel):
@@ -606,14 +706,14 @@ class AccountPortfolioHistoricalWeights(BaseObjectOrm):
     pass
 
 class WeightPosition(BaseObjectOrm, BasePydanticModel):
-    id: Optional[int] = None
-    parent_weights: int
-    asset: Union[AssetMixin,int]
+    # id: Optional[int] = None
+    # parent_weights: int
+    asset: Union[AssetMixin, int]
     weight_notional_exposure: float
 
     @property
     def asset_id(self):
-        return self.asset if isinstance(self.asset,int) else self.asset.id
+        return self.asset if isinstance(self.asset, int) else self.asset.id
 
     @root_validator(pre=True)
     def resolve_assets(cls, values):
@@ -630,7 +730,7 @@ class HistoricalWeights(BaseObjectOrm,BasePydanticModel):
     weights_date: datetime.datetime
     comments: Optional[str] = None
     target_portfolio: int
-    weights:Union[List[WeightPosition],List[int]]
+    weights: Union[List[WeightPosition],List[int]]
 
     @classmethod
     def add_from_time_serie(cls, local_time_serie_id: int, positions_list: list,
@@ -670,6 +770,7 @@ class DataFrequency(str, Enum):
     one_d = "1d"
     one_w = "1w"
     one_month ="1mo"
+    one_quarter ="1q"
 
 class Trade(BaseObjectOrm):
     @classmethod
@@ -687,18 +788,7 @@ class OrdersExecutionConfiguration(BaseModel):
     broker_class: str
     broker_configuration: dict
 
-class TargetPortfolioExecutionConfiguration(BaseObjectOrm,BasePydanticModel):
-    related_portfolio: Optional[int]=None
-    portfolio_build_configuration: Optional[Dict[str, Any]] = None
-    orders_execution_configuration: Optional[OrdersExecutionConfiguration] = None
 
-    rebalance_tolerance_percent: float = Field(default=0.02, ge=0)
-    minimum_notional_for_a_rebalance: float = Field(default=15.00, ge=0)
-    max_latency_in_cdc_seconds: float = Field(default=60.00, ge=0)
-    unwind_funds_hanging_limit_seconds: Optional[float] = None
-    minimum_positions_holding_seconds: Optional[float] = None
-    rebalance_step_every_seconds: Optional[float] = None
-    max_data_latency_seconds: Optional[float] = None
 
 class PortfolioTags(BasePydanticModel):
     id:Optional[int]=None
@@ -726,7 +816,6 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     latest_weights:Optional[List[Dict]] =None
 
     creation_date: Optional[datetime.datetime] = None
-    execution_configuration: Union[int, TargetPortfolioExecutionConfiguration]
 
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_time_index_name: Optional[str] = Field(None, max_length=20)
@@ -742,7 +831,6 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             signal_local_time_serie_id:int,
             is_active: bool ,
             available_in_venues__symbols:list[str],
-            execution_configuration: dict,
             calendar_name: str,
             tracking_funds_expected_exposure_from_latest_holdings: bool,
             is_asset_only: bool,
@@ -763,7 +851,6 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             "signal_local_time_serie_id": signal_local_time_serie_id,
             # Using the same ID for local_signal_time_serie_id as specified.
             "available_in_venues__symbols": available_in_venues__symbols,
-            "execution_configuration": execution_configuration,
             "calendar_name": calendar_name,
             "tracking_funds_expected_exposure_from_latest_holdings": tracking_funds_expected_exposure_from_latest_holdings,
             "is_asset_only": is_asset_only,
@@ -886,33 +973,33 @@ class VirtualFund(BaseObjectOrm, BasePydanticModel):
     last_trade_time: Optional[datetime.datetime] = None
     latest_holdings_are_only_cash: bool
 
-    def sanitize_target_weights_for_execution_venue(self,target_weights:dict):
-        """
-        This functions switches assets from main net to test net to guarante consistency in the recording
-        of trades and orders
-        Args:
-            target_weights:{asset_id:WeightExecutionPosition}
-
-        Returns:
-
-        """
-        if self.target_account.execution_venue.symbol == CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL:
-            target_ev=CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL
-            new_target_weights={}
-            for _, position in target_weights.items():
-                AssetClass = position.asset.__class__
-                asset,_ = AssetClass.filter(symbol=position.asset.unique_symbol, execution_venue__symbol=target_ev,
-                                        asset_type=position.asset.asset_type,
-                                        )
-                asset = asset[0]
-                new_position = copy.deepcopy(position)
-                new_position.asset=asset
-                new_target_weights[asset.id] = new_position
-                # todo create in DB an execution position
-        else:
-            new_target_weights = target_weights
-
-        return new_target_weights
+    # def sanitize_target_weights_for_execution_venue(self,target_weights:dict):
+    #     """
+    #     This functions switches assets from main net to test net to guarante consistency in the recording
+    #     of trades and orders
+    #     Args:
+    #         target_weights:{asset_id:WeightExecutionPosition}
+    #
+    #     Returns:
+    #
+    #     """
+    #     if self.target_account.execution_venue.symbol == CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL:
+    #         target_ev=CONSTANTS.BINANCE_TESTNET_FUTURES_EV_SYMBOL
+    #         new_target_weights={}
+    #         for _, position in target_weights.items():
+    #             AssetClass = position.asset.__class__
+    #             asset,_ = AssetClass.filter(symbol=position.asset.unique_symbol, execution_venue__symbol=target_ev,
+    #                                     asset_type=position.asset.asset_type,
+    #                                     )
+    #             asset = asset[0]
+    #             new_position = copy.deepcopy(position)
+    #             new_position.asset=asset
+    #             new_target_weights[asset.id] = new_position
+    #             # todo create in DB an execution position
+    #     else:
+    #         new_target_weights = target_weights
+    #
+    #     return new_target_weights
 
     # def build_rebalance_from_target_weights(
     #         self,
@@ -1013,40 +1100,37 @@ class OrderType(str, Enum):
     LIMIT = "limit"
     NOT_PLACED = "not_placed"
 
-class Order(BaseObjectOrm,BasePydanticModel):
+class Order(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = Field(None, primary_key=True)
     order_remote_id: str
-    order_time: datetime.datetime
-    order_side: OrderSide  # Use int for choices (-1: SELL, 1: BUY)
+    client_order_id: str
     order_type: OrderType
+    order_time: datetime.datetime
+    expires_time: datetime.datetime
+    order_side: OrderSide  # Use int for choices (-1: SELL, 1: BUY)
     quantity: float
-    price: Optional[float] = None  # Price can be None for market orders
     status: OrderStatus = OrderStatus.NOT_PLACED
     filled_quantity: Optional[float] = 0.0
     filled_price: Optional[float] = None
-    order_manager: Optional[int] = None  # Assuming foreign key ID is used
+    order_manager: Union[int, "OrderManager"] = None  # Assuming foreign key ID is used
     asset: int  # Assuming foreign key ID is used
     related_fund: Optional[int] = None  # Assuming foreign key ID is used
     related_account: int  # Assuming foreign key ID is used
+    time_in_force: str
     comments: Optional[str] = None
 
     class Config:
         use_enum_values = True  # This allows using enum values directly
 
-    @classmethod
-    def create_or_update(cls, *args, **kwargs):
-        base_url = cls.get_object_url()
-        payload = {"json": kwargs }
-        r = make_request(s=cls.build_session(),
-                         loaders=cls.LOADERS, r_type="POST", url=f"{base_url}/create_or_update/", payload=payload)
-        if r.status_code <200 or r.status_code>=300:
-            raise Exception(r.text)
-        return cls(**r.json())
+class MarketOrder(Order):
+    pass
 
-class OrderManagerTargetQuantity(BaseObjectOrm, BasePydanticModel):
-    id:Optional[int]=None
-    asset:Union[Asset,int]
-    quantity:float
+class LimitOrder(Order):
+    limit_price: float
+
+class OrderManagerTargetQuantity(BaseModel):
+    asset: Union[int, Asset]
+    quantity: float
 
 class OrderManager(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
@@ -1054,16 +1138,24 @@ class OrderManager(BaseObjectOrm, BasePydanticModel):
     target_rebalance: list[OrderManagerTargetQuantity]
     order_received_time: Optional[datetime.datetime] = None
     execution_end: Optional[datetime.datetime] = None
-    related_account: Union[Account,int]  # Representing the ForeignKey field with the related account ID
+    related_account: Union[Account, int]  # Representing the ForeignKey field with the related account ID
 
     @classmethod
     def destroy_before_date(cls, target_date: datetime.datetime):
         base_url = cls.get_object_url()
-        payload = {"json": {"target_date": target_date.strftime(DATE_FORMAT),
-                         },}
+        payload = {
+            "json": {
+                "target_date": target_date.strftime(DATE_FORMAT),
+            },
+        }
 
-        r = make_request(s=cls.build_session(),
-                         loaders=cls.LOADERS,r_type="POST", url=f"{base_url}/destroy_before_date/", payload=payload)
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=f"{base_url}/destroy_before_date/",
+            payload=payload
+        )
 
         if r.status_code != 204:
             raise Exception(r.text)
@@ -1072,31 +1164,6 @@ class OrderManager(BaseObjectOrm, BasePydanticModel):
 # ------------------------------
 # ALPACA
 # ------------------------------
-class AlpacaAssetMixin(AssetMixin, BaseObjectOrm):
-    ticker: str
-    asset_class: str
-    exchange: str
-    status: Literal["active", "inactive"]
-    marginable: bool
-    shortable: bool
-    easy_to_borrow: bool
-    fractionable: bool
-
-    def get_spot_reference_asset_symbol(self):
-        return self.symbol
-
-    @staticmethod
-    def get_properties_from_unique_symbol(unique_symbol: str):
-        if unique_symbol.endswith(CONSTANTS.ALPACA_CRYPTO_POSTFIX):
-            return {"symbol": unique_symbol.replace(CONSTANTS.ALPACA_CRYPTO_POSTFIX, ""), "asset_type": CONSTANTS.ASSET_TYPE_CRYPTO_SPOT}
-
-        return {"symbol": unique_symbol, "asset_type": CONSTANTS.ASSET_TYPE_CASH_EQUITY}
-
-class AlpacaAsset(AlpacaAssetMixin):
-    pass
-
-class AlpacaCurrencyPair(AlpacaAssetMixin, CurrencyPairMixin):
-    pass
 
 class AlapaAccountRiskFactors(AccountRiskFactors):
     total_initial_margin: float
@@ -1112,7 +1179,7 @@ class AlapaAccountRiskFactors(AccountRiskFactors):
     regt_buying_power: float
     sma: float
 
-class AlpacaAccount(AccountMixin, BaseObjectOrm):
+class AlpacaAccount(AccountMixin,):
     api_key: str
     secret_key: str
 
@@ -1128,44 +1195,12 @@ class AlpacaAccount(AccountMixin, BaseObjectOrm):
     transfers_blocked: bool
     shorting_enabled: bool
 
-class AlpacaAssetTrade(BasePydanticModel, BaseObjectOrm):
 
-    @classmethod
-    def create_or_update(cls, timeout=None, *args, **kwargs, ):
-        url = f"{cls.get_object_url()}/create_or_update/"
-        data = cls.serialize_for_json(kwargs)
-        payload = {"json": data}
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=f"{url}",
-                         time_out=timeout,
-                         payload=payload)
-        if r.status_code not in [201, 200]:
-            raise Exception(r.text)
-        return cls(**r.json())
 
 # ------------------------------
 # BINANCE
 # ------------------------------
-class BinanceAsset(AssetMixin, BaseObjectOrm):
-    pass
 
-class BinanceCurrencyPair(CurrencyPairMixin, BaseObjectOrm):
-   pass
-
-class BinanceAssetFutureUSDM(FutureUSDMMixin, BaseObjectOrm):
-
-    @classmethod
-    def batch_upsert_from_base_quote(cls, asset_config_list: list, execution_venue_symbol: str, asset_type: str,
-                                     timeout=None):
-        url = f"{cls.get_object_url()}/batch_upsert_from_base_quote/"
-        payload = dict(json={"asset_config_list": asset_config_list, "execution_venue_symbol": execution_venue_symbol,
-                             "asset_type": asset_type
-                             })
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, time_out=timeout,
-                         payload=payload)
-
-        if r.status_code != 200:
-            raise Exception("Error inserting assets")
-        return r.json()
 
 class BinanceFuturesAccountRiskFactors(AccountRiskFactors):
     total_initial_margin: float
@@ -1177,7 +1212,7 @@ class BinanceFuturesAccountRiskFactors(AccountRiskFactors):
     available_balance: float
     max_withdraw_amount: float
 
-class BaseFuturesAccount(AccountMixin, BaseObjectOrm):
+class BaseFuturesAccount(Account):
     api_key :str
     secret_key :str
 
@@ -1186,20 +1221,3 @@ class BaseFuturesAccount(AccountMixin, BaseObjectOrm):
     can_deposit: bool = False
     can_withdraw: bool = False
 
-class BinanceFuturesTestNetAccount(BaseFuturesAccount):
-    pass
-
-class BinanceFuturesAccount(BaseFuturesAccount):
-    pass
-
-class BinanceSpotAccount(BaseObjectOrm):
-    pass
-
-class BinanceSpotTestNetAccount(BaseObjectOrm):
-    pass
-
-class BinanceEarnAccount(BaseObjectOrm):
-    pass
-
-class BinanceAssetFuturesUSDMTrade(Trade):
-   pass

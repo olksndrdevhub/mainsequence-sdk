@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 
 from mainsequence.virtualfundbuilder.enums import RebalanceFrequencyStrategyName, PriceTypeNames
-from mainsequence.virtualfundbuilder.strategy_factory.rebalance_factory import RebalanceStrategyBase, register_rebalance_class
+from mainsequence.virtualfundbuilder.resource_factory.rebalance_factory import RebalanceStrategyBase, register_rebalance_class
 
 
 @register_rebalance_class(register_in_agent=True)

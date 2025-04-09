@@ -1,8 +1,11 @@
 __version__ = '0.1.0'
-from dotenv import load_dotenv
+
 from pathlib import Path
 import os
 import sys
+
+from mainsequence.virtualfundbuilder.__main__ import get_pod_configuration
+
 
 def load_env():
 
@@ -25,8 +28,12 @@ from mainsequence.virtualfundbuilder.utils import (
     filter_assets
 )
 
+# no more default strategies, everything should be for user
 def register_default_strategies():
     # Keep this in a function to not clutter the libs namespace
-    import mainsequence.virtualfundbuilder.contrib.signals
+    import mainsequence.virtualfundbuilder.contrib.time_series
     import mainsequence.virtualfundbuilder.contrib.rebalance_strategies
-register_default_strategies()
+
+if os.getenv("PROJECT_LIBRARY_NAME") is None:
+    # TODO workaround for now to make local execution work
+    register_default_strategies()

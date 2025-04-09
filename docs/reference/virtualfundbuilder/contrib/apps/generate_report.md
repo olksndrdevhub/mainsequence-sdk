@@ -1,0 +1,1 @@
+::: mainsequence.virtualfundbuilder.contrib.apps.generate_report

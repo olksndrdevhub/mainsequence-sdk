@@ -9,8 +9,6 @@ from pydantic.fields import PydanticUndefined, FieldInfo
 import pandas as pd
 from mainsequence.client import CONSTANTS, Asset
 from mainsequence.tdag.time_series import ModelList, TimeSerie
-from mainsequence.client import CONSTANTS as TDAG_CONSTANTS
-from mainsequence.client.models_tdag import register_strategy
 import numpy as np
 from tqdm import tqdm
 from numpy.linalg import LinAlgError
@@ -23,10 +21,6 @@ from typing import Any, Dict, List, Union, get_type_hints
 from enum import Enum
 from pydantic import BaseModel
 import yaml
-import os
-from pathlib import Path
-import os
-import tempfile
 from mainsequence.logconf import logger
 
 def get_vfb_logger():
@@ -35,9 +29,6 @@ def get_vfb_logger():
     # If the logger doesn't have any handlers, create it using the custom function
     logger.bind(sub_application="virtualfundbuilder")
     return logger
-
-
-
 
 logger = get_vfb_logger()
 
@@ -251,8 +242,7 @@ def get_basic_default_value(elem):
     else:
         raise ValueError(f"Unsupported type: {elem}")
 
-
-def parse_full_element_signature(elem, parent_description=None, attr_name=None, attr_default=None):
+def parse_object_signature_raw(elem, parent_description=None, attr_name=None, attr_default=None):
     if isinstance(attr_default, Enum):
         attr_default = attr_default.value
 
@@ -269,7 +259,7 @@ def parse_full_element_signature(elem, parent_description=None, attr_name=None, 
 
     if get_origin(elem) == Union:
         for arg in get_args(elem):
-            sub_elem = parse_full_element_signature(arg, parent_description, attr_name, attr_default)
+            sub_elem = parse_object_signature_raw(arg, parent_description, attr_name, attr_default)
             if sub_elem["allowed_values"]:
                 return sub_elem
 
@@ -282,7 +272,7 @@ def parse_full_element_signature(elem, parent_description=None, attr_name=None, 
         element_info["name"] = None
         if hasattr(elem, '__args__'):
             element_info["elements"] = [
-                parse_full_element_signature(elem.__args__[0], parent_description, attr_name, attr_default)
+                parse_object_signature_raw(elem.__args__[0], parent_description, attr_name, attr_default)
             ]
             for e in element_info["elements"]:
                 e["type"] = element_info["type"]
@@ -290,7 +280,7 @@ def parse_full_element_signature(elem, parent_description=None, attr_name=None, 
     elif hasattr(elem, '__origin__') and elem.__origin__ is dict:
         if hasattr(elem, '__args__'):
             element_info["elements"] = [
-                parse_full_element_signature(arg, parent_description, attr_name, attr_default)
+                parse_object_signature_raw(arg, parent_description, attr_name, attr_default)
                 for arg in elem.__args__
             ]
 
@@ -307,7 +297,7 @@ def parse_full_element_signature(elem, parent_description=None, attr_name=None, 
 
         for field_name, field_info in elem.__fields__.items():
             element_info["elements"].append(
-                parse_full_element_signature(
+                parse_object_signature_raw(
                     field_info.annotation,
                     doc_parsed["args_descriptions"].get(field_name),
                     field_name,
@@ -324,7 +314,7 @@ def parse_full_element_signature(elem, parent_description=None, attr_name=None, 
 
         for field_name, field_type in get_type_hints(elem).items():
             element_info["elements"].append(
-                parse_full_element_signature(
+                parse_object_signature_raw(
                     field_type,
                     doc_parsed["args_descriptions"].get(field_name),
                     field_name,
@@ -342,7 +332,7 @@ def parse_full_element_signature(elem, parent_description=None, attr_name=None, 
         default_values = {k: v.default for k, v in inspect.signature(elem).parameters.items() if v.default is not inspect.Parameter.empty}
         for field_name, field_type in get_type_hints(elem).items():
             element_info["elements"].append(
-                parse_full_element_signature(
+                parse_object_signature_raw(
                     field_type,
                     doc_parsed["args_descriptions"].get(field_name),
                     field_name,
@@ -352,15 +342,24 @@ def parse_full_element_signature(elem, parent_description=None, attr_name=None, 
 
     elif isinstance(elem, FieldInfo):
         configuration_elem = elem.json_schema_extra.get("portfolio_configuration_overwrite")
-        element_info["elements"] = parse_full_element_signature(configuration_elem)["elements"]
+        element_info["elements"] = parse_object_signature_raw(configuration_elem)["elements"]
         element_info["type"] = elem.default
-
 
     return element_info
 
+def parse_object_signature(base_object: Any, use_examples_for_default: Optional[list]=None, exclude_attr: Optional[list]=None ) -> dict:
+
+    signature_raw = parse_object_signature_raw(base_object)
+    documentation_dict = parse_raw_object_signature(
+        object_signature=signature_raw,
+        use_examples_for_default=use_examples_for_default,
+        exclude_attr=exclude_attr
+    )
+    return documentation_dict
 
 
-def dict_to_markdown(root_dict, level=1, elements_to_exclude=None, children_to_exclude=None):
+
+def object_signature_to_markdown(root_dict, level=1, elements_to_exclude=None, children_to_exclude=None):
     """
     Convert a nested dictionary structure into a markdown formatted string.
 
@@ -405,10 +404,7 @@ def dict_to_markdown(root_dict, level=1, elements_to_exclude=None, children_to_e
 
     return nested_dict_to_markdown(root_dict, level=level)
 
-def parse_docsdict_to_defaultconfig(data, use_examples_for_default=None, exclude_attr=None):
-    """
-    Recursive function to parse the dictionary into the desired YAML structure
-    """
+def parse_raw_object_signature(object_signature, use_examples_for_default=None, exclude_attr=None):
     use_examples_for_default = use_examples_for_default or []
     exclude_attr = exclude_attr or []
 
@@ -462,11 +458,10 @@ def parse_docsdict_to_defaultconfig(data, use_examples_for_default=None, exclude
             parsed[name] = info_dict
         return parsed
 
-    parsed = parse_elements(data['elements'])
+    parsed = parse_elements(object_signature['elements'])
     if parsed is None:
         parsed = {}
     return parsed
-
 
 
 def find_ts_recursively(root_ts, ts_names):
@@ -526,7 +521,7 @@ def default_config_to_dict(default_config):
 
     return default_config
 
-def default_config_to_yaml(default_config):
+def object_signature_to_yaml(default_config):
     """Convert the default configuration dictionary to a YAML string.
 
     Args:
@@ -544,7 +539,7 @@ def build_markdown(root_class, persist: bool = True, elements_to_exclude=None, c
     Builds standards portfolio configuration documentation
     Returns:
     """
-    parsed_documentation = parse_full_element_signature(root_class)
+    parsed_documentation = parse_object_signature_raw(root_class)
 
     # Iteratively go through the structure to set the signal weights names
     for element in parsed_documentation.get('elements', []):
@@ -556,7 +551,7 @@ def build_markdown(root_class, persist: bool = True, elements_to_exclude=None, c
                             weight_config['default'] = "MarketCap"
                             break
 
-    portfolio_config = dict_to_markdown(
+    portfolio_config = object_signature_to_markdown(
         parsed_documentation,
         children_to_exclude=children_to_exclude,
         elements_to_exclude=elements_to_exclude,
@@ -569,27 +564,24 @@ def get_default_documentation(exclude_arguments=None):
     if exclude_arguments is None:
         exclude_arguments = [
                 "tracking_funds_expected_exposure_from_latest_holdings",
-                "portfolio_tdag_update_configuration",
                 "builds_from_target_positions",
                 "is_live"
         ]
     from mainsequence.virtualfundbuilder.models import PortfolioConfiguration
-    element_signature = parse_full_element_signature(PortfolioConfiguration)
-
-    documentation_dict = parse_docsdict_to_defaultconfig(
-        data=element_signature,
+    object_signature = parse_object_signature(
+        base_object=PortfolioConfiguration,
         use_examples_for_default=["asset_universe"],
         exclude_attr=exclude_arguments
     )
 
-    default_config = default_config_to_yaml(documentation_dict)
+    default_yaml = object_signature_to_yaml(object_signature)
 
-    markdown = build_markdown(
+    markdown_documentation = build_markdown(
         elements_to_exclude=exclude_arguments,
         root_class=PortfolioConfiguration
     )
 
-    return {"default_config": default_config, "markdown": markdown, "documentation_dict": documentation_dict}
+    return {"default_config": default_yaml, "markdown": markdown_documentation, "documentation_dict": object_signature}
 
 def extract_code(output_string):
     import re
@@ -608,80 +600,6 @@ def _convert_unknown_to_string(obj):
         return str(obj)
     except Exception:
         raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
-
-
-def _send_strategy_to_registry(strategy_type, strategy_class, is_jupyter=False, is_production=False):
-    """Helper function to send the strategy payload to the registry."""
-    assert os.environ.get("TDAG_ENDPOINT", None), "TDAG_ENDPOINT is not set"
-
-    def _get_wrapped_or_init(strategy_class):
-        """Returns the wrapped __init__ method if it exists, otherwise returns the normal __init__."""
-        init_method = strategy_class.__init__
-        return getattr(init_method, '__wrapped__', init_method)
-
-    init_method = _get_wrapped_or_init(strategy_class)
-    signal_signature = parse_full_element_signature(init_method)
-    signal_defaultconfig = parse_docsdict_to_defaultconfig(signal_signature, use_examples_for_default=["asset_universe"])
-    signal_markdown = build_markdown(
-        children_to_exclude=["front_end_details"],
-        root_class=init_method
-    )
-    signal_documentation_dict = parse_docsdict_to_defaultconfig(
-        data=signal_signature,
-        use_examples_for_default=["asset_universe"],
-    )
-
-    # get the init signature form class and parent class, might need to be generalized to all parents
-    exclude_arguments = ["is_live"]
-    parent_class = strategy_class.__mro__[1]
-    init_method_parent = _get_wrapped_or_init(parent_class)
-
-    parent_signature = parse_full_element_signature(init_method_parent)
-    parent_defaultconfig = parse_docsdict_to_defaultconfig(
-        parent_signature,
-        use_examples_for_default=["asset_universe"],
-        exclude_attr=exclude_arguments
-    )
-    signal_defaultconfig.update(parent_defaultconfig)
-
-    parent_documentation_dict = parse_docsdict_to_defaultconfig(
-        data=parent_signature,
-        use_examples_for_default=["asset_universe"],
-        exclude_attr=exclude_arguments
-    )
-    signal_documentation_dict.update(parent_documentation_dict)
-
-    parent_markdown = build_markdown(
-        children_to_exclude=["front_end_details"],
-        root_class=init_method_parent,
-        elements_to_exclude=exclude_arguments
-    )
-    signal_markdown += parent_markdown
-    element_signature = default_config_to_yaml(signal_defaultconfig)
-
-    if is_jupyter:
-        code = strategy_class.get_source_notebook()
-    else:
-        code = inspect.getsource(strategy_class)
-
-    payload = {
-        "strategy_type": strategy_type.value,
-        "strategy_name": strategy_class.__name__,
-        "parsed_signature": element_signature,
-        "strategy_documentation": signal_markdown,
-        "strategy_documentation_dict": signal_documentation_dict,
-        "code": code,
-    }
-    logger.debug(f"Register signal: {strategy_class.__name__}")
-    payload = json.loads(json.dumps(payload, default=_convert_unknown_to_string))
-    headers = {"Content-Type": "application/json"}
-    try:
-
-        response = register_strategy(json_payload=payload)
-        if response.status_code not in [200, 201]:
-            print(response.text)
-    except Exception as e:
-        logger.warning(f"Could register strategy to TSORM {e}")
 
 def is_jupyter_environment():
     try:

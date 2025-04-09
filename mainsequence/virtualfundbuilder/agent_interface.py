@@ -1,4 +1,5 @@
 import copy
+import inspect
 import json
 import os
 import traceback
@@ -6,9 +7,10 @@ from pathlib import Path
 
 import yaml
 
-from mainsequence.virtualfundbuilder.enums import StrategyType
+from mainsequence.virtualfundbuilder.enums import ResourceType
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
-from mainsequence.virtualfundbuilder.utils import _send_strategy_to_registry, is_jupyter_environment
+from mainsequence.virtualfundbuilder.utils import is_jupyter_environment
+from .resource_factory.base_factory import send_default_configuration, send_resource_to_backend
 from .utils import logger
 
 
@@ -22,10 +24,28 @@ class TDAGAgent:
 
         # initialize default state once
         if not self.backend_registered:
-            VirtualFundLauncher().send_default_configuration()
+            send_default_configuration()
             self.backend_registered = True
 
         self.logger.info("Setup TDAG Agent successfull")
+
+    def query_agent(self, query):
+        try:
+            from mainsequence.client.models_tdag import query_agent
+            payload = {
+                "query": query,
+            }
+            response = query_agent(json_payload=payload)
+            if response.status_code not in [200, 201]:
+                raise Exception(response.text)
+
+            answer = response.json()["agent_response"]
+        except Exception as e:
+            self.logger.warning(f"Could not get answer from Agent {e}")
+            traceback.print_exc()
+            return None
+
+        return answer
 
     def generate_portfolio(self, cls, signal_description=None):
         full_signal_description = f"Create me a default portfolio using the {cls.__name__} signal."
@@ -34,7 +54,12 @@ class TDAGAgent:
         else:
             full_signal_description += f"Use NVDA, AAPL and GOOGL for the assets universe."
 
-        _send_strategy_to_registry(StrategyType.SIGNAL_WEIGHTS_STRATEGY, cls, is_jupyter=is_jupyter_environment(), is_production=False)
+        if is_jupyter_environment():
+            code = cls.get_source_notebook()
+        else:
+            code = inspect.getsource(cls)
+        attributes = {"code": code}
+        send_resource_to_backend(cls, attributes=attributes)
 
         payload = {
             "strategy_name": cls.__name__,

@@ -1,17 +1,17 @@
 import copy
 import pytz
-from typing import Union, Dict, List,Literal, Optional
+from typing import Union, Dict, List, Literal, Optional
 import pandas as pd
 import numpy as np
 import datetime
 import pandas_market_calendars as mcal
 
-from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList, APITimeSerie,data_source_pickle_path
-from mainsequence.client import(CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
-                                BACKEND_DETACHED, DataUpdates
-                                )
-from mainsequence.client import VAM_CONSTANTS as ASSET_ORM_CONSTANTS, ExecutionVenue
-from mainsequence.client import HistoricalBarsSource, DoesNotExist, Asset
+from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList, APITimeSerie, data_source_pickle_path
+from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
+                                 BACKEND_DETACHED, DataUpdates, AssetCategory
+                                 )
+from mainsequence.client import MARKETS_CONSTANTS, ExecutionVenue
+from mainsequence.client import HistoricalBarsSource, DoesNotExist, Asset, MarketsTimeSeriesDetails
 from mainsequence.tdag.time_series.utils import (
     string_frequency_to_minutes,
     string_freq_to_time_delta,
@@ -21,86 +21,43 @@ import os
 from tqdm import tqdm
 from joblib import Parallel, delayed
 
-from mainsequence.virtualfundbuilder.models import AssetsConfiguration, AssetUniverse, AssetFilter
+from mainsequence.virtualfundbuilder.models import AssetsConfiguration
 from mainsequence.virtualfundbuilder.utils import logger
 
 FULL_CALENDAR = "24/7"
 
-def get_prices_timeseries(assets_configuration: AssetsConfiguration):
+
+def get_interpolated_prices_timeseries(assets_configuration: AssetsConfiguration):
     """
     Creates a Wrapper Timeseries for an asset configuration.
     """
-    time_series_dict = {}
-
     prices_configuration = copy.deepcopy(assets_configuration).prices_configuration
-    is_live = prices_configuration.is_live
+    markets_time_series_unique_id_list = [p.unique_identifier for p in prices_configuration.markets_time_series]
+
     prices_configuration_kwargs = prices_configuration.model_dump()
     prices_configuration_kwargs.pop("is_live", None)
-
-    data_mode = ASSET_ORM_CONSTANTS.DATA_MODE_LIVE if is_live else  ASSET_ORM_CONSTANTS.DATA_MODE_BACKTEST
-
-    asset_universe = assets_configuration.asset_universe
-    venue_asset_filters_map = asset_universe.get_filters_per_execution_venue()
-    for execution_venue, asset_filters in venue_asset_filters_map.items():
-        tmp_universe = AssetUniverse(asset_filters=asset_filters)
-        time_series_dict[execution_venue] = InterpolatedPrices(
-            execution_venue_symbol=execution_venue,
-            asset_universe=tmp_universe,
-            data_mode=data_mode,
-            **prices_configuration_kwargs
-        )
-
-    return WrapperTimeSerie(time_series_dict=time_series_dict)
+    prices_configuration_kwargs.pop("markets_time_series", None)
+    return InterpolatedPrices(
+        asset_category_unique_id=assets_configuration.assets_category_unique_id,
+        markets_time_series_unique_id_list=markets_time_series_unique_id_list,
+        **prices_configuration_kwargs
+    )
 
 
-
-def get_prices_source(source:str, bar_frequency_id,
-                      asset_filters: Optional[List[AssetFilter]]=None,
-                      is_train: bool = True):
+def get_time_serie_from_markets_unique_id(market_time_serie_unique_identifier: str):
     """
     Returns the appropriate bar time series based on the asset list and source.
     """
-    if source in [ASSET_ORM_CONSTANTS.MAIN_SEQUENCE_PORTFOLIOS_EV]:
-        raise NotImplementedError
-        if is_train:
-            backtest_time_series={}
-            for asset in asset_list:
-                data_source = DynamicTableDataSource.get(asset.backtest_portfolio_data_source_id)
-                pp = data_source_pickle_path(data_source.id)
-                if os.path.isfile(pp) == False:
-                    data_source.persist_to_pickle(pp)
-                backtest_time_series[asset.id], pickle_path = TimeSerie.rebuild_and_set_from_local_hash_id(
-                    local_hash_id=asset.backtest_portfolio.local_time_serie_hash_id,
-                    data_source_id =data_source.id,
-                    graph_depth_limit=-1,
-                )
-            return WrapperTimeSerie(time_series_dict=backtest_time_series)
-        else:
-            live_time_series = {}
-            for asset in asset_list:
-                data_source = DynamicTableDataSource.get(asset.live_portfolio_data_source_id)
-                pp = data_source_pickle_path(data_source.id)
-                if os.path.isfile(pp) == False:
-                    data_source.persist_to_pickle(pp)
-                live_time_series[asset.id], pickle_path =  TimeSerie.rebuild_and_set_from_local_hash_id(
-                                                            local_hash_id=asset.live_portfolio.local_time_serie_hash_id,
-                                                            data_source_id =data_source.id,
-                                                            graph_depth_limit=-1,
-                                                        )
-
-            return WrapperTimeSerie(time_series_dict=live_time_series)
-
-    else:
-        data_mode = ASSET_ORM_CONSTANTS.DATA_MODE_BACKTEST if is_train else ASSET_ORM_CONSTANTS.DATA_MODE_LIVE
-        try:
-            hbs = HistoricalBarsSource.get(execution_venues__symbol=source, data_frequency_id=bar_frequency_id,
-                                           data_mode=data_mode, adjusted=True)
-        except DoesNotExist as e:
-            logger.exception(f"HistoricalBarsSource does not exist for {source} -{bar_frequency_id} {data_mode}")
-            raise e
-        api_ts = APITimeSerie(data_source_id=hbs.related_local_time_serie.data_source_id,
-                              local_hash_id=hbs.related_local_time_serie.local_hash_id)
-        return api_ts
+    try:
+        hbs = MarketsTimeSeriesDetails.get(unique_identifier=market_time_serie_unique_identifier)
+    except DoesNotExist as e:
+        logger.exception(f"HistoricalBarsSource does not exist for {market_time_serie_unique_identifier}")
+        raise e
+    api_ts = APITimeSerie(
+        data_source_id=hbs.related_local_time_serie.data_source_id,
+        local_hash_id=hbs.related_local_time_serie.local_hash_id
+    )
+    return api_ts
 
 
 class UpsampleAndInterpolation:
@@ -344,8 +301,7 @@ def interpolate_daily_bars(
     restricted_schedule = calendar_instance.schedule(bars_df.index.min(),
                                                      bars_df.index.max())  # This needs to be faster
     restricted_schedule = restricted_schedule.reset_index()
-    market_type="market_open" #as bars observation date is at max a close we need to restrick the  scheduler to be at max open
-   
+    market_type = "market_open"  # as bars observation date is at max a close we need to restrick the  scheduler to be at max open
 
     restricted_schedule = restricted_schedule.set_index(market_type)
     full_index = bars_df.index.union(restricted_schedule.index)
@@ -440,8 +396,7 @@ def interpolate_intraday_bars(
             except Exception as e:
                 raise e
 
-        #interpolate any other columns with 0
-
+        # interpolate any other columns with 0
 
         return x
 
@@ -525,27 +480,25 @@ class InterpolatedPrices(TimeSerie):
     Handles interpolated prices for assets.
     """
     OFFSET_START = datetime.datetime(2017, 7, 20).replace(tzinfo=pytz.utc)
+
     @TimeSerie._post_init_routines()
     def __init__(
             self,
-            execution_venue_symbol:str,
-            asset_universe:AssetUniverse,
+            asset_category_unique_id: str,
             bar_frequency_id: str,
             intraday_bar_interpolation_rule: str,
-            data_mode: Literal["live", "backtest"],
+            markets_time_series_unique_id_list: str,
             upsample_frequency_id: Optional[str] = None,
-            asset_filter:Optional[dict] = None,
-            local_kwargs_to_ignore: List[str] = ["asset_universe"],
+            asset_filter: Optional[dict] = None,
+            local_kwargs_to_ignore: List[str] = ["asset_category_unique_id"],
             *args,
             **kwargs
     ):
-
         """
         Initializes the InterpolatedPrices object.
         """
         assert "d" in bar_frequency_id or "m" in bar_frequency_id, f"bar_frequency_id={bar_frequency_id} should be 'd for days' or 'm for min'"
-        self.data_mode=data_mode
-        self.asset_universe = asset_universe
+        self.asset_category_unique_id = asset_category_unique_id
         self.interpolator = UpsampleAndInterpolation(
             bar_frequency_id=bar_frequency_id,
             upsample_frequency_id=upsample_frequency_id,
@@ -555,36 +508,21 @@ class InterpolatedPrices(TimeSerie):
         self.intraday_bar_interpolation_rule = intraday_bar_interpolation_rule
         self.bar_frequency_id = bar_frequency_id
         self.upsample_frequency_id = upsample_frequency_id
+        self.markets_time_series_unique_id_list=markets_time_series_unique_id_list
 
 
+        price_source = {mud: get_time_serie_from_markets_unique_id(
+            market_time_serie_unique_identifier=mud) for mud in markets_time_series_unique_id_list}
+        self.bars_ts = WrapperTimeSerie(time_series_dict=price_source)
 
-        self.execution_venue_symbol = execution_venue_symbol
-        price_source = get_prices_source(
-            asset_filters=asset_universe.asset_filters,
-            bar_frequency_id=bar_frequency_id,
-            source=self.execution_venue_symbol, is_train=True
-        )
-        self.bars_ts = (
-            WrapperTimeSerie(time_series_dict=price_source) if isinstance(price_source, dict) else price_source
-        )
 
-        self.set_asset_details()
         super().__init__(*args, **kwargs)
 
     def get_html_description(self) -> Union[str, None]:
-        description = f"""<p>{self.data_mode} Time Serie Instance of {self.__class__.__name__} updating table {self.remote_table_hashed_name} for for <b>train</b> prices in <b>{self.execution_venue_symbol}</b> for backtesting</p>"""
+        description = f"""<p>Time Serie Instance of {self.__class__.__name__} updating table {self.remote_table_hashed_name} for for <b>train</b> prices in <b>{self.execution_venue_symbol}</b> for backtesting</p>"""
         return description
 
-    def set_asset_details(self):
-        asset_list = self.asset_universe.asset_list
-        if len(asset_list) == 0:
-            raise Exception(f"Asset universe has no assets {self.asset_universe}")
 
-        equal_venue = [a.execution_venue.symbol == self.execution_venue_symbol for a in asset_list]
-        assert all(equal_venue), "InterpolatedPrices should have only one type of execution_venue"
-
-        self.asset_calendar_map = {a.unique_identifier: a.calendar for a in asset_list}
-        self.asset_list = asset_list
 
     def _get_required_cores(self, last_observation_map) -> int:
         """
@@ -602,7 +540,7 @@ class InterpolatedPrices(TimeSerie):
         """
         Returns a human-readable string representation of the object.
         """
-        name = f"{self.__class__.__name__} Upsample: {self.upsample_frequency_id} in {self.execution_venue_symbol}"
+        name = f"{self.__class__.__name__} Upsample: {self.upsample_frequency_id} {self.markets_time_series_unique_id_list}"
         return name
 
     def run_after_post_init_routines(self):
@@ -611,20 +549,21 @@ class InterpolatedPrices(TimeSerie):
         """
         if BACKEND_DETACHED():
             return None
-        
+
         try:
             if self.metadata is None:
                 return None
         except LocalTimeSeriesDoesNotExist:
             return None  # first update
 
-        if self.execution_venue_symbol!= ASSET_ORM_CONSTANTS.MAIN_SEQUENCE_PORTFOLIOS_EV:
 
-            if not self.metadata.protect_from_deletion:
-                self.local_persist_manager.protect_from_deletion()
 
-            if not self.metadata.open_for_everyone:
-                self.local_persist_manager.open_for_everyone()
+
+        if not self.metadata.protect_from_deletion:
+            self.local_persist_manager.protect_from_deletion()
+
+        if not self.metadata.open_for_everyone:
+            self.local_persist_manager.open_for_everyone()
 
     def _transform_raw_data_to_upsampled_df(
             self,
@@ -696,13 +635,12 @@ class InterpolatedPrices(TimeSerie):
         if len(upsampled_df) == 0:
             return pd.DataFrame()
 
-        max_value_per_asset = {d.index.max():d.unique_identifier.iloc[0] for d in upsampled_df}
-        min_max=min(max_value_per_asset.keys())
+        max_value_per_asset = {d.index.max(): d.unique_identifier.iloc[0] for d in upsampled_df}
+        min_max = min(max_value_per_asset.keys())
         self.logger.info(f"min_max {max_value_per_asset[min_max]} {min_max} max_max {max(max_value_per_asset.keys())}")
         upsampled_df = pd.concat(upsampled_df, axis=0)
         # upsampled_df = upsampled_df[upsampled_df.index <= min_max]
         upsampled_df.volume = upsampled_df.volume.fillna(0)
-
 
         upsampled_df.index.name = "time_index"
         upsampled_df = upsampled_df.set_index("unique_identifier", append=True)
@@ -733,36 +671,11 @@ class InterpolatedPrices(TimeSerie):
         if isinstance(self.bars_ts, WrapperTimeSerie):
             raw_data_df = []
             for k, ts in self.bars_ts.related_time_series.items():
-                if isinstance(ts, PortfolioStrategy) == False:
-                    raise NotImplementedError
-                tmp_data = unique_identifier_range_map[asset_id_map[k]]
+                tmp_data = ts.filter_by_assets_ranges(
+                    unique_identifier_range_map=unique_identifier_range_map)
+                raw_data_df.append(tmp_data)
+            raw_data_df=pd.concat(raw_data_df,axis=0)
 
-                tmp_df = ts.get_df_between_dates(
-                    start_date=tmp_data["start_date"],
-                    great_or_equal=(tmp_data["start_date_operand"] == ">="),
-
-                )
-
-                tmp_df["unique_identifier"] = asset_id_map[k]
-                tmp_df = tmp_df.set_index(["unique_identifier"], append=True)
-
-                tmp_df = tmp_df.rename(columns={"portfolio_minus_fees": "close"})
-                tmp_df["vwap"] = tmp_df["close"]
-                tmp_df["open"] = tmp_df["close"]
-                tmp_df["high"] = tmp_df["close"]
-                tmp_df["low"] = tmp_df["close"]
-                tmp_df["volume"] = 1.0
-                tmp_df["first_trade_time"] = tmp_df.index.get_level_values("time_index")
-                tmp_df["last_trade_time"] = tmp_df.index.get_level_values("time_index")
-                tmp_df["open_time"] = tmp_df.index.get_level_values("time_index") - string_freq_to_time_delta(
-                    ts.assets_configuration.prices_configuration.bar_frequency_id)
-
-                raw_data_df.append(tmp_df[["vwap", "open", "close", "high", "low", "volume", "first_trade_time",
-                                           "last_trade_time", "open_time"]])
-            raw_data_df = pd.concat(raw_data_df, axis=0)
-
-        else:
-            raw_data_df = self.bars_ts.filter_by_assets_ranges(unique_identifier_range_map=unique_identifier_range_map)
 
         if raw_data_df.shape[0] == 0:
             self.logger.info("New new data to interpolate")
@@ -773,6 +686,16 @@ class InterpolatedPrices(TimeSerie):
         )
         return upsampled_df
 
+    def _get_asset_list(self):
+        """
+        Creates mappings from symbols to IDs
+
+        """
+
+        asset_category = AssetCategory.get(unique_identifier=self.asset_category_unique_id)
+        asset_list = Asset.filter_with_asset_class(id__in= asset_category.assets)
+        self.asset_calendar_map = {a.unique_identifier: a.calendar for a in asset_list}
+        return asset_list
     def update(
             self,
             update_statistics: DataUpdates
@@ -780,19 +703,17 @@ class InterpolatedPrices(TimeSerie):
         """
         Updates the series from the source based on the latest value.
         """
-
-
         prices = self.get_upsampled_data(
             update_statistics=update_statistics,
         )
 
-        if update_statistics.is_empty()==False:
-            TARGET_COLS=['open', 'close', 'high', 'low', 'volume', 'vwap', 'open_time']
+        if update_statistics.is_empty() == False:
+            TARGET_COLS = ['open', 'close', 'high', 'low', 'volume', 'vwap', 'open_time']
             assert prices[[c for c in prices.columns if c in TARGET_COLS]].isnull().sum().sum() == 0
 
         prices = update_statistics.filter_df_by_latest_value(prices)
 
-        duplicates_exist = prices.reset_index().duplicated(subset=["time_index","unique_identifier"]).any()
+        duplicates_exist = prices.reset_index().duplicated(subset=["time_index", "unique_identifier"]).any()
         if duplicates_exist:
             raise Exception()
 
@@ -865,7 +786,7 @@ class InterpolatedPricesLive():
             AND bucket < '{end_request}' AND symbol IN ({symbols})
         """
 
-        connection_uri=self.data_source.get_connection_uri()
+        connection_uri = self.data_source.get_connection_uri()
 
         try:
             with psycopg2.connect(connection_config['connection_details']) as conn:
@@ -905,14 +826,15 @@ class InterpolatedPricesLive():
 
     def update(
             self,
-            update_statistics:DataUpdates
+            update_statistics: DataUpdates
     ) -> pd.DataFrame:
         """
         Updates the series from the source based on the latest value.
         """
         #
-        if self.data_source.data_type!=CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-            self.logger.warning(f"This time serie cant be updated with a data source of type {self.data_source.data_type}")
+        if self.data_source.data_type != CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+            self.logger.warning(
+                f"This time serie cant be updated with a data source of type {self.data_source.data_type}")
             return pd.DataFrame()
         # If no latest value, start updating from the most recent 24 hours
         if latest_value is None:
@@ -934,7 +856,3 @@ class InterpolatedPricesLive():
             prices = prices[prices.index.get_level_values(level="time_index") > latest_value]
 
         return prices
-
-
-
-
