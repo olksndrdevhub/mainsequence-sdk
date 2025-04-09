@@ -96,21 +96,22 @@ class AssetMistMatch(Exception):
 
 
 class VolatilityControlConfiguration(BaseModel):
-    target_volatility: float
-    ewm_span: int
-    ann_factor: int
+    target_volatility: float = 0.1
+    ewm_span: int = 21
+    ann_factor: int = 252
 
 
 @register_signal_class(register_in_agent=True)
 class MarketCap(WeightsBase, TimeSerie):
     @TimeSerie._post_init_routines()
-    def __init__(self, historical_market_cap_ts_unique_identifier: str,
+    def __init__(self,
+                 volatility_control_configuration: VolatilityControlConfiguration,
+                 historical_market_cap_ts_unique_identifier: str = "polygon_historical_markecap",
                  minimum_atvr_ratio: float = .1,
                  rolling_atvr_volume_windows: List[int] = [60, 360],
                  frequency_trading_percent: float = .9,
                  source_frequency: str = "1d",
                  min_number_of_assets: int = 3,
-                 volatility_control_configuration: Optional[VolatilityControlConfiguration] = None,
                  num_top_assets: Optional[int] = None, *args, **kwargs):
         """
         Signal Weights using weighting by Market Capitalization or Equal Weights
