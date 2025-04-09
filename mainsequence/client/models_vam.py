@@ -429,8 +429,6 @@ class TargetPortfolioIndexAsset(IndexAsset):
     def reference_portfolio_details_url(self):
         return f"{TDAG_ENDPOINT}/dashboards/portfolio-detail/?target_portfolio_id={self.reference_portfolios.id}"
 
-   
-
 class AssetCurrencyPair(AssetMixin, BasePydanticModel):
     base_asset: Union[AssetMixin, int]
     quote_asset: Union[AssetMixin, int]

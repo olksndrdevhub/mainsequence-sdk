@@ -96,21 +96,22 @@ class AssetMistMatch(Exception):
 
 
 class VolatilityControlConfiguration(BaseModel):
-    target_volatility: float
-    ewm_span: int
-    ann_factor: int
+    target_volatility: float = 0.1
+    ewm_span: int = 21
+    ann_factor: int = 252
 
 
 @register_signal_class(register_in_agent=True)
 class MarketCap(WeightsBase, TimeSerie):
     @TimeSerie._post_init_routines()
-    def __init__(self, historical_market_cap_ts_unique_identifier: str,
+    def __init__(self,
+                 volatility_control_configuration: VolatilityControlConfiguration,
+                 historical_market_cap_ts_unique_identifier: str = "polygon_historical_markecap",
                  minimum_atvr_ratio: float = .1,
                  rolling_atvr_volume_windows: List[int] = [60, 360],
                  frequency_trading_percent: float = .9,
                  source_frequency: str = "1d",
                  min_number_of_assets: int = 3,
-                 volatility_control_configuration: Optional[VolatilityControlConfiguration] = None,
                  num_top_assets: Optional[int] = None, *args, **kwargs):
         """
         Signal Weights using weighting by Market Capitalization or Equal Weights
@@ -139,7 +140,7 @@ class MarketCap(WeightsBase, TimeSerie):
         import json
         windows_str = ", ".join(str(window) for window in self.rolling_atvr_volume_windows)
         if self.volatility_control_configuration is not None:
-            volatility_details = self.volatility_control_configuration.model_dump_json()
+            volatility_details = self.volatility_control_configuration
             vol_message = f"The strategy uses the following volatility target configuration:\n{volatility_details}\n"
         else:
             vol_message = "The strategy does not use volatility control.\n"
@@ -193,7 +194,7 @@ class MarketCap(WeightsBase, TimeSerie):
         """
         asset_list = update_statistics.asset_list
         if len(asset_list) < self.min_number_of_assets:
-            raise AssetMistMatch(f"only {len(asset_list)} in asset_list minum are{self.min_number_of_assets} ")
+            raise AssetMistMatch(f"only {len(asset_list)} in asset_list minum are {self.min_number_of_assets} ")
 
         share_class_to_asset_map = {}
         for asset in asset_list:
@@ -262,6 +263,8 @@ class MarketCap(WeightsBase, TimeSerie):
         for window in self.rolling_atvr_volume_windows:
             # Compute the rolling median of volume over the window.
             rolling_median = dollar_volume_df.rolling(window=window, min_periods=1).median()
+
+            print("rolling median", rolling_median)
             # Annualize: assume 252 trading days per year.
             annual_factor = 252 # todo fix when prices are not daily
             annualized_traded_value = rolling_median * annual_factor
@@ -308,12 +311,12 @@ class MarketCap(WeightsBase, TimeSerie):
         if self.volatility_control_configuration is not None:
             log_returns = (np.log(mc_raw["price"])).diff()
 
-            ewm_vol = (log_returns * weights).sum(axis=1).ewm(span=self.volatility_control_configuration.ewm_span,
-                                                              adjust=False).std() * np.sqrt(self.volatility_control_configuration.ann_factor)
+            ewm_vol = (log_returns * weights).sum(axis=1).ewm(span=self.volatility_control_configuration["ewm_span"],
+                                                              adjust=False).std() * np.sqrt(self.volatility_control_configuration["ann_factor"])
 
-            scaling_factor = self.volatility_control_configuration.target_volatility / ewm_vol
-            scaling_factor = min(scaling_factor, 1.0)
-            weights = weights * scaling_factor
+            scaling_factor = self.volatility_control_configuration["target_volatility"] / ewm_vol
+            scaling_factor = scaling_factor.clip(upper=1.0)
+            weights = weights.mul(scaling_factor, axis=0)
 
         # 12. Reshape the weights to a long-form DataFrame if desired.
         signal_weights = weights.stack().rename("signal_weight").to_frame()

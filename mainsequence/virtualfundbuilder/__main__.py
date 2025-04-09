@@ -37,6 +37,7 @@ def update_job_status(status_message):
         return None
 
 def run_configuration(configuration_name):
+    # TODO legacy, remove with new RunNamedPortfolio app
     from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
     print("Run Timeseries Configuration")
     portfolio = PortfolioInterface.load_from_configuration(configuration_name)

@@ -26,10 +26,9 @@ class PortfolioInterface():
         """
         Initializes the portfolio strategy with the necessary configurations.
         """
-        # persist data source to pickle
         if configuration_name:
             self.check_valid_configuration_name(configuration_name)
-        self.build_purpose=build_purpose
+        self.build_purpose = build_purpose
         self.portfolio_config_template = portfolio_config_template
         self.portfolio_config = configuration_sanitizer(portfolio_config_template)
         self.configuration_name = configuration_name
@@ -62,29 +61,25 @@ class PortfolioInterface():
         os.environ["PATCH_BUILD_CONFIGURATION"] = patch
         self._is_initialized = True
 
-    def build_target_portfolio_in_backend(self,portfolio_tags=None) -> TargetPortfolio:
+    def build_target_portfolio_in_backend(self, portfolio_tags=None) -> TargetPortfolio:
         """
         This method creates a portfolio in VAM with configm file settings.
 
         Returns:
         """
-        portfolio_tags=None
         from mainsequence.client import TargetPortfolioIndexAsset
         if not self._is_initialized:
             self._initialize_nodes()
 
         portfolio_ts = self.portfolio_strategy_time_serie
 
-        def build_markets_portfolio(ts,build_purpose):
+        def build_markets_portfolio(ts, build_purpose):
             from mainsequence.client import BACKEND_DETACHED
 
             # when is live target portfolio
-
             signal_weights_ts = ts.signal_weights
-            
-            #portfolio configuration
 
-            #timeseries can be running in local lake so need to request  the id
+            #timeseries can be running in local lake so need to request the id
             if BACKEND_DETACHED():
                 standard_kwargs = dict(is_asset_only=False,
                                        local_time_serie_id=0,
@@ -92,7 +87,6 @@ class PortfolioInterface():
                                        is_active=True,
                                        signal_local_time_serie_id=0,
                                        build_purpose=build_purpose,
-
                                        )
                 #need to pickle because there is not local met
                 ts.persist_to_pickle(overwrite=True)
@@ -110,7 +104,7 @@ class PortfolioInterface():
             standard_kwargs.update(user_kwargs)
 
             standard_kwargs["available_in_venues__symbols"] = ts.get_required_execution_venues()
-            standard_kwargs["calendar_name"]=self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
+            standard_kwargs["calendar_name"] = self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
                                                         "calendar"]
             if BACKEND_DETACHED():
                 standard_kwargs["available_in_venues"] = [0]
@@ -127,8 +121,6 @@ class PortfolioInterface():
 
             standard_kwargs["backtest_table_time_index_name"] = "time_index"
             standard_kwargs["backtest_table_price_column_name"] = "portfolio"
-            # if portfolio_tags is not None:
-            #     standard_kwargs["tags"] = portfolio_tags
 
             target_portfolio = TargetPortfolio.get_or_none(local_time_serie__id=ts.local_metadata.id)
             if target_portfolio is None:
@@ -242,7 +234,7 @@ class PortfolioInterface():
 
         portfolio_config = PortfolioConfiguration.read_portfolio_configuration_from_yaml(config_file)
 
-        portfolio = cls(portfolio_config, configuration_name)
+        portfolio = cls(portfolio_config_template=portfolio_config, configuration_name=configuration_name)
         return portfolio
 
     @classmethod
