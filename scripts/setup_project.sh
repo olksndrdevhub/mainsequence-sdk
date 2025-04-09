@@ -94,9 +94,8 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   cp -a "/opt/code/mainsequence-sdk/requirements.txt" "${ROOT_PROJECT_PATH}/requirements.txt" || echo "WARNING: Copy requirements step failed!"
   cp -a /opt/code/mainsequence-sdk/mainsequence/virtualfundbuilder/contrib/time_series/* "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy TimeSeries step failed!"
   cp -a /opt/code/mainsequence-sdk/mainsequence/virtualfundbuilder/contrib/rebalance_strategies/* "$VFB_PROJECT_PATH/rebalance_strategies" || echo "WARNING: Copy Rebalance Strategies step failed!"
-  cp -a /opt/code/mainsequence-sdk/mainsequence/virtualfundbuilder/contrib/apps/* "$VFB_PROJECT_PATH/apps" || echo "WARNING: Copy apps step failed!"
-  cp -a /opt/code/mainsequence-sdk/mainsequence/virtualfundbuilder/contrib/configurations/* "$VFB_PROJECT_PATH/configurations" || echo "WARNING: Copy configurations step failed!"
-  cp -a /opt/code/mainsequence-sdk/examples/time_series/* "$VFB_PROJECT_PATH/time_series" || echo "WARNING: Copy Example TimeSeries step failed!"
+  cp -a /opt/code/mainsequence-sdk/examples/configurations/* "$VFB_PROJECT_PATH/configurations" || echo "WARNING: Copy configurations step failed!"
+  cp -a /opt/code/mainsequence-sdk/examples/apps/* "$VFB_PROJECT_PATH/apps" || echo "WARNING: Copy Example apps step failed!"
 
   echo "Adding/Updating .gitignore..."
   echo ".ipynb_checkpoints" > "$ROOT_PROJECT_PATH/.gitignore"

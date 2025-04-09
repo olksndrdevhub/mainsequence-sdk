@@ -1,5 +1,5 @@
 __version__ = '0.1.0'
-from dotenv import load_dotenv
+
 from pathlib import Path
 import os
 import sys
@@ -33,9 +33,7 @@ def register_default_strategies():
     # Keep this in a function to not clutter the libs namespace
     import mainsequence.virtualfundbuilder.contrib.time_series
     import mainsequence.virtualfundbuilder.contrib.rebalance_strategies
-    import mainsequence.virtualfundbuilder.contrib.apps
-
 
 if os.getenv("PROJECT_LIBRARY_NAME") is None:
-    # TODO workaround for now, hack to make local execution work
+    # TODO workaround for now to make local execution work
     register_default_strategies()
