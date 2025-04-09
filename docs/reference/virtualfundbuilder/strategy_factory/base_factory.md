@@ -1,1 +1,0 @@
-::: mainsequence.virtualfundbuilder.strategy_factory.base_factory

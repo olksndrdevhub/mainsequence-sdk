@@ -1,0 +1,1 @@
+::: mainsequence.virtualfundbuilder.contrib.apps.news_app

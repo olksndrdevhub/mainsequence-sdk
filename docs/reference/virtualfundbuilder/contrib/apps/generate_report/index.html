@@ -5,10 +5,10 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
-<link href="http://127.0.0.1:8000/home/jose/code/MainSequenceClientSide/mainsequence-sdk/docs/reference/virtualfundbuilder/contrib/time_series/mock_signal/" rel="canonical"/>
+<link href="http://127.0.0.1:8000/home/jose/code/MainSequenceClientSide/mainsequence-sdk/docs/reference/virtualfundbuilder/contrib/apps/generate_report/" rel="canonical"/>
 <link href="../../../../../../../../../../../img/favico.ico" rel="icon"/>
 <meta content="mkdocs-1.6.1, mkdocs-material-9.5.44" name="generator"/>
-<title>Mock signal - Main Sequence SDK</title>
+<title>Generate report - Main Sequence SDK</title>
 <link href="../../../../../../../../../../../assets/stylesheets/main.0253249f.min.css" rel="stylesheet"/>
 <link href="../../../../../../../../../../../assets/stylesheets/palette.06af60db.min.css" rel="stylesheet"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -23,7 +23,7 @@
 <input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
 <label class="md-overlay" for="__drawer"></label>
 <div data-md-component="skip">
-<a class="md-skip" href="#mainsequence.virtualfundbuilder.contrib.time_series.mock_signal">
+<a class="md-skip" href="#mainsequence.virtualfundbuilder.contrib.apps.generate_report">
           Skip to content
         </a>
 </div>
@@ -47,7 +47,7 @@
 <div class="md-header__topic" data-md-component="header-topic">
 <span class="md-ellipsis">
             
-              Mock signal
+              Generate report
             
           </span>
 </div>
@@ -860,30 +860,44 @@
     </label>
 <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.virtualfundbuilder.contrib.time_series.mock_signal">
+<a class="md-nav__link" href="#mainsequence.virtualfundbuilder.contrib.apps.generate_report">
 <span class="md-ellipsis">
-      mock_signal
+      generate_report
     </span>
 </a>
-<nav aria-label="mock_signal" class="md-nav">
+<nav aria-label="generate_report" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.virtualfundbuilder.contrib.time_series.mock_signal.MockSignal">
+<a class="md-nav__link" href="#mainsequence.virtualfundbuilder.contrib.apps.generate_report.ReportApp">
 <span class="md-ellipsis">
-      MockSignal
+      ReportApp
     </span>
 </a>
-<nav aria-label="MockSignal" class="md-nav">
+<nav aria-label="ReportApp" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.virtualfundbuilder.contrib.time_series.mock_signal.MockSignal.update">
+<a class="md-nav__link" href="#mainsequence.virtualfundbuilder.contrib.apps.generate_report.ReportApp.run">
 <span class="md-ellipsis">
-      update
+      run
     </span>
 </a>
 </li>
 </ul>
 </nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#mainsequence.virtualfundbuilder.contrib.apps.generate_report.ReportConfig">
+<span class="md-ellipsis">
+      ReportConfig
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#mainsequence.virtualfundbuilder.contrib.apps.generate_report.example_data">
+<span class="md-ellipsis">
+      example_data
+    </span>
+</a>
 </li>
 </ul>
 </nav>
@@ -895,34 +909,57 @@
 </div>
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
-<h1>Mock signal</h1>
+<h1>Generate report</h1>
 <div class="doc doc-object doc-module">
-<h3 class="doc doc-heading" id="mainsequence.virtualfundbuilder.contrib.time_series.mock_signal">
-<code>mainsequence.virtualfundbuilder.contrib.time_series.mock_signal</code>
+<h3 class="doc doc-heading" id="mainsequence.virtualfundbuilder.contrib.apps.generate_report">
+<code>mainsequence.virtualfundbuilder.contrib.apps.generate_report</code>
 </h3>
 <div class="doc doc-contents first">
 <div class="doc doc-children">
 <div class="doc doc-object doc-class">
-<h4 class="doc doc-heading" id="mainsequence.virtualfundbuilder.contrib.time_series.mock_signal.MockSignal">
-<code>MockSignal</code>
+<h4 class="doc doc-heading" id="mainsequence.virtualfundbuilder.contrib.apps.generate_report.ReportApp">
+<code>ReportApp</code>
 </h4>
 <div class="doc doc-contents">
 <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" href="../../../resource_factory/signal_factory/#mainsequence.virtualfundbuilder.resource_factory.signal_factory.WeightsBase" title="mainsequence.virtualfundbuilder.resource_factory.signal_factory.WeightsBase">WeightsBase</a></code>, <code><a class="autorefs autorefs-internal" href="../../../../tdag/time_series/time_series/#mainsequence.tdag.time_series.time_series.TimeSerie" title="mainsequence.tdag.time_series.TimeSerie">TimeSerie</a></code></p>
-<p>Mock Signal to test strategies. Creates a signal with long/short of ETH and BTC in frequency.</p>
+              Bases: <code><span title="mainsequence.virtualfundbuilder.resource_factory.app_factory.BaseApp">BaseApp</span></code></p>
+<p>Minimal example of a 'ReportApp' that can:
+1) Generate dummy data and create charts (line + heatmap).
+2) Embed those charts into an HTML template.
+3) Optionally export the HTML to PDF using WeasyPrint.</p>
 <div class="doc doc-children">
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.virtualfundbuilder.contrib.time_series.mock_signal.MockSignal.update">
-<code class="highlight language-python"><span class="n">update</span><span class="p">(</span><span class="n">latest_value</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+<h5 class="doc doc-heading" id="mainsequence.virtualfundbuilder.contrib.apps.generate_report.ReportApp.run">
+<code class="highlight language-python"><span class="n">run</span><span class="p">()</span></code>
 </h5>
 <div class="doc doc-contents">
-<p>Args:
-    latest_value (Union[datetime, None]): The timestamp of the most recent data point.</p>
-<p>Returns:
-    DataFrame: A DataFrame containing updated signal weights, indexed by time and asset symbol.</p>
+<p>Generates an HTML report (and optional PDF) in a minimal, self-contained way.</p>
 </div>
 </div>
 </div>
+</div>
+</div>
+<div class="doc doc-object doc-class">
+<h4 class="doc doc-heading" id="mainsequence.virtualfundbuilder.contrib.apps.generate_report.ReportConfig">
+<code>ReportConfig</code>
+</h4>
+<div class="doc doc-contents">
+<p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+<p>Pydantic model defining the parameters for report generation.</p>
+<div class="doc doc-children">
+</div>
+</div>
+</div>
+<div class="doc doc-object doc-function">
+<h4 class="doc doc-heading" id="mainsequence.virtualfundbuilder.contrib.apps.generate_report.example_data">
+<code class="highlight language-python"><span class="n">example_data</span><span class="p">(</span><span class="n">assets</span><span class="p">)</span></code>
+</h4>
+<div class="doc doc-contents">
+<p>Fetch real data from the 'api_ts.get_df_between_dates()' call, then:
+  1) Build a time-series chart of 'Revenue' vs. time for each asset (ticker).
+  2) Build a correlation heatmap of 'Revenue' vs. 'EPS' for the latest time period.
+  3) Return both figures as Base64-encoded PNGs.</p>
 </div>
 </div>
 </div>

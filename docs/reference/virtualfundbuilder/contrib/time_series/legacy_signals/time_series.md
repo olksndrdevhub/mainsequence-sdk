@@ -1,1 +1,0 @@
-::: mainsequence.virtualfundbuilder.contrib.time_series.legacy_signals.time_series

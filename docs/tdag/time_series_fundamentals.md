@@ -38,11 +38,7 @@ flowchart TD
 The constructor (`__init__`) defines the initial state and configuration:
 
 ```python
-def __init__(self, init_meta=None,
-             build_meta_data: Union[dict, None] = None,
-             local_kwargs_to_ignore: Union[List[str], None] = None,
-             data_configuration_path: Union[str, None] = None,
-             *args, **kwargs):
+def __init__(self, *args, **kwargs):
     ...
 ```
 
@@ -58,20 +54,23 @@ The constructor arguments create two essential hashes that facilitate efficient 
 
 Some arguments are explicitly excluded from hashing:
 
-- **`init_meta`**: Arbitrary metadata used during initialization for convenience and clarity.
-- **`build_meta_data`**: Metadata recoverable anytime and editable from interfaces; useful for dynamic or interactive data handling.
+- **`init_meta`**: Arbitrary metadata used during initialization for convenience and clarity. **excluded from hashing**
+- **`build_meta_data`**: Metadata recoverable anytime and editable from the GUI; useful for dynamic or interactive data handling. **excluded from hashing**
 - **`local_kwargs_to_ignore`**: Arguments excluded from the `hash_id` calculation but included in `local_hash_id`, allowing flexibility in differentiating between datasets and update processes.
 
-### Decorator Usage
+### Post Init Decorator Usage
 
-Always decorate the constructor to ensure proper integration with TDAG:
+Always decorate the constructor to ensure proper integration with TDAG. 
+This decorator is responsible for executing all synchronization routines necessary to initialize the TDAG engine.
+
 
 ```python
 from mainsequence.tdag import TimeSerie
 
 class NewTimeSeries(TimeSerie):
+    
     @TimeSerie._post_init_routines
-    def __init__(self):
+    def __init__(self,*args,**kwargs):
         ...
 ```
 
@@ -112,41 +111,5 @@ def update(self, update_statistics: DataUpdates, *args, **kwargs) -> pd.DataFram
 Returned DataFrame requirements:
 
 - **Unidimensional index**: `DatetimeIndex` in `pytz.utc`.
-- **Multidimensional index**: three dimensions: `time_index`, `asset_symbol`, and `execution_venue_symbol`.
+- **Multidimensional index**: two dimensions: `time_index` in `pytz.utc`., `unique_identifier`.
 
-## Essential Helper Methods
-
-### Retrieving Data Between Dates
-
-The `get_df_between_dates` method fetches data from a specified date range:
-
-```python
-def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
-                         end_date: Union[datetime.datetime, None] = None,
-                         unique_identifier_list: Union[None, list] = None,
-                         great_or_equal=True, less_or_equal=True,
-                         unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None
-                         ) -> pd.DataFrame:
-```
-
-This method efficiently retrieves data within a specific range, accommodating various filtering scenarios by asset or time intervals.
-
-### Getting Last Observation
-
-```python
-def get_last_observation(self, asset_symbols: Union[None, list] = None):
-```
-
-Returns the most recent observation in the series.
-
-## WrapperTimeSerie Class
-
-`WrapperTimeSerie` allows collective management of multiple `TimeSerie` instances, facilitating scalable and efficient updates:
-
-```python
-class WrapperTimeSerie(TimeSerie):
-    @TimeSerie._post_init_routines()
-    def __init__(self, time_series_dict: Dict[str, TimeSerie], *args, **kwargs):
-```
-
-TDAG’s TimeSeries object simplifies managing complex data dependencies, ensuring efficiency, consistency, and maintainability in your data pipelines.

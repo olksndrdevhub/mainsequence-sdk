@@ -7,6 +7,11 @@ The **Main Sequence Python SDK** is a powerful set of client libraries designed 
 3. **VirtualFundBuilder:** A collection of classes and methods to quickly build portfolios and interact with our AI agents.
 4. **Examples:** A comprehensive collection of examples demonstrating how to build portfolios and interact with our AI agents.
 
+
+**We strongly** encourage you to go through our examples. We have built the examples as individual Jupyter notebooks that explain the SDK through use cases. Since most platform usage involves a combination of operations, this is the most intuitive way to learn about Main Sequence.
+
+
+
 ---
 
 ## How the Documentation is Organized
@@ -18,9 +23,6 @@ Additionally, we provide an extensive set of examples within the repository here
 
 The examples section is organized by use-case rather than by individual libraries.
 
-You can find a full video tutorial here:  
-[Example Repository](https://github.com/mainsequence-sdk/mainsequence-sdk/tree/main/mainsequence).
-
-Recordings of our previous bootcamps are also available here:  
-[Example Repository](https://github.com/mainsequence-sdk/mainsequence-sdk/tree/main/mainsequence).
+Recordings of our previous bootcamps will be available in our youtube channel:  
+[Example Repository](https://www.youtube.com/channel/UCHevDrKbbsoWuV4OjTHOrpA).
 
