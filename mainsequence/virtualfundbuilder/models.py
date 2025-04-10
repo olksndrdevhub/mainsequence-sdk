@@ -139,7 +139,7 @@ class PortfolioMarketsConfig(VFBConfigBaseModel):
         execution_configuration (VAMExecutionConfiguration): Execution configuration for VAM.
     """
     portfolio_name: str = "Portfolio Strategy Title"
-    front_end_details: Optional[FrontEndDetails]=None
+    front_end_details: Optional[FrontEndDetails] = None
     tracking_funds_expected_exposure_from_latest_holdings: bool = False
 
 class AssetMixinOverwrite(VFBConfigBaseModel):

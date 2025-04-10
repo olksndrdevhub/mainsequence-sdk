@@ -158,7 +158,7 @@ def send_resource_to_backend(resource_class, attributes: Optional[dict]=None):
 
     init_method = _get_wrapped_or_init(resource_class)
 
-    object_signature = parse_object_signature(init_method, use_examples_for_default=["asset_universe"])
+    object_signature = parse_object_signature(init_method, use_examples_for_default=[])
     markdown_documentation = build_markdown(
         children_to_exclude=["front_end_details"],
         root_class=init_method

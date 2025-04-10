@@ -14,11 +14,9 @@ dotenv.load_dotenv('../.env.dev')
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
 from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent
 
-Artifact.upload_file(filepath="/home/jose/code/MainSequenceClientSide/mainsequence-sdk/mainsequence/virtualfundbuilder/portfolio_templates/momentum_portfolio.py")
-
 tdag_agent = TDAGAgent()
 
-# from mainsequence.virtualfundbuilder.contrib.time_series import MarketCap
-# portfolio = tdag_agent.generate_portfolio(MarketCap, signal_description="Create me a market cap portfolio using AAPL and GOOG")
-# res = portfolio.run()
+from mainsequence.virtualfundbuilder.contrib.time_series import MarketCap
+portfolio = tdag_agent.generate_portfolio(MarketCap, signal_description="Create me a market cap portfolio using AAPL and GOOG")
+res = portfolio.run()
 # res.head()

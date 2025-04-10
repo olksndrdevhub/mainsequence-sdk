@@ -2,10 +2,7 @@ import logging
 from .models import *
 logger = get_vfb_logger()
 
-
-
-
-def replace_none_with_python_none(config):
+def replace_none_and_empty_dict_with_python_none(config):
     """
     Recursively replace all string 'None' with Python None in the given dictionary
     and log the path where replacements occur.
@@ -22,7 +19,10 @@ def replace_none_with_python_none(config):
         if isinstance(d, dict):
             for key, value in d.items():
                 current_path = f"{path}.{key}"
-                if isinstance(value, dict):
+                if isinstance(value, dict) and not value:
+                    d[key] = None
+                    logger.info(f"Replaced empty dict {{}} with Python None at: {current_path}")
+                elif isinstance(value, dict):
                     recursive_replace(value, current_path)
                 elif isinstance(value, list):
                     for i, item in enumerate(value):
@@ -30,6 +30,7 @@ def replace_none_with_python_none(config):
                 elif value == 'None':
                     d[key] = None
                     logger.info(f"Replaced 'None' in configuration with None at {current_path}")
+
         elif isinstance(d, list):
             for i, item in enumerate(d):
                 recursive_replace(item, f"{path}[{i}]")
@@ -40,67 +41,37 @@ def replace_none_with_python_none(config):
 def configuration_sanitizer(configuration: dict) -> PortfolioConfiguration:
     """
     Verifies that a configuration has all the required attributes.
-
-    If `auto_complete` is True, missing parts of the configuration will be auto-completed when possible.
-
     Args:
         configuration (dict): The configuration dictionary to sanitize.
-        auto_complete (bool, optional): Whether to auto-complete missing parts. Defaults to False.
-
     Returns:
         PortfolioConfiguration: The sanitized portfolio configuration.
     """
-
-    DEFAULT_TDAG_UPDATE_CONFIGURATION = {
-        'base_dependency_tree_update_details': {
-            'update_schedule': "*/1 * * * *",
-            'distributed_num_cpus': 1,
-            'execution_timeout_seconds': 50,
-        },
-        'base_classes_to_exclude': [],
-        'custom_update_details_per_class': {},
-    }
-
-
     configuration = copy.deepcopy(configuration)
-    # Review portfolio_build_configuration
-    configuration = replace_none_with_python_none(configuration)
+    configuration = replace_none_and_empty_dict_with_python_none(configuration)
     portfolio_build_config = configuration["portfolio_build_configuration"]
     for key in ["assets_configuration", "backtesting_weights_configuration", "execution_configuration"]:
         if key not in portfolio_build_config:
             raise KeyError(f"Missing required key {key}")
 
-    # Prices configuration review
     if portfolio_build_config["assets_configuration"] is not None:
         if "prices_configuration" not in portfolio_build_config["assets_configuration"]:
             raise Exception("Missing prices configuration in portfolio_build_config['assets_configuration']")
-
 
     if "rebalance_strategy_configuration" not in portfolio_build_config["backtesting_weights_configuration"]:
         raise Exception(
             "Missing 'rebalance_strategy_configuration' in 'backtesting_weights_configuration'"
         )
 
-
     if "calendar" not in portfolio_build_config["backtesting_weights_configuration"]["rebalance_strategy_configuration"] or not portfolio_build_config["backtesting_weights_configuration"]["rebalance_strategy_configuration"]["calendar"]:
         raise Exception(
             "Missing 'calendar' in 'rebalance_strategy_configuration'"
         )
-
-
 
     if "signal_weights_configuration" not in portfolio_build_config["backtesting_weights_configuration"]:
         raise Exception(
             "Missing 'signal_weights_configuration' in 'backtesting_weights_configuration'"
         )
 
-
-    configuration["portfolio_build_configuration"] = portfolio_build_config
-
-    # Review tdag configuration
-
-
-    # Review portfolio_markets_configuration
     portfolio_markets_config = configuration['portfolio_markets_configuration']
 
 
@@ -109,18 +80,12 @@ def configuration_sanitizer(configuration: dict) -> PortfolioConfiguration:
         raise Exception(
             "Missing 'tracking_funds_expected_exposure_from_latest_holdings' in portfolio_markets_config"
         )
-        portfolio_markets_config["tracking_funds_expected_exposure_from_latest_holdings"] = False
-
-    configuration['portfolio_markets_configuration'] = portfolio_markets_config
 
     if "signal_assets_configuration" not in portfolio_build_config['backtesting_weights_configuration']['signal_weights_configuration']:
         raise Exception(
             "Missing 'signal_weights_configuration' in 'backtesting_weights_configuration'"
         )
-        portfolio_build_config["assets_configuration"]
 
-
-    configuration["portfolio_markets_configuration"]['front_end_details'] = configuration["portfolio_markets_configuration"]['front_end_details']
     if "portfolio_prices_frequency" not in portfolio_build_config:
         raise Exception("Missing 'portfolio_prices_frequency' in 'portfolio_build_config'")
 

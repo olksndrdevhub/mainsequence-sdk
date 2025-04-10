@@ -569,7 +569,7 @@ def get_default_documentation(exclude_arguments=None):
     from mainsequence.virtualfundbuilder.models import PortfolioConfiguration
     object_signature = parse_object_signature(
         base_object=PortfolioConfiguration,
-        use_examples_for_default=["asset_universe"],
+        use_examples_for_default=[],
         exclude_attr=exclude_arguments
     )
 
