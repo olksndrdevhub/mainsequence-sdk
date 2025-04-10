@@ -154,7 +154,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
     delisted_datetime: Optional[datetime.datetime] = None
     unique_identifier: str
 
-    figi_details:FigiInfo
+    figi_details:Union[FigiInfo,int]
 
     @staticmethod
     def get_properties_from_unique_symbol(unique_symbol: str):
@@ -167,32 +167,6 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
     def execution_venue_symbol(self):
         return self.execution_venue.symbol
 
-    @classmethod
-    def switch_cash_asset(cls,asset_id,target_currency_asset:object):
-        url = f"{cls.get_object_url()}/{asset_id}/switch_cash_asset/"
-        payload=dict(params={"target_currency_asset_id": target_currency_asset.id})
-        r = make_request(s=cls.build_session(),loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
-
-        if r.status_code != 200:
-            raise Exception("Error switching cash asset")
-        return cls(**r.json())
-
-    @classmethod
-    def switch_cash_in_asset_list(cls, asset_id_list:list, target_currency_asset_id: int,timeout=None):
-        url = f"{cls.get_object_url()}/switch_cash_in_asset_list/"
-        payload = dict(json={"asset_id_list": asset_id_list,"target_currency_asset_id": target_currency_asset_id})
-        r = make_request(
-            s=cls.build_session(),
-            loaders=cls.LOADERS,
-            r_type="POST",
-            url=url,
-            payload=payload,
-            time_out=timeout
-        )
-
-        if r.status_code != 200:
-            raise Exception("Error switching cash asset")
-        return r.json()
 
     @classmethod
     def batch_upsert(cls, asset_config_list:list, execution_venue_symbol:str, asset_type:str, timeout=None):
@@ -213,17 +187,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
             raise Exception("Error inserting assets")
         return r.json()
 
-    def get_ccxt_symbol(self,settlement_symbol:Union[str,None]=None):
-        """
-        Gets the right symbol for ccxt
-        Returns
-        -------
 
-        """
-        if self.asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_USDM]:
-            return  f"{self.base_asset.symbol}/{self.quote_asset.symbol}:{self.quote_asset.symbol}"
-        else:
-            return  f"{self.symbol}/{settlement_symbol}:{settlement_symbol}"
 
     @classmethod
     def get_all_assets_on_positions(
@@ -311,7 +275,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
     unique_identifier: str
     display_name: str
     source: str
-    assets: List[int]
+    assets: List[Union[int,"Asset"]]
     organization_owner_uid: str
     description: Optional[str]=None
     
@@ -440,6 +404,10 @@ class AssetCurrencyPair(AssetMixin, BasePydanticModel):
     def get_ms_share_class(self):
         return self.base_asset.get_ms_share_class()
 
+
+
+
+
 class FutureUSDMMixin(AssetMixin, BasePydanticModel):
     maturity_code: str = Field(..., max_length=50)
     last_trade_time: Optional[datetime.datetime] = None
@@ -524,13 +492,6 @@ class AccountMixin(BasePydanticModel):
     def execution_venue_symbol(self):
         return self.execution_venue.symbol
 
-    def get_latest_income_record(self):
-        base_url = self.get_object_url()
-        url = f"{base_url}/{self.id}/last_income_record/"
-        r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="GET", url=url)
-        if r.status_code != 200:
-            raise Exception("Error Syncing funds in account")
-        return FundingFeeTransaction(**r.json())
 
     def get_nav(self):
         base_url = self.get_object_url()
