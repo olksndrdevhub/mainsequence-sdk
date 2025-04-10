@@ -65,25 +65,22 @@ class Group(BaseModel):
     permissions: List[Any]  # Adjust the type for permissions as needed
 
 class User(BaseObjectOrm,BasePydanticModel):
-    id: int
-    password: str
-    is_superuser: bool
+
     first_name: str
     last_name: str
-    is_staff: bool
-    is_active: bool
+    is_active:bool
     date_joined: datetime.datetime
     role: str
     username: str
     email: str
     last_login: datetime.datetime
     api_request_limit: int
-    mfa_secret: Optional[str]
     mfa_enabled: bool
     organization: Organization
     plan: Optional[Any]  # Use a specific model if plan details are available
     groups: List[Group]
     user_permissions: List[Any]  # Adjust as necessary for permission structure
+    phone_number:Optional[str]=None
 
     @classmethod
     def get_object_url(cls):
