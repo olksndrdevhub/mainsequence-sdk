@@ -782,7 +782,7 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
         default=False,
         description="Flag indicating if the system should track the funds' expected exposure based on the latest holdings. This is helpful when building your execution engine"
     )
-    available_in_venues: List[Union[int, ExecutionVenue]]
+    required_venues: List[Union[int, ExecutionVenue]]
     latest_weights:Optional[List[Dict]] =None
 
     creation_date: Optional[datetime.datetime] = None
@@ -799,6 +799,7 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             local_time_serie_id: int,
             signal_local_time_serie_id:int,
             is_active: bool ,
+            valuation_asset_id:int,
             required_venues__symbols:list[str],
             calendar_name: str,
             tracking_funds_expected_exposure_from_latest_holdings: bool,
@@ -822,6 +823,7 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             "tracking_funds_expected_exposure_from_latest_holdings": tracking_funds_expected_exposure_from_latest_holdings,
             "is_asset_only": is_asset_only,
             "target_portfolio_about": target_portfolio_about,
+            "valuation_asset_id":valuation_asset_id,
             "backtest_table_price_column_name": backtest_table_price_column_name,
             "tags": tags,
         }
@@ -829,8 +831,9 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": payload_data},time_out=timeout)
         if r.status_code not in [201]:
             raise Exception(f" {r.text}")
+        response=r.json()
 
-        return cls(**r.json())
+        return cls(**response["portfolio"]),TargetPortfolioIndexAsset(**response["portfolio_index_asset"])
 
     def add_venue(self,venue_id)->None:
         url = f"{self.get_object_url()}/{self.id}/add_venue/"
