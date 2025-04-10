@@ -563,14 +563,11 @@ def build_markdown(root_class, persist: bool = True, elements_to_exclude=None, c
 def get_default_documentation(exclude_arguments=None):
     if exclude_arguments is None:
         exclude_arguments = [
-                "tracking_funds_expected_exposure_from_latest_holdings",
-                "builds_from_target_positions",
-                "is_live"
         ]
     from mainsequence.virtualfundbuilder.models import PortfolioConfiguration
     object_signature = parse_object_signature(
         base_object=PortfolioConfiguration,
-        use_examples_for_default=["asset_universe"],
+        use_examples_for_default=[],
         exclude_attr=exclude_arguments
     )
 

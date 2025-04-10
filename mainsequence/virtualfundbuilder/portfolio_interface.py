@@ -103,11 +103,11 @@ class PortfolioInterface():
 
             standard_kwargs.update(user_kwargs)
 
-            standard_kwargs["available_in_venues__symbols"] = ts.get_required_execution_venues()
+            standard_kwargs["required_venues__symbols"] = ts.get_required_execution_venues()
             standard_kwargs["calendar_name"] = self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
                                                         "calendar"]
             if BACKEND_DETACHED():
-                standard_kwargs["available_in_venues"] = [0]
+                standard_kwargs["required_venues"] = [0]
                 standard_kwargs["id"] = ts.local_hash_id
                 return TargetPortfolio(**standard_kwargs)
 

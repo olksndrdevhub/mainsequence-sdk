@@ -770,7 +770,7 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     builds_from_target_positions: bool = False
     follow_account_rebalance: bool = False
     tracking_funds_expected_exposure_from_latest_holdings: bool = False
-    available_in_venues: List[Union[int, ExecutionVenue]]
+    required_venues: List[Union[int, ExecutionVenue]]
     latest_weights:Optional[List[Dict]] =None
 
     creation_date: Optional[datetime.datetime] = None
@@ -788,7 +788,7 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             local_time_serie_id: int,
             signal_local_time_serie_id:int,
             is_active: bool ,
-            available_in_venues__symbols:list[str],
+            required_venues__symbols:list[str],
             calendar_name: str,
             tracking_funds_expected_exposure_from_latest_holdings: bool,
             is_asset_only: bool,
@@ -808,7 +808,7 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             "local_time_serie_id": local_time_serie_id,
             "signal_local_time_serie_id": signal_local_time_serie_id,
             # Using the same ID for local_signal_time_serie_id as specified.
-            "available_in_venues__symbols": available_in_venues__symbols,
+            "required_venues__symbols": required_venues__symbols,
             "calendar_name": calendar_name,
             "tracking_funds_expected_exposure_from_latest_holdings": tracking_funds_expected_exposure_from_latest_holdings,
             "is_asset_only": is_asset_only,
