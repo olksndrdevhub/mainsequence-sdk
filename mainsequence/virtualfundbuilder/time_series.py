@@ -150,7 +150,7 @@ class PortfolioStrategy(TimeSerie):
         end_date = earliest_last_value
 
         # Handle case when latest_value is None
-        start_date = update_statistics.max_time_index_value
+        start_date = update_statistics.max_time_index_value or self.OFFSET_START
 
         # Adjust end_date based on max time difference variable if set
         max_td_env = os.getenv("MAX_TD_FROM_LATEST_VALUE", None)
@@ -402,9 +402,6 @@ rebalance details:"""
         Reason for interpolation: Prices might have a lower frequency that the index, so we need to ffill (e.g. daily signals and prices, but at different times, price at 8pm, MC signal at 0am)
         NOTE: prices should be upsampled the same way as new_index, no need to upsample
         """
-
-
-
         raw_prices = bars_ts.get_df_between_dates(start_date=new_index.min() - pd.Timedelta(index_freq),  end_date=new_index.max(), great_or_equal=True,
                 less_or_equal=True, unique_identifier_list=unique_identifier_list,).sort_values("time_index")
 

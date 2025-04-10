@@ -21,6 +21,7 @@ class RunPortfolio(BaseApp):
 
 class NamedPortfolioConfiguration(BaseModel):
     portfolio_name: str = "market_cap_example"
+    update_tree: bool = True
 
 @register_app()
 class RunNamedPortfolio(BaseApp):
@@ -33,9 +34,8 @@ class RunNamedPortfolio(BaseApp):
     def run(self) -> None:
         from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
         portfolio = PortfolioInterface.load_from_configuration(self.configuration.portfolio_name)
-        res = portfolio.run()
+        res = portfolio.run(update_tree=self.configuration.update_tree)
         logger.info(f"Portfolio Run successful with results {res.head()}")
-
 
 if __name__ == "__main__":
     configuration = NamedPortfolioConfiguration()
