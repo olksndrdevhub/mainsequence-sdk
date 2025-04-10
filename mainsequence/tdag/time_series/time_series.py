@@ -1100,12 +1100,8 @@ class TimeSerieRebuildMethods(ABC):
 
         update_statistics = self.set_update_statistics(update_statistics)
 
-
         try:
-        
             if must_update == True:
-              
-
                 max_update_time_days = os.getenv("TDAG_MAX_UPDATE_TIME_DAYS", None)
                 update_on_batches = False
                 if update_on_batches is not None:

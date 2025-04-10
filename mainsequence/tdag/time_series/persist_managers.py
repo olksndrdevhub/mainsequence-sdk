@@ -31,16 +31,23 @@ class APIPersistManager:
                              columns: Union[list, None] = None,
                              unique_identifier_range_map: Union[UniqueIdentifierRangeMap, None] = None,):
         filtered_data = self.local_metadata.get_data_between_dates_from_api(
-
                                                         start_date=start_date,
                                                         end_date=end_date, great_or_equal=great_or_equal,
                                                         less_or_equal=less_or_equal,
                                                         unique_identifier_list=unique_identifier_list,
                                                         columns=columns,
-                                                        unique_identifier_range_map=unique_identifier_range_map)
+                                                        unique_identifier_range_map=unique_identifier_range_map
+        )
 
         if len(filtered_data) == 0:
             logger.info(f"Data from {self.local_hash_id} is empty in request ")
+            logger.debug(
+                f"Calling get_data_between_dates_from_api with arguments: "
+                f"start_date={start_date}, end_date={end_date}, "
+                f"great_or_equal={great_or_equal}, less_or_equal={less_or_equal}, "
+                f"unique_identifier_list={unique_identifier_list}, columns={columns}, "
+                f"unique_identifier_range_map={unique_identifier_range_map}"
+            )
             return filtered_data
 
         #fix types

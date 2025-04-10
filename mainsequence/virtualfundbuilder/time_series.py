@@ -93,7 +93,6 @@ class PortfolioStrategy(TimeSerie):
         self.assets_configuration = portfolio_build_configuration.assets_configuration
         self.bars_ts = get_interpolated_prices_timeseries(copy.deepcopy(self.assets_configuration))
 
-
         self.portfolio_frequency = self.assets_configuration.prices_configuration.upsample_frequency_id
 
         self.full_signal_weight_config = copy.deepcopy(self.backtesting_weights_config.signal_weights_configuration)
@@ -114,8 +113,8 @@ class PortfolioStrategy(TimeSerie):
         super().__init__(*args, **kwargs)
 
     def get_required_execution_venues(self):
-        asset_list=self._get_asset_list()
-        required_venues={a.execution_venue.symbol for a in asset_list}
+        asset_list = self._get_asset_list()
+        required_venues = {a.execution_venue.symbol for a in asset_list}
         return list(required_venues)
 
     def _get_asset_list(self):
@@ -151,7 +150,7 @@ class PortfolioStrategy(TimeSerie):
         end_date = earliest_last_value
 
         # Handle case when latest_value is None
-        start_date = update_statistics._max_time_in_update_statistics
+        start_date = update_statistics.max_time_index_value
 
         # Adjust end_date based on max time difference variable if set
         max_td_env = os.getenv("MAX_TD_FROM_LATEST_VALUE", None)
@@ -440,9 +439,6 @@ rebalance details:"""
         Returns:
             pd.DataFrame: Updated portfolio values with and without fees and returns.
         """
-
-
-
         self.logger.debug("Starting update of portfolio weights.")
         start_date, end_date = self._calculate_start_end_dates(update_statistics)
 
