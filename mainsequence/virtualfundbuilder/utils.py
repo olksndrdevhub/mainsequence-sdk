@@ -564,7 +564,6 @@ def get_default_documentation(exclude_arguments=None):
     if exclude_arguments is None:
         exclude_arguments = [
                 "tracking_funds_expected_exposure_from_latest_holdings",
-                "builds_from_target_positions",
                 "is_live"
         ]
     from mainsequence.virtualfundbuilder.models import PortfolioConfiguration

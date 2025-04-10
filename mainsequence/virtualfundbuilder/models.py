@@ -141,7 +141,6 @@ class PortfolioMarketsConfig(VFBConfigBaseModel):
     portfolio_name: str = "Portfolio Strategy Title"
     front_end_details: Optional[FrontEndDetails]=None
     tracking_funds_expected_exposure_from_latest_holdings: bool = False
-    builds_from_target_positions: bool = False
 
 class AssetMixinOverwrite(VFBConfigBaseModel):
     """

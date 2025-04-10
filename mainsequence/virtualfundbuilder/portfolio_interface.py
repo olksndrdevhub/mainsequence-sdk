@@ -119,8 +119,7 @@ class PortfolioInterface():
                 "rebalance_strategy_name": ts.backtesting_weights_config.rebalance_strategy_name,
             }
 
-            standard_kwargs["backtest_table_time_index_name"] = "time_index"
-            standard_kwargs["backtest_table_price_column_name"] = "portfolio"
+            standard_kwargs["backtest_table_price_column_name"] = "close"
 
             target_portfolio = TargetPortfolio.get_or_none(local_time_serie__id=ts.local_metadata.id)
             if target_portfolio is None:

@@ -753,6 +753,15 @@ class PortfolioTags(BasePydanticModel):
     name:str
     color:str
 
+from typing import TypedDict
+
+class TargetPortfolioAbout(TypedDict):
+    description: str
+    signal_name: str
+    signal_description: str
+    rebalance_strategy_name: str
+
+
 class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     id: Optional[Union[int,str]] = None
     portfolio_name: str = Field(..., max_length=255)
@@ -769,14 +778,16 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     builds_from_predictions: bool = False
     builds_from_target_positions: bool = False
     follow_account_rebalance: bool = False
-    tracking_funds_expected_exposure_from_latest_holdings: bool = False
+    tracking_funds_expected_exposure_from_latest_holdings: bool = Field(
+        default=False,
+        description="Flag indicating if the system should track the funds' expected exposure based on the latest holdings. This is helpful when building your execution engine"
+    )
     available_in_venues: List[Union[int, ExecutionVenue]]
     latest_weights:Optional[List[Dict]] =None
 
     creation_date: Optional[datetime.datetime] = None
 
     comparable_portfolios: Optional[List[int]] = None
-    backtest_table_time_index_name: Optional[str] = Field(None, max_length=20)
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
     tags: Optional[List[PortfolioTags]] = None
 
@@ -792,13 +803,11 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             calendar_name: str,
             tracking_funds_expected_exposure_from_latest_holdings: bool,
             is_asset_only: bool,
-            builds_from_target_positions: bool,
-            target_portfolio_about: dict,
-            backtest_table_time_index_name: str,
+            target_portfolio_about: TargetPortfolioAbout,
             backtest_table_price_column_name: str,
             tags: Optional[list] = None,
-            timeout=None# or Optional[List[str]] if you prefer
-    ) -> "PortfolioType":
+            timeout=None
+    ) -> "TargetPortfolio":
         url = f"{cls.get_object_url()}/create_from_time_series/"
         # Build the payload with the required arguments.
         payload_data = {
@@ -812,14 +821,12 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             "calendar_name": calendar_name,
             "tracking_funds_expected_exposure_from_latest_holdings": tracking_funds_expected_exposure_from_latest_holdings,
             "is_asset_only": is_asset_only,
-            "builds_from_target_positions": builds_from_target_positions,
             "target_portfolio_about": target_portfolio_about,
-            "backtest_table_time_index_name": backtest_table_time_index_name,
             "backtest_table_price_column_name": backtest_table_price_column_name,
             "tags": tags,
         }
 
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": payload_data},)
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": payload_data},time_out=timeout)
         if r.status_code not in [201]:
             raise Exception(f" {r.text}")
 
