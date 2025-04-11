@@ -269,6 +269,10 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             return self.remote_table.data_source.id
 
     @classmethod
+    def get(cls,*args,**kwargs):
+        return super().get(*args,**kwargs)
+
+    @classmethod
     def get_or_create(cls, **kwargs):
         url = cls.get_object_url() + "/get_or_create/"
         kwargs = serialize_to_json(kwargs)
@@ -801,14 +805,16 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             remote_table_patch: Union[dict, None],
             build_meta_data: dict,
             data_source_id: int,
-            local_table_patch: dict
+            local_table_patch: dict,
     ) -> "LocalTimeSerie":
         url = cls.get_object_url("TimeSerie") + "/patch_build_configuration"
         payload = {"json": {"remote_table_patch": remote_table_patch, "local_table_patch": local_table_patch,
                             "build_meta_data": build_meta_data, "data_source_id": data_source_id,
                             }}
         s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload,
+
+                         )
         if r.status_code != 200:
             raise Exception(r.text)
         return LocalTimeSerie(**r.json())

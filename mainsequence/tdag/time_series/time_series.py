@@ -2181,7 +2181,8 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
             self.local_persist_manager.patch_build_configuration(local_configuration=self.local_initial_configuration,
                                                                  remote_configuration=self.remote_initial_configuration,
-                                                                 remote_build_metadata=self.remote_build_metadata
+                                                                 remote_build_metadata=self.remote_build_metadata,
+                                                                 threaded_request=True
                                                                  )
 
         if self.local_persist_manager.metadata.sourcetableconfiguration is not None:

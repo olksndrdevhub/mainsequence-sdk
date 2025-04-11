@@ -12,18 +12,52 @@ from mainsequence.client import (LocalTimeSerie, UniqueIdentifierRangeMap,
 
 from mainsequence.client.models_tdag import BACKEND_DETACHED, none_if_backend_detached, DynamicTableHelpers
 import json
+import threading
+from concurrent.futures import Future
+from .. import  future_registry  # import your global future registry module
+
+
 
 class APIPersistManager:
 
     def __init__(self,data_source_id:int,local_hash_id:str):
         self.data_source_id = data_source_id
         self.local_hash_id = local_hash_id
+        logger.debug(f"Initializing Time Serie {self.local_hash_id} {self.data_source_id} as APITimeSerie")
 
-        local_metadata = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
-                                                  remote_table__data_source__id=self.data_source_id
-                                                  )
-        self.local_metadata=local_metadata
+        # Create a Future to hold the local metadata when ready.
+        self._local_metadata_future = Future()
+        # Register the future globally.
+        future_registry.add_future(self._local_metadata_future)
+        # Launch the REST request in a separate, non-daemon thread.
+        thread = threading.Thread(target=self._init_local_metadata,
+                                  name=f"LocalMetadataThread-{self.local_hash_id}",
+                                  daemon=False)
+        thread.start()
 
+
+
+    @property
+    def local_metadata(self):
+        """Lazily block and cache the result if needed."""
+        if not hasattr(self, '_local_metadata_cached'):
+            # This call blocks until the future is resolved.
+            self._local_metadata_cached = self._local_metadata_future.result()
+        return self._local_metadata_cached
+
+    def _init_local_metadata(self):
+        """Perform the REST request asynchronously."""
+        try:
+            result = LocalTimeSerie.get_or_none(
+                local_hash_id=self.local_hash_id,
+                remote_table__data_source__id=self.data_source_id
+            )
+            self._local_metadata_future.set_result(result)
+        except Exception as exc:
+            self._local_metadata_future.set_exception(exc)
+        finally:
+            # Remove the future from the global registry once done.
+            future_registry.remove_future(self._local_metadata_future)
 
     def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
                              less_or_equal=True,
@@ -91,6 +125,11 @@ class PersistManager:
         self.human_readable = human_readable if human_readable is not None else local_hash_id
 
         self.class_name = class_name
+
+        # Private members for managing lazy asynchronous retrieval.
+        self._local_metadata_future = None
+        self._local_metadata_cached = None  # Cached result after first lookup
+
         if self.local_hash_id is not None:
             self.synchronize_metadata(meta_data=metadata,
                                       local_metadata=local_metadata,
@@ -107,6 +146,43 @@ class PersistManager:
         elif data_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
 
+    @property
+    def local_metadata(self):
+        """Lazily block and cache the result if needed."""
+        if not hasattr(self, '_local_metadata_cached'):
+            # This call blocks until the future is resolved.
+            self._local_metadata_cached = self._local_metadata_future.result()
+            self.local_build_configuration=self._local_metadata_cached.build_configuration
+            self.local_build_metadata=self._local_metadata_cached.build_meta_data
+            self.metadata=self._local_metadata_cached.remote_table
+        return self._local_metadata_cached
+
+    def _init_local_metadata(self):
+        """Perform the REST request asynchronously."""
+        try:
+            result =  LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
+                                                remote_table__data_source__id=self.data_source.id
+                                                      )
+            self._local_metadata_future.set_result(result)
+        except Exception as exc:
+            self._local_metadata_future.set_exception(exc)
+        finally:
+            # Remove the future from the global registry once done.
+            future_registry.remove_future(self._local_metadata_future)
+
+    def register_local_metadata(self,force_registry=True):
+        if force_registry ==True:
+            if hasattr(self, '_local_metadata_cached'):
+                del self._local_metadata_cached
+        self._local_metadata_future = Future()
+        # Register the future globally.
+        future_registry.add_future(self._local_metadata_future)
+        # Launch the REST request in a separate, non-daemon thread.
+        thread = threading.Thread(target=self._init_local_metadata,
+                                  name=f"LocalMetadataThreadPM-{self.local_hash_id}",
+                                  daemon=False)
+        thread.start()
+
     def synchronize_metadata(self, meta_data: Union[dict, None], local_metadata: Union[dict, None],
                              set_last_index_value: bool = False,
                              class_name: Union[str, None] = None
@@ -116,7 +192,7 @@ class PersistManager:
         :return:
         """
         if BACKEND_DETACHED():
-            self.local_metadata=local_metadata
+            self._local_metadata_cached=local_metadata
             return None
 
         # start with remote metadata
@@ -125,18 +201,9 @@ class PersistManager:
         if meta_data is None or local_metadata is None:  # avoid calling 2 times the DB
             meta_data = {}
 
-            local_metadata = {}  # set to empty in case not exist
-            local_metadata = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
-                                                remote_table__data_source__id=self.data_source.id
-                                                      )
+            self.register_local_metadata(force_registry=True)
 
-        if local_metadata is not None:
-            self.local_build_configuration = local_metadata.build_configuration
-            self.local_build_metadata = local_metadata.build_meta_data
-            self.local_metadata = local_metadata
 
-            # metadata should always exist
-            self.metadata = local_metadata.remote_table
 
 
 
@@ -304,9 +371,9 @@ class PersistManager:
 
 
     def patch_build_configuration(self,local_configuration:dict,remote_configuration:dict,
-                                  remote_build_metadata:dict,):
+                                  remote_build_metadata:dict,threaded_request:bool):
         """
-
+        This method can be threaded because it runs at the end of an init method
         Args:
             local_configuration:
             remote_configuration:
@@ -315,7 +382,7 @@ class PersistManager:
 
         """
 
-
+        import threading
 
         kwargs = dict(
                       build_configuration=remote_configuration, )
@@ -324,12 +391,30 @@ class PersistManager:
         local_metadata_kwargs = dict(local_hash_id=self.local_hash_id,
                                build_configuration=local_configuration,
                               )
+        logger.debug(f"Patchig configuration threaded {threaded_request}")
+        def _patch_build_configuration():
+            """Helper function for patching build configuration."""
+            return DynamicTableMetaData.patch_build_configuration(
+                remote_table_patch=kwargs,
+                data_source_id=self.data_source.id,
+                build_meta_data=remote_build_metadata,
+                local_table_patch=local_metadata_kwargs,
+            )
 
+        if threaded_request:
+            # Define a worker that updates self.local_metadata
+            def patch_worker():
+                self._local_metadata_cached = _patch_build_configuration()
 
-        self.local_metadata=DynamicTableMetaData.patch_build_configuration(remote_table_patch=kwargs,
-                                                data_source_id=self.data_source.id,
-                                                build_meta_data=remote_build_metadata,
-                                                local_table_patch=local_metadata_kwargs)
+            # Create a non-daemon thread; non-daemon threads ensure the process
+            # does not exit until they have finished.
+            patch_thread = threading.Thread(target=patch_worker)
+            patch_thread.daemon = False  # This is the default, but it emphasizes that
+            # the thread is non-daemon.
+            patch_thread.start()
+        else:
+            self.local_metadata = _patch_build_configuration()
+
 
     def local_persist_exist_set_config(self,remote_table_hashed_name:str,
                                        local_configuration:dict, remote_configuration:dict,data_source:dict,
@@ -351,6 +436,7 @@ class PersistManager:
             remote_build_metadata = self.remote_build_metadata
         remote_table_exist = True
         if remote_build_configuration is None:
+            logger.debug(f"remote table {remote_table_hashed_name} does not exist creating")
             #create remote table
             remote_table_exist = False
             try:
@@ -399,6 +485,8 @@ class PersistManager:
         if hasattr(self, "local_build_configuration"):
             local_build_configuration, local_build_metadata = self.local_build_configuration, self.local_build_metadata
         if local_build_configuration is None:
+
+            logger.debug(f"local_metadata {self.local_hash_id} does not exist creating")
             local_table_exist=False
             local_update = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
                                                        remote_table__data_source__id=self.data_source.id)
@@ -420,14 +508,20 @@ class PersistManager:
                 self.local_build_configuration = local_metadata.build_configuration
                 self.local_build_metadata = local_metadata.build_meta_data
                 self.local_metadata = local_metadata
+
+
+
             else:
                 local_metadata=local_update
-            self.local_metadata=local_metadata
+
+            self._local_metadata_cached = local_metadata
             self.local_build_configuration = local_metadata.build_configuration
             self.local_build_metadata = local_metadata.build_meta_data
-
             # metadata should always exist
             self.metadata = local_metadata.remote_table
+
+
+
 
         return   local_table_exist
     def _verify_insertion_format(self,temp_df):
@@ -461,7 +555,7 @@ class PersistManager:
         metadata,local_metadata=self.local_metadata.remote_table.build_or_update_update_details( **update_kwargs)
 
         self.metadata = metadata
-        self.local_metadata = local_metadata
+        self._local_metadata_cached = local_metadata
 
     def patch_update_details(self,local_hash_id=None,
                              **kwargs):
@@ -547,7 +641,7 @@ class PersistManager:
 
         """
 
-        self.local_metadata = DynamicTableHelpers.upsert_data_into_table(
+        self._local_metadata_cached = DynamicTableHelpers.upsert_data_into_table(
             local_metadata=self.local_metadata,
             data=temp_df,
             data_source=self.data_source,

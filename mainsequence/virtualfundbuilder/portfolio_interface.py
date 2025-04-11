@@ -50,6 +50,7 @@ class PortfolioInterface():
         """
         Initializes the portfolio strategy for backtesting and for live prediction.
         Also, forces an update of the build configuration in tdag to guarantee that assets are properly rebuilt
+        patch_build_configuration:defaults to True as we want to patch the configuration while we test but for production can be set to False
         """
         patch = os.environ.get("PATCH_BUILD_CONFIGURATION", "False")
         os.environ[
@@ -163,7 +164,7 @@ class PortfolioInterface():
             *args, **kwargs
     ):
         if not self._is_initialized or patch_build_configuration == True:
-            self._initialize_nodes(patch_build_configuration=True)
+            self._initialize_nodes(patch_build_configuration=patch_build_configuration)
 
         if self.portfolio_strategy_time_serie.data_source.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             self.portfolio_strategy_time_serie.run(debug_mode=debug_mode, update_tree=update_tree, force_update=force_update, **kwargs)

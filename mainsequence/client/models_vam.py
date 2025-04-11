@@ -205,15 +205,24 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         return [cls(**a) for a in r.json()]
 
     @classmethod
-    def filter_with_asset_class(cls, timeout=None, *args, **kwargs):
+    def filter_with_asset_class(cls, timeout=None,
+                                include_relationship_details_depth=None,
+                                *args, **kwargs):
         """
-        Filters assets and returns instances with their correct asset class,
+           Filters assets and returns instances with their correct asset class,
         looping through all DRF-paginated pages.
+        :param timeout:
+        :param include_details: Flag to include foreign key relationships
+        :param args:
+        :param kwargs:
+        :return:
         """
+
         from .models_helpers import create_from_serializer_with_class
 
         base_url = cls.get_object_url()
         # Convert `kwargs` to query parameters
+        # kwargs["include_relationship_details_depth"]=include_details
         params = cls._parse_parameters_filter(parameters=kwargs)
 
         # We'll call the custom action endpoint

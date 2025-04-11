@@ -52,7 +52,6 @@ def make_request(
     time_out=None,
 ):
     from requests.models import Response
-    logger.debug(f"Requesting {r_type} from {url}")
 
     TIMEOFF = 0.25
     TRIES = int(15 // TIMEOFF)
@@ -93,7 +92,7 @@ def make_request(
             start_time = time.perf_counter()
             r = req(url, timeout=timeout, **request_kwargs)
             duration = time.perf_counter() - start_time
-            logger.debug(f"Request took {duration:.4f} seconds.")
+            logger.debug(f"took {duration:.4f} seconds. Requesting {r_type} from {url}")
 
             if r.status_code in [403, 401] and not headers_refreshed:
                 logger.warning(f"Error {r.status_code} Refreshing headers")
