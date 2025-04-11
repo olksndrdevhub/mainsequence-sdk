@@ -73,8 +73,8 @@ def configuration_sanitizer(configuration: dict) -> PortfolioConfiguration:
         )
 
     portfolio_markets_config = configuration['portfolio_markets_configuration']
-    if "builds_from_target_positions" not in portfolio_markets_config:
-        raise Exception("Missing 'builds_from_target_positions' in portfolio_markets_config")
+
+
 
     if "tracking_funds_expected_exposure_from_latest_holdings" not in portfolio_markets_config:
         raise Exception(

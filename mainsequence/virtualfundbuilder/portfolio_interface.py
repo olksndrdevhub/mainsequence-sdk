@@ -1,6 +1,6 @@
 import copy
 from mainsequence.tdag.utils import write_yaml
-from mainsequence.client import BACKEND_DETACHED
+from mainsequence.client import BACKEND_DETACHED, IndexAsset
 import os
 from typing import Dict, Any, List, Union, Optional
 import yaml
@@ -119,20 +119,20 @@ class PortfolioInterface():
                 "rebalance_strategy_name": ts.backtesting_weights_config.rebalance_strategy_name,
             }
 
-            standard_kwargs["backtest_table_time_index_name"] = "time_index"
-            standard_kwargs["backtest_table_price_column_name"] = "portfolio"
+            standard_kwargs["backtest_table_price_column_name"] = "close"
 
             target_portfolio = TargetPortfolio.get_or_none(local_time_serie__id=ts.local_metadata.id)
             if target_portfolio is None:
-                target_portfolio = TargetPortfolio.create_from_time_series(**standard_kwargs)
+                target_portfolio,index_asset = TargetPortfolio.create_from_time_series(**standard_kwargs)
             else:
                 # patch timeserie of portfolio to guaranteed recreation
                 target_portfolio.patch(**standard_kwargs)
                 self.logger.debug(f"Target portfolio {ts.local_metadata.id} already exists in Backend")
+                index_asset=TargetPortfolioIndexAsset.get(reference_portfolio__id=target_portfolio.id)
 
-            return target_portfolio
+            return target_portfolio,index_asset
 
-        target_portfolio = build_markets_portfolio(portfolio_ts, build_purpose=self.build_purpose)
+        target_portfolio,index_asset = build_markets_portfolio(portfolio_ts, build_purpose=self.build_purpose)
 
         # create index Asset
         asset_symbol = target_portfolio.portfolio_ticker
@@ -142,20 +142,13 @@ class PortfolioInterface():
                                                     name=asset_symbol,
                                                     unique_identifier=asset_symbol,
                                                     unique_symbol=asset_symbol,
-                                                    live_portfolio=live_portfolio,
-                                                    backtest_portfolio=backtest_portfolio,
-                                                    valuation_asset=live_ts.valuation_asset,
+                                                    reference_portfolio=target_portfolio.id,
+                                                    valuation_asset=portfolio_ts.valuation_asset,
                                                     calendar=Calendar(
                                                     name=self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
                                                         "calendar"])
                                                     )
-        else:
-            index_asset = Asset.create_or_update_index_asset_from_portfolios(reference_portfolio=target_portfolio.id,
-                                                                             valuation_asset=portfolio_ts.valuation_asset.id,
-                                                                             calendar=
-                                                                             self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
-                                                                                 "calendar"]
-                                                                             )
+
         self.index_asset = index_asset
         self.target_portfolio = target_portfolio
 
