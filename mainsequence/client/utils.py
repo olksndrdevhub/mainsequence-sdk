@@ -90,7 +90,11 @@ def make_request(
     # Now loop with retry logic
     while keep_request:
         try:
+            start_time = time.perf_counter()
             r = req(url, timeout=timeout, **request_kwargs)
+            duration = time.perf_counter() - start_time
+            logger.debug(f"Request took {duration:.4f} seconds.")
+
             if r.status_code in [403, 401] and not headers_refreshed:
                 logger.warning(f"Error {r.status_code} Refreshing headers")
                 loaders.refresh_headers()
