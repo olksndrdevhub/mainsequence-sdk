@@ -70,23 +70,14 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
         asset_list:List[Asset],
         description=""
     ):
-        try:
-            bar_source = MarketsTimeSeriesDetails.get(
-                unique_identifier=unique_identifier,
-            )
 
-            if time_serie.use_vam_assets and bar_source.related_local_time_serie.id != time_serie.local_time_serie.id:
-                bar_source = bar_source.patch(related_local_time_serie__id=time_serie.local_time_serie.id)
-
-        except DoesNotExist:
-            if time_serie.use_vam_assets:
-                # if run for the first time save this as reference in VAM
-                bar_source = MarketsTimeSeriesDetails.update_or_create(
-                    unique_identifier=unique_identifier,
-                    related_local_time_serie__id=time_serie.local_time_serie.id,
-                    data_frequency_id=data_frequency_id,
-                    description=description,
-                )
+        # if run for the first time save this as reference in VAM
+        bar_source = MarketsTimeSeriesDetails.update_or_create(
+            unique_identifier=unique_identifier,
+            related_local_time_serie__id=time_serie.local_time_serie.id,
+            data_frequency_id=data_frequency_id,
+            description=description,
+        )
 
         if bar_source is None:
             raise ValueError("No historical bars source found")
