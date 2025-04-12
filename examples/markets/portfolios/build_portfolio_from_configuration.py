@@ -93,7 +93,7 @@ for category in all_categories:
             os.remove(tmp_file_path)
     try:
 
-        portfolio_interface.run(portfolio_tags=["Thematic", "Crypto"],add_portfolio_to_markets_backend=False,
+        portfolio_interface.run(portfolio_tags=["Thematic", "Crypto"],add_portfolio_to_markets_backend=True,
                                 patch_build_configuration=True)
     except AssetMistMatch:
         portfolio_interface.delete_portfolio()

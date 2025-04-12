@@ -481,12 +481,8 @@ class AccountMixin(BasePydanticModel):
     execution_venue: "ExecutionVenue"
     account_is_active: bool
     account_name: Optional[str] = None
-    is_account_in_cool_down:bool
     cash_asset: Asset
     is_paper: bool
-    is_on_manual_rebalance: bool
-    user: Optional[int] = None
-    execution_configuration: "AccountExecutionConfiguration"
     account_target_portfolio: AccountTargetPortfolio
     latest_holdings: Union["AccountLatestHoldingsSerializer",None]=None
 
@@ -598,6 +594,9 @@ class RebalanceTargetPosition(BasePydanticModel):
     weight_notional_exposure: float
 
 class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
+
+
+
     def rebalance(
         self,
         target_positions: List[RebalanceTargetPosition],
