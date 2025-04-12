@@ -44,16 +44,17 @@ def get_interpolated_prices_timeseries(assets_configuration: AssetsConfiguration
     )
 
 
-def get_time_serie_from_markets_unique_id(market_time_serie_unique_identifier: str):
+def get_time_serie_from_markets_unique_id(market_time_serie_unique_identifier: str) -> TimeSerie:
     """
     Returns the appropriate bar time series based on the asset list and source.
     """
     try:
-        hbs = MarketsTimeSeriesDetails.get(unique_identifier=market_time_serie_unique_identifier)
+        hbs = MarketsTimeSeriesDetails.get(unique_identifier=market_time_serie_unique_identifier,include_relations_detail=True)
     except DoesNotExist as e:
         logger.exception(f"HistoricalBarsSource does not exist for {market_time_serie_unique_identifier}")
         raise e
     api_ts = APITimeSerie(
+
         data_source_id=hbs.related_local_time_serie.data_source_id,
         local_hash_id=hbs.related_local_time_serie.local_hash_id
     )
@@ -693,7 +694,8 @@ class InterpolatedPrices(TimeSerie):
         """
 
         asset_category = AssetCategory.get(unique_identifier=self.asset_category_unique_id)
-        asset_list = Asset.filter_with_asset_class(id__in= asset_category.assets)
+        # asset_list = Asset.filter_with_asset_class(id__in= asset_category.assets)
+        asset_list = Asset.filter(id__in=asset_category.assets) # No needed introspection of specific asset features
         self.asset_calendar_map = {a.unique_identifier: a.calendar for a in asset_list}
         return asset_list
     def update(

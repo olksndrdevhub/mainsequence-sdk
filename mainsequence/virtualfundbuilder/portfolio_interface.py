@@ -103,7 +103,7 @@ class PortfolioInterface():
             user_kwargs.pop("front_end_details", None)
 
             standard_kwargs.update(user_kwargs)
-
+            standard_kwargs["valuation_asset_id"]=self.portfolio_config.portfolio_build_configuration.valuation_asset.id
             standard_kwargs["required_venues__symbols"] = ts.get_required_execution_venues()
             standard_kwargs["calendar_name"] = self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
                                                         "calendar"]
@@ -160,7 +160,7 @@ class PortfolioInterface():
             patch_build_configuration=True,
             debug_mode=True,
             force_update=True,
-            update_tree=True,portfolio_tags:List[str] = None,
+            update_tree=True,portfolio_tags:List[str] = None,add_portfolio_to_markets_backend=False,
             *args, **kwargs
     ):
         if not self._is_initialized or patch_build_configuration == True:
@@ -168,7 +168,8 @@ class PortfolioInterface():
 
         if self.portfolio_strategy_time_serie.data_source.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             self.portfolio_strategy_time_serie.run(debug_mode=debug_mode, update_tree=update_tree, force_update=force_update, **kwargs)
-            self.build_target_portfolio_in_backend(portfolio_tags=portfolio_tags)
+            if add_portfolio_to_markets_backend == True:
+                self.build_target_portfolio_in_backend(portfolio_tags=portfolio_tags)
         else:
             self.portfolio_strategy_time_serie.run_local_update(*args, **kwargs)
 

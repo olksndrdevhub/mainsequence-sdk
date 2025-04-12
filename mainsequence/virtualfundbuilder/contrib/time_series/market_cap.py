@@ -181,7 +181,8 @@ class MarketCap(WeightsBase, TimeSerie):
 
     def _get_asset_list(self) -> Union[None, list]:
         asset_category = AssetCategory.get(unique_identifier=self.assets_configuration.assets_category_unique_id)
-        asset_list = Asset.filter_with_asset_class(id__in=asset_category.assets)
+        # asset_list = Asset.filter_with_asset_class(id__in=asset_category.assets)
+        asset_list = Asset.filter(id__in=asset_category.assets)
         return asset_list
 
     def update(self, update_statistics: "DataUpdates"):

@@ -439,6 +439,7 @@ class ConfigSerializer:
             ts_kwargs = {}
             ts = collections.OrderedDict(sorted(kwargs["time_series_dict"].items()))
             for key, ts in ts.items():
+
                 ts_kwargs[key] = f"{ts.local_hash_id}_{ts.data_source_id}"
             kwargs["time_series_dict"] = ts_kwargs
 
@@ -711,6 +712,8 @@ class GraphNodeMethods(ABC):
         members = self.__dict__
 
         if self.is_local_relation_tree_set == False:
+            #persiste manager needs to have full information
+            self.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True,force_registry=True)
 
             for key, value in members.items():
                 try:
@@ -1098,6 +1101,8 @@ class TimeSerieRebuildMethods(ABC):
         if force_update == True or update_statistics.max_time_index_value is None:
             must_update = True
 
+        #Update statistics and build and rebuild localmetadata with foreign relations
+        self.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True)
         update_statistics = self.set_update_statistics(update_statistics)
 
         try:
@@ -1230,6 +1235,9 @@ class DataPersistanceMethods(ABC):
         gets latest value directly from querying the DB,
         args and kwargs are nedeed for datalake
         """
+        if isinstance(self.metadata,int):
+            self.local_persist_manager.set_local_metadata_lazy(force_registry=True,include_relations_detail=True)
+
         if self.metadata.sourcetableconfiguration is None:
 
             return DataUpdates()
@@ -1463,6 +1471,8 @@ class CommonMethodsMixin:
 class APITimeSerie(CommonMethodsMixin):
     PICKLE_PREFIFX = "api-"
 
+
+
     @classmethod
     def build_from_local_time_serie(cls, local_time_serie: "LocalTimeSerie"):
         return cls(data_source_id=local_time_serie.remote_table.data_source.id,
@@ -1484,16 +1494,21 @@ class APITimeSerie(CommonMethodsMixin):
         )
         return ts
 
-    def __init__(self, data_source_id: int, local_hash_id: str, data_source_local_lake: Union[None, DataSource] = None):
+    def __init__(self,
+                 data_source_id: int, local_hash_id: str,
+                 data_source_local_lake: Union[None, DataSource] = None):
         """
         A time serie is uniquely identified in tdag by  data_source_id and table_name
         :param data_source_id:
         :param table_name:
         """
+
+
         if data_source_local_lake is not None:
             assert data_source_local_lake.data_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE, "data_source_local_lake should be of type CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE"
-        self.data_source_id = data_source_id
-        self.local_hash_id = local_hash_id
+
+        self.data_source_id=data_source_id
+        self.local_hash_id=local_hash_id
         self.data_source = data_source_local_lake
         self.local_persist_manager
 
@@ -1501,8 +1516,9 @@ class APITimeSerie(CommonMethodsMixin):
     def local_persist_manager(self):
 
         if hasattr(self, "_local_persist_manager") == False:
-            self.logger.debug(f"Setting local persist manager for {self.local_hash_id}")
+
             self._set_local_persist_manager()
+            self.logger.debug(f"Setting local persist manager for {self.local_hash_id}")
         return self._local_persist_manager
 
     def set_relation_tree(self):
@@ -1532,43 +1548,12 @@ class APITimeSerie(CommonMethodsMixin):
 
         self._verify_local_data_source()
 
-        self._local_persist_manager = APIPersistManager(data_source_id=self.data_source_id,
-                                                        local_hash_id=self.local_hash_id,
+        self._local_persist_manager = APIPersistManager(local_hash_id=self.local_hash_id,data_source_id=self.data_source_id
                                                         )
-        local_metadata = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
-                                            remote_table__data_source__id=self.data_source_id,
-                                            )
+        local_metadata = self._local_persist_manager.local_metadata
+
         assert local_metadata is not None, f"Verify that  {self.local_hash_id} exists if you are not the author reach to the author"
 
-        self.remote_table_hashed_name = local_metadata.remote_table.hash_id
-        if self.data_source is None:
-
-            if isinstance(local_metadata.remote_table.data_source, dict):
-                # data source is open use direct connection
-
-                self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=self.local_hash_id,
-                                                                                class_name=
-                                                                                local_metadata.build_configuration.time_series_class_import_path["qualname"],
-
-                                                                                human_readable=
-                                                                                local_metadata.remote_table.human_readable,
-                                                                                local_metadata=local_metadata,
-                                                                                description="",
-                                                                                data_source=self.build_data_source_from_configuration(
-                                                                                    local_metadata.remote_table.data_source)
-                                                                                )
-        else:
-
-            local_persist_manager_lake = DataLakePersistManager(local_hash_id=self.local_hash_id,
-                                                                class_name=self.__class__.__name__,
-                                                                human_readable=f"Local API Lake for {self.local_hash_id}",
-                                                                local_metadata=local_metadata,
-                                                                description=f"Local API Lake for {self.local_hash_id}",
-                                                                data_source=self.data_source)
-            table_exist_locally = local_persist_manager_lake.table_exist(local_metadata.remote_table.hash_id)
-            if table_exist_locally:
-                self.data_source_id = local_persist_manager_lake.data_source.id
-                self._local_persist_manager = local_persist_manager_lake
 
     def get_df_between_dates(self, start_date: Optional[datetime.datetime] = None,
                              end_date: Optional[datetime.datetime] = None,
@@ -2151,8 +2136,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 self.set_relation_tree()
                 self.local_persist_manager.build_update_details(source_class_name=self.__class__.__name__)
 
-        if self.local_persist_manager.metadata.human_readable is None and self.human_readable is not None:
-            self.local_persist_manager.patch_table(human_readable=self.human_readable)
+
 
         if self.local_persist_manager.update_details is not None:
             source_class_name = self.local_persist_manager.metadata.source_class_name
@@ -2182,7 +2166,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             self.local_persist_manager.patch_build_configuration(local_configuration=self.local_initial_configuration,
                                                                  remote_configuration=self.remote_initial_configuration,
                                                                  remote_build_metadata=self.remote_build_metadata,
-                                                                 threaded_request=True
                                                                  )
 
         if self.local_persist_manager.metadata.sourcetableconfiguration is not None:

@@ -23,7 +23,8 @@ class APIPersistManager:
     def __init__(self,data_source_id:int,local_hash_id:str):
         self.data_source_id = data_source_id
         self.local_hash_id = local_hash_id
-        logger.debug(f"Initializing Time Serie {self.local_hash_id} {self.data_source_id} as APITimeSerie")
+
+        logger.debug(f"Initializing Time Serie {self.local_hash_id}  as APITimeSerie")
 
         # Create a Future to hold the local metadata when ready.
         self._local_metadata_future = Future()
@@ -48,9 +49,11 @@ class APIPersistManager:
     def _init_local_metadata(self):
         """Perform the REST request asynchronously."""
         try:
-            result = LocalTimeSerie.get_or_none(
-                local_hash_id=self.local_hash_id,
-                remote_table__data_source__id=self.data_source_id
+
+
+            result = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
+                                                remote_table__data_source__id=self.data_source_id,
+                                                    include_relations_detail=True
             )
             self._local_metadata_future.set_result(result)
         except Exception as exc:
@@ -129,6 +132,8 @@ class PersistManager:
         # Private members for managing lazy asynchronous retrieval.
         self._local_metadata_future = None
         self._local_metadata_cached = None  # Cached result after first lookup
+        self._local_metadata_lock = threading.Lock()
+        self._metadata_cached=None
 
         if self.local_hash_id is not None:
             self.synchronize_metadata(meta_data=metadata,
@@ -146,39 +151,66 @@ class PersistManager:
         elif data_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
 
+    ## method for doing lazy queries
+
+    def set_local_metadata(self,local_metadata:LocalTimeSerie):
+        self._local_metadata_cached = local_metadata
+        self.local_build_configuration = local_metadata.build_configuration
+        self.local_build_metadata = local_metadata.build_meta_data
+        self.metadata = local_metadata.remote_table
+
     @property
     def local_metadata(self):
-        """Lazily block and cache the result if needed."""
-        if not hasattr(self, '_local_metadata_cached'):
-            # This call blocks until the future is resolved.
-            self._local_metadata_cached = self._local_metadata_future.result()
-            self.local_build_configuration=self._local_metadata_cached.build_configuration
-            self.local_build_metadata=self._local_metadata_cached.build_meta_data
-            self.metadata=self._local_metadata_cached.remote_table
-        return self._local_metadata_cached
+        with self._local_metadata_lock:
+            if self._local_metadata_cached is None:
+                if self._local_metadata_future is None:
+                    # If no future is running, start one.
+                    self.set_local_metadata_lazy(force_registry=True)
+                # Block until the future completes and cache its result.
+                local_metadata = self._local_metadata_future.result()
+                self.set_local_metadata(local_metadata)
+            return self._local_metadata_cached
 
-    def _init_local_metadata(self):
-        """Perform the REST request asynchronously."""
+            # Define a callback that will launch set_local_metadata_lazy after the remote update is complete.
+
+    def set_local_metadata_lazy_callback(self,fut:Future):
         try:
-            result =  LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
-                                                remote_table__data_source__id=self.data_source.id
-                                                      )
-            self._local_metadata_future.set_result(result)
+            # This will re-raise any exception that occurred in _update_task.
+            fut.result()
         except Exception as exc:
-            self._local_metadata_future.set_exception(exc)
-        finally:
-            # Remove the future from the global registry once done.
-            future_registry.remove_future(self._local_metadata_future)
+            # Optionally, handle or log the error if needed.
+            # For example: logger.error("Remote build update failed: %s", exc)
+            raise e
+        # Launch the local metadata update regardless of the outcome.
+        self.set_local_metadata_lazy(force_registry=True)
 
-    def register_local_metadata(self,force_registry=True):
-        if force_registry ==True:
-            if hasattr(self, '_local_metadata_cached'):
-                del self._local_metadata_cached
-        self._local_metadata_future = Future()
-        # Register the future globally.
-        future_registry.add_future(self._local_metadata_future)
-        # Launch the REST request in a separate, non-daemon thread.
-        thread = threading.Thread(target=self._init_local_metadata,
+    def set_local_metadata_lazy(self,force_registry=True,include_relations_detail=False):
+
+        with self._local_metadata_lock:
+            if force_registry:
+                self._local_metadata_cached = None
+            # Capture the new future in a local variable.
+            new_future = Future()
+            self._local_metadata_future = new_future
+            # Register the new future.
+            future_registry.add_future(new_future)
+
+        def _get_or_none_local_metadata():
+            """Perform the REST request asynchronously."""
+            try:
+                result = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
+                                                    remote_table__data_source__id=self.data_source.id,
+                                                    include_relations_detail=include_relations_detail
+                                                    )
+                new_future.set_result(result)
+            except Exception as exc:
+                new_future.set_exception(exc)
+            finally:
+                # Remove the future from the global registry once done.
+                future_registry.remove_future(new_future)
+
+
+        thread = threading.Thread(target=_get_or_none_local_metadata,
                                   name=f"LocalMetadataThreadPM-{self.local_hash_id}",
                                   daemon=False)
         thread.start()
@@ -198,10 +230,12 @@ class PersistManager:
         # start with remote metadata
         if set_last_index_value == True:
             LocalTimeSerie.set_last_update_index_time(metadata=self.local_metadata)
-        if meta_data is None or local_metadata is None:  # avoid calling 2 times the DB
-            meta_data = {}
+        if local_metadata is not None:
+            self.set_local_metadata(local_metadata)
+            return None
 
-            self.register_local_metadata(force_registry=True)
+        #speedd up the wait
+        self.set_local_metadata_lazy(force_registry=True)
 
 
 
@@ -237,14 +271,17 @@ class PersistManager:
 
                                         )
         else:
-            self.local_metadata.depends_on_connect_remote_table(
-                source_hash_id=self.metadata.hash_id,
-                source_local_hash_id=self.local_metadata.local_hash_id,
-                source_data_source_id=self.data_source.id,
+            try:
+                self.local_metadata.depends_on_connect_remote_table(
+                    source_hash_id=self.metadata.hash_id,
+                    source_local_hash_id=self.local_metadata.local_hash_id,
+                    source_data_source_id=self.data_source.id,
 
-                                        target_data_source_id=new_ts.data_source_id,
-                                        target_local_hash_id=new_ts.local_hash_id
-                                        )
+                                            target_data_source_id=new_ts.data_source_id,
+                                            target_local_hash_id=new_ts.local_hash_id
+                                            )
+            except Exception as exc:
+                raise exc
 
 
     def display_mermaid_dependency_diagram(self):
@@ -371,7 +408,7 @@ class PersistManager:
 
 
     def patch_build_configuration(self,local_configuration:dict,remote_configuration:dict,
-                                  remote_build_metadata:dict,threaded_request:bool):
+                                  remote_build_metadata:dict):
         """
         This method can be threaded because it runs at the end of an init method
         Args:
@@ -382,7 +419,10 @@ class PersistManager:
 
         """
 
-        import threading
+        # This ensures that later accesses to local_metadata will block for the new value.
+        with self._local_metadata_lock:
+            self._local_metadata_future = Future()
+            future_registry.add_future(self._local_metadata_future)
 
         kwargs = dict(
                       build_configuration=remote_configuration, )
@@ -391,29 +431,40 @@ class PersistManager:
         local_metadata_kwargs = dict(local_hash_id=self.local_hash_id,
                                build_configuration=local_configuration,
                               )
-        logger.debug(f"Patchig configuration threaded {threaded_request}")
+
+        patch_future = Future()
+        future_registry.add_future(patch_future)
+
+        # Define the inner helper function.
         def _patch_build_configuration():
-            """Helper function for patching build configuration."""
-            return DynamicTableMetaData.patch_build_configuration(
-                remote_table_patch=kwargs,
-                data_source_id=self.data_source.id,
-                build_meta_data=remote_build_metadata,
-                local_table_patch=local_metadata_kwargs,
-            )
+            """Helper function for patching build configuration asynchronously."""
+            try:
+                # Execute the patch operation; this method is expected to return a LocalTimeSerie-like instance.
+                result = DynamicTableMetaData.patch_build_configuration(
+                    remote_table_patch=kwargs,
+                    data_source_id=self.data_source.id,
+                    build_meta_data=remote_build_metadata,
+                    local_table_patch=local_metadata_kwargs,
+                )
+                patch_future.set_result(True) #success
+            except Exception as exc:
+                patch_future.set_exception(exc)
+            finally:
+                # Once the operation is complete (or errors out), remove the future from the global registry.
+                future_registry.remove_future(result)
 
-        if threaded_request:
-            # Define a worker that updates self.local_metadata
-            def patch_worker():
-                self._local_metadata_cached = _patch_build_configuration()
 
-            # Create a non-daemon thread; non-daemon threads ensure the process
-            # does not exit until they have finished.
-            patch_thread = threading.Thread(target=patch_worker)
-            patch_thread.daemon = False  # This is the default, but it emphasizes that
-            # the thread is non-daemon.
-            patch_thread.start()
-        else:
-            self.local_metadata = _patch_build_configuration()
+
+
+        thread = threading.Thread(
+            target=_patch_build_configuration,
+            name=f"PatchBuildConfigThread-{self.local_hash_id}",
+            daemon=False
+        )
+        thread.start()
+
+        patch_future.add_done_callback(self.set_local_metadata_lazy_callback)
+
 
 
     def local_persist_exist_set_config(self,remote_table_hashed_name:str,
@@ -505,20 +556,15 @@ class PersistManager:
                 local_metadata = LocalTimeSerie.get_or_create(**metadata_kwargs,
 
                                               )
-                self.local_build_configuration = local_metadata.build_configuration
-                self.local_build_metadata = local_metadata.build_meta_data
-                self.local_metadata = local_metadata
+                self.set_local_metadata_lazy(force_registry=True,include_relations_detail=False)
 
 
 
             else:
                 local_metadata=local_update
+                self.set_local_metadata(local_metadata=local_metadata)
 
-            self._local_metadata_cached = local_metadata
-            self.local_build_configuration = local_metadata.build_configuration
-            self.local_build_metadata = local_metadata.build_meta_data
-            # metadata should always exist
-            self.metadata = local_metadata.remote_table
+
 
 
 
@@ -550,34 +596,42 @@ class PersistManager:
         update_kwargs=dict(source_class_name=source_class_name,
                            local_metadata=json.loads(self.local_metadata.model_dump_json())
                            )
+        # This ensures that later accesses to local_metadata will block for the new value.
+        with self._local_metadata_lock:
+            self._local_metadata_future = Future()
+            future_registry.add_future(self._local_metadata_future)
 
 
-        metadata,local_metadata=self.local_metadata.remote_table.build_or_update_update_details( **update_kwargs)
 
-        self.metadata = metadata
-        self._local_metadata_cached = local_metadata
+        # Create a future for the remote update task and register it.
+        future = Future()
+        future_registry.add_future(future)
 
-    def patch_update_details(self,local_hash_id=None,
-                             **kwargs):
-        """
-        Patch update details ofr related_table
-        Parameters
-        ----------
-        hash_id :
-        kwargs :
+        def _update_task():
+            try:
+                # Run the remote build/update details task.
+                self.local_metadata.remote_table.build_or_update_update_details(**update_kwargs)
+                future.set_result(True)  # Signal success
+            except Exception as exc:
+                future.set_exception(exc)
+            finally:
+                # Unregister the future once the task completes.
+                future_registry.remove_future(future)
 
-        Returns
-        -------
+        thread = threading.Thread(
+            target=_update_task,
+            name=f"BuildUpdateDetailsThread-{self.local_hash_id}",
+            daemon=False
+        )
+        thread.start()
 
-        """
-        if local_hash_id is not None:
-            kwargs["use_local_hash_id"]=local_hash_id
-            metadata = self.dth.build_or_update_update_details(metadata=self.metadata,**kwargs)
-            return metadata
-        kwargs["local_metadata"] = self.local_metadata
-        metadatas = self.dth.build_or_update_update_details(metadata=self.metadata,**kwargs)
-        self.metadata = metadatas["metadata"]
-        self.local_metadata = metadatas["local_metadata"]
+
+
+            # Attach the callback to the future.
+
+        future.add_done_callback(self.set_local_metadata_lazy_callback)
+
+
 
     def patch_table(self,**kwargs):
         self.metadata.patch( **kwargs)

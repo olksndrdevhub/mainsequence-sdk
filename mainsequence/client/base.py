@@ -264,7 +264,7 @@ class BaseObjectOrm:
                 loaders=cls.LOADERS,
                 r_type="GET",
                 url=detail_url,
-                payload={},
+                payload={"params": filters},#neede to pass special serializer
                 time_out=timeout
             )
 

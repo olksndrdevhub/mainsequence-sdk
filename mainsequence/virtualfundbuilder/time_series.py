@@ -122,7 +122,8 @@ class PortfolioStrategy(TimeSerie):
         Creates mappings from symbols to IDs
         """
         asset_category = AssetCategory.get(unique_identifier=self.assets_configuration.assets_category_unique_id)
-        asset_list = Asset.filter_with_asset_class(id__in=asset_category.assets)
+        # asset_list = Asset.filter_with_asset_class(id__in=asset_category.assets)
+        asset_list = Asset.filter(id__in=asset_category.assets) # no need for specifics as only symbols are relevant
         return asset_list
 
     def _calculate_start_end_dates(self, update_statistics: DataUpdates):

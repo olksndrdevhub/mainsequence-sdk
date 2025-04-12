@@ -24,12 +24,18 @@ import math
 import gzip
 import base64
 import numpy as np
+import concurrent.futures
+
 _default_data_source = None  # Module-level cache
 BACKEND_DETACHED = lambda: os.environ.get('BACKEND_DETACHED', "false").lower() == "true"
 
 JSON_COMPRESSED_PREFIX = ["json_compressed", "jcomp_"]
 
 loaders = AuthLoaders()
+
+
+# Global executor (or you could define one on your class)
+_executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
 def none_if_backend_detached(func):
     """
@@ -257,8 +263,8 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     ogm_dependencies_linked: bool = Field(default=False, description="OGM dependencies linked flag")
     tags: Optional[list[str]] = Field(default=[], description="List of tags")
     description: Optional[str] = Field(None, description="Optional HTML description")
-    localtimeserieupdatedetails: Optional["LocalTimeSerieUpdateDetails"] = None
-    run_configuration: "RunConfiguration"
+    localtimeserieupdatedetails: Optional[Union["LocalTimeSerieUpdateDetails",int]] = None
+    run_configuration: Optional["RunConfiguration"]=None
     data_schema:Optional[Dict] = None
 
     @property
@@ -366,16 +372,37 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     def set_end_of_execution(
             self,
             historical_update_id: int,
-            timeout=None,
+            timeout=None,threaded_request=True,
             **kwargs
     ):
         s = self.build_session()
         url = self.get_object_url() + f"/{self.id}/set_end_of_execution/"
         kwargs.update(dict(historical_update_id=historical_update_id))
         payload = {"json": kwargs}
-        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload, time_out=timeout)
-        if r.status_code != 200:
-            raise Exception(f"Error in request ")
+
+        def _do_request():
+            r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload, time_out=timeout)
+            if r.status_code != 200:
+                raise Exception("Error in request")
+            return r
+
+        if threaded_request:
+            # Submit the request to an executor. The returned Future will be non-blocking.
+            future = _executor.submit(_do_request)
+
+            # Optionally, attach a callback to log failures. (Exceptions will also be
+            # re-raised when someone calls future.result().)
+            def _handle_exception(fut):
+                try:
+                    fut.result()  # This will re-raise any exception caught in _do_request.
+                except Exception as e:
+                    logger.error("set_end_of_execution: request failed: %s", e)
+
+            future.add_done_callback(_handle_exception)
+            return future
+        else:
+            # Synchronous execution that will raise exceptions inline.
+            return _do_request()
 
     @classmethod
     def batch_set_end_of_execution(cls, update_map: dict, timeout=None):
@@ -751,7 +778,6 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     #TS specifi
     compression_policy_config:Optional[dict]
     retention_policy_config:Optional[dict]
-    table_size: Optional[float]
 
 
     _drop_indices: bool = False  # for direct incertion we can pass this values
@@ -786,7 +812,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
         data = r.json()
         return cls(**data)
 
-    def build_or_update_update_details(self, *args, **kwargs) -> ["DynamicTableMetaData", "LocalTimeSerie"]:
+    def build_or_update_update_details(self, *args, **kwargs):
         base_url = self.get_object_url()
         payload = {"json": kwargs}
         s = self.build_session()
@@ -795,8 +821,6 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
         if r.status_code != 202:
             raise Exception(f"Error in request {r.text}")
 
-        result = r.json()
-        return DynamicTableMetaData(**result["dynamic_table_metadata"]), LocalTimeSerie(**result["local_time_series"])
 
     @none_if_backend_detached
     @classmethod
@@ -806,7 +830,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             build_meta_data: dict,
             data_source_id: int,
             local_table_patch: dict,
-    ) -> "LocalTimeSerie":
+    ) :
         url = cls.get_object_url("TimeSerie") + "/patch_build_configuration"
         payload = {"json": {"remote_table_patch": remote_table_patch, "local_table_patch": local_table_patch,
                             "build_meta_data": build_meta_data, "data_source_id": data_source_id,
@@ -817,7 +841,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
                          )
         if r.status_code != 200:
             raise Exception(r.text)
-        return LocalTimeSerie(**r.json())
+
 
 class Scheduler(BasePydanticModel, BaseObjectOrm):
     uid: str

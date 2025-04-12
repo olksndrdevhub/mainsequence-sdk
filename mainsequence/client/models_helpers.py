@@ -36,7 +36,7 @@ def get_right_account_class(account: Account):
 class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
     id:Optional[int]=None
     unique_identifier: str
-    related_local_time_serie: LocalTimeSerie
+    related_local_time_serie: Union[LocalTimeSerie,int]
     description: Optional[str] = Field(None, description="Descriptions of the data source")
     data_frequency_id: str = DataFrequency
     assets_in_data_source:Optional[List[int]]
@@ -44,6 +44,14 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
 
     def __str__(self):
         return self.class_name() + f" {self.unique_identifier}"
+
+    @classmethod
+    def get(cls,*args,**kwargs):
+        return super().get(*args,**kwargs)
+
+    @classmethod
+    def filter(cls,*args,**kwargs):
+        return super().filter(*args,**kwargs)
 
     def append_asset_list_source(self, asset_list: List[Asset]):
         if asset_list:
