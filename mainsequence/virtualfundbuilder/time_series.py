@@ -239,18 +239,7 @@ class PortfolioStrategy(TimeSerie):
 rebalance details:"""
         return json.dumps(portfolio_about)
 
-    @property
-    def human_readable(self):
-        """
-        Generates a human-readable name for the portfolio strategy.
 
-        Returns:
-            str: Human-readable name.
-        """
-        ewc = self.backtesting_weights_config
-        is_live = 'live' if self.is_live else 'backtesting'
-        name = f"VFB reb: {ewc.rebalance_strategy_name} signal: {ewc.signal_weights_name} in {is_live} mode"
-        return name
 
     def build_prefix(self):
         reba_strat = self.rebalance_strategy_name

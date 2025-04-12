@@ -110,7 +110,7 @@ class PersistManager:
 
                  description: Union[str, None] = None,
                  class_name: Union[str, None] = None,
-                 human_readable: Union[str, None] = None, metadata: Union[dict, None] = None,
+                  metadata: Union[dict, None] = None,
                  local_metadata: Union[dict, None] = None
 
                  ):
@@ -125,7 +125,6 @@ class PersistManager:
 
 
         self.table_model_loaded = False
-        self.human_readable = human_readable if human_readable is not None else local_hash_id
 
         self.class_name = class_name
 
@@ -254,17 +253,13 @@ class PersistManager:
         """
 
         if is_api ==False:
-            try:
-                human_readable = new_ts.local_persist_manager.metadata.human_readable
-            except KeyError:
-                human_readable = new_ts.human_readable
+
             self.local_metadata.depends_on_connect(
 
                                         source_local_hash_id=self.local_metadata.local_hash_id,
                                         target_local_hash_id=new_ts.local_hash_id,
 
                                         target_class_name=new_ts.__class__.__name__,
-                                        target_human_readable=human_readable,
 
                                         source_data_source_id=self.data_source.id,
                                         target_data_source_id=new_ts.data_source.id
@@ -502,8 +497,7 @@ class PersistManager:
                               data_source=data_source.model_dump(),
                               build_meta_data=remote_build_metadata)
 
-                if self.human_readable is not None:
-                    kwargs["human_readable"] = self.human_readable
+
 
                 # kwargs["source_class_name"]=self.class_name
                 self.metadata = DynamicTableMetaData.get_or_create(**kwargs)

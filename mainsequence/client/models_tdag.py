@@ -129,7 +129,6 @@ class TimeSerieNode(BasePydanticModel, BaseObjectOrm):
     hash_id: str
     data_source_id: int
     source_class_name: str
-    human_readable: str
     creation_date: datetime.datetime
     relation_tree_frozen: bool
 
@@ -739,13 +738,13 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                            target_local_hash_id: str,
                            source_data_source_id: id,
                            target_data_source_id: id,
-                           target_human_readable: str):
+                         ):
 
         s = cls.build_session()
         url = cls.get_object_url("TimeSerie") + "/depends_on_connect/"
         payload = dict(json={"target_class_name": target_class_name,
                              "source_local_hash_id": source_local_hash_id, "target_local_hash_id": target_local_hash_id,
-                             "target_human_readable": target_human_readable,
+
                              "source_data_source_id": source_data_source_id,
                              "target_data_source_id": target_data_source_id,
                              })
@@ -765,7 +764,6 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
                                                 description="Whether the data source is open for everyone")
     build_configuration: Dict[str, Any] = Field(..., description="Configuration in JSON format")
     build_meta_data: Optional[Dict[str, Any]] = Field(None, description="Optional YAML metadata")
-    human_readable: Optional[str] = Field(None, max_length=255, description="Human-readable description")
     time_serie_source_code_git_hash: Optional[str] = Field(None, max_length=255,
                                                            description="Git hash of the time series source code")
     time_serie_source_code: Optional[str] = Field(None, description="File path for time series source code")

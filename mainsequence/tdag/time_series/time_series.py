@@ -1664,7 +1664,6 @@ class APITimeSerie(CommonMethodsMixin):
 
                                                                class_name=local_metadata["build_configuration"][
                                                                    "time_series_class_import_path"]["qualname"],
-                                                               human_readable=f"Local API Lake for {self.local_hash_id}",
                                                                logger=self.logger,
                                                                local_metadata=local_metadata,
                                                                description=f"Local API Lake for {self.local_hash_id}",
@@ -1921,9 +1920,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
     def local_time_serie(self):
         return self.local_persist_manager.local_metadata
 
-    @property
-    def human_readable(self):
-        return None
+
 
     @property
     def update_uses_parallel(self):
@@ -2094,15 +2091,11 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                Local metadata for the time series, if available.
         """
         from .persist_managers import DataLakePersistManager
-        try:
-            human_readable = self.human_readable
-        except:
-            human_readable = None
+
 
         self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=local_hash_id,
 
                                                                         class_name=self.__class__.__name__,
-                                                                        human_readable=human_readable,
 
                                                                         local_metadata=local_metadata,
                                                                         data_source=self.data_source,

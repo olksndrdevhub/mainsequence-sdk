@@ -536,13 +536,7 @@ class InterpolatedPrices(TimeSerie):
 
         return required
 
-    @property
-    def human_readable(self) -> str:
-        """
-        Returns a human-readable string representation of the object.
-        """
-        name = f"{self.__class__.__name__} Upsample: {self.upsample_frequency_id} {self.markets_time_series_unique_id_list}"
-        return name
+
 
     def run_after_post_init_routines(self):
         """

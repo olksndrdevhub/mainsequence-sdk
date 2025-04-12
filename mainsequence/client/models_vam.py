@@ -869,7 +869,7 @@ class ExecutionPrediction(BaseObjectOrm):
         payload = {"json": {"time_serie_hash_id": time_serie_hash_id,
                             "prediction_time": prediction_time.strftime(DATE_FORMAT),
                             "symbol_to_search_map": symbol_to_search_map,
-                            "predictions": predictions, "human_readable_name": human_readable_name,
+                            "predictions": predictions,
                             }, }
 
         r = make_request(s=cls.build_session(),
