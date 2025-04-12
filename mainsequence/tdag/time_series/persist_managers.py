@@ -46,6 +46,11 @@ class APIPersistManager:
             self._local_metadata_cached = self._local_metadata_future.result()
         return self._local_metadata_cached
 
+    @property
+    def metadata(self):
+        return self.local_metadata.remote_table
+
+
     def _init_local_metadata(self):
         """Perform the REST request asynchronously."""
         try:
@@ -154,9 +159,7 @@ class PersistManager:
 
     def set_local_metadata(self,local_metadata:LocalTimeSerie):
         self._local_metadata_cached = local_metadata
-        self.local_build_configuration = local_metadata.build_configuration
-        self.local_build_metadata = local_metadata.build_meta_data
-        self.metadata = local_metadata.remote_table
+
 
     @property
     def local_metadata(self):
@@ -171,6 +174,15 @@ class PersistManager:
             return self._local_metadata_cached
 
             # Define a callback that will launch set_local_metadata_lazy after the remote update is complete.
+    @property
+    def metadata(self):
+        return self.local_metadata.remote_table
+    @property
+    def local_build_configuration(self):
+        return self.local_metadata.build_configuration
+    @property
+    def local_build_metadata(self):
+        return self.local_metadata.build_meta_data
 
     def set_local_metadata_lazy_callback(self,fut:Future):
         try:
@@ -500,8 +512,9 @@ class PersistManager:
 
 
                 # kwargs["source_class_name"]=self.class_name
-                self.metadata = DynamicTableMetaData.get_or_create(**kwargs)
-
+                #todo. thread this
+                metadata = DynamicTableMetaData.get_or_create(**kwargs)
+                self.set_local_metadata_lazy(force_registry=True,include_relations_detail=True)
                 #todo: after creating metadata always delete local parquet manager even if not exist
                 # self.delete_local_parquet()
 

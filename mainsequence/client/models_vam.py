@@ -469,16 +469,23 @@ class AccountPortfolioHistoricalPositions(BaseObjectOrm, BasePydanticModel):
     positions: list[AccountPortfolioPosition]
 
 class AccountTargetPortfolio(BaseObjectOrm, BasePydanticModel):
+    id:int
     related_account:Optional[int]
     latest_positions:Optional[AccountPortfolioHistoricalPositions]=None
+    model_portfolio_name:Optional[str]=None
+    model_portfolio_description:Optional[str]=None
     @property
     def unique_identifier(self):
         return self.related_account_id
 
+    def get_latest_positions_as_df(self):
+        if self.latest_positions is None:
+            return pd.DataFrame()
+
 
 class AccountMixin(BasePydanticModel):
     id: Optional[int] = None
-    execution_venue: "ExecutionVenue"
+    execution_venue: Union["ExecutionVenue",int]
     account_is_active: bool
     account_name: Optional[str] = None
     cash_asset: Asset
@@ -798,6 +805,7 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
     tags: Optional[List[PortfolioTags]] = None
+    valuation_asset:Union[Asset,int]
 
     @classmethod
     def create_from_time_series(
