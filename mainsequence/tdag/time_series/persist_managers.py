@@ -177,9 +177,11 @@ class PersistManager:
     @property
     def metadata(self):
         return self.local_metadata.remote_table
+
     @property
     def local_build_configuration(self):
         return self.local_metadata.build_configuration
+
     @property
     def local_build_metadata(self):
         return self.local_metadata.build_meta_data
@@ -191,11 +193,11 @@ class PersistManager:
         except Exception as exc:
             # Optionally, handle or log the error if needed.
             # For example: logger.error("Remote build update failed: %s", exc)
-            raise e
+            raise exc
         # Launch the local metadata update regardless of the outcome.
         self.set_local_metadata_lazy(force_registry=True)
 
-    def set_local_metadata_lazy(self,force_registry=True,include_relations_detail=False):
+    def set_local_metadata_lazy(self,force_registry=True, include_relations_detail=False):
 
         with self._local_metadata_lock:
             if force_registry:
@@ -209,17 +211,17 @@ class PersistManager:
         def _get_or_none_local_metadata():
             """Perform the REST request asynchronously."""
             try:
-                result = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
-                                                    remote_table__data_source__id=self.data_source.id,
-                                                    include_relations_detail=include_relations_detail
-                                                    )
+                result = LocalTimeSerie.get_or_none(
+                    local_hash_id=self.local_hash_id,
+                    remote_table__data_source__id=self.data_source.id,
+                    include_relations_detail=include_relations_detail
+                )
                 new_future.set_result(result)
             except Exception as exc:
                 new_future.set_exception(exc)
             finally:
                 # Remove the future from the global registry once done.
                 future_registry.remove_future(new_future)
-
 
         thread = threading.Thread(target=_get_or_none_local_metadata,
                                   name=f"LocalMetadataThreadPM-{self.local_hash_id}",
@@ -246,11 +248,7 @@ class PersistManager:
             return None
 
         #speedd up the wait
-        self.set_local_metadata_lazy(force_registry=True)
-
-
-
-
+        self.set_local_metadata_lazy(force_registry=True, include_relations_detail=True)
 
     def depends_on_connect(self,new_ts:"TimeSerie",is_api:bool):
         """
@@ -333,8 +331,6 @@ class PersistManager:
 
         return mermaid_chart
 
-
-
     def get_all_dependencies_update_priority(self):
         depth_df = self.local_metadata.get_all_dependencies_update_priority()
         return depth_df
@@ -350,9 +346,7 @@ class PersistManager:
 
     @property
     def run_configuration(self):
-
         return self.local_metadata.run_configuration
-
 
     @property
     def source_table_configuration(self):
@@ -360,21 +354,11 @@ class PersistManager:
             return self.metadata['sourcetableconfiguration']
         return None
     @none_if_backend_detached
-    def update_source_informmation(self, git_hash_id:str, source_code:str):
-        """
-
-        Args:
-            git_hash_id:
-            source_code:
-
-        Returns:
-
-        """
-
-        self.metadata = self.metadata.patch( time_serie_source_code_git_hash=git_hash_id,
-                            time_serie_source_code=source_code,)
-
-    
+    def update_source_informmation(self, git_hash_id: str, source_code: str):
+        self.local_metadata.remote_table = self.metadata.patch(
+            time_serie_source_code_git_hash=git_hash_id,
+            time_serie_source_code=source_code,
+        )
 
     @staticmethod
     def batch_data_persisted(hash_id_list: list):
@@ -487,7 +471,7 @@ class PersistManager:
         :return:
         """
 
-        remote_build_configuration=None
+        remote_build_configuration = None
         if hasattr(self, "remote_build_configuration"):
             remote_build_configuration = self.remote_build_configuration
         if hasattr(self, "remote_build_metadata"):
@@ -513,30 +497,25 @@ class PersistManager:
 
                 # kwargs["source_class_name"]=self.class_name
                 #todo. thread this
-                metadata = DynamicTableMetaData.get_or_create(**kwargs)
-                self.set_local_metadata_lazy(force_registry=True,include_relations_detail=True)
+                dtd_metadata = DynamicTableMetaData.get_or_create(**kwargs)
+                remote_table_hash_id = dtd_metadata.hash_id
                 #todo: after creating metadata always delete local parquet manager even if not exist
                 # self.delete_local_parquet()
 
             except Exception as e:
                 self.logger.exception(f"{remote_table_hashed_name} Could not set meta data in DB for P")
                 raise e
-        # check if link to local update exists
+        else:
+            self.set_local_metadata_lazy(force_registry=True, include_relations_detail=True)
+            remote_table_hash_id = self.metadata.hash_id
 
-        local_table_exist = self._verify_local_ts_exists(local_configuration=local_configuration)
+        local_table_exist = self._verify_local_ts_exists(remote_table_hash_id=remote_table_hash_id, local_configuration=local_configuration)
 
-        return remote_table_exist,local_table_exist
+        return remote_table_exist, local_table_exist
 
-    def _verify_local_ts_exists(self,local_configuration:Union[dict,None]=None):
+    def _verify_local_ts_exists(self, remote_table_hash_id: str, local_configuration: Union[dict, None]=None):
         """
         Verifies that the local time serie exist in ORM
-        Parameters
-        ----------
-        local_configuration
-
-        Returns
-        -------
-
         """
         local_table_exist=True
         local_build_configuration = None
@@ -545,38 +524,29 @@ class PersistManager:
         if local_build_configuration is None:
 
             logger.debug(f"local_metadata {self.local_hash_id} does not exist creating")
-            local_table_exist=False
+            local_table_exist = False
             local_update = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
                                                        remote_table__data_source__id=self.data_source.id)
             if local_update is None:
                 local_build_metadata = local_configuration[
                     "build_meta_data"] if "build_meta_data" in local_configuration.keys() else {}
                 local_configuration.pop("build_meta_data", None)
-                metadata_kwargs=dict(local_hash_id=self.local_hash_id,
-                              build_configuration=local_configuration,
-                              remote_table__hash_id=self.metadata.hash_id,
-                                     description=self.description,
-                                     data_source_id=self.data_source.id
-                                     )
+                metadata_kwargs = dict(
+                    local_hash_id=self.local_hash_id,
+                    build_configuration=local_configuration,
+                    remote_table__hash_id=remote_table_hash_id,
+                    description=self.description,
+                    data_source_id=self.data_source.id
+                )
 
-
-                local_metadata = LocalTimeSerie.get_or_create(**metadata_kwargs,
-
-                                              )
-                self.set_local_metadata_lazy(force_registry=True,include_relations_detail=False)
-
-
-
+                local_metadata = LocalTimeSerie.get_or_create(**metadata_kwargs,)
+                self.set_local_metadata_lazy(force_registry=True, include_relations_detail=True)
             else:
-                local_metadata=local_update
+                local_metadata = local_update
                 self.set_local_metadata(local_metadata=local_metadata)
 
-
-
-
-
-
         return   local_table_exist
+
     def _verify_insertion_format(self,temp_df):
         """
         verifies that data frame is properly configured
@@ -691,25 +661,13 @@ class PersistManager:
                              overwrite=False):
         """
         Main update time series function, it is called from TimeSeries class
-        Parameters
-        ----------
-        temp_df
-        latest_value
-        session
-
-        Returns
-        -------
-
         """
-
         self._local_metadata_cached = DynamicTableHelpers.upsert_data_into_table(
             local_metadata=self.local_metadata,
             data=temp_df,
             data_source=self.data_source,
 
         )
-
-
 
     def get_persisted_ts(self):
         """
@@ -718,7 +676,6 @@ class PersistManager:
         """
 
         persisted_df = self.dth.get_data_by_time_index(metadata=self.metadata)
-
         return persisted_df
 
     def filter_by_assets_ranges(self, asset_ranges_map: dict,time_serie):

@@ -551,9 +551,6 @@ class InterpolatedPrices(TimeSerie):
         except LocalTimeSeriesDoesNotExist:
             return None  # first update
 
-
-
-
         if not self.metadata.protect_from_deletion:
             self.local_persist_manager.protect_from_deletion()
 

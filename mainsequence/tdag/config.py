@@ -71,9 +71,6 @@ class Configuration:
             return None
         for ob_var in self.OBLIGATORY_ENV_VARIABLES:
             assert ob_var in os.environ, f"{ob_var} not in environment variables"
-            
-
-
 
     def _build_template_yaml(self):
         config = {
@@ -115,23 +112,23 @@ class TimeSeriesOGM:
 
     @property
     def temp_folder(self):
-        target_path = f"{self.time_series_folder}/temp"
+        target_path = os.path.join(f"{self.time_series_folder}", "temp")
         self.verify_exist(target_path=target_path)
         return target_path
 
     @property
     def local_metadata_path(self):
-        target_path = f"{self.time_series_folder}/metadata"
+        target_path = os.path.join(f"{self.time_series_folder}", "metadata")
         self.verify_exist(target_path=target_path)
         return target_path
 
     @property
     def pickle_storage_path(self):
-        target_path = f"{self.time_series_folder}/pickled_ts"
+        target_path = os.path.join(f"{self.time_series_folder}", "pickled_ts")
         self.verify_exist(target_path=target_path)
         return target_path
 
     def get_ts_pickle_path(self, local_hash_id: str):
-        return f"{self.pickle_storage_path}/{local_hash_id}.pickle"
+        return os.path.join(f"{self.pickle_storage_path}", f"{local_hash_id}.pickle")
 
 ogm = TimeSeriesOGM()
