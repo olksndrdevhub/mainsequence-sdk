@@ -14,7 +14,7 @@ import json
 import time
 
 from enum import IntEnum, Enum
-
+from decimal import Decimal
 from mainsequence.client import LocalTimeSerie
 
 from .base import BasePydanticModel, BaseObjectOrm, MARKETS_CONSTANTS as CONSTANTS, TDAG_ENDPOINT, API_ENDPOINT, HtmlSaveException
@@ -1108,7 +1108,8 @@ class OrderStatus(str, Enum):
     PARTIALLY_FILLED = "partially_filled"
     CANCELED = "canceled"
     NOT_PLACED = "not_placed"
-
+class OrderTimeInForce(str, Enum):
+    GOOD_TILL_CANCELED = "gtc"
 class OrderSide(IntEnum):
     SELL = -1
     BUY = 1
@@ -1139,7 +1140,22 @@ class Order(BaseObjectOrm, BasePydanticModel):
 
     class Config:
         use_enum_values = True  # This allows using enum values directly
+    @classmethod
+    def update_or_create(cls,*args,**kwargs):
+        url = f"{cls.get_object_url()}/update_or_create/"
+        payload = { "json": kwargs }
 
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            payload=payload
+        )
+
+        if r.status_code not in  [200,201]:
+            raise r.text
+        return cls(**r.json())
 class MarketOrder(Order):
     pass
 
@@ -1148,7 +1164,7 @@ class LimitOrder(Order):
 
 class OrderManagerTargetQuantity(BaseModel):
     asset: Union[int, Asset]
-    quantity: float
+    quantity: Decimal
 
 class OrderManager(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
@@ -1157,6 +1173,19 @@ class OrderManager(BaseObjectOrm, BasePydanticModel):
     order_received_time: Optional[datetime.datetime] = None
     execution_end: Optional[datetime.datetime] = None
     related_account: Union[Account, int]  # Representing the ForeignKey field with the related account ID
+
+
+    @staticmethod
+    def serialize_for_json(kwargs):
+        new_data = {}
+        for key, value in kwargs.items():
+            new_value = copy.deepcopy(value)
+            if isinstance(value, datetime.datetime):
+                new_value = str(value)
+            elif key == "target_rebalance":
+                new_value=[json.loads(c.model_dump_json()) for c in value]
+            new_data[key] = new_value
+        return new_data
 
     @classmethod
     def destroy_before_date(cls, target_date: datetime.datetime):
