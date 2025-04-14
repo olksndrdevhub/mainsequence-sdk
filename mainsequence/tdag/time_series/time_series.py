@@ -1134,7 +1134,9 @@ class TimeSerieRebuildMethods(ABC):
             self.local_persist_manager.local_metadata.set_end_of_execution(
                 historical_update_id=local_time_serie_historical_update.id,
                 error_on_update=error_on_last_update)
-
+            #always set last relations details
+            self.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True,
+                                                               )
             self._run_post_update_routines(error_on_last_update=error_on_last_update,
                                            update_statistics=update_statistics
                                            )

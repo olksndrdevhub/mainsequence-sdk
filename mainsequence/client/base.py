@@ -87,6 +87,7 @@ class BaseObjectOrm:
 
         # VAM
         "TargetPortfolio": 'assets/target_portfolio',
+        "AssetOnlyPortfolio":'assets/asset_only_portfolio',
         "Asset": "assets/asset",
         "IndexAsset": "assets/index_asset",
         "AssetFutureUSDM": "assets/asset_future_usdm",
@@ -113,7 +114,6 @@ class BaseObjectOrm:
         "HistoricalBarsSource": "data_sources/historical-bars-source",
         "MarketsTimeSeriesDetails": "data_sources/markets-time-series-details",
         "AssetCategory": "assets/asset-category",
-        "TargetPortfolioFrontEndDetails": "assets/target-portfolio-details",
 
         # TDAG
         "TimeSerie": "ogm/time_serie",

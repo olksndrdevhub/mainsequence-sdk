@@ -30,19 +30,34 @@ def validator_for_string(value):
         except ValueError:
             raise ValueError(f"Invalid datetime format: {value}. Expected format is 'YYYY-MM-DDTHH:MM:SSZ'.")
 
-def get_correct_asset_class(asset_type):
-    # if asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_SPOT, CONSTANTS.ASSET_TYPE_CASH_EQUITY,CONSTANTS.ASSET_TYPE_CURRENCY]:
-    #     return Asset
-    # elif asset_type in [CONSTANTS.ASSET_TYPE_CRYPTO_USDM]:
-    #     return AssetFutureUSDM
-    # elif asset_type in [CONSTANTS.ASSET_TYPE_CURRENCY_PAIR]:
-    #     return AssetCurrencyPair
-    # else:
-    raise NotImplementedError
+
+def get_model_class(model_class: str):
+    """
+    Reverse look from model class by name
+    """
+    MODEL_CLASS_MAP = {
+
+        "Asset": Asset,
+        "AssetCurrencyPair": AssetCurrencyPair,
+        "AssetFutureUSDM": AssetFutureUSDM,
+        "IndexAsset": IndexAsset,
+        "TargetPortfolioIndexAsset": TargetPortfolioIndexAsset,
+        "Calendar": Calendar
+    }
+    return MODEL_CLASS_MAP[model_class]
+
+
+def create_from_serializer_with_class(asset_list: List[dict]):
+    new_list = []
+    for a in asset_list:
+        AssetClass = get_model_class(a["AssetClass"])
+        a.pop("AssetClass")
+        new_list.append(AssetClass(**a))
+    return new_list
+
 
 def resolve_asset(asset_dict:dict):
-    # AssetClass = get_correct_asset_class(asset_dict['asset_type'])
-    # asset = AssetClass(**asset_dict)
+    asset=create_from_serializer_with_class([asset_dict])[0]
     return asset
 
 
@@ -460,7 +475,6 @@ class AccountPortfolioPosition(BasePydanticModel):
     weight_notional_exposure: Optional[float]=0.0
     constant_notional_exposure: Optional[float]=0.0
     single_asset_quantity: Optional[float]=0.0
-    assets_in_position: list["WeightPosition"]
 
 class AccountPortfolioHistoricalPositions(BaseObjectOrm, BasePydanticModel):
     id: Optional[int]
@@ -478,9 +492,6 @@ class AccountTargetPortfolio(BaseObjectOrm, BasePydanticModel):
     def unique_identifier(self):
         return self.related_account_id
 
-    def get_latest_positions_as_df(self):
-        if self.latest_positions is None:
-            return pd.DataFrame()
 
 
 class AccountMixin(BasePydanticModel):
@@ -603,11 +614,32 @@ class RebalanceTargetPosition(BasePydanticModel):
 class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
 
 
+    def snapshot_account(self,timeout=None):
+
+        base_url = self.get_object_url()
+        url = f"{base_url}/{self.id}/snapshot_account/"
+        r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="GET", url=url,
+                         time_out=timeout)
+        if r.status_code != 200:
+            raise Exception(f"Error Getting NAV in account {r.text}")
+
+
+    def get_tracking_error_details(self, timeout=None):
+
+        base_url = self.get_object_url()
+        url = f"{base_url}/{self.id}/get_tracking_error_details/"
+        r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="GET", url=url,
+                         time_out=timeout)
+        if r.status_code != 200:
+            raise Exception(f"Error Getting NAV in account {r.text}")
+        result = r.json()
+        return result['fund_summary'],result['account_tracking_error']
 
     def rebalance(
         self,
         target_positions: List[RebalanceTargetPosition],
-        scheduled_time: Optional[datetime.datetime] = None
+        scheduled_time: Optional[datetime.datetime] = None,
+            timeout=None
     ) -> AccountPortfolioScheduledRebalance:
 
         parsed_target_positions = {}
@@ -620,6 +652,7 @@ class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
             }
 
         return AccountPortfolioScheduledRebalance.create(
+            timeout=timeout,
             target_positions=parsed_target_positions,
             target_account_portfolio=self.id,
             scheduled_time=scheduled_time,
@@ -777,18 +810,18 @@ class TargetPortfolioAbout(TypedDict):
     rebalance_strategy_name: str
 
 
-class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
-    id: Optional[Union[int,str]] = None
+class TargetPortfolioMixin:
+    id: Optional[Union[int, str]] = None
     portfolio_name: str = Field(..., max_length=255)
     portfolio_ticker: str = Field(..., max_length=150)
     latest_rebalance: Optional[datetime.datetime] = None
-    calendar:Calendar
+    calendar: Calendar
 
     is_asset_only: bool = False
-    build_purpose:str
+    build_purpose: str
     is_active: bool = False
     local_time_serie: LocalTimeSerie
-    signal_local_time_serie:LocalTimeSerie
+    signal_local_time_serie: LocalTimeSerie
 
     builds_from_predictions: bool = False
     builds_from_target_positions: bool = False
@@ -798,14 +831,14 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
         description="Flag indicating if the system should track the funds' expected exposure based on the latest holdings. This is helpful when building your execution engine"
     )
     required_venues: List[Union[int, ExecutionVenue]]
-    latest_weights:Optional[List[Dict]] =None
+    latest_weights: Optional[List[Dict]] = None
 
     creation_date: Optional[datetime.datetime] = None
 
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
     tags: Optional[List[PortfolioTags]] = None
-    valuation_asset:Union[Asset,int]
+    valuation_asset: Union[Asset, int]
 
     @classmethod
     def create_from_time_series(
@@ -813,10 +846,10 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             portfolio_name: str,
             build_purpose: str,
             local_time_serie_id: int,
-            signal_local_time_serie_id:int,
-            is_active: bool ,
-            valuation_asset_id:int,
-            required_venues__symbols:list[str],
+            signal_local_time_serie_id: int,
+            is_active: bool,
+            valuation_asset_id: int,
+            required_venues__symbols: list[str],
             calendar_name: str,
             tracking_funds_expected_exposure_from_latest_holdings: bool,
             is_asset_only: bool,
@@ -839,27 +872,31 @@ class TargetPortfolio(BaseObjectOrm, BasePydanticModel):
             "tracking_funds_expected_exposure_from_latest_holdings": tracking_funds_expected_exposure_from_latest_holdings,
             "is_asset_only": is_asset_only,
             "target_portfolio_about": target_portfolio_about,
-            "valuation_asset_id":valuation_asset_id,
+            "valuation_asset_id": valuation_asset_id,
             "backtest_table_price_column_name": backtest_table_price_column_name,
             "tags": tags,
         }
 
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": payload_data},time_out=timeout)
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url,
+                         payload={"json": payload_data}, time_out=timeout)
         if r.status_code not in [201]:
             raise Exception(f" {r.text}")
-        response=r.json()
+        response = r.json()
 
-        return cls(**response["portfolio"]),TargetPortfolioIndexAsset(**response["portfolio_index_asset"])
+        return cls(**response["portfolio"]), TargetPortfolioIndexAsset(**response["portfolio_index_asset"])
 
-    def add_venue(self,venue_id)->None:
+    def add_venue(self, venue_id) -> None:
         url = f"{self.get_object_url()}/{self.id}/add_venue/"
         payload = {"json": {"venue_id": venue_id}}
         r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
-
-class AssetOnlyPortfolio(BaseObjectOrm):
+class TargetPortfolio(TargetPortfolioMixin,BaseObjectOrm, BasePydanticModel):
     pass
+
+class AssetOnlyPortfolio(TargetPortfolioMixin,BaseObjectOrm, BasePydanticModel):
+    local_time_serie: Optional[LocalTimeSerie]=None
+    signal_local_time_serie:Optional[LocalTimeSerie]=None
 
 class ExecutionPrediction(BaseObjectOrm):
     @classmethod
@@ -945,8 +982,6 @@ class VirtualFund(BaseObjectOrm, BasePydanticModel):
     id: Optional[float] = None
     target_portfolio: Union[int,"TargetPortfolio"]
     target_account: AccountMixin
-    fund_name: str
-    fund_comments: str
     notional_exposure_in_account: float
     latest_holdings: "VirtualFundHistoricalHoldings" = None
     latest_rebalance: Optional[datetime.datetime] = None
@@ -955,7 +990,6 @@ class VirtualFund(BaseObjectOrm, BasePydanticModel):
     requires_nav_adjustment: bool = Field(default=False)
     target_portfolio_weight_in_account: Optional[float] = None
     last_trade_time: Optional[datetime.datetime] = None
-    latest_holdings_are_only_cash: bool
 
     # def sanitize_target_weights_for_execution_venue(self,target_weights:dict):
     #     """

@@ -2,28 +2,7 @@ from .models_vam import *
 from .base import MARKETS_CONSTANTS
 from .models_tdag import LocalTimeSerie
 
-def get_model_class(model_class: str):
-    """
-    Reverse look from model class by name
-    """
-    MODEL_CLASS_MAP = {
-        
-        "Asset": Asset,
-        "AssetCurrencyPair": AssetCurrencyPair,
-        "AssetFutureUSDM": AssetFutureUSDM,
-        "IndexAsset": IndexAsset,
-        "TargetPortfolioIndexAsset": TargetPortfolioIndexAsset,
-        "Calendar": Calendar
-    }
-    return MODEL_CLASS_MAP[model_class]
 
-def create_from_serializer_with_class(asset_list: List[dict]):
-    new_list = []
-    for a in asset_list:
-        AssetClass = get_model_class(a["AssetClass"])
-        a.pop("AssetClass")
-        new_list.append(AssetClass(**a))
-    return new_list
 
 def get_right_account_class(account: Account):
     from mainsequence.client import models_vam as model_module
