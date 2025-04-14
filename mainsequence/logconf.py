@@ -9,13 +9,8 @@ from typing import Union
 
 from requests.structures import CaseInsensitiveDict
 from structlog.dev import ConsoleRenderer
-from .instrumentation import add_otel_trace_context,OTelJSONRenderer
-logger=None
-
-
-
-
-
+from .instrumentation import OTelJSONRenderer
+logger = None
 
 def extract_from_record(_, __, event_dict):
     """
@@ -39,7 +34,6 @@ def add_structlog_event_to_record(logger, method_name, event_dict):
         record.structlog_event = event_dict.copy()
     return event_dict
 
-
 class CustomConsoleRenderer(ConsoleRenderer):
     def __call__(self, logger, name, event_dict):
         # Extract call site parameters
@@ -55,17 +49,12 @@ class CustomConsoleRenderer(ConsoleRenderer):
             rendered += f" (at {filename}:{lineno} in {func_name}())"
         elif filename and lineno:
             rendered += f" (at {filename}:{lineno})"
-
-
         return rendered
 
-
-
-def build_application_logger(application_name:str="ms-sdk",
-
-                      **metadata):
-
-
+def build_application_logger(
+        application_name:str="ms-sdk",
+        **metadata
+):
     """
     Create a logger that logs to console and file in JSON format.
     """
@@ -84,17 +73,14 @@ def build_application_logger(application_name:str="ms-sdk",
         structlog.stdlib.add_log_level,
         structlog.stdlib.ExtraAdder(),
         timestamper,
-
     ]
 
-    handlers= {
+    handlers = {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "colored",
             "level":os.getenv("LOG_LEVEL", "DEBUG")
         },
-
-
     }
     if logger_file is not None:
         ensure_dir(logger_file)
@@ -200,6 +186,5 @@ def build_application_logger(application_name:str="ms-sdk",
 
     logger = logger.bind()
     return logger
-
 
 logger = build_application_logger()

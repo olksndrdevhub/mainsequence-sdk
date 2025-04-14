@@ -825,9 +825,10 @@ class TimeSerieRebuildMethods(ABC):
             ts.persist_to_pickle()
             ts.logger.info(f"ts {local_hash_id} pickled ")
 
-        ts = TimeSerie.load_and_set_from_pickle(pickle_path=pickle_path,
-                                                graph_depth_limit=graph_depth_limit,
-                                                )
+        ts = TimeSerie.load_and_set_from_pickle(
+            pickle_path=pickle_path,
+            graph_depth_limit=graph_depth_limit,
+        )
         return ts, pickle_path
 
     def set_data_source_from_pickle_path(self, pikle_path):
@@ -912,7 +913,7 @@ class TimeSerieRebuildMethods(ABC):
 
     @classmethod
     def get_pickle_path(cls, local_hash_id: str,data_source_id: int):
-        return f"{ogm.pickle_storage_path}/{data_source_id}/{local_hash_id}.pickle"
+        return os.path.join(ogm.pickle_storage_path, str(data_source_id), f"{local_hash_id}.pickle")
 
     @classmethod
     def load_and_set_from_hash_id(cls,  local_hash_id: int,data_source_id: int):
@@ -2094,15 +2095,12 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         """
         from .persist_managers import DataLakePersistManager
 
-
-        self._local_persist_manager = PersistManager.get_from_data_type(local_hash_id=local_hash_id,
-
-                                                                        class_name=self.__class__.__name__,
-
-                                                                        local_metadata=local_metadata,
-                                                                        data_source=self.data_source,
-
-                                                                        )
+        self._local_persist_manager = PersistManager.get_from_data_type(
+            local_hash_id=local_hash_id,
+            class_name=self.__class__.__name__,
+            local_metadata=local_metadata,
+            data_source=self.data_source,
+        )
         if isinstance(self._local_persist_manager, DataLakePersistManager) and verify_local_run:
             self._local_persist_manager.verify_if_already_run(self)
         self._verify_and_build_remote_objects()
@@ -2130,8 +2128,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             if update_details["remote_exist"] == False or update_details["local_exist"] == False:
                 self.set_relation_tree()
                 self.local_persist_manager.build_update_details(source_class_name=self.__class__.__name__)
-
-
 
         if self.local_persist_manager.update_details is not None:
             source_class_name = self.local_persist_manager.metadata.source_class_name
