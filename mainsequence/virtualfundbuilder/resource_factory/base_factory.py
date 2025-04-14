@@ -6,7 +6,7 @@ from threading import Thread
 
 from mainsequence.client.models_tdag import DynamicResource
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger, parse_object_signature, build_markdown, object_signature_to_yaml
-from typing import get_type_hints, List, Optional
+from typing import get_type_hints, List, Optional, Union
 from pydantic import BaseModel
 from enum import Enum
 from pathlib import Path
@@ -47,34 +47,71 @@ class BaseResource():
 
     @classmethod
     def build_and_parse_from_configuration(cls, **kwargs) -> 'WeightsBase':
-        # Get the __init__ method's type hints and signature
         type_hints = get_type_hints(cls.__init__)
 
-        # Loop through each argument in kwargs
+        def parse_value_into_hint(value, hint):
+            """
+            Recursively parse `value` according to `hint`.
+            Handles:
+              - Pydantic models
+              - Enums
+              - Lists of Pydantic models
+              - Optional[...] / Union[..., NoneType]
+            """
+            if value is None:
+                return None
+
+            from typing import get_origin, get_args, Union
+            origin = get_origin(hint)
+            args = get_args(hint)
+
+            # Handle Optional/Union
+            # e.g. Optional[SomeModel] => Union[SomeModel, NoneType]
+            if origin is Union and len(args) == 2 and type(None) in args:
+                # Identify the non-None type
+                non_none_type = args[0] if args[1] == type(None) else args[1]
+                return parse_value_into_hint(value, non_none_type)
+
+            # Handle single Pydantic model
+            if inspect.isclass(hint) and issubclass(hint, BaseModel):
+                if not isinstance(value, hint):
+                    return hint(**value)
+                return value
+
+            # Handle single Enum
+            if inspect.isclass(hint) and issubclass(hint, Enum):
+                if not isinstance(value, hint):
+                    return hint(value)
+                return value
+
+            # Handle List[...] of Pydantic models or other types
+            if origin is list:
+                inner_type = args[0]
+                # If the list elements are Pydantic models
+                if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
+                    return [
+                        inner_type(**item) if not isinstance(item, inner_type) else item
+                        for item in value
+                    ]
+                # If the list elements are Enums, or other known transformations, handle similarly
+                if inspect.isclass(inner_type) and issubclass(inner_type, Enum):
+                    return [
+                        inner_type(item) if not isinstance(item, inner_type) else item
+                        for item in value
+                    ]
+                # Otherwise, just return the list as is
+                return value
+
+            # If none of the above, just return the value unchanged.
+            return value
+
+        # Now loop through each argument in kwargs and parse
         for arg, value in kwargs.items():
-            # Check if the argument has a type hint in __init__
             if arg in type_hints:
                 hint = type_hints[arg]
+                kwargs[arg] = parse_value_into_hint(value, hint)
 
-                # Check if the hint is a single Pydantic model
-                if inspect.isclass(hint) and issubclass(hint, BaseModel):
-                    # Convert to the Pydantic model if the value is not already an instance
-                    if not isinstance(value, hint):
-                        kwargs[arg] = hint(**value)
-
-                if inspect.isclass(hint) and issubclass(hint, Enum):
-                    # Convert to the Pydantic model if the value is not already an instance
-                    if not isinstance(value, hint):
-                        kwargs[arg] = hint(value)
-                # Check if the hint is a List of Pydantic models
-                elif getattr(hint, '__origin__', None) is list:
-                    inner_type = hint.__args__[0]
-                    if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
-                        # Convert each item in the list to the Pydantic model if not already an instance
-                        if not all(isinstance(item, inner_type) for item in value):
-                            kwargs[arg] = [inner_type(**item) if not isinstance(item, inner_type) else item for item in value]
-
-        return cls( **kwargs)
+        return cls(**kwargs)
 
 
 def insert_in_registry(registry, cls, register_in_agent, name=None, attributes: Optional[dict]=None):
