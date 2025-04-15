@@ -438,9 +438,8 @@ class ConfigSerializer:
         if kwargs["time_series_class_import_path"]["qualname"] == "WrapperTimeSerie":
             ts_kwargs = {}
             ts = collections.OrderedDict(sorted(kwargs["time_series_dict"].items()))
-            for key, ts in ts.items():
-
-                ts_kwargs[key] = f"{ts.local_hash_id}_{ts.data_source_id}"
+            for key, (ts, ev) in ts.items():
+                ts_kwargs[key] = f"{ts.local_hash_id}_{ts.data_source_id}_{ev}"
             kwargs["time_series_dict"] = ts_kwargs
 
         ordered_kwargs = self._serialize_configuration_dict(kwargs=kwargs)
@@ -712,7 +711,7 @@ class GraphNodeMethods(ABC):
         members = self.__dict__
 
         if self.is_local_relation_tree_set == False:
-            #persiste manager needs to have full information
+            # persiste manager needs to have full information
             self.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True,force_registry=True)
 
             for key, value in members.items():
@@ -2576,7 +2575,7 @@ class WrapperTimeSerie(TimeSerie):
     """A wrapper class for managing multiple TimeSerie objects."""
 
     @TimeSerie._post_init_routines()
-    def __init__(self, time_series_dict: Dict[str, TimeSerie], *args, **kwargs):
+    def __init__(self, time_series_dict: Dict[str, TimeSerie], asset_category_unique_id: str, *args, **kwargs):
         """
         Initialize the WrapperTimeSerie.
 
@@ -2584,42 +2583,25 @@ class WrapperTimeSerie(TimeSerie):
             time_series_dict: Dictionary of TimeSerie objects.
         """
         super().__init__(*args, **kwargs)
-        for key, value in time_series_dict.items():
-            if isinstance(value, TimeSerie) == False and "tdag.time_series.time_series.TimeSerie" not in [
-                ".".join([o.__module__, o.__name__]) for o in inspect.getmro(value.__class__)]:
-                if isinstance(value, APITimeSerie) == False and "tdag.time_series.time_series.APITimeSerie" not in [
-                    ".".join([o.__module__, o.__name__]) for o in inspect.getmro(value.__class__)]:
-                    logger.error("value is not of class TimeSerie nor APITimeSerie")
-                    logger.error(self)
-                    raise Exception
-
         self.related_time_series = time_series_dict
 
-        # todo set minimum update date.
+    def lookup_asset_ts(self, asset: "Asset"):
+        lookup_tuple = (asset.execution_venue, asset.figi_details.security_type, asset.figi_details.security_market_sector)
+        if lookup_tuple not in self.assets_lookup_map:
+            raise ValueError(f"Asset {asset} not found in asset lookup map")
+        return self.assets_lookup_map[lookup_tuple]
 
-    @property
-    def wrapped_latest_index_value(self) -> Dict[str, Any]:
-        """
-        Get the latest values of all wrapped TimeSeries.
 
-        Returns:
-            A dictionary with keys corresponding to TimeSerie keys and values being their latest values.
-        """
-        updates = {}
-        for key, ts in self.related_time_series.items():
-            updates[key] = ts.get_update_statistics()
+    def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
+                             end_date: Union[datetime.datetime, None] = None,
+                             unique_identifier_list: Union[None, list] = None,
+                              great_or_equal=True, less_or_equal=True,
+                             unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
+                             ):
 
-        return updates
+        df = None
 
-    @property
-    def wrapper_keys(self) -> List[str]:
-        """
-        Get the keys of all wrapped TimeSeries.
-
-        Returns:
-            A list of keys for all wrapped TimeSeries.
-        """
-        return list(self.related_time_series.keys())
+        return df
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         """ Restore instance attributes from a pickled state. """
@@ -2664,28 +2646,6 @@ class WrapperTimeSerie(TimeSerie):
         data_source = self.load_data_source_from_pickle(pikle_path)
         self.set_data_source(data_source=data_source)
 
-    def set_local_persist_manager_if_not_set(self) -> None:
-        """
-        Set local persist manager for all wrapped TimeSeries.
-        """
-        raise NotImplementedError
-
-        def update_ts(related_time_series, key):
-            related_time_series[key].set_local_persist_manager_if_not_set()
-
-        with ThreadPoolExecutor(max_workers=20) as executor:
-            future_list = []
-            for key, value in self.related_time_series.items():
-                future = executor.submit(update_ts, self.related_time_series, key)
-                future_list.append(future)
-
-            for future in as_completed(future_list):
-                # You can optionally handle exceptions here if any
-                try:
-                    result = future.result()  # This will block until the future is done
-                except Exception as e:
-                    self.logger.exception("Error in thread")
-                    raise e
 
     def set_state_with_sessions(self, include_vam_client_objects: bool,
                                 graph_depth_limit: int,
@@ -2943,18 +2903,6 @@ class WrapperTimeSerie(TimeSerie):
         """ Get values of wrapped TimeSeries. """
         return self.related_time_series.values()
 
-    def get_ts_as_pandas(self) -> List[pd.DataFrame]:
-        """
-         Get all wrapped TimeSeries as a list of pandas DataFrames.
-
-         Returns:
-             A list of pandas DataFrames, one for each wrapped TimeSerie.
-         """
-        pandas_list = []
-        for ts in self.related_time_series.values():
-            pandas_list.append(ts.pandas_df)
-        return pandas_list
-
     def get_wrapped(self) -> List[TimeSerie]:
         """
         Get all wrapped TimeSeries, including nested ones.
@@ -2970,3 +2918,403 @@ class WrapperTimeSerie(TimeSerie):
             else:
                 wrapped.append(ts)
         return wrapped
+
+
+# class WrapperTimeSerie(TimeSerie):
+#     """A wrapper class for managing multiple TimeSerie objects."""
+#
+#     @TimeSerie._post_init_routines()
+#     def __init__(self, time_series_dict: Dict[str, TimeSerie], *args, **kwargs):
+#         """
+#         Initialize the WrapperTimeSerie.
+#
+#         Args:
+#             time_series_dict: Dictionary of TimeSerie objects.
+#         """
+#         super().__init__(*args, **kwargs)
+#         for key, value in time_series_dict.items():
+#             if isinstance(value, TimeSerie) == False and "tdag.time_series.time_series.TimeSerie" not in [
+#                 ".".join([o.__module__, o.__name__]) for o in inspect.getmro(value.__class__)]:
+#                 if isinstance(value, APITimeSerie) == False and "tdag.time_series.time_series.APITimeSerie" not in [
+#                     ".".join([o.__module__, o.__name__]) for o in inspect.getmro(value.__class__)]:
+#                     logger.error("value is not of class TimeSerie nor APITimeSerie")
+#                     logger.error(self)
+#                     raise Exception
+#
+#         self.related_time_series = time_series_dict
+#
+#         # todo set minimum update date.
+#
+#     @property
+#     def wrapped_latest_index_value(self) -> Dict[str, Any]:
+#         """
+#         Get the latest values of all wrapped TimeSeries.
+#
+#         Returns:
+#             A dictionary with keys corresponding to TimeSerie keys and values being their latest values.
+#         """
+#         updates = {}
+#         for key, ts in self.related_time_series.items():
+#             updates[key] = ts.get_update_statistics()
+#
+#         return updates
+#
+#     @property
+#     def wrapper_keys(self) -> List[str]:
+#         """
+#         Get the keys of all wrapped TimeSeries.
+#
+#         Returns:
+#             A list of keys for all wrapped TimeSeries.
+#         """
+#         return list(self.related_time_series.keys())
+#
+#     def __setstate__(self, state: Dict[str, Any]) -> None:
+#         """ Restore instance attributes from a pickled state. """
+#
+#         # Restore instance attributes (i.e., filename and lineno).
+#         for key, value in state["related_time_series"].items():
+#             if isinstance(value, dict) == True:
+#                 local_hash_id = value["local_hash_id"]
+#
+#                 module = importlib.import_module(state["_data_source"]["pydantic_model_import_path"]["module"])
+#                 PydanticClass = getattr(module, state["_data_source"]["pydantic_model_import_path"]['qualname'])
+#                 data_source = PydanticClass(**state["_data_source"]['serialized_model'])
+#                 pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
+#                                                         data_source_id=data_source.id
+#                                                         )
+#
+#                 state["related_time_series"][key] = load_from_pickle(pickle_path=pickle_path)
+#
+#         self.__dict__.update(state)
+#
+#     def __getstate__(self):
+#         # Copy the object's state from self.__dict__ which contains
+#         # all our instance attributes. Always use the dict.copy()
+#         # method to avoid modifying the original state.
+#
+#         state = self.__dict__
+#         for key, value in state["related_time_series"].items():
+#             new_value = {"is_time_serie_pickled": True}
+#             if isinstance(value, dict):
+#                 assert value["is_time_serie_pickled"] == True
+#                 new_value = value
+#             else:
+#                 value.persist_to_pickle()
+#                 new_value["local_hash_id"] = value.local_hash_id
+#             state["related_time_series"][key] = new_value
+#         state = self._prepare_state_for_pickle(state=state)
+#
+#         # Remove the unpicklable entries.
+#         return state
+#
+#     def set_data_source_from_pickle_path(self, pikle_path):
+#         data_source = self.load_data_source_from_pickle(pikle_path)
+#         self.set_data_source(data_source=data_source)
+#
+#     def set_local_persist_manager_if_not_set(self) -> None:
+#         """
+#         Set local persist manager for all wrapped TimeSeries.
+#         """
+#         raise NotImplementedError
+#
+#         def update_ts(related_time_series, key):
+#             related_time_series[key].set_local_persist_manager_if_not_set()
+#
+#         with ThreadPoolExecutor(max_workers=20) as executor:
+#             future_list = []
+#             for key, value in self.related_time_series.items():
+#                 future = executor.submit(update_ts, self.related_time_series, key)
+#                 future_list.append(future)
+#
+#             for future in as_completed(future_list):
+#                 # You can optionally handle exceptions here if any
+#                 try:
+#                     result = future.result()  # This will block until the future is done
+#                 except Exception as e:
+#                     self.logger.exception("Error in thread")
+#                     raise e
+#
+#     def set_state_with_sessions(self, include_vam_client_objects: bool,
+#                                 graph_depth_limit: int,
+#                                 graph_depth: int,
+#                                 ) -> None:
+#         """
+#         Set state with sessions for all wrapped TimeSeries.
+#
+#         Args:
+#             include_vam_client_objects: Whether to include asset ORM objects.
+#             graph_depth_limit: The maximum depth of the graph to traverse.
+#             graph_depth: The current depth in the graph.
+#             local_metadatas: Optional metadata dictionary.
+#         """
+#
+#         USE_THREADS = True
+#
+#         super(TimeSerie, self).set_state_with_sessions(
+#             include_vam_client_objects=include_vam_client_objects,
+#             graph_depth_limit=graph_depth_limit,
+#             graph_depth=graph_depth)
+#         errors = {}
+#
+#         def update_ts(related_time_series, ts_key, include_vam_client_objects,
+#                       graph_depth,
+#                       graph_depth_limit, error_list,  rel_ts, raise_exceptions=USE_THREADS):
+#             if isinstance(rel_ts, dict):
+#                 pickle_path = TimeSerie.get_pickle_path(local_hash_id=rel_ts['local_hash_id'])
+#                 related_time_series[ts_key] = load_from_pickle(pickle_path=pickle_path)
+#             try:
+#                 if isinstance(related_time_series[ts_key], APITimeSerie):
+#                     return None
+#                 related_time_series[ts_key].set_state_with_sessions(
+#                     graph_depth=graph_depth, graph_depth_limit=graph_depth_limit,
+#                     include_vam_client_objects=include_vam_client_objects,
+#                 )
+#             except Exception as e:
+#                 if raise_exceptions == True:
+#                     raise e
+#                 tb_str = traceback.format_exc()
+#                 # Store the exception along with its traceback
+#                 error_list[ts_key] = {'error': str(e), 'traceback': tb_str}
+#
+#         if USE_THREADS == True:
+#             thread_list = []
+#             with ThreadPoolExecutor(max_workers=10) as executor:
+#                 for ts_key, rel_ts in self.related_time_series.items():
+#                     future = executor.submit(update_ts, self.related_time_series, ts_key,
+#                                              include_vam_client_objects, graph_depth,
+#                                              graph_depth_limit, errors,
+#                                              rel_ts)
+#
+#                     thread_list.append(future)
+#                 for future in as_completed(thread_list):
+#                     # You can optionally handle exceptions here if any
+#                     try:
+#                         result = future.result()  # This will block until the future is done
+#                     except Exception as e:
+#                         self.logger.exception("Error in thread")
+#                         raise e
+#         else:
+#             self.logger.warning("NOT using threads for  loading state")
+#             for ts_key, rel_ts in self.related_time_series.items():
+#                 t = update_ts(self.related_time_series, ts_key,
+#                               include_vam_client_objects, graph_depth,
+#                               graph_depth_limit, errors, local_metadatas, rel_ts, True)
+#
+#         if len(errors.keys()) > 0:
+#             raise Exception(f"Error setting state for {errors}")
+#
+#         # for t in thread_list:
+#         #     t.join()
+#
+#     @tracer.start_as_current_span("Wrapper.concat_between_dates")
+#     def pandas_df_concat_on_rows_by_key_between_dates(self, start_date: Optional[datetime.datetime]=None,
+#                                                       great_or_equal: Optional[bool]=None,
+#                                                       end_date: Optional[datetime.datetime]=None,
+#                                                       less_or_equal: Optional[bool]=None,
+#                                                       thread: bool = False,
+#                                                       unique_identifier_list: Optional[list] = None,
+#                                                       return_as_list=False, key_date_filter: Optional[dict] = None,
+#                                                       unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
+#                                                       ) -> pd.DataFrame:
+#         """
+#          Concatenate DataFrames from all wrapped TimeSeries between given dates.
+#
+#          Args:
+#              start_date: The start date for the data range.
+#              great_or_equal: Whether to include the start date (True) or not (False).
+#              end_date: The end date for the data range.
+#              less_or_equal: Whether to include the end date (True) or not (False).
+#              thread: Whether to use threading for parallel processing.
+#              unique_identifier_list: asset_symbol filter
+#              return_as_list: If True, return a dictionary of DataFrames instead of concatenating.
+#             key_date_filter: Concatenate DataFrames only for key date filter.
+#          Returns:
+#              A concatenated DataFrame or a dictionary of DataFrames if return_as_list is True.
+#          """
+#         all_dfs = []
+#         all_dfs_thread = {}
+#         thread = False
+#
+#         def add_ts(ts, key, thread, unique_identifier_list, key_date_filter,unique_identifier_range_map):
+#             data_start_date = start_date
+#             if isinstance(start_date, dict):
+#                 data_start_date = start_date[key]
+#             if key_date_filter is not None:
+#                 data_start_date = key_date_filter.get(key, data_start_date)
+#
+#             tmp_df = ts.get_df_between_dates(start_date=data_start_date, great_or_equal=great_or_equal,
+#                                              end_date=end_date, less_or_equal=less_or_equal,
+#                                              unique_identifier_list=unique_identifier_list,
+#                                              unique_identifier_range_map=unique_identifier_range_map
+#                                              )
+#             tmp_df["key"] = key
+#             all_dfs_thread[key] = tmp_df
+#
+#         if thread == False:
+#             for key, ts in self.related_time_series.items():
+#                 add_ts(ts, key, thread, unique_identifier_list, key_date_filter,unique_identifier_range_map)
+#         else:
+#
+#             with ThreadPoolExecutor(max_workers=10) as executor:
+#                 future_list = []
+#                 for key, ts in self.related_time_series.items():
+#                     future = executor.submit(add_ts, ts, key, thread, unique_identifier_list, key_date_filter,
+#                                              unique_identifier_range_map
+#                                              )
+#                     future_list.append(future)
+#
+#                 for future in as_completed(future_list):
+#                     # You can optionally handle exceptions here if any
+#                     try:
+#                         result = future.result()  # This will block until the future is done
+#                     except Exception as e:
+#                         self.logger.exception("Error in thread")
+#                         raise e
+#
+#         if return_as_list == False:
+#             all_dfs = pd.concat(all_dfs_thread.values(), axis=0)
+#         else:
+#             all_dfs = all_dfs_thread
+#
+#         return all_dfs
+#
+#     @tracer.start_as_current_span("Wrapper.concat_greater_than")
+#     def pandas_df_concat_on_rows_by_key_greater_than(self, target_value: datetime.datetime, great_or_equal: bool,
+#                                                      thread: bool = False, return_as_list=False,
+#                                                      columns: Union[None, list] = None, *args,
+#                                                      **kwargs) -> pd.DataFrame:
+#         """
+#          Concatenate DataFrames from all wrapped TimeSeries greater than a target value.
+#
+#          Args:
+#              target_value: The latest datetime value to compare against.
+#              great_or_equal: Whether to include the target value (True) or not (False).
+#              thread: Whether to use threading for parallel processing.
+#              return_as_list: If True, return a dictionary of DataFrames instead of concatenating.
+#              columns: Optional list of columns to include.
+#
+#          Returns:
+#              A concatenated DataFrame or a dictionary of DataFrames if return_as_list is True.
+#
+#          """
+#         all_dfs = []
+#         all_dfs_thread = {}
+#
+#         def add_ts(ts, key, thread, columns):
+#             tmp_df = ts.get_df_between_dates(start_date=target_value,
+#                                              great_or_equal=great_or_equal,
+#                                              columns=columns,
+#                                              *args, **kwargs
+#                                              )
+#             tmp_df["key"] = key
+#             if thread == False:
+#                 return tmp_df
+#             all_dfs_thread[key] = tmp_df
+#             if return_as_list == False:
+#                 all_dfs = pd.concat(all_dfs, axis=0)
+#
+#         if thread == False:
+#
+#             for key, ts in self.related_time_series.items():
+#                 tmp_df = add_ts(ts, key, thread, columns)
+#                 all_dfs.append(tmp_df)
+#
+#             all_dfs = pd.concat(all_dfs, axis=0)
+#         else:
+#             thread_list = []
+#             for key, ts in self.related_time_series.items():
+#                 t = threading.Thread(target=add_ts, args=(ts, key, thread, columns))
+#                 t.start()
+#                 thread_list.append(t)
+#             for t in thread_list:
+#                 t.join()
+#             all_dfs = pd.concat(all_dfs_thread.values(), axis=0)
+#
+#         return all_dfs
+#
+#     def get_pandas_df_list_data_greater_than(self, target_value: datetime.datetime, great_or_equal: bool,
+#                                              thread=True) -> list:
+#         """
+#         Get DataFrames from all wrapped TimeSeries greater than a target value.
+#
+#         Args:
+#             target_value: The target datetime value to compare against.
+#             great_or_equal: Whether to include the target value (True) or not (False).
+#             thread: Whether to use threading for parallel processing.
+#
+#         Returns:
+#             A dictionary with TimeSerie keys and their corresponding DataFrames or error messages.
+#         """
+#         thread_list = []
+#
+#         def get_df(all_dfs, key, ts, target_value, great_or_equal):
+#             try:
+#                 tmp_df = ts.get_df_between_dates(start_date=target_value, great_or_equal=great_or_equal)
+#                 all_dfs[key] = tmp_df
+#             except Exception as e:
+#                 all_dfs[key] = "Error"
+#
+#         all_dfs = {}
+#         for key, ts in self.related_time_series.items():
+#
+#             if thread == False:
+#                 get_df(all_dfs, key, ts, target_value, great_or_equal, )
+#             else:
+#                 t = threading.Thread(target=get_df, args=(all_dfs, key, ts, target_value, great_or_equal,))
+#                 t.start()
+#                 thread_list.append(t)
+#
+#         for t in thread_list:
+#             t.join()
+#
+#         return all_dfs
+#
+#     def update(self, update_statistics):
+#
+#         """ Implemented in the wrapped nodes"""
+#         pass
+#
+#     def __getitem__(self, item):
+#         return self.related_time_series[item]
+#
+#     def children_is_updating(self) -> bool:
+#         """ Check if any wrapped TimeSerie is currently updating. """
+#
+#         return any([i.active_update for i in self.get_wrapped()])
+#
+#     def items(self):
+#         """Get items of wrapped TimeSeries. """
+#         return self.related_time_series.items()
+#
+#     def values(self):
+#         """ Get values of wrapped TimeSeries. """
+#         return self.related_time_series.values()
+#
+#     def get_ts_as_pandas(self) -> List[pd.DataFrame]:
+#         """
+#          Get all wrapped TimeSeries as a list of pandas DataFrames.
+#
+#          Returns:
+#              A list of pandas DataFrames, one for each wrapped TimeSerie.
+#          """
+#         pandas_list = []
+#         for ts in self.related_time_series.values():
+#             pandas_list.append(ts.pandas_df)
+#         return pandas_list
+#
+#     def get_wrapped(self) -> List[TimeSerie]:
+#         """
+#         Get all wrapped TimeSeries, including nested ones.
+#
+#         Returns:
+#             A list of all wrapped TimeSerie objects, including those nested in other WrapperTimeSeries.
+#         """
+#         wrapped = []
+#         for ts in self.related_time_series.values():
+#             if isinstance(ts, WrapperTimeSerie):
+#                 tmp_w = ts.get_wrapped()
+#                 wrapped.extend(tmp_w)
+#             else:
+#                 wrapped.append(ts)
+#         return wrapped

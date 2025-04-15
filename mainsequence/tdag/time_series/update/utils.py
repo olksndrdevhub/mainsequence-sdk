@@ -30,14 +30,13 @@ def get_node_time_to_wait(local_metadata):
         time_to_wait = (pd.to_datetime(next_update) - datetime.datetime.now(pytz.utc)).total_seconds()
         time_to_wait = max(0, time_to_wait)
     return time_to_wait, next_update
-def get_time_to_wait_from_hash_id(local_hash_id: str,data_source_id:int):
-    
-    local_metadata = LocalTimeSerie.get_or_none(local_hash_id=local_hash_id,
-                                              data_source_id=data_source_id
-                                              )
-    time_to_wait, next_update = get_node_time_to_wait(local_metadata=local_metadata)
 
-    
+def get_time_to_wait_from_hash_id(local_hash_id: str,data_source_id:int):
+    local_metadata = LocalTimeSerie.get_or_none(
+        local_hash_id=local_hash_id,
+        remote_table__data_source__id=data_source_id
+    )
+    time_to_wait, next_update = get_node_time_to_wait(local_metadata=local_metadata)
     return time_to_wait, next_update
 
 class UpdateInterface:

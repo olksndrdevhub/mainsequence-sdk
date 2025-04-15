@@ -1,4 +1,5 @@
 import copy
+
 import pytz
 from typing import Union, Dict, List, Literal, Optional
 import pandas as pd
@@ -12,6 +13,7 @@ from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTi
                                  )
 from mainsequence.client import MARKETS_CONSTANTS, ExecutionVenue
 from mainsequence.client import HistoricalBarsSource, DoesNotExist, Asset, MarketsTimeSeriesDetails
+from mainsequence.tdag.time_series.time_series import WrapperTimeSerie
 from mainsequence.tdag.time_series.utils import (
     string_frequency_to_minutes,
     string_freq_to_time_delta,
@@ -509,11 +511,23 @@ class InterpolatedPrices(TimeSerie):
         self.intraday_bar_interpolation_rule = intraday_bar_interpolation_rule
         self.bar_frequency_id = bar_frequency_id
         self.upsample_frequency_id = upsample_frequency_id
-        self.markets_time_series_unique_id_list=markets_time_series_unique_id_list
+        self.markets_time_series_unique_id_list = markets_time_series_unique_id_list
 
-        price_source = {mud: get_time_serie_from_markets_unique_id(
-            market_time_serie_unique_identifier=mud) for mud in markets_time_series_unique_id_list}
-        self.bars_ts = WrapperTimeSerie(time_series_dict=price_source)
+        alpaca_ts = get_time_serie_from_markets_unique_id(market_time_serie_unique_identifier="alpaca_1d_bars")
+        binance_ts = get_time_serie_from_markets_unique_id(market_time_serie_unique_identifier="binance_1d_bars")
+        time_series_dict = {
+            # execution_venue figi_details.security_type figi_details.security_market_sector
+            f"{MARKETS_CONSTANTS.MAIN_SEQUENCE_EV}_Common Stock_Equity": (alpaca_ts, MARKETS_CONSTANTS.ALPACA_EV_SYMBOL),
+            f"{MARKETS_CONSTANTS.MAIN_SEQUENCE_EV}_Crypto_Curncy": (binance_ts, MARKETS_CONSTANTS.BINANCE_EV_SYMBOL),
+            f"{MARKETS_CONSTANTS.ALPACA_EV_SYMBOL}_Common Stock_Equity": (alpaca_ts, MARKETS_CONSTANTS.ALPACA_EV_SYMBOL),
+            f"{MARKETS_CONSTANTS.BINANCE_EV_SYMBOL}_Crypto_Curncy": (binance_ts, MARKETS_CONSTANTS.BINANCE_EV_SYMBOL),
+        }
+
+        # price_source = {
+        #     mud: get_time_serie_from_markets_unique_id(market_time_serie_unique_identifier=mud)
+        #     for mud in markets_time_series_unique_id_list
+        # }
+        self.bars_ts = WrapperTimeSerie(time_series_dict=time_series_dict, asset_category_unique_id=asset_category_unique_id)
         super().__init__(*args, **kwargs)
 
     def get_html_description(self) -> Union[str, None]:
@@ -630,7 +644,6 @@ class InterpolatedPrices(TimeSerie):
     def get_upsampled_data(
             self,
             update_statistics: DataUpdates,
-
     ) -> pd.DataFrame:
         """
         Main method to get upsampled data for prices.
@@ -644,13 +657,32 @@ class InterpolatedPrices(TimeSerie):
             } for unique_identifier, last_update in update_statistics.update_statistics.items()
         }
 
-        if isinstance(self.bars_ts, WrapperTimeSerie):
-            raw_data_df = []
-            for k, ts in self.bars_ts.related_time_series.items():
-                tmp_data = ts.filter_by_assets_ranges(
-                    unique_identifier_range_map=unique_identifier_range_map)
-                raw_data_df.append(tmp_data)
-            raw_data_df=pd.concat(raw_data_df,axis=0)
+        assets = self._get_asset_list()
+
+        def lookup_asset_ts(asset: "Asset"):
+            lookup_str = f"{asset.execution_venue.symbol}_{asset.figi_details.security_type}_{asset.figi_details.security_market_sector}"
+            print(lookup_str)
+            if lookup_str not in self.bars_ts.related_time_series:
+                raise ValueError(f"Asset {asset} not found in asset lookup map")
+            return self.bars_ts.related_time_series[lookup_str]
+
+        from collections import defaultdict
+
+        assets_per_ts = defaultdict(list)
+        for asset in assets:
+            ts, target_venue = lookup_asset_ts(asset)
+            assets_per_ts[ts].append(asset.unique_identifier)
+
+
+
+
+
+        raw_data_df = []
+        for k, ts in self.bars_ts.related_time_series.items():
+            tmp_data = ts.filter_by_assets_ranges(
+                unique_identifier_range_map=unique_identifier_range_map)
+            raw_data_df.append(tmp_data)
+        raw_data_df=pd.concat(raw_data_df, axis=0)
 
 
         if raw_data_df.shape[0] == 0:
@@ -665,14 +697,12 @@ class InterpolatedPrices(TimeSerie):
     def _get_asset_list(self):
         """
         Creates mappings from symbols to IDs
-
         """
-
         asset_category = AssetCategory.get(unique_identifier=self.asset_category_unique_id)
-        # asset_list = Asset.filter_with_asset_class(id__in= asset_category.assets)
-        asset_list = Asset.filter(id__in=asset_category.assets) # No needed introspection of specific asset features
+        asset_list = Asset.filter(id__in=asset_category.assets)
         self.asset_calendar_map = {a.unique_identifier: a.calendar for a in asset_list}
         return asset_list
+
     def update(
             self,
             update_statistics: DataUpdates

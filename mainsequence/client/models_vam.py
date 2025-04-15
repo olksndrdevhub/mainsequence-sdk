@@ -166,7 +166,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
     delisted_datetime: Optional[datetime.datetime] = None
     unique_identifier: str
 
-    figi_details:Union[FigiInfo,int]
+    figi_details: Union[FigiInfo,int]
 
     @staticmethod
     def get_properties_from_unique_symbol(unique_symbol: str):

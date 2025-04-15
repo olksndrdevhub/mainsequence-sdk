@@ -9,7 +9,6 @@ import pytz
 
 from mainsequence.tdag.time_series import TimeSerie
 from mainsequence.client import CONSTANTS,Asset
-from mainsequence.virtualfundbuilder.enums import ExecutionVenueNames
 
 from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
@@ -25,7 +24,6 @@ import pytz
 
 from mainsequence.tdag.time_series import TimeSerie
 from mainsequence.client import CONSTANTS, Asset, AssetCategory
-from mainsequence.virtualfundbuilder.enums import ExecutionVenueNames
 
 from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
