@@ -1125,7 +1125,7 @@ class Order(BaseObjectOrm, BasePydanticModel):
     client_order_id: str
     order_type: OrderType
     order_time: datetime.datetime
-    expires_time: datetime.datetime
+    expires_time: Optional[datetime.datetime]=None
     order_side: OrderSide  # Use int for choices (-1: SELL, 1: BUY)
     quantity: float
     status: OrderStatus = OrderStatus.NOT_PLACED
@@ -1141,8 +1141,19 @@ class Order(BaseObjectOrm, BasePydanticModel):
     class Config:
         use_enum_values = True  # This allows using enum values directly
     @classmethod
-    def update_or_create(cls,*args,**kwargs):
-        url = f"{cls.get_object_url()}/update_or_create/"
+    def create_or_update(cls,order_time_stamp:float,*args,**kwargs):
+        """
+
+        Args:
+            order_time: timestamp
+            *args:
+            **kwargs:
+
+        Returns:
+
+        """
+        url = f"{cls.get_object_url()}/create_or_update/"
+        kwargs['order_time'] = order_time_stamp
         payload = { "json": kwargs }
 
         r = make_request(
