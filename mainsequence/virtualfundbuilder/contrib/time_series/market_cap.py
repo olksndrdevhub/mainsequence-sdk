@@ -265,7 +265,6 @@ class MarketCap(WeightsBase, TimeSerie):
             # Compute the rolling median of volume over the window.
             rolling_median = dollar_volume_df.rolling(window=window, min_periods=1).median()
 
-            print("rolling median", rolling_median)
             # Annualize: assume 252 trading days per year.
             annual_factor = 252 # todo fix when prices are not daily
             annualized_traded_value = rolling_median * annual_factor
