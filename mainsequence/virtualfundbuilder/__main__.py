@@ -121,6 +121,7 @@ def get_pod_configuration():
     script_lines.append("tdag_agent = TDAGAgent()")
 
     TMP_SCRIPT = "\n".join(script_lines)
+    print(f"Executing Script: \n{TMP_SCRIPT}")
 
     # Write out to a temporary .py file and run
     temp_dir = tempfile.mkdtemp()
