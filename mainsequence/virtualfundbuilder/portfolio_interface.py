@@ -160,7 +160,8 @@ class PortfolioInterface():
             patch_build_configuration=True,
             debug_mode=True,
             force_update=True,
-            update_tree=True,portfolio_tags:List[str] = None,add_portfolio_to_markets_backend=False,
+            update_tree=True,portfolio_tags:List[str] = None,
+            add_portfolio_to_markets_backend=False,
             *args, **kwargs
     ):
         if not self._is_initialized or patch_build_configuration == True:

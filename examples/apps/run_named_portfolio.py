@@ -7,9 +7,13 @@ from mainsequence.virtualfundbuilder.resource_factory.app_factory import BaseApp
 
 logger = get_vfb_logger()
 
+class PortfolioRunParameters(BaseModel):
+    add_portfolio_to_markets_backend: bool = True
+    update_tree: bool = True
+
 class NamedPortfolioConfiguration(BaseModel):
     portfolio_name: str = "market_cap_example"
-    update_tree: bool = True
+    portfolio_run_parameters: PortfolioRunParameters
 
 @register_app()
 class RunNamedPortfolio(BaseApp):
@@ -22,7 +26,7 @@ class RunNamedPortfolio(BaseApp):
     def run(self) -> None:
         from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
         portfolio = PortfolioInterface.load_from_configuration(self.configuration.portfolio_name)
-        res = portfolio.run(update_tree=self.configuration.update_tree)
+        res = portfolio.run(**self.configuration.portfolio_run_parameters.model_dump())
         logger.info(f"Portfolio Run successful with results {res.head()}")
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ portfolio_build_configuration:
     signal_weights_name: MarketCap
     rebalance_strategy_name: ImmediateSignal
     signal_weights_configuration:
-      historical_market_cap_ts_unique_identifier: polygon_historical_markecap
+      historical_market_cap_ts_unique_identifier: polygon_historical_marketcap
       num_top_assets: None
       minimum_atvr_ratio: .05
       rolling_atv_volume_windows: [ 90, 365 ]
