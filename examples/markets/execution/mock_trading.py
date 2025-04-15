@@ -93,28 +93,28 @@ all_orders=[]
 for target_position in order_manager.target_rebalance:
     asset=target_position.asset
 
-    order_remote_id = str(datetime.datetime.now(pytz.utc).replace(tzinfo=pytz.utc).timestamp()),
+    order_remote_id = str(datetime.datetime.now(pytz.utc).replace(tzinfo=pytz.utc).timestamp())
     tmp_order=MarketOrder.create_or_update(
         order_type=OrderType.MARKET,
         order_manager=order_manager.id,
         order_remote_id=order_remote_id,
         client_order_id=f"{order_manager.id}_{asset.id}",
-        order_time=datetime.datetime.now(pytz.utc).replace(tzinfo=pytz.utc),
+        order_time_stamp=datetime.datetime.now(pytz.utc).replace(tzinfo=pytz.utc).timestamp(),
         expires_time=None,
         order_side=OrderSide.BUY if target_position.quantity>0 else OrderSide.SELL,
-        quantity=target_position.quantity,
+        quantity=float(target_position.quantity),
         status=OrderStatus.LIVE,
         asset=asset.id,
         related_account=account.id,
         time_in_force=OrderTimeInForce.GOOD_TILL_CANCELED,
         comments="Mock Order"
-
-
     )
     #mock a trade
-    trade_q = target_position.quantity * random.uniform(0.95, 1.05)
+    trade_q = float(target_position.quantity) * random.uniform(0.95, 1.05)
     price=rebalance_df[rebalance_df.asset_id==asset.id]["price"].iloc[0]
-    new_trade=Trade(trade_time=datetime.datetime.now(pytz.utc).replace(tzinfo=pytz.utc),
+    new_trade=Trade.create(
+
+                    trade_time=datetime.datetime.now(pytz.utc).replace(tzinfo=pytz.utc),
                     trade_side=1 if target_position.quantity>0 else -1,
                     asset=asset.id,
                     quantity=trade_q,
