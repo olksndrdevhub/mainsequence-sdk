@@ -2585,38 +2585,77 @@ class WrapperTimeSerie(TimeSerie):
         self.translation_table = translation_table
 
 
-    def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
-                             end_date: Union[datetime.datetime, None] = None,
-                             unique_identifier_list: Union[None, list] = None,
-                              great_or_equal=True, less_or_equal=True,
-                             unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
-                             ):
+    def get_df_between_dates(
+            self,
+            start_date: Union[datetime.datetime, None] = None,
+            end_date: Union[datetime.datetime, None] = None,
+            unique_identifier_list: Union[None, list] = None,
+            great_or_equal = True,
+            less_or_equal = True,
+            unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
+    ):
 
-        # this translating the assets process should be in backend and return the correct assets
+        # evaluate the rules for each asset
         from mainsequence.client import Asset
         assets = Asset.filter(unique_identifier__in=list(unique_identifier_range_map.keys()))
         asset_translation_dict = {}
         for asset in assets:
             asset_translation_dict[asset.unique_identifier] = self.translation_table.evaluate_asset(asset)
 
-        asset_translation_dict_helper = pd.DataFrame(asset_translation_dict).T
-        unique_ts = asset_translation_dict_helper
-        for api_ts, row in pd.DataFrame(asset_translation_dict).T.groupby(["markets_time_serie_unique_identifier"]):
-            print(row)
-            # get new assets
-            unique_identifier_translation_dict = {}
+        # we grouped the assets for the same rules together and now query all assets that have the same target
+        asset_translation_df = pd.DataFrame.from_dict(asset_translation_dict, orient="index")
+        grouped = asset_translation_df.groupby(
+            ["markets_time_serie_unique_identifier", "execution_venue_symbol", "exchange_code"],
+            dropna=False
+        )
 
+        data_df = []
+        for (mkt_ts_id, target_execution_venue_symbol, target_exchange_code), group_df in grouped:
+            # get the correct TimeSerie instance from our pre-built map
+            api_ts = self.api_ts_map[mkt_ts_id]
 
+            # figure out which assets belong to this group
+            grouped_unique_ids = group_df.index.tolist()
+            source_assets = [
+                a for a in assets
+                if a.unique_identifier in grouped_unique_ids
+            ]
 
-        # for ts in tranlastion table get data
-        raw_data_df = []
-        for k, ts in self.bars_ts.related_time_series.items():
-            tmp_data = ts.filter_by_assets_ranges(
-                unique_identifier_range_map=unique_identifier_range_map)
-            raw_data_df.append(tmp_data)
-        raw_data_df=pd.concat(raw_data_df, axis=0)
+            # get correct target assets based on the share classes
+            main_sequence_share_classes = [a.main_sequence_share_class for a in assets]
+            target_assets = Asset.filter(
+                execution_venue_symbol=target_execution_venue_symbol,
+                exchange_code=target_exchange_code,
+                main_sequence_share_class__in=main_sequence_share_classes
+            )
 
-        return df
+            # create the source-target mapping
+            source_asset_share_class_map = {}
+            for a in source_assets:
+                if a.main_sequence_share_class in source_asset_share_class_map:
+                    raise ValueError(f"Share class {a.main_sequence_share_class} cannot be duplicated")
+                source_asset_share_class_map[a.main_sequence_share_class] = a.unique_identifier
+
+            source_target_map = {}
+            for a in target_assets:
+                main_sequence_share_class = a.main_sequence_share_class
+                source_unique_identifier = source_asset_share_class_map[main_sequence_share_class]
+                source_target_map[source_unique_identifier] = a.unique_identifier
+
+            # create the correct unique identifier range map
+            unique_identifier_range_map_target = {}
+            for a_unique_identifier, asset_range in unique_identifier_range_map.items():
+                if a_unique_identifier not in source_target_map.keys(): continue
+                target_key = source_target_map[a_unique_identifier]
+
+                unique_identifier_range_map_target[target_key] = asset_range
+
+            # get the data
+            tmp_data = api_ts.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map_target)
+            data_df.append(tmp_data)
+
+        data_df = pd.concat(data_df, axis=0)
+        return data_df
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         """ Restore instance attributes from a pickled state. """

@@ -336,7 +336,6 @@ class AssetTranslationRule(BaseModel):
         query_dict = dict(
             execution_venue__symbol=self.target_execution_venue_symbol,
             main_sequence_share_class=source_asset.main_sequence_share_class,
-            ticker=source_asset.ticker,
         )
         if self.target_exchange_code is not None:
             query_dict["exchange_code"] = self.target_exchange_code
@@ -354,7 +353,6 @@ class AssetTranslationTable(BaseModel):
                     "markets_time_serie_unique_identifier": rule.markets_time_serie_unique_identifier,
                     "execution_venue_symbol": rule.target_execution_venue_symbol,
                     "exchange_code": rule.target_exchange_code,
-                    "target_asset_unique_identifier": rule.translate_asset(asset).unique_identifier
                 }
 
         return None
