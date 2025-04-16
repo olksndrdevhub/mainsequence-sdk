@@ -6,10 +6,6 @@ class RebalanceFrequencyStrategyName(Enum):
     MONTHLY = "monthly"
     QUARTERLY = "quarterly"
 
-
-
-ExecutionVenueNames = Enum("ExecutionVenueNames", {key.upper(): key for key in CONSTANTS.EXECUTION_VENUES_NAMES.keys()})
-
 class PriceTypeNames(Enum):
     VWAP = "vwap"
     OPEN = "open"

@@ -1,4 +1,5 @@
 import copy
+
 import pytz
 from typing import Union, Dict, List, Literal, Optional
 import pandas as pd
@@ -8,10 +9,11 @@ import pandas_market_calendars as mcal
 
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList, APITimeSerie, data_source_pickle_path
 from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
-                                 BACKEND_DETACHED, DataUpdates, AssetCategory
+                                 BACKEND_DETACHED, DataUpdates, AssetCategory, AssetTranslationTable, AssetTranslationRule
                                  )
 from mainsequence.client import MARKETS_CONSTANTS, ExecutionVenue
 from mainsequence.client import HistoricalBarsSource, DoesNotExist, Asset, MarketsTimeSeriesDetails
+from mainsequence.tdag.time_series.time_series import WrapperTimeSerie
 from mainsequence.tdag.time_series.utils import (
     string_frequency_to_minutes,
     string_freq_to_time_delta,
@@ -44,21 +46,7 @@ def get_interpolated_prices_timeseries(assets_configuration: AssetsConfiguration
     )
 
 
-def get_time_serie_from_markets_unique_id(market_time_serie_unique_identifier: str) -> TimeSerie:
-    """
-    Returns the appropriate bar time series based on the asset list and source.
-    """
-    try:
-        hbs = MarketsTimeSeriesDetails.get(unique_identifier=market_time_serie_unique_identifier,include_relations_detail=True)
-    except DoesNotExist as e:
-        logger.exception(f"HistoricalBarsSource does not exist for {market_time_serie_unique_identifier}")
-        raise e
-    api_ts = APITimeSerie(
 
-        data_source_id=hbs.related_local_time_serie.data_source_id,
-        local_hash_id=hbs.related_local_time_serie.local_hash_id
-    )
-    return api_ts
 
 
 class UpsampleAndInterpolation:
@@ -509,11 +497,31 @@ class InterpolatedPrices(TimeSerie):
         self.intraday_bar_interpolation_rule = intraday_bar_interpolation_rule
         self.bar_frequency_id = bar_frequency_id
         self.upsample_frequency_id = upsample_frequency_id
-        self.markets_time_series_unique_id_list=markets_time_series_unique_id_list
+        self.markets_time_series_unique_id_list = markets_time_series_unique_id_list
 
-        price_source = {mud: get_time_serie_from_markets_unique_id(
-            market_time_serie_unique_identifier=mud) for mud in markets_time_series_unique_id_list}
-        self.bars_ts = WrapperTimeSerie(time_series_dict=price_source)
+        # define the translation rules
+        translation_table_template = AssetTranslationTable(
+            rules=[
+                AssetTranslationRule(
+                    execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+                    security_type="Common Stock",
+                    security_market_sector="Equity",
+                    markets_time_serie_unique_identifier="alpaca_1d_bars",
+                    target_execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
+                    target_exchange_code="US",
+                ),
+                AssetTranslationRule(
+                    execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
+                    security_type="Common Stock",
+                    security_market_sector="Equity",
+                    markets_time_serie_unique_identifier="alpaca_1d_bars",
+                    target_execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
+                    target_exchange_code="US",
+                )
+            ]
+        )
+
+        self.bars_ts = WrapperTimeSerie(translation_table_template=translation_table_template)
         super().__init__(*args, **kwargs)
 
     def get_html_description(self) -> Union[str, None]:
@@ -630,7 +638,6 @@ class InterpolatedPrices(TimeSerie):
     def get_upsampled_data(
             self,
             update_statistics: DataUpdates,
-
     ) -> pd.DataFrame:
         """
         Main method to get upsampled data for prices.
@@ -644,14 +651,7 @@ class InterpolatedPrices(TimeSerie):
             } for unique_identifier, last_update in update_statistics.update_statistics.items()
         }
 
-        if isinstance(self.bars_ts, WrapperTimeSerie):
-            raw_data_df = []
-            for k, ts in self.bars_ts.related_time_series.items():
-                tmp_data = ts.filter_by_assets_ranges(
-                    unique_identifier_range_map=unique_identifier_range_map)
-                raw_data_df.append(tmp_data)
-            raw_data_df=pd.concat(raw_data_df,axis=0)
-
+        raw_data_df = self.bars_ts.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map)
 
         if raw_data_df.shape[0] == 0:
             self.logger.info("New new data to interpolate")
@@ -665,14 +665,12 @@ class InterpolatedPrices(TimeSerie):
     def _get_asset_list(self):
         """
         Creates mappings from symbols to IDs
-
         """
-
         asset_category = AssetCategory.get(unique_identifier=self.asset_category_unique_id)
-        # asset_list = Asset.filter_with_asset_class(id__in= asset_category.assets)
-        asset_list = Asset.filter(id__in=asset_category.assets) # No needed introspection of specific asset features
+        asset_list = Asset.filter(id__in=asset_category.assets)
         self.asset_calendar_map = {a.unique_identifier: a.calendar for a in asset_list}
         return asset_list
+
     def update(
             self,
             update_statistics: DataUpdates

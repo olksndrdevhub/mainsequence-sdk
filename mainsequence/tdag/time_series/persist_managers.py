@@ -560,7 +560,7 @@ class PersistManager:
         """
 
         if isinstance(temp_df.index,pd.MultiIndex)==True:
-            assert temp_df.index.names==["time_index","asset_symbol"] or  temp_df.index.names==["time_index","asset_symbol","execution_venue_symbol"]
+            assert temp_df.index.names==["time_index", "asset_symbol"] or  temp_df.index.names==["time_index", "asset_symbol", "execution_venue_symbol"]
 
     def build_update_details(self,source_class_name):
         """

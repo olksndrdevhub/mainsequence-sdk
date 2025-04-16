@@ -9,7 +9,7 @@ portfolio_build_configuration:
       intraday_bar_interpolation_rule: ffill
       markets_time_series:
         - unique_identifier: alpaca_1d_bars
-    assets_category_unique_id: magnificent_7_alpaca
+    assets_category_unique_id: magnificent_7
   execution_configuration:
     commission_fee: 0.00018
   portfolio_prices_frequency: 1d
@@ -28,7 +28,7 @@ portfolio_build_configuration:
         ewm_span: 21
         ann_factor: 252
       signal_assets_configuration:
-        assets_category_unique_id: magnificent_7_alpaca
+        assets_category_unique_id: magnificent_7
         price_type: close
         prices_configuration:
           bar_frequency_id: 1d

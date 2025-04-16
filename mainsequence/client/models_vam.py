@@ -112,8 +112,14 @@ class User(BaseObjectOrm,BasePydanticModel):
 
         return cls(**r.json())
 
-class FigiInfo(BasePydanticModel):
-    id:Optional[int]=None
+class AssetMixin(BaseObjectOrm, BasePydanticModel):
+    id: Optional[int] = None
+    can_trade: bool
+    calendar: Union[Calendar,int]
+    execution_venue: Union["ExecutionVenue", int]
+    delisted_datetime: Optional[datetime.datetime] = None
+    unique_identifier: str
+
     real_figi: bool = Field(default=True, description="FIGI identifier is real (default: True)")
     figi: constr(max_length=12) = Field(
         ...,
@@ -156,81 +162,20 @@ class FigiInfo(BasePydanticModel):
         description="Sepcial Main Sequence class . Should be the maximum level of agroupation"
     )
 
-class AssetMixin(BaseObjectOrm, BasePydanticModel):
-    id: Optional[int] = None
-    symbol: str
-    name: str
-    can_trade: bool
-    calendar: Union[Calendar,int]
-    execution_venue: Union["ExecutionVenue", int]
-    delisted_datetime: Optional[datetime.datetime] = None
-    unique_identifier: str
-
-    figi_details:Union[FigiInfo,int]
-
-    @staticmethod
-    def get_properties_from_unique_symbol(unique_symbol: str):
-        if unique_symbol.endswith(CONSTANTS.ALPACA_CRYPTO_POSTFIX):
-            return {"symbol": unique_symbol.replace(CONSTANTS.ALPACA_CRYPTO_POSTFIX, ""), "asset_type": CONSTANTS.ASSET_TYPE_CRYPTO_SPOT}
-
-        return {"symbol": unique_symbol, "asset_type": CONSTANTS.ASSET_TYPE_CASH_EQUITY}
-
     @property
     def execution_venue_symbol(self):
         return self.execution_venue.symbol
 
-
     @classmethod
-    def batch_upsert(cls, asset_config_list:list, execution_venue_symbol:str, asset_type:str, timeout=None):
-        url = f"{cls.get_object_url()}/batch_upsert/"
-        payload = dict(json={"asset_config_list": asset_config_list,"execution_venue_symbol": execution_venue_symbol,
-                             "asset_type": asset_type
-                               })
-        r = make_request(
-            s=cls.build_session(),
-            loaders=cls.LOADERS,
-            r_type="POST",
-            url=url,
-            time_out=timeout,
-            payload=payload
-        )
-
-        if r.status_code != 200:
-            raise Exception("Error inserting assets")
-        return r.json()
-
-
-
-    @classmethod
-    def get_all_assets_on_positions(
+    def filter_with_asset_class(
             cls,
-            execution_venue_symbol: str,
-            asset_type: str,
-            switch_to_currency_pair_with_quote: Union[str,None]=None,
+            timeout=None,
+            include_relationship_details_depth=None,
+            *args,
+            **kwargs
     ):
-        url = f"{Asset.get_object_url()}/get_all_assets_on_positions/"
-        payload = dict(params={"execution_venue_symbol": execution_venue_symbol,
-                               "asset_type": asset_type})
-        if switch_to_currency_pair_with_quote is not None:
-            payload["params"]["switch_to_currency_pair_with_quote"]=switch_to_currency_pair_with_quote
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
-
-        if r.status_code != 200:
-            raise Exception("Error getting all assets in positions")
-        return [cls(**a) for a in r.json()]
-
-    @classmethod
-    def filter_with_asset_class(cls, timeout=None,
-                                include_relationship_details_depth=None,
-                                *args, **kwargs):
         """
            Filters assets and returns instances with their correct asset class,
-        looping through all DRF-paginated pages.
-        :param timeout:
-        :param include_details: Flag to include foreign key relationships
-        :param args:
-        :param kwargs:
-        :return:
         """
 
         from .models_helpers import create_from_serializer_with_class
@@ -367,17 +312,68 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
         return AssetCategory(**r.json())
 
 
+class AssetTranslationRule(BaseModel):
+
+    # Rule items
+    execution_venue_symbol: str
+    security_type: str
+    security_market_sector: str
+
+    # API timeserie
+    markets_time_serie_unique_identifier: Any
+
+    # asset type information
+    target_execution_venue_symbol: str
+    target_exchange_code: Optional[str]
+
+    def is_asset_in_rule(self, asset):
+        return asset.execution_venue_symbol == self.execution_venue_symbol \
+           and asset.security_type == self.security_type \
+           and asset.security_market_sector == self.security_market_sector
+
+    def translate_asset(self, source_asset):
+        """ Translate source to target asset based on rule """
+        query_dict = dict(
+            execution_venue__symbol=self.target_execution_venue_symbol,
+            main_sequence_share_class=source_asset.main_sequence_share_class,
+            ticker=source_asset.ticker,
+        )
+        if self.target_exchange_code is not None:
+            query_dict["exchange_code"] = self.target_exchange_code
+
+        return source_asset.__class__.get(**query_dict)
+
+
+class AssetTranslationTable(BaseModel):
+    rules: List[AssetTranslationRule]
+
+    def evaluate_asset(self, asset):
+        for rule in self.rules:
+            if rule.is_asset_in_rule(asset):
+                return {
+                    "markets_time_serie_unique_identifier": rule.markets_time_serie_unique_identifier,
+                    "execution_venue_symbol": rule.target_execution_venue_symbol,
+                    "exchange_code": rule.target_exchange_code,
+                    "target_asset_unique_identifier": rule.translate_asset(asset).unique_identifier
+                }
+
+        return None
+
+
+
 class Asset(AssetMixin, BaseObjectOrm):
 
     def get_spot_reference_asset_symbol(self):
-        return self.symbol
-    
+        return self.ticker
+
     @classmethod
-    def create_or_update_index_asset_from_portfolios(cls,
-                                                     reference_portfolio:int,
-                                                     valuation_asset:int,
-                                                     calendar:str,timeout=None
-                                                     )->"TargetPortfolioIndexAsset":
+    def create_or_update_index_asset_from_portfolios(
+            cls,
+            reference_portfolio: int,
+            valuation_asset: int,
+            calendar: str,
+            timeout = None
+    ) -> "TargetPortfolioIndexAsset":
         url = f"{cls.get_object_url()}/create_or_update_index_asset_from_portfolios/"
         payload = {
             "json": dict(
@@ -424,10 +420,6 @@ class AssetCurrencyPair(AssetMixin, BasePydanticModel):
 
     def get_ms_share_class(self):
         return self.base_asset.get_ms_share_class()
-
-
-
-
 
 class FutureUSDMMixin(AssetMixin, BasePydanticModel):
     maturity_code: str = Field(..., max_length=50)

@@ -20,3 +20,4 @@ from mainsequence.virtualfundbuilder.contrib.time_series import MarketCap
 portfolio = tdag_agent.generate_portfolio(MarketCap, signal_description="Create me a market cap portfolio using AAPL and GOOG")
 res = portfolio.run()
 # res.head()
+

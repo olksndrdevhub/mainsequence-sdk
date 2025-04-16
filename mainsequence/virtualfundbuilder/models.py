@@ -10,7 +10,7 @@ from mainsequence.tdag.time_series import ModelList
 import json
 from pydantic import FieldValidationInfo, field_validator, root_validator, Field
 
-from mainsequence.virtualfundbuilder.enums import (ExecutionVenueNames, PriceTypeNames)
+from mainsequence.virtualfundbuilder.enums import (PriceTypeNames)
 
 from mainsequence.client.models_tdag import RunConfiguration
 import yaml
@@ -147,8 +147,7 @@ class AssetMixinOverwrite(VFBConfigBaseModel):
     The Asset for evaluating the portfolio.
 
     Attributes:
-        symbol (str): The symbol of the asset.
-        execution_venue_symbol (ExecutionVenueNames): The execution venue where the asset traded. Needs to match with asset universe.
+        unique_identifier (str): The unique_identifier of the asset.
     """
     unique_identifier: str = MARKETS_CONSTANTS.UNIQUE_IDENTIFIER_USD
 
