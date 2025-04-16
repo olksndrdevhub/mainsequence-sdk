@@ -4,12 +4,14 @@ This script is used to Mock the Process of integrating and execution engine into
 
 """
 import pytz
-
+import numpy as np
 ## GEt
 from mainsequence.client import TargetPortfolio, Account, RebalanceTargetPosition, OrderSide
-from mainsequence.client import OrderManager, OrderManagerTargetQuantity, \
-    Asset, MarketOrder, AccountHistoricalHoldings,OrderType,OrderStatus,OrderTimeInForce,Trade
+from mainsequence.client import OrderManager, OrderManagerTargetQuantity,Order, \
+    Asset, MarketOrder, AccountHistoricalHoldings,OrderType,OrderStatus,OrderTimeInForce,Trade,TradeSide
 from mainsequence.client import AssetOnlyPortfolio
+from decimal import Decimal, ROUND_HALF_UP
+
 import pandas as pd
 import datetime
 #%% Configuration
@@ -94,28 +96,46 @@ for target_position in order_manager.target_rebalance:
     asset=target_position.asset
 
     order_remote_id = str(datetime.datetime.now(pytz.utc).replace(tzinfo=pytz.utc).timestamp())
-    tmp_order=MarketOrder.create_or_update(
-        order_type=OrderType.MARKET,
-        order_manager=order_manager.id,
-        order_remote_id=order_remote_id,
-        client_order_id=f"{order_manager.id}_{asset.id}",
-        order_time_stamp=datetime.datetime.now(pytz.utc).replace(tzinfo=pytz.utc).timestamp(),
-        expires_time=None,
-        order_side=OrderSide.BUY if target_position.quantity>0 else OrderSide.SELL,
-        quantity=float(target_position.quantity),
-        status=OrderStatus.LIVE,
-        asset=asset.id,
-        related_account=account.id,
-        time_in_force=OrderTimeInForce.GOOD_TILL_CANCELED,
-        comments="Mock Order"
-    )
+    if np.random.rand() >0.9999: #send as market order
+        tmp_order=Order.create_or_update(
+            order_type=OrderType.MARKET,
+            order_manager=order_manager.id,
+            order_remote_id=order_remote_id,
+            client_order_id=f"{order_manager.id}_{asset.id}",
+            order_time_stamp=datetime.datetime.now(pytz.utc).replace(tzinfo=pytz.utc).timestamp(),
+            expires_time=None,
+            order_side=OrderSide.BUY if target_position.quantity>0 else OrderSide.SELL,
+            quantity=float(target_position.quantity),
+            status=OrderStatus.LIVE,
+            asset=asset.id,
+            related_account=account.id,
+            time_in_force=OrderTimeInForce.GOOD_TILL_CANCELED,
+            comments="Mock Order"
+        )
+    else:
+        tmp_order=Order.create_or_update(
+            order_type=OrderType.LIMIT,
+            order_manager=order_manager.id,
+            order_remote_id=order_remote_id,
+            client_order_id=f"{order_manager.id}_{asset.id}",
+            order_time_stamp=datetime.datetime.now(pytz.utc).replace(tzinfo=pytz.utc).timestamp(),
+            expires_time=None,
+            order_side=OrderSide.BUY if target_position.quantity > 0 else OrderSide.SELL,
+            quantity=float(target_position.quantity),
+            limit_price= np.floor(float(row["price"]) * 100) / 100,
+            status=OrderStatus.LIVE,
+            asset=asset.id,
+            related_account=account.id,
+            time_in_force=OrderTimeInForce.GOOD_TILL_CANCELED,
+            comments="Mock Order"
+        )
     #mock a trade
     trade_q = float(target_position.quantity) * random.uniform(0.95, 1.05)
     price=rebalance_df[rebalance_df.asset_id==asset.id]["price"].iloc[0]
     new_trade=Trade.create(
 
                     trade_time=datetime.datetime.now(pytz.utc).replace(tzinfo=pytz.utc),
-                    trade_side=1 if target_position.quantity>0 else -1,
+                    trade_side=TradeSide.BUY if target_position.quantity>0 else TradeSide.SELL,
                     asset=asset.id,
                     quantity=trade_q,
                     price = price,
@@ -126,6 +146,8 @@ for target_position in order_manager.target_rebalance:
                     comments="Mock Trade",
                     )
     #update order
-    tmp_order.patch(status=OrderStatus.FILLED)
+    tmp_order.patch(status=OrderStatus.PARTIALLY_FILLED,filled_price=price,
+                    filled_quantity=trade_q
+                    )
 
     all_orders.append(tmp_order)

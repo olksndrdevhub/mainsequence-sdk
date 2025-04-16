@@ -778,7 +778,29 @@ class DataFrequency(str, Enum):
     one_month ="1mo"
     one_quarter ="1q"
 
-class Trade(BaseObjectOrm):
+class TradeSide(IntEnum):
+    SELL = -1
+    BUY = 1
+
+class Trade(BaseObjectOrm,BasePydanticModel):
+    id: Optional[int] =None
+
+    # Use a default_factory to set the default trade_time to now (with UTC timezone)
+    trade_time: datetime.datetime
+    trade_side: TradeSide
+    asset: Optional[Union[AssetMixin,int]]
+    quantity: float
+    price: float
+    commission: Optional[float]
+    commission_asset: Optional[Union[AssetMixin,int]]
+
+    related_fund: Optional[Union["VirtualFund",int]]
+    related_account: Optional[Union[Account,int]]
+    related_order: Optional[Union["Order",int]]
+
+    comments: Optional[str]
+    venue_specific_properties: Optional[Dict]
+
     @classmethod
     def create_or_update(cls, trade_kwargs,timeout=None) -> None:
         url = f"{cls.get_object_url()}/create_or_update/"
@@ -788,7 +810,7 @@ class Trade(BaseObjectOrm):
                          time_out=timeout)
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
-        return r
+        return cls(**r.json())
 
 class OrdersExecutionConfiguration(BaseModel):
     broker_class: str
@@ -811,7 +833,7 @@ class TargetPortfolioAbout(TypedDict):
 
 
 class TargetPortfolioMixin:
-    id: Optional[Union[int, str]] = None
+    id: Optional[int] = None
     portfolio_name: str = Field(..., max_length=255)
     portfolio_ticker: str = Field(..., max_length=150)
     latest_rebalance: Optional[datetime.datetime] = None
