@@ -38,7 +38,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
 from mainsequence.client import LocalTimeSerie, LocalTimeSerieUpdateDetails, CONSTANTS, \
-    DynamicTableDataSource
+    DynamicTableDataSource, AssetTranslationTable
 from enum import Enum
 from functools import wraps
 from mainsequence.tdag.config import bcolors
@@ -62,7 +62,7 @@ def rebuild_with_type(value, rebuild_function):
         raise NotImplementedError
 
 
-from mainsequence.client.models_helpers import get_model_class
+from mainsequence.client.models_helpers import get_model_class, MarketsTimeSeriesDetails
 
 build_model = lambda model_data: get_model_class(model_data["orm_class"])(**model_data)
 
@@ -433,17 +433,7 @@ class ConfigSerializer:
           :param kwargs:
           :return:
           """
-
-        import collections
-        if kwargs["time_series_class_import_path"]["qualname"] == "WrapperTimeSerie":
-            ts_kwargs = {}
-            ts = collections.OrderedDict(sorted(kwargs["time_series_dict"].items()))
-            for key, (ts, ev) in ts.items():
-                ts_kwargs[key] = f"{ts.local_hash_id}_{ts.data_source_id}_{ev}"
-            kwargs["time_series_dict"] = ts_kwargs
-
         ordered_kwargs = self._serialize_configuration_dict(kwargs=kwargs)
-
         return ordered_kwargs
 
     @classmethod
@@ -664,22 +654,6 @@ class GraphNodeMethods(ABC):
         dependecy_map = {} if dependecy_map is None else dependecy_map
         for key, value in members.items():
             try:
-                if "related_time_series" in key:  # this is necessary for WrapperTimeSeries
-                    # add to tree
-                    assert isinstance(value, dict)
-
-                    for tm_ts in value.values():
-                        if isinstance(tm_ts, dict):
-                            pickle_path = self.get_pickle_path(local_hash_id=tm_ts["data_source_id"])
-                            dependecy_map[(tm_ts["local_hash_id"], tm_ts["data_source_id"])] = {"is_pickle": True,
-                                                                                                "ts": pickle_path}
-
-                        else:
-                            is_api = isinstance(tm_ts, APITimeSerie)
-                            dependecy_map[(tm_ts.local_hash_id, tm_ts.data_source_id)] = {"is_pickle": False,
-                                                                                          "ts": tm_ts}
-                            # tm_ts.get_update_map(dependecy_map)
-
                 if isinstance(value, TimeSerie):
                     value.local_persist_manager  # before connection call local persist manager to garantee ts is created
                     dependecy_map[(value.local_hash_id, value.data_source_id)] = {"is_pickle": False, "ts": value}
@@ -695,8 +669,8 @@ class GraphNodeMethods(ABC):
                                                                                       "ts": pickle_path}
 
                     if "is_api_time_serie_pickled" in value.keys():
-                        is_api = isinstance(tm_ts, APITimeSerie)
-                        dependecy_map[(value.local_hash_id, value.data_source_id)] = {"is_pickle": False, "ts": tm_ts}
+                        is_api = isinstance(value, APITimeSerie)
+                        dependecy_map[(value.local_hash_id, value.data_source_id)] = {"is_pickle": False, "ts": value}
                         # tm_ts.get_update_map(dependecy_map)
             except Exception as e:
                 raise e
@@ -2575,7 +2549,7 @@ class WrapperTimeSerie(TimeSerie):
     """A wrapper class for managing multiple TimeSerie objects."""
 
     @TimeSerie._post_init_routines()
-    def __init__(self, time_series_dict: Dict[str, TimeSerie], asset_category_unique_id: str, *args, **kwargs):
+    def __init__(self, translation_table_template: AssetTranslationTable, *args, **kwargs):
         """
         Initialize the WrapperTimeSerie.
 
@@ -2583,13 +2557,32 @@ class WrapperTimeSerie(TimeSerie):
             time_series_dict: Dictionary of TimeSerie objects.
         """
         super().__init__(*args, **kwargs)
-        self.related_time_series = time_series_dict
 
-    def lookup_asset_ts(self, asset: "Asset"):
-        lookup_tuple = (asset.execution_venue, asset.figi_details.security_type, asset.figi_details.security_market_sector)
-        if lookup_tuple not in self.assets_lookup_map:
-            raise ValueError(f"Asset {asset} not found in asset lookup map")
-        return self.assets_lookup_map[lookup_tuple]
+        def get_time_serie_from_markets_unique_id(market_time_serie_unique_identifier: str) -> TimeSerie:
+            """
+            Returns the appropriate bar time series based on the asset list and source.
+            """
+            from mainsequence.client import DoesNotExist
+            try:
+                hbs = MarketsTimeSeriesDetails.get(unique_identifier=market_time_serie_unique_identifier, include_relations_detail=True)
+            except DoesNotExist as e:
+                logger.exception(f"HistoricalBarsSource does not exist for {market_time_serie_unique_identifier}")
+                raise e
+            api_ts = APITimeSerie(
+                data_source_id=hbs.related_local_time_serie.data_source_id,
+                local_hash_id=hbs.related_local_time_serie.local_hash_id
+            )
+            return api_ts
+
+        translation_table = copy.deepcopy(translation_table_template)
+
+        self.api_ts_map = {}
+        for rule in translation_table.rules:
+            if rule.markets_time_serie_unique_identifier not in self.api_ts_map:
+                self.api_ts_map[rule.markets_time_serie_unique_identifier] = get_time_serie_from_markets_unique_id(
+                    market_time_serie_unique_identifier=rule.markets_time_serie_unique_identifier)
+
+        self.translation_table = translation_table
 
 
     def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
@@ -2599,7 +2592,29 @@ class WrapperTimeSerie(TimeSerie):
                              unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
                              ):
 
-        df = None
+        # this translating the assets process should be in backend and return the correct assets
+        from mainsequence.client import Asset
+        assets = Asset.filter(unique_identifier__in=list(unique_identifier_range_map.keys()))
+        asset_translation_dict = {}
+        for asset in assets:
+            asset_translation_dict[asset.unique_identifier] = self.translation_table.evaluate_asset(asset)
+
+        asset_translation_dict_helper = pd.DataFrame(asset_translation_dict).T
+        unique_ts = asset_translation_dict_helper
+        for api_ts, row in pd.DataFrame(asset_translation_dict).T.groupby(["markets_time_serie_unique_identifier"]):
+            print(row)
+            # get new assets
+            unique_identifier_translation_dict = {}
+
+
+
+        # for ts in tranlastion table get data
+        raw_data_df = []
+        for k, ts in self.bars_ts.related_time_series.items():
+            tmp_data = ts.filter_by_assets_ranges(
+                unique_identifier_range_map=unique_identifier_range_map)
+            raw_data_df.append(tmp_data)
+        raw_data_df=pd.concat(raw_data_df, axis=0)
 
         return df
 

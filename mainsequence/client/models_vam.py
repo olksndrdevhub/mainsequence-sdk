@@ -312,11 +312,60 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
         return AssetCategory(**r.json())
 
 
+class AssetTranslationRule(BaseModel):
+
+    # Rule items
+    execution_venue_symbol: str
+    security_type: str
+    security_market_sector: str
+
+    # API timeserie
+    markets_time_serie_unique_identifier: Any
+
+    # asset type information
+    target_execution_venue_symbol: str
+    target_exchange_code: Optional[str]
+
+    def is_asset_in_rule(self, asset):
+        return asset.execution_venue_symbol == self.execution_venue_symbol \
+           and asset.security_type == self.security_type \
+           and asset.security_market_sector == self.security_market_sector
+
+    def translate_asset(self, source_asset):
+        """ Translate source to target asset based on rule """
+        query_dict = dict(
+            execution_venue__symbol=self.target_execution_venue_symbol,
+            main_sequence_share_class=source_asset.main_sequence_share_class,
+            ticker=source_asset.ticker,
+        )
+        if self.target_exchange_code is not None:
+            query_dict["exchange_code"] = self.target_exchange_code
+
+        return source_asset.__class__.get(**query_dict)
+
+
+class AssetTranslationTable(BaseModel):
+    rules: List[AssetTranslationRule]
+
+    def evaluate_asset(self, asset):
+        for rule in self.rules:
+            if rule.is_asset_in_rule(asset):
+                return {
+                    "markets_time_serie_unique_identifier": rule.markets_time_serie_unique_identifier,
+                    "execution_venue_symbol": rule.target_execution_venue_symbol,
+                    "exchange_code": rule.target_exchange_code,
+                    "target_asset_unique_identifier": rule.translate_asset(asset).unique_identifier
+                }
+
+        return None
+
+
+
 class Asset(AssetMixin, BaseObjectOrm):
 
     def get_spot_reference_asset_symbol(self):
         return self.ticker
-    
+
     @classmethod
     def create_or_update_index_asset_from_portfolios(
             cls,
