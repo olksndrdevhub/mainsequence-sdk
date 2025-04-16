@@ -324,7 +324,7 @@ class AssetTranslationRule(BaseModel):
 
     # asset type information
     target_execution_venue_symbol: str
-    target_exchange_code: Optional[str]
+    target_exchange_code: Optional[str]=None
 
     def is_asset_in_rule(self, asset):
         return asset.execution_venue_symbol == self.execution_venue_symbol \

@@ -30,5 +30,7 @@ class RunNamedPortfolio(BaseApp):
         logger.info(f"Portfolio Run successful with results {res.head()}")
 
 if __name__ == "__main__":
-    configuration = NamedPortfolioConfiguration()
+    configuration = NamedPortfolioConfiguration(
+        portfolio_run_parameters=PortfolioRunParameters()
+    )
     RunNamedPortfolio(configuration).run()

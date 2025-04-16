@@ -1,5 +1,5 @@
 from mainsequence import MARKETS_CONSTANTS
-from mainsequence.tdag.time_series import TimeSerie, APITimeSerie
+from mainsequence.tdag.time_series import TimeSerie, APITimeSerie, WrapperTimeSerie
 
 from datetime import datetime, timedelta, tzinfo
 from typing import Union, List
@@ -8,7 +8,7 @@ import pandas as pd
 import pytz
 
 from mainsequence.tdag.time_series import TimeSerie
-from mainsequence.client import CONSTANTS,Asset
+from mainsequence.client import CONSTANTS, Asset, AssetTranslationTable, AssetTranslationRule
 
 from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
@@ -104,7 +104,7 @@ class MarketCap(WeightsBase, TimeSerie):
     @TimeSerie._post_init_routines()
     def __init__(self,
                  volatility_control_configuration: Optional[VolatilityControlConfiguration],
-                 historical_market_cap_ts_unique_identifier: str = "polygon_historical_markecap",
+                 historical_market_cap_ts_unique_identifier: str = "polygon_historical_marketcap",
                  minimum_atvr_ratio: float = .1,
                  rolling_atvr_volume_windows: List[int] = [60, 360],
                  frequency_trading_percent: float = .9,
@@ -125,8 +125,27 @@ class MarketCap(WeightsBase, TimeSerie):
         self.rolling_atvr_volume_windows = rolling_atvr_volume_windows
         self.frequency_trading_percent = frequency_trading_percent
         self.min_number_of_assets = min_number_of_assets
-        self.historical_market_cap_ts = APITimeSerie.build_from_unique_identifier(
-            historical_market_cap_ts_unique_identifier)
+
+        translation_table_template = AssetTranslationTable(
+            rules=[
+                AssetTranslationRule(
+                    execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+                    security_type="Common Stock",
+                    security_market_sector="Equity",
+                    markets_time_serie_unique_identifier="polygon_historical_marketcap",
+                    target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+                ),
+                AssetTranslationRule(
+                    execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
+                    security_type="Common Stock",
+                    security_market_sector="Equity",
+                    markets_time_serie_unique_identifier="polygon_historical_marketcap",
+                    target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+                )
+            ]
+        )
+
+        self.historical_market_cap_ts = WrapperTimeSerie(translation_table_template=translation_table_template)
         self.volatility_control_configuration = volatility_control_configuration
 
     def maximum_forward_fill(self):
@@ -195,24 +214,12 @@ class MarketCap(WeightsBase, TimeSerie):
         if len(asset_list) < self.min_number_of_assets:
             raise AssetMistMatch(f"only {len(asset_list)} in asset_list minum are {self.min_number_of_assets} ")
 
-        share_class_to_asset_map = {}
-        for asset in asset_list:
-            share_class_to_asset_map[asset.get_ms_share_class()] = {"original_asset": asset.unique_identifier,
-                                                                    "last_update": update_statistics[
-                                                                        asset.unique_identifier]
-                                                                    }
-
-        ms_asset_list = Asset.filter(
-            figi_details__main_sequence_share_class__in=list(share_class_to_asset_map.keys()),
-            execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV
-        )
-
         unique_identifier_range_market_cap_map = {
             a.unique_identifier: {
-                "start_date": share_class_to_asset_map[a.figi_details.main_sequence_share_class]['last_update'],
+                "start_date": update_statistics[a.unique_identifier],
                 "start_date_operand": ">"
             }
-            for a in ms_asset_list
+            for a in asset_list
         }
 
         mc = self.historical_market_cap_ts.get_df_between_dates(
@@ -232,20 +239,6 @@ class MarketCap(WeightsBase, TimeSerie):
         # If there is no market cap data, return an empty DataFrame.
         if mc.shape[0] == 0:
             return pd.DataFrame()
-
-        # 2. Create an asset mapping to translate a spot symbol into your unique identifier.
-        mc_to_asset_share_class = {
-            a.unique_identifier: share_class_to_asset_map[a.figi_details.main_sequence_share_class]['original_asset']
-            for a in ms_asset_list}
-
-        # Adjust the market cap index so that the level corresponding to "unique_identifier"
-        # is re‐mapped using asset_map. (This assumes the level’s string contains '-*-' and that
-        # you need to split and take the first part.)
-        mc.index = mc.index.set_levels(
-            mc.index.levels[mc.index.names.index("unique_identifier")]
-            .map(mc_to_asset_share_class),
-            level=1
-        )
 
         # 3. Pivot the market cap data to get a DataFrame with a datetime index and one column per asset.
         mc_raw = mc.pivot_table(columns="unique_identifier", index="time_index")

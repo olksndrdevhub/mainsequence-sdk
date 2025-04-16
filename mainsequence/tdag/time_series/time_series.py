@@ -2681,6 +2681,9 @@ class WrapperTimeSerie(TimeSerie):
                     less_or_equal=less_or_equal,
                 )
 
+            if tmp_data.empty:
+                continue
+
             tmp_data = tmp_data.rename(index=target_source_map, level="unique_identifier")
             data_df.append(tmp_data)
 
