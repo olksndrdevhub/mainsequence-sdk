@@ -147,7 +147,7 @@ class AssetMixinOverwrite(VFBConfigBaseModel):
     The Asset for evaluating the portfolio.
 
     Attributes:
-        symbol (str): The symbol of the asset.
+        unique_identifier (str): The unique_identifier of the asset.
     """
     unique_identifier: str = MARKETS_CONSTANTS.UNIQUE_IDENTIFIER_USD
 

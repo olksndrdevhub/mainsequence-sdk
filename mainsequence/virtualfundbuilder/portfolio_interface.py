@@ -139,16 +139,18 @@ class PortfolioInterface():
         asset_symbol = target_portfolio.portfolio_ticker
         
         if BACKEND_DETACHED():
-            index_asset = TargetPortfolioIndexAsset(symbol=asset_symbol,
-                                                    name=asset_symbol,
-                                                    unique_identifier=asset_symbol,
-                                                    unique_symbol=asset_symbol,
-                                                    reference_portfolio=target_portfolio.id,
-                                                    valuation_asset=portfolio_ts.valuation_asset,
-                                                    calendar=Calendar(
-                                                    name=self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
-                                                        "calendar"])
-                                                    )
+            index_asset = TargetPortfolioIndexAsset(
+                ticker=asset_symbol,
+                name=asset_symbol,
+                unique_identifier=asset_symbol,
+                unique_symbol=asset_symbol,
+                reference_portfolio=target_portfolio.id,
+                valuation_asset=portfolio_ts.valuation_asset,
+                calendar=Calendar(
+                    name=self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
+                        "calendar"]
+                )
+            )
 
         self.index_asset = index_asset
         self.target_portfolio = target_portfolio
