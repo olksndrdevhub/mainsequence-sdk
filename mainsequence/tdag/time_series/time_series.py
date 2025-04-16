@@ -2595,16 +2595,29 @@ class WrapperTimeSerie(TimeSerie):
             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
     ):
 
+        if (unique_identifier_list is None) == (unique_identifier_range_map is None):
+            raise ValueError(
+                "Pass **either** unique_identifier_list **or** unique_identifier_range_map, but not both."
+            )
+
+        if unique_identifier_list is not None:
+            wanted_src_uids = set(unique_identifier_list)
+        else:  # range‑map path
+            wanted_src_uids = set(unique_identifier_range_map.keys())
+
+        if not wanted_src_uids:
+            return pd.DataFrame()
+
         # evaluate the rules for each asset
         from mainsequence.client import Asset
-        assets = Asset.filter(unique_identifier__in=list(unique_identifier_range_map.keys()))
+        assets = Asset.filter(unique_identifier__in=list(wanted_src_uids))
         asset_translation_dict = {}
         for asset in assets:
             asset_translation_dict[asset.unique_identifier] = self.translation_table.evaluate_asset(asset)
 
         # we grouped the assets for the same rules together and now query all assets that have the same target
-        asset_translation_df = pd.DataFrame.from_dict(asset_translation_dict, orient="index")
-        grouped = asset_translation_df.groupby(
+        translation_df  = pd.DataFrame.from_dict(asset_translation_dict, orient="index")
+        grouped = translation_df.groupby(
             ["markets_time_serie_unique_identifier", "execution_venue_symbol", "exchange_code"],
             dropna=False
         )
@@ -2624,7 +2637,7 @@ class WrapperTimeSerie(TimeSerie):
             # get correct target assets based on the share classes
             main_sequence_share_classes = [a.main_sequence_share_class for a in assets]
             target_assets = Asset.filter(
-                execution_venue_symbol=target_execution_venue_symbol,
+                execution_venue__symbol=target_execution_venue_symbol,
                 exchange_code=target_exchange_code,
                 main_sequence_share_class__in=main_sequence_share_classes
             )
@@ -2642,16 +2655,33 @@ class WrapperTimeSerie(TimeSerie):
                 source_unique_identifier = source_asset_share_class_map[main_sequence_share_class]
                 source_target_map[source_unique_identifier] = a.unique_identifier
 
-            # create the correct unique identifier range map
-            unique_identifier_range_map_target = {}
-            for a_unique_identifier, asset_range in unique_identifier_range_map.items():
-                if a_unique_identifier not in source_target_map.keys(): continue
-                target_key = source_target_map[a_unique_identifier]
+            target_source_map = {v: k for k, v in source_target_map.items()}
+            if unique_identifier_range_map is not None:
+                # create the correct unique identifier range map
+                unique_identifier_range_map_target = {}
+                for a_unique_identifier, asset_range in unique_identifier_range_map.items():
+                    if a_unique_identifier not in source_target_map.keys(): continue
+                    target_key = source_target_map[a_unique_identifier]
 
-                unique_identifier_range_map_target[target_key] = asset_range
+                    unique_identifier_range_map_target[target_key] = asset_range
 
-            # get the data
-            tmp_data = api_ts.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map_target)
+                tmp_data = api_ts.get_df_between_dates(
+                    unique_identifier_range_map=unique_identifier_range_map_target,
+                    start_date=start_date,
+                    end_date=end_date,
+                    great_or_equal=great_or_equal,
+                    less_or_equal=less_or_equal,
+                )
+            else:
+                tmp_data = api_ts.get_df_between_dates(
+                    start_date=start_date,
+                    end_date=end_date,
+                    unique_identifier_list=list(source_target_map.values()),
+                    great_or_equal=great_or_equal,
+                    less_or_equal=less_or_equal,
+                )
+
+            tmp_data = tmp_data.rename(index=target_source_map, level="unique_identifier")
             data_df.append(tmp_data)
 
         data_df = pd.concat(data_df, axis=0)
