@@ -815,10 +815,10 @@ class TimeSerieRebuildMethods(ABC):
                                                 )
         if os.path.isfile(pickle_path) == False or os.stat(pickle_path).st_size == 0:
             # rebuild time serie and pickle
-            ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
-                                                      data_source=data_source_id,
-
-                                                      )
+            ts = TimeSerie.rebuild_from_configuration(
+                local_hash_id=local_hash_id,
+                data_source=data_source_id,
+            )
             if set_dependencies_df == True:
                 ts.set_relation_tree()
 
@@ -829,6 +829,7 @@ class TimeSerieRebuildMethods(ABC):
             pickle_path=pickle_path,
             graph_depth_limit=graph_depth_limit,
         )
+        ts.logger.debug(f"ts {local_hash_id} loaded from pickle ")
         return ts, pickle_path
 
     def set_data_source_from_pickle_path(self, pikle_path):
@@ -1020,27 +1021,33 @@ class TimeSerieRebuildMethods(ABC):
         return 0
 
     def _prepare_state_for_pickle(self, state):
-        """
-        Method to run before ttime series is pikledl
-        :return:
-        :rtype:
-        """
         import cloudpickle
         properties = state
         serializer = ConfigSerializer()
         properties = serializer.serialize_to_pickle(properties)
         names_to_remove = []
         for name, attr in properties.items():
-            if name in ["local_persist_manager", "logger", "init_meta"]:
+            if name in [
+                "local_persist_manager",
+                "logger",
+                "init_meta",
+                "_local_metadata_future",
+                "_local_metadata_lock",
+                "_local_persist_manager",
+                "update_tracker",
+            ]:
                 names_to_remove.append(name)
                 continue
+
             try:
                 cloudpickle.dumps(attr)
             except Exception as e:
                 self.logger.exception(f"Cant Pickle property {name}")
                 raise e
 
-        properties = {key: value for key, value in properties.items() if key not in names_to_remove}
+        for n in names_to_remove:
+            properties.pop(n, None)
+
         return properties
 
     def run_in_debug_scheduler(self, break_after_one_update=True, run_head_in_main_process=True,
@@ -1474,8 +1481,6 @@ class CommonMethodsMixin:
 class APITimeSerie(CommonMethodsMixin):
     PICKLE_PREFIFX = "api-"
 
-
-
     @classmethod
     def build_from_local_time_serie(cls, local_time_serie: "LocalTimeSerie"):
         return cls(data_source_id=local_time_serie.remote_table.data_source.id,
@@ -1484,11 +1489,6 @@ class APITimeSerie(CommonMethodsMixin):
 
     @classmethod
     def build_from_unique_identifier(cls, unique_identifier: str):
-        """
-
-        :param vam_source_name:
-        :return:
-        """
         from mainsequence.client import MarketsTimeSeriesDetails
         tdag_api_data_source = MarketsTimeSeriesDetails.get(unique_identifier=unique_identifier)
         ts = cls(
@@ -1505,8 +1505,6 @@ class APITimeSerie(CommonMethodsMixin):
         :param data_source_id:
         :param table_name:
         """
-
-
         if data_source_local_lake is not None:
             assert data_source_local_lake.data_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE, "data_source_local_lake should be of type CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE"
 
@@ -1515,20 +1513,25 @@ class APITimeSerie(CommonMethodsMixin):
         self.data_source = data_source_local_lake
         self.local_persist_manager
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Remove unpicklable/transient state specific to APITimeSerie
+        names_to_remove = [
+            "_local_persist_manager", # APIPersistManager instance
+        ]
+        cleaned_state = {k: v for k, v in state.items() if k not in names_to_remove}
+        return cleaned_state
+
     @property
     def local_persist_manager(self):
 
         if hasattr(self, "_local_persist_manager") == False:
-
             self._set_local_persist_manager()
             self.logger.debug(f"Setting local persist manager for {self.local_hash_id}")
         return self._local_persist_manager
 
     def set_relation_tree(self):
         pass  # do nothing  for API Time Series
-
-
-
 
     def _verify_local_data_source(self):
         pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)

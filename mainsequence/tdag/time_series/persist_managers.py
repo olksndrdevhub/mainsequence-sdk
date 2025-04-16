@@ -197,7 +197,7 @@ class PersistManager:
         # Launch the local metadata update regardless of the outcome.
         self.set_local_metadata_lazy(force_registry=True)
 
-    def set_local_metadata_lazy(self,force_registry=True, include_relations_detail=False):
+    def set_local_metadata_lazy(self, force_registry=True, include_relations_detail=False):
 
         with self._local_metadata_lock:
             if force_registry:

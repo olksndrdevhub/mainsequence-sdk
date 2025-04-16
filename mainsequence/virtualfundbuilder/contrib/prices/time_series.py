@@ -511,19 +511,14 @@ class InterpolatedPrices(TimeSerie):
         self.upsample_frequency_id = upsample_frequency_id
         self.markets_time_series_unique_id_list=markets_time_series_unique_id_list
 
-
         price_source = {mud: get_time_serie_from_markets_unique_id(
             market_time_serie_unique_identifier=mud) for mud in markets_time_series_unique_id_list}
         self.bars_ts = WrapperTimeSerie(time_series_dict=price_source)
-
-
         super().__init__(*args, **kwargs)
 
     def get_html_description(self) -> Union[str, None]:
         description = f"""<p>Time Serie Instance of {self.__class__.__name__} updating table {self.remote_table_hashed_name} for for <b>train</b> prices in <b>{self.execution_venue_symbol}</b> for backtesting</p>"""
         return description
-
-
 
     def _get_required_cores(self, last_observation_map) -> int:
         """
@@ -536,20 +531,9 @@ class InterpolatedPrices(TimeSerie):
 
         return required
 
-
-
-    def run_after_post_init_routines(self):
-        """
-        Use post init routines to configure the time series
-        """
+    def _run_post_update_routines(self, error_on_last_update, update_statistics):
         if BACKEND_DETACHED():
             return None
-
-        try:
-            if self.metadata is None:
-                return None
-        except LocalTimeSeriesDoesNotExist:
-            return None  # first update
 
         if not self.metadata.protect_from_deletion:
             self.local_persist_manager.protect_from_deletion()

@@ -9,19 +9,31 @@ from mainsequence.virtualfundbuilder.resource_factory.app_factory import BaseApp
 
 logger = get_vfb_logger()
 
+class PortfolioRunParameters(BaseModel):
+    add_portfolio_to_markets_backend: bool = True
+    update_tree: bool = True
+
+class RunPortfolioConfiguration(BaseModel):
+    portfolio_configuration: PortfolioConfiguration
+    portfolio_run_parameters: PortfolioRunParameters
+
 @register_app()
 class RunPortfolio(BaseApp):
-    configuration_class = PortfolioConfiguration
+    configuration_class = RunPortfolioConfiguration
 
-    def __init__(self, configuration: PortfolioConfiguration):
+    def __init__(self, configuration: RunPortfolioConfiguration):
         self.configuration = configuration
 
     def run(self) -> Artifact:
-        portfolio = PortfolioInterface(portfolio_config_template=self.configuration.model_dump())
-        res = portfolio.run()
+        portfolio = PortfolioInterface(portfolio_config_template=self.configuration.portfolio_configuration.model_dump())
+        res = portfolio.run(**self.configuration.portfolio_run_parameters.model_dump())
         logger.info(f"Portfolio Run successful with results {res.head()}")
 
 
 if __name__ == "__main__":
     portfolio_configuration = PortfolioInterface.load_from_configuration("market_cap_example").portfolio_config
-    RunPortfolio(portfolio_configuration).run()
+    run_portfolio_configuration = RunPortfolioConfiguration(
+        portfolio_configuration=portfolio_configuration,
+        portfolio_run_parameters=PortfolioRunParameters(),
+    )
+    RunPortfolio(run_portfolio_configuration).run()
