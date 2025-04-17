@@ -162,6 +162,9 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         description="Sepcial Main Sequence class . Should be the maximum level of agroupation"
     )
 
+    def __repr__(self) -> str:
+        return f"{self.class_name()}: {self.unique_identifier}"
+
     @property
     def execution_venue_symbol(self):
         return self.execution_venue.symbol
@@ -311,7 +314,6 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
         # Return a new instance of AssetCategory built from the response JSON.
         return AssetCategory(**r.json())
 
-
 class AssetTranslationRule(BaseModel):
 
     # Rule items
@@ -342,7 +344,6 @@ class AssetTranslationRule(BaseModel):
 
         return source_asset.__class__.get(**query_dict)
 
-
 class AssetTranslationTable(BaseModel):
     rules: List[AssetTranslationRule]
 
@@ -356,8 +357,6 @@ class AssetTranslationTable(BaseModel):
                 }
 
         return None
-
-
 
 class Asset(AssetMixin, BaseObjectOrm):
 

@@ -285,10 +285,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         payload = {"json": kwargs}
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code in [200, 201]:
-            if r.status_code == 200:
-                raise AlreadyExist(r.text)
-        else:
+        if r.status_code not in [200, 201]:
             raise Exception(r.text)
         data = r.json()
 
@@ -803,10 +800,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
         if r.status_code not in [201, 200]:
-            if r.status_code == 200:
-                raise AlreadyExist(r.text)
-            else:
-                raise Exception(r.text)
+            raise Exception(r.text)
         data = r.json()
         return cls(**data)
 

@@ -19,7 +19,6 @@ class PortfolioInterface():
     Manages the overall strategy of investing. It initializes the tree and runs it either within the scheduler or
     directly with a full tree update.
     """
-
     def __init__(self, portfolio_config_template: dict,
                  build_purpose=CONSTANTS.PORTFOLIO_BUILD_FOR_BACKTEST,
                  configuration_name: str=None):
@@ -124,12 +123,12 @@ class PortfolioInterface():
 
             target_portfolio = TargetPortfolio.get_or_none(local_time_serie__id=ts.local_metadata.id)
             if target_portfolio is None:
-                target_portfolio,index_asset = TargetPortfolio.create_from_time_series(**standard_kwargs)
+                target_portfolio, index_asset = TargetPortfolio.create_from_time_series(**standard_kwargs)
             else:
                 # patch timeserie of portfolio to guaranteed recreation
                 target_portfolio.patch(**standard_kwargs)
                 self.logger.debug(f"Target portfolio {ts.local_metadata.id} already exists in Backend")
-                index_asset=TargetPortfolioIndexAsset.get(reference_portfolio__id=target_portfolio.id)
+                index_asset = TargetPortfolioIndexAsset.get(reference_portfolio__id=target_portfolio.id)
 
             return target_portfolio,index_asset
 

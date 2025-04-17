@@ -142,8 +142,6 @@ def set_data_source(pod_source=None, tdag_detached=False, override_all: bool = F
             raise
 
 
-
-
 class SchedulerUpdater:
     ACTOR_WAIT_LIMIT = 80  # seconds to wait before sending task to get scheduled
 
@@ -158,16 +156,12 @@ class SchedulerUpdater:
                           ):
 
         # get_remote_hash_id
-
         new_scheduler = Scheduler.initialize_debug_for_ts(local_hash_id=time_serie_hash_id,
                                                           data_source_id=data_source_id,
                                                           name_suffix=name_suffix,
-
                                                           )
 
-
         try:
-
             updater = cls(scheduler=new_scheduler)
             updater.logger.info(f"Scheduler ID {new_scheduler.name}")
             updater.start(debug=debug, update_tree=update_tree, break_after_one_update=break_after_one_update,
@@ -195,18 +189,11 @@ class SchedulerUpdater:
         scheduler_updater.start(*args, **kwargs)
 
     def __init__(self, scheduler: Scheduler):
-
         from mainsequence.tdag.config import logging_folder
         global logger
         self.node_scheduler = scheduler
-        logger=logger.bind(   scheduler_name=scheduler.name)
+        logger = logger.bind(scheduler_name=scheduler.name)
         self.logger = logger
-
-
-
-
-
-
 
     def _clear_idle_scheduled_tree(self, *args, **kwargs):
         pass
@@ -214,11 +201,7 @@ class SchedulerUpdater:
     def _node_scheduler_heart_beat(self):
         """
         Timestamps a heart-beat from scheduler
-        Returns
-        -------
-
         """
-
         self.node_scheduler.last_heart_beat = datetime.datetime.now(pytz.utc)
         self.node_scheduler.save()
 
@@ -463,8 +446,6 @@ class SchedulerUpdater:
             wait_list[local_hash_id] = dict(next_update=next_update, remote_table_hashed_name=remote_table_hashed_name)
 
         return task_hex_to_uid, wait_list
-
-
 
     def start(self, debug=False, update_tree: Union[bool, dict] = True, break_after_one_update=False,
               raise_exception_on_error=False,

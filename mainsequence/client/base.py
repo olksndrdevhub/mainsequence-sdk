@@ -67,8 +67,6 @@ class BasePydanticModel(BaseModel):
     model_config = ConfigDict(extra='forbid')  # Forbid extra fields in v2
     orm_class: str = None  # This will be set to the class that inherits
 
-
-
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

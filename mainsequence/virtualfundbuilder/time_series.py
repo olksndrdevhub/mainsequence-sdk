@@ -102,7 +102,6 @@ class PortfolioStrategy(TimeSerie):
             signal_weights_name=self.signal_weights_name
         )
 
-        # TODO make this part of the arguments in the signal
         self.signal_weights = SignalWeightClass.build_and_parse_from_configuration(**self.full_signal_weight_config)
 
         self.rebalance_strategy_name = self.backtesting_weights_config.rebalance_strategy_name

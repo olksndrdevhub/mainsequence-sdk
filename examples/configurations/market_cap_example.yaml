@@ -1,6 +1,6 @@
 portfolio_build_configuration:
   valuation_asset:
-    unique_identifier: USD_alpaca_BBG0013HGBT3
+    unique_identifier: USD_ms_share_class_Yc5KyX6Vh0Eq
   assets_configuration:
     price_type: vwap
     prices_configuration:
