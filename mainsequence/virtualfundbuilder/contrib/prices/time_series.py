@@ -9,7 +9,7 @@ import pandas_market_calendars as mcal
 
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList, APITimeSerie, data_source_pickle_path
 from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
-                                 BACKEND_DETACHED, DataUpdates, AssetCategory, AssetTranslationTable, AssetTranslationRule
+                                 BACKEND_DETACHED, DataUpdates, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
                                  )
 from mainsequence.client import MARKETS_CONSTANTS, ExecutionVenue
 from mainsequence.client import HistoricalBarsSource, DoesNotExist, Asset, MarketsTimeSeriesDetails
@@ -44,10 +44,6 @@ def get_interpolated_prices_timeseries(assets_configuration: AssetsConfiguration
         markets_time_series_unique_id_list=markets_time_series_unique_id_list,
         **prices_configuration_kwargs
     )
-
-
-
-
 
 class UpsampleAndInterpolation:
     """
@@ -500,20 +496,22 @@ class InterpolatedPrices(TimeSerie):
         self.markets_time_series_unique_id_list = markets_time_series_unique_id_list
 
         # define the translation rules
-        translation_table_template = AssetTranslationTable(
+        translation_table = AssetTranslationTable(
             rules=[
                 AssetTranslationRule(
-                    execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                    security_type="Common Stock",
-                    security_market_sector="Equity",
+                    asset_filter=AssetFilter(
+                        execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+                        security_type="Common Stock",
+                    ),
                     markets_time_serie_unique_identifier="alpaca_1d_bars",
                     target_execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
                     target_exchange_code="US",
                 ),
                 AssetTranslationRule(
-                    execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                    security_type="Common Stock",
-                    security_market_sector="Equity",
+                    asset_filter=AssetFilter(
+                        execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
+                        security_type="Common Stock",
+                    ),
                     markets_time_serie_unique_identifier="alpaca_1d_bars",
                     target_execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
                     target_exchange_code="US",
@@ -521,7 +519,7 @@ class InterpolatedPrices(TimeSerie):
             ]
         )
 
-        self.bars_ts = WrapperTimeSerie(translation_table_template=translation_table_template)
+        self.bars_ts = WrapperTimeSerie(translation_table=translation_table)
         super().__init__(*args, **kwargs)
 
     def get_html_description(self) -> Union[str, None]:

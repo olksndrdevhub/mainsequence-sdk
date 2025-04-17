@@ -2542,7 +2542,7 @@ class WrapperTimeSerie(TimeSerie):
     """A wrapper class for managing multiple TimeSerie objects."""
 
     @TimeSerie._post_init_routines()
-    def __init__(self, translation_table_template: AssetTranslationTable, *args, **kwargs):
+    def __init__(self, translation_table: AssetTranslationTable, *args, **kwargs):
         """
         Initialize the WrapperTimeSerie.
 
@@ -2567,7 +2567,7 @@ class WrapperTimeSerie(TimeSerie):
             )
             return api_ts
 
-        translation_table = copy.deepcopy(translation_table_template)
+        translation_table = copy.deepcopy(translation_table)
 
         self.api_ts_map = {}
         for rule in translation_table.rules:

@@ -8,7 +8,7 @@ import pandas as pd
 import pytz
 
 from mainsequence.tdag.time_series import TimeSerie
-from mainsequence.client import CONSTANTS, Asset, AssetTranslationTable, AssetTranslationRule
+from mainsequence.client import CONSTANTS, Asset, AssetTranslationTable, AssetTranslationRule, AssetFilter
 
 from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
@@ -126,26 +126,28 @@ class MarketCap(WeightsBase, TimeSerie):
         self.frequency_trading_percent = frequency_trading_percent
         self.min_number_of_assets = min_number_of_assets
 
-        translation_table_template = AssetTranslationTable(
+        translation_table = AssetTranslationTable(
             rules=[
                 AssetTranslationRule(
-                    execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                    security_type="Common Stock",
-                    security_market_sector="Equity",
+                    asset_filter=AssetFilter(
+                        execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+                        security_type="Common Stock",
+                    ),
                     markets_time_serie_unique_identifier="polygon_historical_marketcap",
                     target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
                 ),
                 AssetTranslationRule(
-                    execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                    security_type="Common Stock",
-                    security_market_sector="Equity",
+                    asset_filter=AssetFilter(
+                        execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
+                        security_type="Common Stock",
+                    ),
                     markets_time_serie_unique_identifier="polygon_historical_marketcap",
                     target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
                 )
             ]
         )
 
-        self.historical_market_cap_ts = WrapperTimeSerie(translation_table_template=translation_table_template)
+        self.historical_market_cap_ts = WrapperTimeSerie(translation_table=translation_table)
         self.volatility_control_configuration = volatility_control_configuration
 
     def maximum_forward_fill(self):

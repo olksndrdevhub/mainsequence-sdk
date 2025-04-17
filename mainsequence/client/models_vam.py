@@ -314,35 +314,36 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
         # Return a new instance of AssetCategory built from the response JSON.
         return AssetCategory(**r.json())
 
+
+class TranslationError(RuntimeError):
+    """Raised when no translation rule (or more than one) matches an asset."""
+
+class AssetFilter(BaseModel):
+    execution_venue_symbol: str
+    security_type: Optional[str] = None
+    security_market_sector: Optional[str] = None
+
+    def filter_triggered(self, asset: "Asset") -> bool:
+        if asset.execution_venue_symbol != self.execution_venue_symbol:
+            return False
+        if self.security_type is not None and asset.security_type != self.security_type:
+            return False
+        if self.security_market_sector is not None and asset.security_market_sector != self.security_market_sector:
+            return False
+        return True
+
 class AssetTranslationRule(BaseModel):
 
-    # Rule items
-    execution_venue_symbol: str
-    security_type: str
-    security_market_sector: str
+    asset_filter: AssetFilter
 
     # API timeserie
-    markets_time_serie_unique_identifier: Any
+    markets_time_serie_unique_identifier: str
 
-    # asset type information
     target_execution_venue_symbol: str
-    target_exchange_code: Optional[str]=None
+    target_exchange_code: Optional[str] = None
 
-    def is_asset_in_rule(self, asset):
-        return asset.execution_venue_symbol == self.execution_venue_symbol \
-           and asset.security_type == self.security_type \
-           and asset.security_market_sector == self.security_market_sector
-
-    def translate_asset(self, source_asset):
-        """ Translate source to target asset based on rule """
-        query_dict = dict(
-            execution_venue__symbol=self.target_execution_venue_symbol,
-            main_sequence_share_class=source_asset.main_sequence_share_class,
-        )
-        if self.target_exchange_code is not None:
-            query_dict["exchange_code"] = self.target_exchange_code
-
-        return source_asset.__class__.get(**query_dict)
+    def is_asset_in_rule(self, asset: "Asset") -> bool:
+        return self.asset_filter.filter_triggered(asset)
 
 class AssetTranslationTable(BaseModel):
     rules: List[AssetTranslationRule]
@@ -356,7 +357,7 @@ class AssetTranslationTable(BaseModel):
                     "exchange_code": rule.target_exchange_code,
                 }
 
-        return None
+        raise TranslationError(f"No rules for asset {asset} found")
 
 class Asset(AssetMixin, BaseObjectOrm):
 
