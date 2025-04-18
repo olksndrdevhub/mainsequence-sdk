@@ -47,13 +47,11 @@ class PricesConfiguration(VFBConfigBaseModel):
         upsample_frequency_id (str): Frequency to upsample intraday data to.
         intraday_bar_interpolation_rule (str): Rule for interpolating missing intraday bars.
         is_live (bool): Boolean flag indicating if the price feed is live.
-        markets_time_series List[MarketsTimeSeries]: The list of markets time series.
     """
     bar_frequency_id: str = "1d"
     upsample_frequency_id: str = "1d"  # "15m"
     intraday_bar_interpolation_rule: str = "ffill"
     is_live: bool = False
-    markets_time_series: List[MarketsTimeSeries]
 
 @lru_cache(maxsize=1028)  # Cache up to 1028 different combinations
 def cached_asset_filter(*args,**kwargs):
@@ -137,6 +135,7 @@ class PortfolioMarketsConfig(VFBConfigBaseModel):
     Attributes:
         portfolio_name (str): Name of the portfolio.
         execution_configuration (VAMExecutionConfiguration): Execution configuration for VAM.
+        tracking_funds_expected_exposure_from_latest_holdings (bool): If tracking funds should get the expected exposure from weights or from latest holdings.
     """
     portfolio_name: str = "Portfolio Strategy Title"
     front_end_details: Optional[FrontEndDetails] = None

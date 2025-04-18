@@ -7,8 +7,6 @@ portfolio_build_configuration:
       bar_frequency_id: 1d
       upsample_frequency_id: 1d
       intraday_bar_interpolation_rule: ffill
-      markets_time_series:
-        - unique_identifier: alpaca_1d_bars
     assets_category_unique_id: magnificent_7
   execution_configuration:
     commission_fee: 0.00018
@@ -17,7 +15,6 @@ portfolio_build_configuration:
     signal_weights_name: MarketCap
     rebalance_strategy_name: ImmediateSignal
     signal_weights_configuration:
-      historical_market_cap_ts_unique_identifier: polygon_historical_marketcap
       num_top_assets: None
       minimum_atvr_ratio: .05
       rolling_atv_volume_windows: [ 90, 365 ]
@@ -34,8 +31,6 @@ portfolio_build_configuration:
           bar_frequency_id: 1d
           intraday_bar_interpolation_rule: ffill
           upsample_frequency_id: 1d
-          markets_time_series:
-            - unique_identifier: alpaca_1d_bars
     rebalance_strategy_configuration:
       calendar: 24/7
       rebalance_end: '23:00'
@@ -47,6 +42,4 @@ portfolio_markets_configuration:
   portfolio_name: Magnificent 7 Market Cap 10% Vol Control Portfolio
   front_end_details:
     description: "This is about this portfolios"
-  builds_from_target_positions: false
   tracking_funds_expected_exposure_from_latest_holdings: false
-  follow_account_rebalance: false

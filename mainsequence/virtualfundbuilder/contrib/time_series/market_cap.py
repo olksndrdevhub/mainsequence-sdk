@@ -104,7 +104,6 @@ class MarketCap(WeightsBase, TimeSerie):
     @TimeSerie._post_init_routines()
     def __init__(self,
                  volatility_control_configuration: Optional[VolatilityControlConfiguration],
-                 historical_market_cap_ts_unique_identifier: str = "polygon_historical_marketcap",
                  minimum_atvr_ratio: float = .1,
                  rolling_atvr_volume_windows: List[int] = [60, 360],
                  frequency_trading_percent: float = .9,
