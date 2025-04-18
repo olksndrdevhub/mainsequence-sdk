@@ -151,13 +151,13 @@ class PersistManager:
     @classmethod
     def get_from_data_type(self,data_source:DynamicTableDataSource,*args, **kwargs):
 
+        
         data_type = data_source.related_resource_class_type
-        if data_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            return DataLakePersistManager(data_source=data_source,
-                                         *args, **kwargs)
-
-        elif data_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+        if data_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
+        else:
+            return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
+
 
     ## method for doing lazy queries
 

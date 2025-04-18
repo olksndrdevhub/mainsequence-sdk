@@ -1261,6 +1261,7 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             index_names: list,
             grouped_dates: dict,
     ):
+
         LocalTimeSerie.post_data_frame_in_chunks(
             serialized_data_frame=serialized_data_frame,
             local_metadata=local_metadata,
@@ -1269,6 +1270,26 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             time_index_name=time_index_name,
             overwrite=overwrite,
         )
+
+    def insert_data_into_local_table(
+            self,
+            serialized_data_frame: pd.DataFrame,
+            local_metadata: LocalTimeSerie,
+            overwrite: bool,
+            time_index_name: str,
+            index_names: list,
+            grouped_dates: dict,
+    ):
+
+        # LocalTimeSerie.post_data_frame_in_chunks(
+        #     serialized_data_frame=serialized_data_frame,
+        #     local_metadata=local_metadata,
+        #     data_source=self,
+        #     index_names=index_names,
+        #     time_index_name=time_index_name,
+        #     overwrite=overwrite,
+        # )
+        raise NotImplementedError
 
     def get_data_by_time_index(
             self,
@@ -1422,7 +1443,9 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
                 data_source=self.related_resource,
                 *args, **kwargs,
             )
+        elif self.related_resource_class_type=="duck_db":
 
+            a=5
         else:
             self.related_resource.insert_data_into_table(*args, **kwargs)
 

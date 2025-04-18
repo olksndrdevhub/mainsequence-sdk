@@ -2069,7 +2069,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
            local_metadata : Union[None, dict], optional
                Local metadata for the time series, if available.
         """
-        from .persist_managers import DataLakePersistManager
 
         self._local_persist_manager = PersistManager.get_from_data_type(
             local_hash_id=local_hash_id,
@@ -2077,8 +2076,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             local_metadata=local_metadata,
             data_source=self.data_source,
         )
-        if isinstance(self._local_persist_manager, DataLakePersistManager) and verify_local_run:
-            self._local_persist_manager.verify_if_already_run(self)
 
 
     @none_if_backend_detached
