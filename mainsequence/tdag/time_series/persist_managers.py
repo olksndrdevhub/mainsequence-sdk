@@ -140,9 +140,13 @@ class PersistManager:
         self._metadata_cached=None
 
         if self.local_hash_id is not None:
-            self.synchronize_metadata(meta_data=metadata,
-                                      local_metadata=local_metadata,
-                                      class_name=class_name)
+            self.synchronize_metadata(local_metadata=local_metadata)
+
+    def synchronize_metadata(self,local_metadata:Union[None,LocalTimeSerie]):
+        if local_metadata is not None:
+            self.set_local_metadata(local_metadata)
+        else:
+            self.set_local_metadata_lazy(force_registry=True, include_relations_detail=True)
 
     @classmethod
     def get_from_data_type(self,data_source:DynamicTableDataSource,*args, **kwargs):
@@ -176,6 +180,11 @@ class PersistManager:
             # Define a callback that will launch set_local_metadata_lazy after the remote update is complete.
     @property
     def metadata(self):
+        if self.local_metadata.remote_table.sourcetableconfiguration is not None:
+            if self.local_metadata.remote_table.build_meta_data.get("initialize_with_default_partitions",True) == False:
+                if self.local_metadata.remote_table.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+                    self.logger.warning("Default Partitions will not be initialized ")
+
         return self.local_metadata.remote_table
 
     @property
@@ -228,27 +237,7 @@ class PersistManager:
                                   daemon=False)
         thread.start()
 
-    def synchronize_metadata(self, meta_data: Union[dict, None], local_metadata: Union[dict, None],
-                             set_last_index_value: bool = False,
-                             class_name: Union[str, None] = None
-                             ):
-        """
-        forces a synchronization between table and metadata
-        :return:
-        """
-        if BACKEND_DETACHED():
-            self._local_metadata_cached=local_metadata
-            return None
 
-        # start with remote metadata
-        if set_last_index_value == True:
-            LocalTimeSerie.set_last_update_index_time(metadata=self.local_metadata)
-        if local_metadata is not None:
-            self.set_local_metadata(local_metadata)
-            return None
-
-        #speedd up the wait
-        self.set_local_metadata_lazy(force_registry=True, include_relations_detail=True)
 
     def depends_on_connect(self,new_ts:"TimeSerie",is_api:bool):
         """
@@ -474,13 +463,11 @@ class PersistManager:
         remote_build_configuration = None
         if hasattr(self, "remote_build_configuration"):
             remote_build_configuration = self.remote_build_configuration
-        if hasattr(self, "remote_build_metadata"):
-            remote_build_metadata = self.remote_build_metadata
-        remote_table_exist = True
+
         if remote_build_configuration is None:
             logger.debug(f"remote table {remote_table_hashed_name} does not exist creating")
             #create remote table
-            remote_table_exist = False
+
             try:
 
                 # table may not exist but
@@ -493,14 +480,10 @@ class PersistManager:
                               data_source=data_source.model_dump(),
                               build_meta_data=remote_build_metadata)
 
-
-
-                # kwargs["source_class_name"]=self.class_name
-                #todo. thread this
                 dtd_metadata = DynamicTableMetaData.get_or_create(**kwargs)
                 remote_table_hash_id = dtd_metadata.hash_id
-                #todo: after creating metadata always delete local parquet manager even if not exist
-                # self.delete_local_parquet()
+
+
 
             except Exception as e:
                 self.logger.exception(f"{remote_table_hashed_name} Could not set meta data in DB for P")
@@ -511,20 +494,18 @@ class PersistManager:
 
         local_table_exist = self._verify_local_ts_exists(remote_table_hash_id=remote_table_hash_id, local_configuration=local_configuration)
 
-        return remote_table_exist, local_table_exist
+
 
     def _verify_local_ts_exists(self, remote_table_hash_id: str, local_configuration: Union[dict, None]=None):
         """
         Verifies that the local time serie exist in ORM
         """
-        local_table_exist=True
         local_build_configuration = None
-        if hasattr(self, "local_build_configuration"):
+        if self.local_metadata is not None:
             local_build_configuration, local_build_metadata = self.local_build_configuration, self.local_build_metadata
         if local_build_configuration is None:
 
             logger.debug(f"local_metadata {self.local_hash_id} does not exist creating")
-            local_table_exist = False
             local_update = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
                                                        remote_table__data_source__id=self.data_source.id)
             if local_update is None:
@@ -540,12 +521,14 @@ class PersistManager:
                 )
 
                 local_metadata = LocalTimeSerie.get_or_create(**metadata_kwargs,)
-                self.set_local_metadata_lazy(force_registry=True, include_relations_detail=True)
+
+
             else:
                 local_metadata = local_update
-                self.set_local_metadata(local_metadata=local_metadata)
 
-        return   local_table_exist
+            self.set_local_metadata(local_metadata=local_metadata)
+
+
 
     def _verify_insertion_format(self,temp_df):
         """

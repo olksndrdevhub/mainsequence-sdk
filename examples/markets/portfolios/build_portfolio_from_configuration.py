@@ -16,10 +16,9 @@ top_100_cryptos=AssetCategory.get(unique_identifier="top_100_crypto_market_cap",
 spot_assets = Asset.filter(id__in=top_100_cryptos.assets)
 # get them through main sequence figi class and exchange
 binance_currency_pairs = AssetCurrencyPair.filter(
-    base_asset__figi_details__main_sequence_share_class__in=[a.figi_details.main_sequence_share_class for a in
-                                                             spot_assets],
+    base_asset__main_sequence_share_class__in=[a.main_sequence_share_class for a in   spot_assets],
     execution_venue__symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-    quote_asset__symbol="USDT",
+    quote_asset__ticker="USDT",
     include_base_quote_detail=False
     )
 
@@ -33,8 +32,6 @@ top_100_cryptos_binance=AssetCategory.get_or_create(
 top_100_cryptos_binance.patch(assets=[a.id for a in binance_currency_pairs])
 
 all_categories=[top_100_cryptos_binance]
-
-
 
 
 
@@ -56,8 +53,6 @@ for category in all_categories:
     #    - Replace placeholders with the actual values
     replaced_str = template_str.replace("CATEGORY_ID", category.unique_identifier)
     replaced_str = replaced_str.replace("CATEGORY_SOURCE", category.source)
-    replaced_str = replaced_str.replace("PRICES_ID", DAILY_CRYPTO_TS_UNIQUE_ID)
-    replaced_str=replaced_str.replace("MARKET_CAP_TS_ID",MARKET_CAP_TS_ID)
 
     # 3. Optionally, load it into a YAML structure (if you want to manipulate further)
     updated_config = yaml.safe_load(replaced_str)
@@ -94,7 +89,7 @@ for category in all_categories:
     try:
 
         portfolio_interface.run(portfolio_tags=["Thematic", "Crypto"],add_portfolio_to_markets_backend=True,
-                                patch_build_configuration=True)
+                                patch_build_configuration=False)
     except AssetMistMatch:
         portfolio_interface.delete_portfolio()
     except Exception as e:

@@ -693,7 +693,8 @@ class GraphNodeMethods(ABC):
         """
         def process_ts_value(value):
             if isinstance(value, TimeSerie):
-                value.local_persist_manager  # before connection call local persist manager to garantee ts is created
+                value.local_persist_manager
+                value._verify_and_build_remote_objects()  # before connection call local persist manager to garantee ts is created
                 self.local_persist_manager.depends_on_connect(value, is_api=False)
                 value.set_relation_tree()
             if isinstance(value, APITimeSerie):
@@ -701,6 +702,9 @@ class GraphNodeMethods(ABC):
                 self.local_persist_manager.depends_on_connect(value, is_api=True)
 
         members = self.__dict__
+        if self.local_persist_manager.local_metadata is None:
+            self._verify_and_build_remote_objects() #critical point to build the objects
+
         if self.is_local_relation_tree_set == False:
             # persiste manager needs to have full information
             self.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True,force_registry=True)
@@ -2075,14 +2079,14 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         )
         if isinstance(self._local_persist_manager, DataLakePersistManager) and verify_local_run:
             self._local_persist_manager.verify_if_already_run(self)
-        self._verify_and_build_remote_objects()
+
 
     @none_if_backend_detached
     def _verify_and_build_remote_objects(self):
 
         time_serie_source_code_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
         time_serie_source_code = self.get_time_serie_source_code(self.__class__)
-        remote_meta_exist, local_meta_exist = self._local_persist_manager.local_persist_exist_set_config(
+        self._local_persist_manager.local_persist_exist_set_config(
             remote_table_hashed_name=self.remote_table_hashed_name,
             local_configuration=self.local_initial_configuration,
             remote_configuration=self.remote_initial_configuration,
@@ -2091,21 +2095,8 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             time_serie_source_code=time_serie_source_code,
             data_source=self.data_source,
 
-        )
-        if remote_meta_exist == False or local_meta_exist == False:
+        ) #this method always creates
 
-            # should be on creation
-            update_details = self.local_persist_manager.local_metadata.update_details_exist() if local_meta_exist == True else {
-                "remote_exist": remote_meta_exist, "local_exist": local_meta_exist}
-            if update_details["remote_exist"] == False or update_details["local_exist"] == False:
-                self.set_relation_tree()
-                self.local_persist_manager.build_update_details(source_class_name=self.__class__.__name__)
-
-        if self.local_persist_manager.update_details is not None:
-            source_class_name = self.local_persist_manager.metadata.source_class_name
-            if source_class_name is None or source_class_name == "":
-                # patch class name
-                self.local_persist_manager.patch_update_details(source_class_name=self.__class__.__name__)
 
     def flush_pickle(self):
         if os.path.isfile(self.pickle_path):
@@ -2122,7 +2113,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         """
         patch_build = os.environ.get("PATCH_BUILD_CONFIGURATION", False) in ["true", "True", 1]
         if patch_build == True:
-            self.local_persist_manager  # just call it before to initilaize dts
+            self._verify_and_build_remote_objects()  # just call it before to initilaize dts
             self.logger.warning(f"Patching build configuration for {self.hash_id}")
             self.flush_pickle()
 
@@ -2131,10 +2122,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                                                                  remote_build_metadata=self.remote_build_metadata,
                                                                  )
 
-        if self.local_persist_manager.metadata.sourcetableconfiguration is not None:
-            if self.remote_build_metadata["initialize_with_default_partitions"] == False:
-                if self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-                    self.logger.warning("Default Partitions will not be initialized ")
+
 
     def _create_config(self, kwargs, post_init_log_messages: list):
         """
@@ -2206,10 +2194,8 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
         """
 
-        # set scheduler
-        update_details = {}
         # reset metadata
-        self.local_persist_manager.synchronize_metadata(meta_data=metadata, local_metadata=local_metadata)
+        self.local_persist_manager.synchronize_metadata(local_metadata=local_metadata)
         self.set_relation_tree()
         if hasattr(self, "logger") == False:
             self._set_logger(self.hashed_name)

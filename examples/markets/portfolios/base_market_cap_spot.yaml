@@ -7,8 +7,6 @@ portfolio_build_configuration:
       bar_frequency_id: 1d
       intraday_bar_interpolation_rule: ffill
       upsample_frequency_id: 1d
-      markets_time_series:
-        - unique_identifier: PRICES_ID
     assets_category_unique_id: CATEGORY_ID
   execution_configuration:
     commission_fee: 0.00018
@@ -18,7 +16,6 @@ portfolio_build_configuration:
       calendar: 24/7
     rebalance_strategy_name: ImmediateSignal
     signal_weights_configuration:
-      historical_market_cap_ts_unique_identifier: MARKET_CAP_TS_ID
       num_top_assets: None
       minimum_atvr_ratio: .05
       rolling_atv_volume_windows: [ 90, 365 ]
@@ -32,8 +29,6 @@ portfolio_build_configuration:
           bar_frequency_id: 1d
           intraday_bar_interpolation_rule: ffill
           upsample_frequency_id: 1d
-          markets_time_series:
-            - unique_identifier: PRICES_ID
       source_frequency: 1d
     signal_weights_name: MarketCap
 portfolio_markets_configuration:
