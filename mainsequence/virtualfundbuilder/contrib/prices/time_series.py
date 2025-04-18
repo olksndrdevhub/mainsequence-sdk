@@ -34,14 +34,12 @@ def get_interpolated_prices_timeseries(assets_configuration: AssetsConfiguration
     Creates a Wrapper Timeseries for an asset configuration.
     """
     prices_configuration = copy.deepcopy(assets_configuration).prices_configuration
-    markets_time_series_unique_id_list = [p.unique_identifier for p in prices_configuration.markets_time_series]
 
     prices_configuration_kwargs = prices_configuration.model_dump()
     prices_configuration_kwargs.pop("is_live", None)
     prices_configuration_kwargs.pop("markets_time_series", None)
     return InterpolatedPrices(
         asset_category_unique_id=assets_configuration.assets_category_unique_id,
-        markets_time_series_unique_id_list=markets_time_series_unique_id_list,
         **prices_configuration_kwargs
     )
 
@@ -472,7 +470,6 @@ class InterpolatedPrices(TimeSerie):
             asset_category_unique_id: str,
             bar_frequency_id: str,
             intraday_bar_interpolation_rule: str,
-            markets_time_series_unique_id_list: str,
             upsample_frequency_id: Optional[str] = None,
             asset_filter: Optional[dict] = None,
             local_kwargs_to_ignore: List[str] = ["asset_category_unique_id"],
@@ -493,7 +490,6 @@ class InterpolatedPrices(TimeSerie):
         self.intraday_bar_interpolation_rule = intraday_bar_interpolation_rule
         self.bar_frequency_id = bar_frequency_id
         self.upsample_frequency_id = upsample_frequency_id
-        self.markets_time_series_unique_id_list = markets_time_series_unique_id_list
 
         # define the translation rules
         translation_table = AssetTranslationTable(
