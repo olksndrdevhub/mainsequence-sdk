@@ -498,9 +498,7 @@ class AccountMixin(BasePydanticModel):
     def account_target_portfolio(self):
         return self.accounttargetportfolio
 
-    @property
-    def execution_venue_symbol(self):
-        return self.execution_venue.symbol
+
 
 
     def get_nav(self):
@@ -661,8 +659,6 @@ class AccountLatestHoldingsSerializer(BaseObjectOrm,BasePydanticModel):
 
     holdings: list
 
-class AccountRiskFactors(BaseObjectOrm):
-    ...
 
 class AccountHistoricalHoldings(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = Field(None, primary_key=True)
@@ -694,6 +690,11 @@ class AccountHistoricalHoldings(BaseObjectOrm,BasePydanticModel):
         )
         if r.status_code != 204:
             raise Exception(r.text)
+
+class AccountRiskFactors(BaseObjectOrm,BasePydanticModel):
+    related_holdings: Union[int,AccountHistoricalHoldings]
+    account_balance: float
+
 
 class FundingFeeTransaction(BaseObjectOrm):
     pass
