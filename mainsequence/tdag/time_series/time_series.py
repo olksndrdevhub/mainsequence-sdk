@@ -2674,49 +2674,9 @@ class WrapperTimeSerie(TimeSerie):
         data_df = pd.concat(data_df, axis=0)
         return data_df
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """ Restore instance attributes from a pickled state. """
-
-        # Restore instance attributes (i.e., filename and lineno).
-        for key, value in state["related_time_series"].items():
-            if isinstance(value, dict) == True:
-                local_hash_id = value["local_hash_id"]
-
-                module = importlib.import_module(state["_data_source"]["pydantic_model_import_path"]["module"])
-                PydanticClass = getattr(module, state["_data_source"]["pydantic_model_import_path"]['qualname'])
-                data_source = PydanticClass(**state["_data_source"]['serialized_model'])
-                pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
-                                                        data_source_id=data_source.id
-                                                        )
-
-                state["related_time_series"][key] = load_from_pickle(pickle_path=pickle_path)
-
-        self.__dict__.update(state)
-
-    def __getstate__(self):
-        # Copy the object's state from self.__dict__ which contains
-        # all our instance attributes. Always use the dict.copy()
-        # method to avoid modifying the original state.
-
-        state = self.__dict__
-        for key, value in state["related_time_series"].items():
-            new_value = {"is_time_serie_pickled": True}
-            if isinstance(value, dict):
-                assert value["is_time_serie_pickled"] == True
-                new_value = value
-            else:
-                value.persist_to_pickle()
-                new_value["local_hash_id"] = value.local_hash_id
-            state["related_time_series"][key] = new_value
-        state = self._prepare_state_for_pickle(state=state)
-
-        # Remove the unpicklable entries.
-        return state
-
     def set_data_source_from_pickle_path(self, pikle_path):
         data_source = self.load_data_source_from_pickle(pikle_path)
         self.set_data_source(data_source=data_source)
-
 
     def set_state_with_sessions(self, include_vam_client_objects: bool,
                                 graph_depth_limit: int,
