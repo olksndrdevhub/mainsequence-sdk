@@ -427,6 +427,7 @@ rebalance details:"""
         """
         self.logger.debug("Starting update of portfolio weights.")
         start_date, end_date = self._calculate_start_end_dates(update_statistics)
+        self.logger.debug(f"Update from {start_date} to {end_date}")
 
         if start_date is None:
             self.logger.info("Start date is None, no update is done")

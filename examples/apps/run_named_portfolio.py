@@ -31,6 +31,7 @@ class RunNamedPortfolio(BaseApp):
 
 if __name__ == "__main__":
     configuration = NamedPortfolioConfiguration(
-        portfolio_run_parameters=PortfolioRunParameters()
+        portfolio_run_parameters=PortfolioRunParameters(),
+        # portfolio_name="sentiment_portfolio"
     )
     RunNamedPortfolio(configuration).run()

@@ -52,6 +52,7 @@ kaleido = "*"
 newspaper3k = "*"
 lxml-html-clean = "*"
 docstring-parser = "*"
+concurrent-log-handler = "*"
 
 [dev-packages]
 mkdocs = "*"
