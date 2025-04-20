@@ -1497,7 +1497,6 @@ class APITimeSerie(CommonMethodsMixin):
 
     @property
     def local_persist_manager(self):
-
         if hasattr(self, "_local_persist_manager") == False:
             self._set_local_persist_manager()
             self.logger.debug(f"Setting local persist manager for {self.local_hash_id}")
@@ -2069,14 +2068,12 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
            local_metadata : Union[None, dict], optional
                Local metadata for the time series, if available.
         """
-
         self._local_persist_manager = PersistManager.get_from_data_type(
             local_hash_id=local_hash_id,
             class_name=self.__class__.__name__,
             local_metadata=local_metadata,
             data_source=self.data_source,
         )
-
 
     @none_if_backend_detached
     def _verify_and_build_remote_objects(self):
@@ -2110,6 +2107,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         """
         patch_build = os.environ.get("PATCH_BUILD_CONFIGURATION", False) in ["true", "True", 1]
         if patch_build == True:
+            self.local_persist_manager # ensure lpm exists
             self._verify_and_build_remote_objects()  # just call it before to initilaize dts
             self.logger.warning(f"Patching build configuration for {self.hash_id}")
             self.flush_pickle()
