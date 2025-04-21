@@ -771,18 +771,9 @@ class TimeSerieRebuildMethods(ABC):
         return data_source
 
     @classmethod
-    def rebuild_and_set_from_local_hash_id(cls, local_hash_id:int,data_source_id:int, set_dependencies_df: bool = False,
+    def rebuild_and_set_from_local_hash_id(cls, local_hash_id:int, data_source_id:int, set_dependencies_df: bool = False,
                                            graph_depth_limit=1,
                                            ):
-        """
-
-        :param local_hash_id:
-        :param data_source_id:
-        :param set_dependencies_df:
-        :param graph_depth_limit:
-        :param local_metadatas:
-        :return:
-        """
         pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
                                                 data_source_id=data_source_id,
                                                 )
@@ -2259,6 +2250,8 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         update_map = {}
         if use_state_for_update == True:
             update_map = self.get_update_map()
+
+        print(f"Updating tree with update map {list(update_map.keys())} and dependencies {self.dependencies_df['local_hash_id'].to_list()}")
 
         if debug_mode == False:
             tmp_ts = self.dependencies_df.copy()
