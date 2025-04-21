@@ -142,7 +142,7 @@ class PersistManager:
         if self.local_hash_id is not None:
             self.synchronize_metadata(local_metadata=local_metadata)
 
-    def synchronize_metadata(self,local_metadata:Union[None,LocalTimeSerie]):
+    def synchronize_metadata(self, local_metadata: Union[None, LocalTimeSerie]):
         if local_metadata is not None:
             self.set_local_metadata(local_metadata)
         else:
