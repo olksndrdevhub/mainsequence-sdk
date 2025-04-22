@@ -22,7 +22,7 @@ from mainsequence.tdag.config import (
 )
 import structlog.contextvars as cvars
 
-from mainsequence.tdag.time_series.persist_managers import PersistManager, DataLakePersistManager
+from mainsequence.tdag.time_series.persist_managers import PersistManager
 from mainsequence.client.models_tdag import (none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate,
                                              DataUpdates, UniqueIdentifierRangeMap
                                              )

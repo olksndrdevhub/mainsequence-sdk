@@ -6,7 +6,7 @@ from mainsequence.logconf import logger
 
 
 from mainsequence.client import (LocalTimeSerie, UniqueIdentifierRangeMap,
-                                 LocalTimeSeriesDoesNotExist, PodLocalLake,
+                                 LocalTimeSeriesDoesNotExist,
                                  DynamicTableDoesNotExist, DynamicTableDataSource, TDAG_CONSTANTS as CONSTANTS, DynamicTableMetaData,
                                  DataUpdates, DoesNotExist)
 

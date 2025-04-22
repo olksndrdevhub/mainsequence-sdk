@@ -142,7 +142,31 @@ class MarketCap(WeightsBase, TimeSerie):
                     ),
                     markets_time_serie_unique_identifier="polygon_historical_marketcap",
                     target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                )
+                ),
+
+                # From crypot main sequence assign binance
+                AssetTranslationRule(
+                    asset_filter=AssetFilter(
+                        execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+                        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
+                    ),
+                    markets_time_serie_unique_identifier="coingecko_market_cap",
+                    target_execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
+                    target_exchange_code=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
+
+                ),
+                # From binance crypto assign binance
+                AssetTranslationRule(
+                    asset_filter=AssetFilter(
+                        execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
+                        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
+                    ),
+                    markets_time_serie_unique_identifier="coingecko_market_cap",
+                    target_execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
+                    target_exchange_code=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
+
+                ),
+
             ]
         )
 
