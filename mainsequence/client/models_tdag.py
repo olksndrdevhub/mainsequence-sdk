@@ -4,7 +4,7 @@ from .base import BasePydanticModel, BaseObjectOrm, TDAG_ENDPOINT
 from .data_sources_interfaces.duckdb import DuckDBInterface
 from .utils import (is_process_running, get_network_ip,
                     TDAG_CONSTANTS,
-                    DATE_FORMAT, AuthLoaders, make_request, set_types_in_table, request_to_datetime, serialize_to_json)
+                    DATE_FORMAT, AuthLoaders, make_request, set_types_in_table, request_to_datetime, serialize_to_json, bios_uuid)
 import copy
 import datetime
 import pytz
@@ -755,7 +755,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     open_for_everyone: bool = Field(default=False, description="Whether the table is open for everyone")
     data_source_open_for_everyone: bool = Field(default=False,
                                                 description="Whether the data source is open for everyone")
-    build_configuration: Dict[str, Any] = Field(..., description="Configuration in JSON format")
+    build_configuration: Optional[Dict[str, Any]] = Field(None, description="Configuration in JSON format")
     build_meta_data: Optional[Dict[str, Any]] = Field(None, description="Optional YAML metadata")
     time_serie_source_code_git_hash: Optional[str] = Field(None, max_length=255,
                                                            description="Git hash of the time series source code")
@@ -764,12 +764,11 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     data_source: Union[int, "DynamicTableDataSource"]
     source_class_name: str
     sourcetableconfiguration: Optional[SourceTableConfiguration] = None
-    table_index_names:Optional[Dict]=None
+    table_index_names:Optional[Dict] = None
 
     #TS specifi
-    compression_policy_config:Optional[dict]
-    retention_policy_config:Optional[dict]
-
+    compression_policy_config: Optional[Dict] = None
+    retention_policy_config: Optional[Dict] = None
 
     _drop_indices: bool = False  # for direct incertion we can pass this values
     _rebuild_indices: bool = False  # for direct incertion we can pass this values
@@ -1238,6 +1237,17 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
     organization: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
     class_type: str
     status: str
+    extra_arguments: Optional[Dict] = None
+
+    @classmethod
+    def get_or_create_duck_db(cls, time_out=None, *args, **kwargs):
+        url = cls.get_object_url() + f"/create_duck_db/"
+        payload = {"json": serialize_to_json(kwargs)}
+        s = cls.build_session()
+        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload, time_out=time_out)
+        if r.status_code not in [200, 201]:
+            raise Exception(f"Error in request {r.text}")
+        return cls(**r.json())
 
     def insert_data_into_table(
             self,
@@ -1297,16 +1307,20 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
     ) -> pd.DataFrame:
 
         if self.class_type == "duck_db":
-            DuckDBInterface().read(
-                table=local_metadata.remote_table.table_name,
+            db_interface = DuckDBInterface()
+            table_name = local_metadata.remote_table.table_name
+
+            df = db_interface.read(
+                table=table_name,
                 start=start_date,
                 end=end_date,
+                great_or_equal=great_or_equal,
+                less_or_equal=less_or_equal,
                 ids=unique_identifier_list,
-                columns=columns
-                # TODO goe, loe, unique_identfier_range_map
+                columns=columns,
+                unique_identifier_range_map=unique_identifier_range_map # Pass range map
             )
         else:
-            metadata = local_metadata.remote_table
             df = local_metadata.get_data_between_dates_from_api(
                 start_date=start_date,
                 end_date=end_date,
@@ -1317,10 +1331,9 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
                 unique_identifier_range_map=unique_identifier_range_map
             )
         if len(df) == 0:
-            if logger:
-                logger.warning(
-                    f"No data returned from remote API for {local_metadata.local_hash_id}"
-                )
+            logger.warning(
+                f"No data returned from remote API for {local_metadata.local_hash_id}"
+            )
             return df
 
         stc = local_metadata.remote_table.sourcetableconfiguration
@@ -1344,6 +1357,30 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
 
     class Config:
         use_enum_values = True  # This ensures that enums are stored as their values (e.g., 'TEXT')
+
+    def init_duck_db(self):
+        assert self.related_resource.class_type == "duck_db"
+
+        # create and set new database
+        data_source = DataSource.get_or_create_duck_db(
+            display_name=f"DuckDB_{bios_uuid()}",
+            host_mac_address=bios_uuid()
+        )
+
+        dynamic_data_source = DynamicTableDataSource.create_duck_db(
+            related_resource=data_source.id,
+            related_resource_class_type=data_source.class_type,
+        )
+
+        # drop local tables that are not in registered in the backend anymore (probably have been deleted)
+        remote_tables = DynamicTableMetaData.filter(data_source__id=self.id, list_tables=True)
+        remote_table_names = [t.table_name for t in remote_tables]
+        local_table_names = DuckDBInterface().list_tables()
+
+        tables_to_delete = set(local_table_names) - set(remote_table_names)
+        for table_name in tables_to_delete:
+            logger.debug(f"Deleting table in local duck db {table_name}")
+            DuckDBInterface().drop_table(table_name)
 
     def model_dump_json(self, **json_dumps_kwargs) -> str:
         """
@@ -1380,16 +1417,11 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
             cloudpickle.dump(self, handle)
 
     @classmethod
-    def get_or_create_local_data_source(cls, *args, **kwargs):
-        url = cls.get_object_url() + "/get_or_create/"
-        for field in ['datalake_start', 'datalake_end']:
-            if field in kwargs and kwargs[field] is not None:
-                kwargs[field] = int(kwargs[field].timestamp())
-        kwargs["data_type"] = TDAG_CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE[0]
+    def create_duck_db(cls, *args, **kwargs):
+        url = cls.get_object_url() + "/create_duck_db/"
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": kwargs})
-
-        if r.status_code not in [200, 201]:
+        if r.status_code not in [201]:
             raise Exception(f"Error in request {r.text}")
         return cls(**r.json())
 

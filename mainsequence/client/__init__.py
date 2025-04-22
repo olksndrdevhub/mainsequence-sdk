@@ -16,6 +16,8 @@ from .models_vam import *
 try:
     POD_PROJECT = Project.get_user_default_project()
     POD_DEFAULT_DATA_SOURCE = POD_PROJECT.data_source
+    if POD_DEFAULT_DATA_SOURCE.related_resource.class_type == "duck_db":
+        POD_DEFAULT_DATA_SOURCE.init_duck_db()
 except Exception as e:
     POD_PROJECT = None
     logger.exception(f"Could not retrive pod project {e}")

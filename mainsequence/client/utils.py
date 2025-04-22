@@ -8,7 +8,7 @@ from requests.structures import CaseInsensitiveDict
 import datetime
 import time
 import pytz
-from typing import Union
+from typing import Union, Optional
 from mainsequence.logconf import logger
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
@@ -276,3 +276,67 @@ def serialize_to_json(kwargs):
 
         new_data[key] = new_value
     return new_data
+
+
+
+
+import os
+import pathlib
+import shutil
+import subprocess
+import uuid
+
+def _linux_machine_id() -> Optional[str]:
+    """Return the OS machine‑id if readable (many distros make this 0644)."""
+    for p in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+        path = pathlib.Path(p)
+        if path.is_file():
+            try:
+                return path.read_text().strip().lower()
+            except PermissionError:
+                continue
+    return None
+
+def bios_uuid() -> str:
+    """Best‑effort hardware/OS identifier that never returns None.
+
+    Order of preference
+    -------------------
+    1. `/sys/class/dmi/id/product_uuid`          (kernel‑exported, no root)
+    2. `dmidecode -s system-uuid`                (requires root *and* dmidecode)
+    3. `/etc/machine-id` or `/var/lib/dbus/machine-id`
+    4. `uuid.getnode()` (MAC address as 48‑bit int, zero‑padded hex)
+
+    The value is always lower‑case and stripped of whitespace.
+    """
+    # Tier 1 – kernel DMI file
+    path = pathlib.Path("/sys/class/dmi/id/product_uuid")
+    if path.is_file():
+        try:
+            val = path.read_text().strip().lower()
+            if val:
+                return val
+        except PermissionError:
+            pass
+
+    # Tier 2 – dmidecode, but only if available *and* running as root
+    if shutil.which("dmidecode") and os.geteuid() == 0:
+        try:
+            out = subprocess.check_output(
+                ["dmidecode", "-s", "system-uuid"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+            val = out.splitlines()[0].strip().lower()
+            if val:
+                return val
+        except subprocess.SubprocessError:
+            pass
+
+    # Tier 3 – machine‑id
+    mid = _linux_machine_id()
+    if mid:
+        return mid
+
+    # Tier 4 – MAC address (uuid.getnode). Always available.
+    return f"{uuid.getnode():012x}"

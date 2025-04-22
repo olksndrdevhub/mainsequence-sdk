@@ -247,9 +247,9 @@ def interpolate_daily_bars(
                         ['unique_identifier']
                     ].bfill().ffill()
 
-            null_index = bars_df[bars_df.isnull().any(axis=1)].index
-            bars_df.close = bars_df.close.ffill()
-            bars_df.loc[null_index, "open"] = bars_df.loc[null_index, "close"]
+            null_index = bars_df.isnull().any(axis=1)
+            bars_df["close"] = bars_df["close"].ffill()
+            bars_df["open"] = bars_df["open"].where(~null_index, bars_df["close"])
             try:
                 bars_df.volume = bars_df.volume.fillna(0)
             except Exception as e:
@@ -261,8 +261,8 @@ def interpolate_daily_bars(
 
             if len(null_index) > 0:
                 if "high" in bars_df.columns:
-                    bars_df.loc[null_index, "high"] = bars_df.loc[null_index, "close"]
-                    bars_df.loc[null_index, "low"] = bars_df.loc[null_index, "close"]
+                    bars_df["high"] = bars_df["high"].where(~null_index, bars_df["close"])
+                    bars_df["low"] = bars_df["low"].where(~null_index, bars_df["close"])
 
                 bars_df["interpolated"] = False
                 bars_df.loc[null_index, "interpolated"] = True

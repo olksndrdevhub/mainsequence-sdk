@@ -1,78 +1,282 @@
 from __future__ import annotations
+
+import os
+from typing import Optional, Literal, List, Dict
+
 import duckdb, pandas as pd
 from pathlib import Path
 import datetime
-import pytz
+from mainsequence.logconf import logger
+
+def get_logger():
+    global logger
+
+    # If the logger doesn't have any handlers, create it using the custom function
+    logger.bind(sub_application="duck_db_interface")
+    return logger
+
+logger = get_logger()
+
 class DuckDBInterface:
     """
     Persist/serve (time_index, unique_identifier, …) DataFrames in a DuckDB file.
     """
 
-    def __init__(self, db_path: str | Path = "analytics.duckdb"):
-        self.db_path = Path(db_path)
-        # Single connection kept open – DuckDB is thread‑safe for concurrent readers
+    def __init__(self, db_path: Optional[str | Path] = None):
+        """
+        Initializes the interface with the path to the DuckDB database file.
+
+        Args:
+            db_path (Optional[str | Path]): Path to the database file.
+                                             Defaults to the value of the DUCKDB_PATH
+                                             environment variable or 'analytics.duckdb'
+                                             in the current directory if the variable is not set.
+        """
+        from mainsequence.tdag.config import TDAG_DATA_PATH
+        default_path = Path(os.getenv("DUCKDB_PATH", TDAG_DATA_PATH))
+        self.db_path = Path(db_path) if db_path else default_path
+        logger.info(f"DuckDBInterface initialized with db_path: {self.db_path}")
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
         self.con = duckdb.connect(str(self.db_path))
         # Sane defaults
         self.con.execute("PRAGMA threads = 4")  # tweak to your cores
         self.con.execute("PRAGMA enable_object_cache = true")
+
 
     # ──────────────────────────────────────────────────────────────────────────────
     # Public API
     # ──────────────────────────────────────────────────────────────────────────────
     def upsert(self, df: pd.DataFrame, table: str) -> None:
         """
-        idempotently writes a DataFrame into *table* using (time_index, uid) PK.
+        Idempotently writes a DataFrame into *table* using (time_index, uid) PK.
         Extra columns are added to the table automatically.
+
+        Args:
+            df (pd.DataFrame): DataFrame to upsert.
+            table (str): Target table name.
         """
-        df = df.copy()  # keep caller's frame untouched
+        if df.empty:
+            logger.warning(f"Attempted to upsert an empty DataFrame to table '{table}'. Skipping.")
+            return
 
-        # 1) Ensure mandatory columns exist
-        if not {"time_index", "unique_identifier"} <= set(df.columns):
-            raise ValueError("DataFrame must contain time_index and unique_identifier")
+        df = df.copy()
+        logger.info(f"Starting upsert of {len(df)} rows into table '{table}' in {self.db_path}")
 
-        # 2) Create/extend the table as needed
-        self._ensure_table(table, df)
+        try:
+            self._ensure_table(table, df)
+            self.con.register("upd_df", df)
+            cols = ", ".join(f'"{c}"' for c in df.columns)
+            try:
+                self.con.execute(f"""
+                    INSERT OR REPLACE INTO "{table}" ({cols})
+                    SELECT {cols} FROM upd_df
+                """)
+                logger.info(f"Successfully upserted {len(df)} rows into table '{table}'.")
+            except duckdb.Error as e:
+                logger.error(f"Error during INSERT OR REPLACE into '{table}': {e}")
+                raise
+            finally:
+                self.con.unregister("upd_df")
+                logger.debug("Unregistered temporary view 'upd_df'.")
+        except duckdb.Error as e:
+            logger.error(f"Failed to upsert data into table '{table}': {e}")
+            raise
+        except Exception as e:
+            logger.exception(f"An unexpected error occurred during upsert to table '{table}': {e}")
+            raise
 
-        # 3) Register the frame as an in‑memory DuckDB relation
-        self.con.register("upd_df", df)
+    def read(
+            self,
+            table: str,
+            *,
+            start: Optional[datetime.datetime] = None,
+            end: Optional[datetime.datetime] = None,
+            great_or_equal: bool = True,  # Changed back to boolean
+            less_or_equal: bool = True,  # Changed back to boolean
+            ids: Optional[List[str]] = None,
+            columns: Optional[List[str]] = None,
+            unique_identifier_range_map: Optional[Dict] = None
+    ) -> pd.DataFrame:
+        """
+        Reads data from the specified table, with optional filtering.
+        Handles missing tables by returning an empty DataFrame.
 
-        # 4) Upsert – INSERT OR REPLACE uses the PRIMARY KEY to deduplicate
-        cols = ", ".join(df.columns)
-        self.con.execute(f"""
-            INSERT OR REPLACE INTO "{table}" ({cols})
-            SELECT {cols} FROM upd_df
-        """)
-        self.con.unregister("upd_df")
+        Args:
+            table (str): The name of the table to read from.
+            start (Optional[datetime.datetime]): Minimum time_index filter.
+            end (Optional[datetime.datetime]): Maximum time_index filter.
+            great_or_equal (bool): If True, use >= for start date comparison. Defaults to True.
+            less_or_equal (bool): If True, use <= for end date comparison. Defaults to True.
+            ids (Optional[List[str]]): List of specific unique_identifiers to include.
+            columns (Optional[List[str]]): Specific columns to select. Reads all if None.
+            unique_identifier_range_map (Optional[UniqueIdentifierRangeMap]):
+                A map where keys are unique_identifiers and values are dicts specifying
+                date ranges (start_date, end_date, start_date_operand, end_date_operand)
+                for that identifier. Mutually exclusive with 'ids'.
 
-    def read(self, table: str, *, start=None, end=None,
-             ids=None, columns=None) -> pd.DataFrame:
+        Returns:
+            pd.DataFrame: The queried data, or an empty DataFrame if the table doesn't exist.
 
-        cols = ", ".join(columns) if columns else "*"
-        sql = [f'SELECT {cols} FROM "{table}"']
-        parms = []
+        Raises:
+            ValueError: If both `ids` and `unique_identifier_range_map` are provided.
+        """
+        # Map boolean flags to operator strings internally
+        start_operator = '>=' if great_or_equal else '>'
+        end_operator = '<=' if less_or_equal else '<'
 
+        if ids is not None and unique_identifier_range_map is not None:
+            raise ValueError("Cannot provide both 'ids' and 'unique_identifier_range_map'.")
+
+        logger.info(
+            f"Reading from table '{table}' with filters: start={start}, end={end}, "
+            f"ids={ids is not None}, columns={columns}, range_map={unique_identifier_range_map is not None}"
+        )
+
+        cols_select = "*"
+        if columns:
+            required_cols = {"time_index", "unique_identifier"}
+            select_set = set(columns) | required_cols
+            cols_select = ", ".join(f'"{c}"' for c in select_set)
+
+        sql_parts = [f'SELECT {cols_select} FROM "{table}"']
+        params = []
+        where_clauses = []
+
+        # --- Build WHERE clauses ---
         if start is not None:
-            sql += ["WHERE" if len(sql) == 1 else "AND", "time_index >= ?"]
-            parms.append(start)
+            where_clauses.append(f"time_index {start_operator} ?")
+            params.append(start.replace(tzinfo=None) if start.tzinfo else start)
         if end is not None:
-            sql += ["AND", "time_index <= ?"]
-            parms.append(end)
+            where_clauses.append(f"time_index {end_operator} ?")
+            params.append(end.replace(tzinfo=None) if end.tzinfo else end)
         if ids:
-            placeholders = ",".join("?" for _ in ids)
-            sql += ["AND", f"unique_identifier IN ({placeholders})"]
-            parms.extend(ids)
+            if not isinstance(ids, list): ids = list(ids)
+            if ids:
+                placeholders = ", ".join("?" for _ in ids)
+                where_clauses.append(f"unique_identifier IN ({placeholders})")
+                params.extend(ids)
+        if unique_identifier_range_map:
+            range_conditions = []
+            for uid, date_info in unique_identifier_range_map.items():
+                uid_conditions = ["unique_identifier = ?"]
+                range_params = [uid]
+                # Use operands from map if present, otherwise default to >= and <=
+                s_op = date_info.get('start_date_operand', '>=')
+                e_op = date_info.get('end_date_operand', '<=')
+                if date_info.get('start_date'):
+                    uid_conditions.append(f"time_index {s_op} ?")
+                    s_date = date_info['start_date']
+                    range_params.append(s_date.replace(tzinfo=None) if s_date.tzinfo else s_date)
+                if date_info.get('end_date'):
+                    uid_conditions.append(f"time_index {e_op} ?")
+                    e_date = date_info['end_date']
+                    range_params.append(e_date.replace(tzinfo=None) if e_date.tzinfo else e_date)
+                range_conditions.append(f"({' AND '.join(uid_conditions)})")
+                params.extend(range_params)
+            if range_conditions:
+                where_clauses.append(f"({' OR '.join(range_conditions)})")
 
-        sql.append("ORDER BY time_index")
+        if where_clauses: sql_parts.append("WHERE " + " AND ".join(where_clauses))
+        sql_parts.append("ORDER BY time_index")
+        query = " ".join(sql_parts)
+        logger.debug(f"Executing read query: {query} with params: {params}")
 
-        df = self.con.execute(" ".join(sql), parms).fetch_df()
+        try:
+            table_exists_result = self.con.execute(
+                "SELECT table_name FROM duckdb_tables WHERE table_name = ?", [table]
+            ).fetchone()
+            if table_exists_result is None:
+                logger.warning(f"Table '{table}' does not exist in {self.db_path}. Returning empty DataFrame.")
+                return pd.DataFrame()
 
-        # ▸ Grab DuckDB’s column types and coerce explicitly
-        schema = self.con.execute(f"DESCRIBE {table}").fetchall()
-        type_map = {name: self._duck_to_pandas(duck_type)
-                    for name, duck_type, *_ in schema
-                    if name in df.columns}
+            df = self.con.execute(query, params).fetch_df()
 
-        return df.astype(type_map, errors="ignore")
+            if not df.empty:
+                schema = self.con.execute(f'PRAGMA table_info("{table}")').fetchall()
+                type_map = {name: self._duck_to_pandas(duck_type)
+                            for name, duck_type, nullable, pk, default, primary_key_pos in schema
+                            if name in df.columns}
+                for col, target_type in type_map.items():
+                    try:
+                        if target_type == "datetime64[ns, UTC]":
+                            df[col] = pd.to_datetime(df[col], errors='coerce').dt.tz_localize('UTC')
+                        elif target_type == "datetime64[ns]":
+                            df[col] = pd.to_datetime(df[col], errors='coerce')
+                        else:
+                            if isinstance(target_type, (pd.Int64Dtype, pd.BooleanDtype, pd.StringDtype)):
+                                df[col] = df[col].astype(target_type, errors='ignore')
+                            else:
+                                df[col] = df[col].astype(target_type, errors='ignore')
+                    except Exception as type_e:
+                        logger.warning(f"Could not coerce column '{col}' to type '{target_type}': {type_e}")
+
+                logger.info(f"Read {len(df)} rows from table '{table}'.")
+                return df
+
+            return pd.DataFrame()
+
+        except duckdb.CatalogException as e:
+            logger.warning(f"CatalogException for table '{table}': {e}. Returning empty DataFrame.")
+            return pd.DataFrame()
+        except duckdb.Error as e:
+            logger.error(f"Failed to read data from table '{table}': {e}")
+            raise
+        except Exception as e:
+            logger.exception(f"An unexpected error occurred during read from table '{table}': {e}")
+            raise
+
+
+    def drop_table(self, table: str) -> None:
+        """
+        Drops the specified table from the database.
+
+        Args:
+            table (str): The name of the table to drop.
+        """
+        logger.info(f"Attempting to drop table '{table}' from {self.db_path}")
+        try:
+            # Use IF EXISTS to avoid error if table is already gone
+            self.con.execute(f'DROP TABLE IF EXISTS "{table}"')
+            logger.info(f"Successfully dropped table '{table}' (if it existed).")
+        except duckdb.Error as e:
+            logger.error(f"Failed to drop table '{table}': {e}")
+            raise # Re-raise the error after logging
+        except Exception as e:
+            logger.exception(f"An unexpected error occurred while dropping table '{table}': {e}")
+            raise
+
+
+    def list_tables(self) -> List[str]:
+        """
+        Lists all user-defined tables in the main schema of the database.
+
+        Returns:
+            List[str]: A list of table names. Returns an empty list if the
+                       database file does not exist or on error.
+        """
+        logger.info(f"Attempting to list tables in {self.db_path}")
+        tables = []
+        try:
+            # Query duckdb_tables information schema view for user tables
+            results = self.con.execute(
+                "SELECT table_name FROM duckdb_tables WHERE schema_name = 'main' ORDER BY table_name"
+            ).fetchall()
+            tables = [row[0] for row in results]
+            logger.info(f"Found {len(tables)} tables: {tables}")
+        except duckdb.IOException as e:
+             # Specific case where the file didn't exist and couldn't be created/opened
+             logger.error(f"Could not list tables, IO error connecting to {self.db_path}: {e}")
+             return [] # Return empty list if DB file is inaccessible
+        except duckdb.Error as e:
+            logger.error(f"Failed to list tables in {self.db_path}: {e}")
+            return [] # Return empty list on other DB errors
+        except Exception as e:
+            logger.exception(f"An unexpected error occurred while listing tables in {self.db_path}: {e}")
+            return [] # Return empty list on unexpected errors
+
+        return tables
+
 
     # ──────────────────────────────────────────────────────────────────────────────
     # Private helpers
@@ -82,13 +286,21 @@ class DuckDBInterface:
         Creates the table if absent, or adds any still‑missing columns.
         """
         # 1) Create‑if‑missing with the two key columns
-        self.con.execute(f"""
-           CREATE TABLE IF NOT EXISTS "{table}" (
-    time_index        TIMESTAMPTZ   NOT NULL,
+        if "unique_identifier" in df.columns:
+            create_cmd = f"""
+                CREATE TABLE IF NOT EXISTS "{table}" (
+                time_index        TIMESTAMPTZ   NOT NULL,
                 unique_identifier VARCHAR   NOT NULL,
                 PRIMARY KEY (time_index, unique_identifier)
-            )
-        """)
+            )"""
+        else:
+            create_cmd = f"""
+                CREATE TABLE IF NOT EXISTS "{table}" (
+                time_index        TIMESTAMPTZ   NOT NULL,
+                PRIMARY KEY (time_index)
+            )"""
+
+        self.con.execute(create_cmd)
 
         # 2) Add new columns on the fly
         existing_cols = {

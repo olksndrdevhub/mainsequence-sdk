@@ -18,7 +18,6 @@ from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 from mainsequence.tdag.utils import write_yaml
 from mainsequence.tdag.utils import hash_dict
 import copy
-from mainsequence.virtualfundbuilder.contrib.templates.asset_groups import SP500_MAP, SP500_HIGH_ESG, SP500_LOW_ESG
 from functools import lru_cache
 
 logger = get_vfb_logger()

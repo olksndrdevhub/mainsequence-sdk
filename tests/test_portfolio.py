@@ -11,8 +11,8 @@ from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent
 from mainsequence.virtualfundbuilder.contrib.time_series import MarketCap
 portfolio = PortfolioInterface.load_from_configuration("market_cap_example")
 
-portfolio.run(add_portfolio_to_markets_backend=True)
-
+res = portfolio.run(add_portfolio_to_markets_backend=False, local_database=True)
+print(res)
 # bars_ts = get_interpolated_prices_timeseries(portfolio.portfolio_build_configuration.assets_configuration)
 
 # bars_ts.run(debug_mode=True, force_update=True)
