@@ -27,7 +27,7 @@ import numpy as np
 import concurrent.futures
 
 _default_data_source = None  # Module-level cache
-BACKEND_DETACHED = lambda: os.environ.get('BACKEND_DETACHED', "false").lower() == "true"
+
 
 JSON_COMPRESSED_PREFIX = ["json_compressed", "jcomp_"]
 
@@ -51,8 +51,7 @@ def none_if_backend_detached(func):
 
         @wraps(getter)
         def wrapper_getter(*args, **kwargs):
-            if BACKEND_DETACHED():
-                return None
+
             return getter(*args, **kwargs)
 
         return property(wrapper_getter, func.fset, func.fdel, func.__doc__)
@@ -63,8 +62,7 @@ def none_if_backend_detached(func):
 
         @wraps(original_func)
         def wrapper(*args, **kwargs):
-            if BACKEND_DETACHED():
-                return None
+
             return original_func(*args, **kwargs)
 
         return classmethod(wrapper)
@@ -75,8 +73,7 @@ def none_if_backend_detached(func):
 
         @wraps(original_func)
         def wrapper(*args, **kwargs):
-            if BACKEND_DETACHED():
-                return None
+
             return original_func(*args, **kwargs)
 
         return staticmethod(wrapper)
@@ -85,8 +82,7 @@ def none_if_backend_detached(func):
     else:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if BACKEND_DETACHED():
-                return None
+
             return func(*args, **kwargs)
 
         return wrapper
@@ -882,12 +878,7 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
                                 data_source_id: int,
                                 name_suffix: Union[str, None] = None, ):
 
-        if BACKEND_DETACHED() == True:
-            return cls(name=f"Detached scheduler for {local_hash_id}",
-                       uid="DETACHED", running_process_pid=0, host="SDf", api_address="Sdf",
-                       api_port=0,
-                       running_in_debug_mode=True, updates_to=local_hash_id,
-                       is_running=True)
+
         s = cls.build_session()
         url = cls.get_object_url() + "/initialize_debug_for_ts/"
         payload = dict(json={"local_hash_id": local_hash_id, "name_suffix": name_suffix,
@@ -903,8 +894,7 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
     def build_and_assign_to_ts(cls, scheduler_name: str, local_hash_id_list: list, delink_all_ts=False,
                                remove_from_other_schedulers=True, **kwargs):
 
-        if BACKEND_DETACHED() == True:
-            raise Exception("TDAG is detached")
+
 
         s = cls.build_session()
         url = cls.get_object_url() + "/build_and_assign_to_ts/"
@@ -922,9 +912,7 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
         return scheduler
 
     def in_active_tree_connect(self, local_time_series_ids: list):
-        if BACKEND_DETACHED() == True:
-            self.in_active_tree = local_time_series_ids
-            return None
+
         s = self.build_session()
         url = self.get_object_url() + f"/{self.uid}/in_active_tree_connect/"
         payload = dict(json={"local_time_series_ids": local_time_series_ids})
@@ -933,9 +921,7 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
             raise Exception(f"Error in request {r.text}")
 
     def assign_to_scheduler(self, hash_id_list: list):
-        if BACKEND_DETACHED() == True:
-            self.schedules_to = hash_id_list
-            return self
+
         s = self.build_session()
         url = self.get_object_url() + f"/{self.uid}/assign_to_scheduler/"
         payload = dict(json={"hash_id_list": hash_id_list})
@@ -1876,8 +1862,7 @@ class DynamicTableHelpers:
             return metadata, r
 
     def get(self, class_name=None, *args, **kwargs):
-        if BACKEND_DETACHED() == True:
-            return {}
+
         instance, r = self.get_rest(*args, **kwargs)
         return instance
 
@@ -2055,8 +2040,7 @@ class DynamicTableHelpers:
             grouped_dates=grouped_dates,
         )
 
-        if BACKEND_DETACHED() == True:
-            return None
+
 
         min_d, last_time_index_value = global_stats["_GLOBAL_"]["min"], global_stats["_GLOBAL_"]["max"]
         max_per_asset_symbol = None

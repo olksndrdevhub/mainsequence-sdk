@@ -113,13 +113,13 @@ def set_data_source(pod_source=None, tdag_detached=False, override_all: bool = F
     """
     if pod_source is not None:
 
-        vars = ["POD_DEFAULT_DATA_SOURCE", "POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE", "BACKEND_DETACHED"]
+        vars = ["POD_DEFAULT_DATA_SOURCE", "POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE", ]
         original_values = {k: os.environ.get(k, None) for k in vars}
 
         # Override the environment variables
         os.environ["POD_DEFAULT_DATA_SOURCE"] = pod_source.model_dump_json()
         os.environ["POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE"] = str(override_all)
-        os.environ["BACKEND_DETACHED"] = str(tdag_detached)
+
 
         try:
             yield pod_source
@@ -398,9 +398,7 @@ class SchedulerUpdater:
         return next_update
 
     def refresh_node_scheduler(self):
-        from mainsequence.client import BACKEND_DETACHED
-        if BACKEND_DETACHED()==True:
-            return None
+
         error_in_request = True
         while error_in_request == True:
             try:

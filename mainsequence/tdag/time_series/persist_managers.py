@@ -10,7 +10,7 @@ from mainsequence.client import (LocalTimeSerie, UniqueIdentifierRangeMap,
                                  DynamicTableDoesNotExist, DynamicTableDataSource, TDAG_CONSTANTS as CONSTANTS, DynamicTableMetaData,
                                  DataUpdates, DoesNotExist)
 
-from mainsequence.client.models_tdag import BACKEND_DETACHED, none_if_backend_detached, DynamicTableHelpers
+from mainsequence.client.models_tdag import  none_if_backend_detached, DynamicTableHelpers
 import json
 import threading
 from concurrent.futures import Future
@@ -614,9 +614,7 @@ class PersistManager:
     def get_update_statistics(self, asset_symbols:list,
                               remote_table_hash_id,time_serie,
                               ) -> [datetime.datetime,Dict[str, datetime.datetime]]:
-        if BACKEND_DETACHED(): #todo this can be optimized by running stats per data lake
-            return self._get_local_lake_update_statistics(remote_table_hash_id=remote_table_hash_id,
-                                                          time_serie=time_serie)
+
 
         metadata = self.local_metadata.remote_table
 
@@ -662,13 +660,10 @@ class PersistManager:
         return persisted_df
 
     def filter_by_assets_ranges(self, asset_ranges_map: dict,time_serie):
-        if BACKEND_DETACHED == False:
-            if self.metadata["sourcetableconfiguration"] is not None:
-                assert "asset_symbol" in self.metadata["sourcetableconfiguration"][
-                    "index_names"], "Table does not contain asset_symbol column"
-        else:
-            if isinstance(self, DataLakePersistManager):
-                self.verify_if_already_run(time_serie)
+
+
+        if isinstance(self, DataLakePersistManager):
+            self.verify_if_already_run(time_serie)
         df = self.dth.filter_by_assets_ranges(metadata=self.metadata, asset_ranges_map=asset_ranges_map,
                                               data_source=self.data_source, local_hash_id=time_serie.local_hash_id)
 
@@ -773,134 +768,3 @@ class TimeScaleLocalPersistManager(PersistManager):
 
 
 
-class DataLakePersistManager(PersistManager):
-
-    """
-    A class to manage data persistence in a local data lake.
-
-    This class handles the storage and retrieval of time series data in a local file system,
-    organized by date ranges and table hashes.
-    """
-
-    def __init__(self, *args,**kwargs):
-        """
-        Initializes the DataLakePersistManager with configuration from environment variables.
-        """
-        super().__init__(*args,**kwargs)
-        self.set_already_run(already_run=False)
-        self.set_is_introspecting(False)
-
-
-    def set_is_introspecting(self,is_introspecting):
-        self.is_introspecting = is_introspecting
-
-    def verify_if_already_run(self,ts):
-        """
-        This method handles all the configuration and setup necessary when running a detached local data lake
-        :param ts:
-        :return:
-        """
-        from mainsequence.client import BACKEND_DETACHED
-        from mainsequence.tdag.time_series import WrapperTimeSerie
-        if self.already_run== True or self.is_introspecting ==True:
-            return None
-        update_statistics=DataUpdates(update_statistics=None,max_time_index_value=None)
-        if BACKEND_DETACHED() and self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            self.set_is_introspecting(True)
-            self.metadata = DynamicTableMetaData(**{"sourcetableconfiguration":None, "hash_id": ts.remote_table_hashed_name,
-                            "table_name":ts.remote_table_hashed_name,"data_source":self.data_source,
-                                                    "build_configuration":{},"source_class_name":ts.__class__.__name__,
-                                                    "creation_date":datetime.datetime.utcnow()
-                            })
-            self.local_metadata=LocalTimeSerie(**{"local_hash_id":self.local_hash_id,"remote_table":self.metadata,
-                                                  "build_configuration":{},"run_configuration":{}
-                                                  })
-            last_update_in_table=None
-            if self.table_exist(table_name=ts.remote_table_hashed_name):
-                # check if table is complete and continue with earliest latest value to avoid data gaps
-                data_updates = ts.get_update_statistics()
-                if data_updates.update_statistics is not None:
-                    last_update_in_table = ts.get_earliest_updated_asset_filter(last_update_per_unique_identifier=data_updates.update_statistics ,
-                                                                                unique_identifier_list=None)
-
-
-                update_statistics.max_time_index_value=last_update_in_table
-
-
-            self.logger.debug(f"Building local data lake from latest value  {last_update_in_table}")
-
-            if isinstance(ts,WrapperTimeSerie):
-                df = None
-                for _,sub_ts in ts.related_time_series.items():
-                    sub_ts.local_persist_manager #query the first run
-            else:
-                df = ts.update(update_statistics=update_statistics)
-
-
-            if df is None:
-                return None
-            if df.shape[0] == 0:
-                return None
-            DynamicTableHelpers.upsert_data_into_table(
-                local_metadata=self.local_metadata,
-                data=df,
-                data_source=self.data_source,
-
-            )
-
-            #verify pickle exist
-            ts.persist_to_pickle()
-            self.set_already_run(True)  # set before the update to stop recurisivity
-
-
-
-    def set_already_run(self, already_run: bool):
-        """
-        This methos is critical as it control the level of introspection and avouids recursivity\
-        This happens for example when TimeSeries.update(*,**):
-        TimeSeries.update(latest_value,*,**):
-            self.get_update_statistics() <- will incurr in a circular refefence using local data late
-        Args:
-            introspection:
-
-        Returns:
-
-        """
-
-        self.already_run = already_run
-
-    def _get_local_lake_update_statistics(self,remote_table_hash_id,time_serie):
-        from mainsequence.client.data_sources_interfaces.local_data_lake import DataLakeInterface
-        assert self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
-        if self.already_run == False:
-            self.verify_if_already_run(time_serie)
-        last_index_value, last_multiindex = DataLakeInterface(
-            data_lake_source=self.data_source,
-        ).get_parquet_latest_value(
-            table_name=remote_table_hash_id
-        )
-        if last_multiindex is not None:
-            if len(last_multiindex)==0:
-                last_multiindex=None
-        return last_index_value, last_multiindex
-
-    def table_exist(self,table_name):
-        from mainsequence.client.data_sources_interfaces.local_data_lake import DataLakeInterface
-        assert self.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE
-        return DataLakeInterface(data_lake_source=self.data_source.related_resource,
-                                                              ).table_exist(
-            table_name=table_name)
-    def get_table_schema(self,table_name):
-        from mainsequence.client.data_sources_interfaces.local_data_lake import DataLakeInterface
-        dli=DataLakeInterface(data_lake_source=self.data_source,
-                         logger=self.logger)
-        schema=dli.get_table_schema(table_name=table_name)
-        schema = {field.name: field.type for field in schema}
-        return schema
-
-    def get_df_between_dates(self,time_serie:"TimeSerie", *args,**kwargs):
-        if self.already_run ==False:
-            self.verify_if_already_run(time_serie)
-        filtered_data=super().get_df_between_dates( *args,**kwargs)
-
-        return filtered_data

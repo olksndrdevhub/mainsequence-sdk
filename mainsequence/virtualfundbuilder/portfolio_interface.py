@@ -1,6 +1,6 @@
 import copy
 from mainsequence.tdag.utils import write_yaml
-from mainsequence.client import BACKEND_DETACHED, IndexAsset
+from mainsequence.client import  IndexAsset
 import os
 from typing import Dict, Any, List, Union, Optional
 import yaml
@@ -74,29 +74,19 @@ class PortfolioInterface():
         portfolio_ts = self.portfolio_strategy_time_serie
 
         def build_markets_portfolio(ts, build_purpose):
-            from mainsequence.client import BACKEND_DETACHED
+
 
             # when is live target portfolio
             signal_weights_ts = ts.signal_weights
 
             #timeseries can be running in local lake so need to request the id
-            if BACKEND_DETACHED():
-                standard_kwargs = dict(is_asset_only=False,
-                                       local_time_serie_id=0,
-                                       local_time_serie_hash_id=ts.local_hash_id,
-                                       is_active=True,
-                                       signal_local_time_serie_id=0,
-                                       build_purpose=build_purpose,
-                                       )
-                #need to pickle because there is not local met
-                ts.persist_to_pickle(overwrite=True)
-            else:
-                standard_kwargs = dict(is_asset_only=False,
-                                       local_time_serie_id=ts.local_metadata.id,
-                                       is_active=True,
-                                       signal_local_time_serie_id=signal_weights_ts.local_metadata.id,
-                                       build_purpose=build_purpose,
-                                       )
+
+            standard_kwargs = dict(is_asset_only=False,
+                                   local_time_serie_id=ts.local_metadata.id,
+                                   is_active=True,
+                                   signal_local_time_serie_id=signal_weights_ts.local_metadata.id,
+                                   build_purpose=build_purpose,
+                                   )
 
             user_kwargs = self.portfolio_markets_config.model_dump()
             user_kwargs.pop("front_end_details", None)
@@ -106,10 +96,7 @@ class PortfolioInterface():
             standard_kwargs["required_venues__symbols"] = ts.get_required_execution_venues()
             standard_kwargs["calendar_name"] = self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
                                                         "calendar"]
-            if BACKEND_DETACHED():
-                standard_kwargs["required_venues"] = [0]
-                standard_kwargs["id"] = ts.local_hash_id
-                return TargetPortfolio(**standard_kwargs)
+
 
             # front end details
             standard_kwargs["target_portfolio_about"] = {
@@ -137,19 +124,7 @@ class PortfolioInterface():
         # create index Asset
         asset_symbol = target_portfolio.portfolio_ticker
         
-        if BACKEND_DETACHED():
-            index_asset = TargetPortfolioIndexAsset(
-                ticker=asset_symbol,
-                name=asset_symbol,
-                unique_identifier=asset_symbol,
-                unique_symbol=asset_symbol,
-                reference_portfolio=target_portfolio.id,
-                valuation_asset=portfolio_ts.valuation_asset,
-                calendar=Calendar(
-                    name=self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
-                        "calendar"]
-                )
-            )
+
 
         self.index_asset = index_asset
         self.target_portfolio = target_portfolio

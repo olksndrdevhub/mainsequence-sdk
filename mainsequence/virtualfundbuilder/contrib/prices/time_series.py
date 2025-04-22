@@ -9,7 +9,7 @@ import pandas_market_calendars as mcal
 
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList, APITimeSerie, data_source_pickle_path
 from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
-                                 BACKEND_DETACHED, DataUpdates, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
+                                  DataUpdates, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
                                  )
 from mainsequence.client import MARKETS_CONSTANTS, ExecutionVenue
 from mainsequence.client import HistoricalBarsSource, DoesNotExist, Asset, MarketsTimeSeriesDetails
@@ -534,8 +534,7 @@ class InterpolatedPrices(TimeSerie):
         return required
 
     def _run_post_update_routines(self, error_on_last_update, update_statistics):
-        if BACKEND_DETACHED():
-            return None
+
 
         if not self.metadata.protect_from_deletion:
             self.local_persist_manager.protect_from_deletion()
