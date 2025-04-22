@@ -3,7 +3,7 @@ from .utils import AuthLoaders
 from .models_tdag import (request_to_datetime, LocalTimeSeriesDoesNotExist, DynamicTableDoesNotExist,
                           SourceTableConfigurationDoesNotExist, LocalTimeSerieUpdateDetails,
                           JSON_COMPRESSED_PREFIX, Scheduler, SchedulerDoesNotExist, LocalTimeSerie,
-                          DynamicTableMetaData, DynamicTableDataSource, LocalTimeSerieNode, PodLocalLake,
+                          DynamicTableMetaData, DynamicTableDataSource, LocalTimeSerieNode,
                           Project, UniqueIdentifierRangeMap, LocalTimeSeriesHistoricalUpdate,
                           DataUpdates)
 

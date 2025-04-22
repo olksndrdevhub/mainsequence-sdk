@@ -17,7 +17,6 @@ from mainsequence.logconf import logger
 
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any, TypedDict
-from .data_sources_interfaces.local_data_lake import DataLakeInterface
 from .data_sources_interfaces import timescale as TimeScaleInterface
 from functools import wraps
 import math
@@ -1451,73 +1450,6 @@ class Project(BasePydanticModel, BaseObjectOrm):
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
         return cls(**r.json())
-
-class PodLocalLake(DataSource):
-    id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
-    in_pod: int = Field(..., description="The ID of the related Pod Source")
-    datalake_name: str = Field(..., max_length=255, description="The name of the data lake")
-    datalake_end: Optional[datetime.datetime] = Field(None, description="The end time of the data lake")
-    datalake_start: Optional[datetime.datetime] = Field(None, description="The start time of the data lake")
-    nodes_to_get_from_db: Optional[Dict] = Field(None, description="Nodes to retrieve from the database as JSON")
-    use_s3_if_available: bool = Field(False, description="Whether to use S3 if available")
-
-    def insert_data_into_table(
-            self,
-            serialized_data_frame: pd.DataFrame,
-            local_metadata: LocalTimeSerie,
-            overwrite: bool,
-            time_index_name: str,
-            index_names: list,
-            grouped_dates: dict,
-
-    ):
-        data_lake_interface = DataLakeInterface(data_lake_source=self, )
-        data_lake_interface.persist_datalake(
-            serialized_data_frame,
-            overwrite=True,
-            time_index_name=time_index_name, index_names=index_names,
-            table_name=local_metadata.remote_table.table_name
-        )
-
-    def filter_by_assets_ranges(
-        self,
-        asset_ranges_map: dict,
-        metadata: dict,
-    ):
-        table_name = metadata["table_name"]
-        data_lake_interface = DataLakeInterface(data_lake_source=self, )
-        df = data_lake_interface.filter_by_assets_ranges(
-            table_name=table_name,
-            asset_ranges_map=asset_ranges_map,
-        )
-        return df
-
-    def get_data_by_time_index(
-            self,
-            local_metadata: dict,
-            start_date: Optional[datetime.datetime] = None,
-            end_date: Optional[datetime.datetime] = None,
-            great_or_equal: bool = True,
-            less_or_equal: bool = True,
-            columns: Optional[List[str]] = None,
-            unique_identifier_list: Optional[List[str]] = None,
-            unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
-
-    ) -> pd.DataFrame:
-        metadata = local_metadata.remote_table
-        table_name = metadata.table_name
-        data_lake_interface = DataLakeInterface(data_lake_source=self)
-
-        filters = data_lake_interface.build_time_and_symbol_filter(
-            start_date=start_date,
-            end_date=end_date,
-            great_or_equal=great_or_equal,
-            less_or_equal=less_or_equal,
-            unique_identifier_list=unique_identifier_list,
-            unique_identifier_range_map=unique_identifier_range_map,
-        )
-        df = data_lake_interface.query_datalake(filters=filters, table_name=table_name)
-        return df
 
 class TimeScaleDB(DataSource):
     database_user: str
