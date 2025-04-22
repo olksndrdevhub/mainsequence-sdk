@@ -434,11 +434,16 @@ class PersistManager:
 
 
 
-    def local_persist_exist_set_config(self,remote_table_hashed_name:str,
-                                       local_configuration:dict, remote_configuration:dict,data_source:dict,
-                                       time_serie_source_code_git_hash:str, time_serie_source_code:str,
-        remote_build_metadata:dict,
-                                       ):
+    def local_persist_exist_set_config(
+            self,
+            remote_table_hashed_name:str,
+            local_configuration:dict,
+            remote_configuration:dict,
+            data_source:dict,
+            time_serie_source_code_git_hash:str,
+            time_serie_source_code:str,
+            remote_build_metadata:dict,
+    ):
         """
         This method runs on initialization of the TimeSerie class. We also use it to retrieve the table if
         is already persisted
@@ -467,11 +472,9 @@ class PersistManager:
                               data_source=data_source.model_dump(),
                               build_meta_data=remote_build_metadata)
 
+
                 dtd_metadata = DynamicTableMetaData.get_or_create(**kwargs)
                 remote_table_hash_id = dtd_metadata.hash_id
-
-
-
             except Exception as e:
                 self.logger.exception(f"{remote_table_hashed_name} Could not set meta data in DB for P")
                 raise e

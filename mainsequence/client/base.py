@@ -124,6 +124,7 @@ class BaseObjectOrm:
         "LocalTimeSerieUpdateDetails": "ts_manager/local_time_serie_update_details",
         "LocalTimeSerieHistoricalUpdate": "ts_manager/lts_historical_update",
         "DynamicTableDataSource": "ts_manager/dynamic_table_data_source",
+        "DataSource": "pods/data_source",
         "Project": "pods/projects",
         "SourceTableConfiguration": "ts_manager/source_table_config",
         "DynamicResource": "tdag-gpt/dynamic_resource",

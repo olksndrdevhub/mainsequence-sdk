@@ -139,17 +139,15 @@ class PortfolioInterface():
             update_tree=True,
             portfolio_tags:List[str] = None,
             add_portfolio_to_markets_backend=False,
+            local_database=False,
             *args, **kwargs
     ):
         if not self._is_initialized or patch_build_configuration == True:
             self._initialize_nodes(patch_build_configuration=patch_build_configuration)
 
-        if self.portfolio_strategy_time_serie.data_source.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-            self.portfolio_strategy_time_serie.run(debug_mode=debug_mode, update_tree=update_tree, force_update=force_update, **kwargs)
-            if add_portfolio_to_markets_backend == True:
-                self.build_target_portfolio_in_backend(portfolio_tags=portfolio_tags)
-        else:
-            self.portfolio_strategy_time_serie.run_local_update(*args, **kwargs)
+        self.portfolio_strategy_time_serie.run(debug_mode=debug_mode, update_tree=update_tree, force_update=force_update, **kwargs)
+        if add_portfolio_to_markets_backend:
+            self.build_target_portfolio_in_backend(portfolio_tags=portfolio_tags)
 
         res = self.portfolio_strategy_time_serie.get_df_between_dates()
         if len(res) > 0:
