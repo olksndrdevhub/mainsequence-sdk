@@ -53,6 +53,7 @@ newspaper3k = "*"
 lxml-html-clean = "*"
 docstring-parser = "*"
 concurrent-log-handler = "*"
+duckdb = "*"
 
 [dev-packages]
 mkdocs = "*"
