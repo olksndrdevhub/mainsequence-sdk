@@ -117,6 +117,7 @@ class DuckDBInterface:
         if pd.api.types.is_bool_dtype(dtype):
             return "BOOLEAN"
         return "VARCHAR"
+
     @staticmethod
     def _duck_to_pandas(duck_type: str):
         """
