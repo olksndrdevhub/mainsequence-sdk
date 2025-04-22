@@ -754,7 +754,7 @@ class TimeSerieRebuildMethods(ABC):
                 rebuild_time_serie.persist_to_pickle()
             else:
                 # if no need to rebuild, just sync the metadata
-                self.local_persist_manager.synchronize_metadata(meta_data=None, local_metadata=None)
+                self.local_persist_manager.synchronize_metadata(local_metadata=None)
 
     @classmethod
     @tracer.start_as_current_span("TS: load_from_pickle")
@@ -771,18 +771,9 @@ class TimeSerieRebuildMethods(ABC):
         return data_source
 
     @classmethod
-    def rebuild_and_set_from_local_hash_id(cls, local_hash_id:int,data_source_id:int, set_dependencies_df: bool = False,
+    def rebuild_and_set_from_local_hash_id(cls, local_hash_id:int, data_source_id:int, set_dependencies_df: bool = False,
                                            graph_depth_limit=1,
                                            ):
-        """
-
-        :param local_hash_id:
-        :param data_source_id:
-        :param set_dependencies_df:
-        :param graph_depth_limit:
-        :param local_metadatas:
-        :return:
-        """
         pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
                                                 data_source_id=data_source_id,
                                                 )
@@ -982,7 +973,7 @@ class TimeSerieRebuildMethods(ABC):
 
         self.__dict__.update(state)
 
-        self.local_persist_manager.synchronize_metadata(meta_data=None, local_metadata=None)
+        self.local_persist_manager.synchronize_metadata(local_metadata=None)
 
     def get_minimum_required_depth_for_update(self):
         """
@@ -1497,7 +1488,6 @@ class APITimeSerie(CommonMethodsMixin):
 
     @property
     def local_persist_manager(self):
-
         if hasattr(self, "_local_persist_manager") == False:
             self._set_local_persist_manager()
             self.logger.debug(f"Setting local persist manager for {self.local_hash_id}")
@@ -2069,14 +2059,12 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
            local_metadata : Union[None, dict], optional
                Local metadata for the time series, if available.
         """
-
         self._local_persist_manager = PersistManager.get_from_data_type(
             local_hash_id=local_hash_id,
             class_name=self.__class__.__name__,
             local_metadata=local_metadata,
             data_source=self.data_source,
         )
-
 
     @none_if_backend_detached
     def _verify_and_build_remote_objects(self):
@@ -2110,6 +2098,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         """
         patch_build = os.environ.get("PATCH_BUILD_CONFIGURATION", False) in ["true", "True", 1]
         if patch_build == True:
+            self.local_persist_manager # ensure lpm exists
             self._verify_and_build_remote_objects()  # just call it before to initilaize dts
             self.logger.warning(f"Patching build configuration for {self.hash_id}")
             self.flush_pickle()
@@ -2262,6 +2251,8 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         if use_state_for_update == True:
             update_map = self.get_update_map()
 
+        self.logger.debug(f"Updating tree with update map {list(update_map.keys())} and dependencies {self.dependencies_df['local_hash_id'].to_list()}")
+
         if debug_mode == False:
             tmp_ts = self.dependencies_df.copy()
             if tmp_ts.shape[0] == 0:
@@ -2304,7 +2295,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
                             except Exception as e:
                                 self.logger.exception(
-                                    f"Error updating dependencie {ts.local_hash_id} when loading pickle")
+                                    f"Error updating dependency {ts.local_hash_id} when loading pickle")
                                 raise e
 
                         try:
@@ -2676,121 +2667,9 @@ class WrapperTimeSerie(TimeSerie):
         data_df = pd.concat(data_df, axis=0)
         return data_df
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """ Restore instance attributes from a pickled state. """
-
-        # Restore instance attributes (i.e., filename and lineno).
-        for key, value in state["related_time_series"].items():
-            if isinstance(value, dict) == True:
-                local_hash_id = value["local_hash_id"]
-
-                module = importlib.import_module(state["_data_source"]["pydantic_model_import_path"]["module"])
-                PydanticClass = getattr(module, state["_data_source"]["pydantic_model_import_path"]['qualname'])
-                data_source = PydanticClass(**state["_data_source"]['serialized_model'])
-                pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
-                                                        data_source_id=data_source.id
-                                                        )
-
-                state["related_time_series"][key] = load_from_pickle(pickle_path=pickle_path)
-
-        self.__dict__.update(state)
-
-    def __getstate__(self):
-        # Copy the object's state from self.__dict__ which contains
-        # all our instance attributes. Always use the dict.copy()
-        # method to avoid modifying the original state.
-
-        state = self.__dict__
-        for key, value in state["related_time_series"].items():
-            new_value = {"is_time_serie_pickled": True}
-            if isinstance(value, dict):
-                assert value["is_time_serie_pickled"] == True
-                new_value = value
-            else:
-                value.persist_to_pickle()
-                new_value["local_hash_id"] = value.local_hash_id
-            state["related_time_series"][key] = new_value
-        state = self._prepare_state_for_pickle(state=state)
-
-        # Remove the unpicklable entries.
-        return state
-
     def set_data_source_from_pickle_path(self, pikle_path):
         data_source = self.load_data_source_from_pickle(pikle_path)
         self.set_data_source(data_source=data_source)
-
-
-    def set_state_with_sessions(self, include_vam_client_objects: bool,
-                                graph_depth_limit: int,
-                                graph_depth: int,
-                                ) -> None:
-        """
-        Set state with sessions for all wrapped TimeSeries.
-
-        Args:
-            include_vam_client_objects: Whether to include asset ORM objects.
-            graph_depth_limit: The maximum depth of the graph to traverse.
-            graph_depth: The current depth in the graph.
-            local_metadatas: Optional metadata dictionary.
-        """
-
-        USE_THREADS = True
-
-        super(TimeSerie, self).set_state_with_sessions(
-            include_vam_client_objects=include_vam_client_objects,
-            graph_depth_limit=graph_depth_limit,
-            graph_depth=graph_depth)
-        errors = {}
-
-        def update_ts(related_time_series, ts_key, include_vam_client_objects,
-                      graph_depth,
-                      graph_depth_limit, error_list,  rel_ts, raise_exceptions=USE_THREADS):
-            if isinstance(rel_ts, dict):
-                pickle_path = TimeSerie.get_pickle_path(local_hash_id=rel_ts['local_hash_id'])
-                related_time_series[ts_key] = load_from_pickle(pickle_path=pickle_path)
-            try:
-                if isinstance(related_time_series[ts_key], APITimeSerie):
-                    return None
-                related_time_series[ts_key].set_state_with_sessions(
-                    graph_depth=graph_depth, graph_depth_limit=graph_depth_limit,
-                    include_vam_client_objects=include_vam_client_objects,
-                )
-            except Exception as e:
-                if raise_exceptions == True:
-                    raise e
-                tb_str = traceback.format_exc()
-                # Store the exception along with its traceback
-                error_list[ts_key] = {'error': str(e), 'traceback': tb_str}
-
-        if USE_THREADS == True:
-            thread_list = []
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                for ts_key, rel_ts in self.related_time_series.items():
-                    future = executor.submit(update_ts, self.related_time_series, ts_key,
-                                             include_vam_client_objects, graph_depth,
-                                             graph_depth_limit, errors,
-                                             rel_ts)
-
-                    thread_list.append(future)
-                for future in as_completed(thread_list):
-                    # You can optionally handle exceptions here if any
-                    try:
-                        result = future.result()  # This will block until the future is done
-                    except Exception as e:
-                        self.logger.exception("Error in thread")
-                        raise e
-        else:
-            self.logger.warning("NOT using threads for  loading state")
-            for ts_key, rel_ts in self.related_time_series.items():
-                t = update_ts(self.related_time_series, ts_key,
-                              include_vam_client_objects, graph_depth,
-                              graph_depth_limit, errors, local_metadatas, rel_ts, True)
-
-        if len(errors.keys()) > 0:
-            raise Exception(f"Error setting state for {errors}")
-
-        # for t in thread_list:
-        #     t.join()
 
     @tracer.start_as_current_span("Wrapper.concat_between_dates")
     def pandas_df_concat_on_rows_by_key_between_dates(self, start_date: Optional[datetime.datetime]=None,

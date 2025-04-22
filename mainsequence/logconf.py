@@ -86,16 +86,18 @@ def build_application_logger(
         ensure_dir(logger_file)
 
         handlers.update(
-            {"file": {
-            "class": "logging.handlers.RotatingFileHandler",
-            "formatter": "plain",
-            "level": os.getenv("LOG_LEVEL_FILE", "DEBUG"),
-            "filename": logger_file,
-            "mode": "a",
-            "maxBytes": 5 * 1024 * 1024,  # Rotate after 5 MB
-            "backupCount": 5,  # Keep up to 5 backup files
-        }}
-
+            {
+                "file": {
+                        "class": "concurrent_log_handler.ConcurrentRotatingFileHandler",
+                        "formatter": "plain",
+                        "level": os.getenv("LOG_LEVEL_FILE", "DEBUG"),
+                        "filename": logger_file,
+                        "mode": "a",
+                        "delay": True,
+                        "maxBytes": 5 * 1024 * 1024,  # Rotate after 5 MB
+                        "backupCount": 5,  # Keep up to 5 backup files
+                }
+            }
         )
 
     logging_config = {

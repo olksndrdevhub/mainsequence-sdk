@@ -142,7 +142,7 @@ class PersistManager:
         if self.local_hash_id is not None:
             self.synchronize_metadata(local_metadata=local_metadata)
 
-    def synchronize_metadata(self,local_metadata:Union[None,LocalTimeSerie]):
+    def synchronize_metadata(self, local_metadata: Union[None, LocalTimeSerie]):
         if local_metadata is not None:
             self.set_local_metadata(local_metadata)
         else:
@@ -150,8 +150,6 @@ class PersistManager:
 
     @classmethod
     def get_from_data_type(self,data_source:DynamicTableDataSource,*args, **kwargs):
-
-        
         data_type = data_source.related_resource_class_type
         if data_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
@@ -160,10 +158,8 @@ class PersistManager:
 
 
     ## method for doing lazy queries
-
-    def set_local_metadata(self,local_metadata:LocalTimeSerie):
+    def set_local_metadata(self, local_metadata: LocalTimeSerie):
         self._local_metadata_cached = local_metadata
-
 
     @property
     def local_metadata(self):
@@ -206,7 +202,7 @@ class PersistManager:
         # Launch the local metadata update regardless of the outcome.
         self.set_local_metadata_lazy(force_registry=True)
 
-    def set_local_metadata_lazy(self, force_registry=True, include_relations_detail=False):
+    def set_local_metadata_lazy(self, force_registry=True, include_relations_detail=True):
 
         with self._local_metadata_lock:
             if force_registry:
@@ -225,6 +221,8 @@ class PersistManager:
                     remote_table__data_source__id=self.data_source.id,
                     include_relations_detail=include_relations_detail
                 )
+                if result is None:
+                    self.logger.warning(f"TimeSeries {self.local_hash_id} with data source {self.data_source.id} not found in backend")
                 new_future.set_result(result)
             except Exception as exc:
                 new_future.set_exception(exc)
@@ -239,30 +237,20 @@ class PersistManager:
 
 
 
-    def depends_on_connect(self,new_ts:"TimeSerie",is_api:bool):
+    def depends_on_connect(self, new_ts:"TimeSerie", is_api:bool):
         """
         Connects a time Serie as relationship in the DB
         Parameters
         ----------
-        new_ts :
-
-        Returns
-        -------
-
         """
 
-        if is_api ==False:
-
+        if not is_api:
             self.local_metadata.depends_on_connect(
-
                                         source_local_hash_id=self.local_metadata.local_hash_id,
                                         target_local_hash_id=new_ts.local_hash_id,
-
                                         target_class_name=new_ts.__class__.__name__,
-
                                         source_data_source_id=self.data_source.id,
                                         target_data_source_id=new_ts.data_source.id
-
                                         )
         else:
             try:
@@ -270,10 +258,9 @@ class PersistManager:
                     source_hash_id=self.metadata.hash_id,
                     source_local_hash_id=self.local_metadata.local_hash_id,
                     source_data_source_id=self.data_source.id,
-
-                                            target_data_source_id=new_ts.data_source_id,
-                                            target_local_hash_id=new_ts.local_hash_id
-                                            )
+                    target_data_source_id=new_ts.data_source_id,
+                    target_local_hash_id=new_ts.local_hash_id
+                )
             except Exception as exc:
                 raise exc
 

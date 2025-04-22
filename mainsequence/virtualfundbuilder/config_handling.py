@@ -74,8 +74,6 @@ def configuration_sanitizer(configuration: dict) -> PortfolioConfiguration:
 
     portfolio_markets_config = configuration['portfolio_markets_configuration']
 
-
-
     if "tracking_funds_expected_exposure_from_latest_holdings" not in portfolio_markets_config:
         raise Exception(
             "Missing 'tracking_funds_expected_exposure_from_latest_holdings' in portfolio_markets_config"

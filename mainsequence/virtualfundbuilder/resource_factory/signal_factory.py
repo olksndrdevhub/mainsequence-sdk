@@ -170,5 +170,5 @@ class SignalWeightsFactory(BaseFactory):
         Scans the given directory for Python files, imports the classes,
         and returns all classes that are subclasses of WeightsBase.
         """
-        SignalWeightsFactory.import_module("signals")
+        SignalWeightsFactory.import_module("time_serie")
         return SIGNAL_CLASS_REGISTRY
