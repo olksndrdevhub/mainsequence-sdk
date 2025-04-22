@@ -1338,8 +1338,6 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
                 class_type = value.get('class_type')
                 if class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
                     return TimeScaleDB(**value)
-                elif class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-                    return PodLocalLake(**value)
                 elif class_type == 'remote':
                     return DataSource(**value)
                 # default fallback:
@@ -1401,8 +1399,7 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
         return cls(**r.json())
 
     def has_direct_postgres_connection(self):
-        if self.related_resource.class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE:
-            return False
+
         has_direct = self.related_resource.class_type != 'remote'
         if has_direct:
             assert self.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB
