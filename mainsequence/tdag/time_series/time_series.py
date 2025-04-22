@@ -26,9 +26,6 @@ from mainsequence.tdag.time_series.persist_managers import PersistManager
 from mainsequence.client.models_tdag import (none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate,
                                              DataUpdates, UniqueIdentifierRangeMap
                                              )
-from numpy.f2py.auxfuncs import isint1
-
-from pycares.errno import value
 from pydantic import BaseModel
 
 from abc import ABC
