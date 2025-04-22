@@ -1247,14 +1247,17 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             grouped_dates: dict,
     ):
 
-        LocalTimeSerie.post_data_frame_in_chunks(
-            serialized_data_frame=serialized_data_frame,
-            local_metadata=local_metadata,
-            data_source=self,
-            index_names=index_names,
-            time_index_name=time_index_name,
-            overwrite=overwrite,
-        )
+        if self.class_type=="duckdb":
+            DuckDBInterface.
+        else:
+            LocalTimeSerie.post_data_frame_in_chunks(
+                serialized_data_frame=serialized_data_frame,
+                local_metadata=local_metadata,
+                data_source=self,
+                index_names=index_names,
+                time_index_name=time_index_name,
+                overwrite=overwrite,
+            )
 
     def insert_data_into_local_table(
             self,
@@ -1425,9 +1428,7 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
                 data_source=self.related_resource,
                 *args, **kwargs,
             )
-        elif self.related_resource_class_type=="duck_db":
 
-            a=5
         else:
             self.related_resource.insert_data_into_table(*args, **kwargs)
 
