@@ -1,6 +1,7 @@
 from importlib.metadata import metadata
 
 from .base import BasePydanticModel, BaseObjectOrm, TDAG_ENDPOINT
+from .data_sources_interfaces.duckdb import DuckDBInterface
 from .utils import (is_process_running, get_network_ip,
                     TDAG_CONSTANTS,
                     DATE_FORMAT, AuthLoaders, make_request, set_types_in_table, request_to_datetime, serialize_to_json)
@@ -1233,6 +1234,7 @@ class LocalTimeSeriesHistoricalUpdate(BasePydanticModel, BaseObjectOrm):
 
 class DataSource(BasePydanticModel, BaseObjectOrm):
     id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
+    display_name: str
     organization: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
     class_type: str
     status: str
@@ -1247,8 +1249,11 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             grouped_dates: dict,
     ):
 
-        if self.class_type=="duckdb":
-            raise NotImplementedError
+        if self.class_type == "duck_db":
+            DuckDBInterface().upsert(
+                df=serialized_data_frame,
+                table=local_metadata.remote_table.table_name
+            )
         else:
             LocalTimeSerie.post_data_frame_in_chunks(
                 serialized_data_frame=serialized_data_frame,
@@ -1290,16 +1295,27 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             unique_identifier_list: Optional[List[str]] = None,
             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
     ) -> pd.DataFrame:
-        metadata = local_metadata.remote_table
-        df = local_metadata.get_data_between_dates_from_api(
-            start_date=start_date,
-            end_date=end_date,
-            great_or_equal=great_or_equal,
-            less_or_equal=less_or_equal,
-            unique_identifier_list=unique_identifier_list,
-            columns=columns,
-            unique_identifier_range_map=unique_identifier_range_map
-        )
+
+        if self.class_type == "duck_db":
+            DuckDBInterface().read(
+                table=local_metadata.remote_table.table_name,
+                start=start_date,
+                end=end_date,
+                ids=unique_identifier_list,
+                columns=columns
+                # TODO goe, loe, unique_identfier_range_map
+            )
+        else:
+            metadata = local_metadata.remote_table
+            df = local_metadata.get_data_between_dates_from_api(
+                start_date=start_date,
+                end_date=end_date,
+                great_or_equal=great_or_equal,
+                less_or_equal=less_or_equal,
+                unique_identifier_list=unique_identifier_list,
+                columns=columns,
+                unique_identifier_range_map=unique_identifier_range_map
+            )
         if len(df) == 0:
             if logger:
                 logger.warning(
@@ -1328,30 +1344,6 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
 
     class Config:
         use_enum_values = True  # This ensures that enums are stored as their values (e.g., 'TEXT')
-
-    @field_validator('related_resource', mode="before")
-    def coerce_related_resource(cls, value):
-        """
-        Decide if `value` should be parsed into a specific subclass
-        of BaseDataSource. This runs before the standard validation.
-        """
-        try:
-            if isinstance(value, dict):
-                # Example logic: pick subclass by `type`
-                class_type = value.get('class_type')
-                if class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-                    return TimeScaleDB(**value)
-                elif class_type == 'remote':
-                    return DataSource(**value)
-                # default fallback:
-                else:
-                    raise NotImplementedError(f"DataSource type {class_type} is not supported.")
-
-            # If it's not a dict (maybe it's an integer or already a BaseDataSource),
-            # just return it as-is so Pydantic can handle it.
-            return value
-        except Exception as e:
-            raise e
 
     def model_dump_json(self, **json_dumps_kwargs) -> str:
         """
@@ -1402,11 +1394,7 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
         return cls(**r.json())
 
     def has_direct_postgres_connection(self):
-
-        has_direct = self.related_resource.class_type != 'remote'
-        if has_direct:
-            assert self.related_resource_class_type in TDAG_CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB
-        return has_direct
+        return self.related_resource.class_type == 'direct'
 
     def get_data_by_time_index(self, *args, **kwargs):
         if self.has_direct_postgres_connection():
