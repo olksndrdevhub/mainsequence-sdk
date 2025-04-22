@@ -1248,7 +1248,7 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
     ):
 
         if self.class_type=="duckdb":
-            DuckDBInterface.
+            raise NotImplementedError
         else:
             LocalTimeSerie.post_data_frame_in_chunks(
                 serialized_data_frame=serialized_data_frame,
