@@ -2078,3 +2078,43 @@ class DynamicTableHelpers:
                         data[c] = data[c].astype(c_type)
         data = data.set_index(source_table_config['index_names'])
         return data
+
+try:
+    POD_PROJECT = Project.get_user_default_project()
+except Exception as e:
+    POD_PROJECT = None
+    logger.exception(f"Could not retrive pod project {e}")
+    raise e
+
+class PodDataSource:
+    def set_remote_db(self):
+        self.data_source = POD_PROJECT.data_source
+        logger.debug(f"Set remote data source to {self.data_source.related_resource.display_name}")
+
+    def set_local_db(self):
+        host_uid = bios_uuid()
+        data_source = DataSource.get_or_create_duck_db(
+            display_name=f"DuckDB_{host_uid}",
+            host_mac_address=host_uid
+        )
+
+        duckdb_dynamic_data_source = DynamicTableDataSource.get_or_create_duck_db(
+            related_resource=data_source.id,
+        )
+
+        # drop local tables that are not in registered in the backend anymore (probably have been deleted)
+        remote_tables = DynamicTableMetaData.filter(data_source__id=duckdb_dynamic_data_source.id, list_tables=True)
+        remote_table_names = [t.table_name for t in remote_tables]
+        from mainsequence.client.data_sources_interfaces.duckdb import DuckDBInterface
+        local_table_names = DuckDBInterface().list_tables()
+
+        tables_to_delete = set(local_table_names) - set(remote_table_names)
+        for table_name in tables_to_delete:
+            logger.debug(f"Deleting table in local duck db {table_name}")
+            DuckDBInterface().drop_table(table_name)
+
+        self.data_source = duckdb_dynamic_data_source
+        logger.debug(f"Set local data source to {self.data_source.related_resource.display_name}")
+
+SessionDataSource = PodDataSource()
+SessionDataSource.set_remote_db()

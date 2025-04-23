@@ -1834,11 +1834,11 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         self.pre_load_routines_run = True
 
     def get_data_source_from_orm(self):
-        from mainsequence.client import POD_DEFAULT_DATA_SOURCE
+        from mainsequence.client import SessionDataSource
 
-        if POD_DEFAULT_DATA_SOURCE.data_source.related_resource is None:
+        if SessionDataSource.data_source.related_resource is None:
             raise Exception("This Pod does not have a default data source")
-        return POD_DEFAULT_DATA_SOURCE.data_source
+        return SessionDataSource.data_source
 
 
     @property

@@ -61,7 +61,7 @@ class DuckDBInterface:
             return
 
         df = df.copy()
-        logger.info(f"Starting upsert of {len(df)} rows into table '{table}' in {self.db_path}")
+        logger.debug(f"Starting upsert of {len(df)} rows into table '{table}' in {self.db_path}")
 
         try:
             self._ensure_table(table, df)
@@ -72,7 +72,7 @@ class DuckDBInterface:
                     INSERT OR REPLACE INTO "{table}" ({cols})
                     SELECT {cols} FROM upd_df
                 """)
-                logger.info(f"Successfully upserted {len(df)} rows into table '{table}'.")
+                logger.debug(f"Successfully upserted {len(df)} rows into table '{table}'.")
             except duckdb.Error as e:
                 logger.error(f"Error during INSERT OR REPLACE into '{table}': {e}")
                 raise
@@ -128,7 +128,7 @@ class DuckDBInterface:
         if ids is not None and unique_identifier_range_map is not None:
             raise ValueError("Cannot provide both 'ids' and 'unique_identifier_range_map'.")
 
-        logger.info(
+        logger.debug(
             f"Reading from table '{table}' with filters: start={start}, end={end}, "
             f"ids={ids is not None}, columns={columns}, range_map={unique_identifier_range_map is not None}"
         )
@@ -211,7 +211,7 @@ class DuckDBInterface:
                     except Exception as type_e:
                         logger.warning(f"Could not coerce column '{col}' to type '{target_type}': {type_e}")
 
-                logger.info(f"Read {len(df)} rows from table '{table}'.")
+                logger.debug(f"Read {len(df)} rows from table '{table}'.")
                 return df
 
             return pd.DataFrame()
@@ -234,11 +234,11 @@ class DuckDBInterface:
         Args:
             table (str): The name of the table to drop.
         """
-        logger.info(f"Attempting to drop table '{table}' from {self.db_path}")
+        logger.debug(f"Attempting to drop table '{table}' from {self.db_path}")
         try:
             # Use IF EXISTS to avoid error if table is already gone
             self.con.execute(f'DROP TABLE IF EXISTS "{table}"')
-            logger.info(f"Successfully dropped table '{table}' (if it existed).")
+            logger.debug(f"Successfully dropped table '{table}' (if it existed).")
         except duckdb.Error as e:
             logger.error(f"Failed to drop table '{table}': {e}")
             raise # Re-raise the error after logging
@@ -255,7 +255,7 @@ class DuckDBInterface:
             List[str]: A list of table names. Returns an empty list if the
                        database file does not exist or on error.
         """
-        logger.info(f"Attempting to list tables in {self.db_path}")
+        logger.debug(f"Attempting to list tables in {self.db_path}")
         tables = []
         try:
             # Query duckdb_tables information schema view for user tables
@@ -263,7 +263,7 @@ class DuckDBInterface:
                 "SELECT table_name FROM duckdb_tables WHERE schema_name = 'main' ORDER BY table_name"
             ).fetchall()
             tables = [row[0] for row in results]
-            logger.info(f"Found {len(tables)} tables: {tables}")
+            logger.debug(f"Found {len(tables)} tables: {tables}")
         except duckdb.IOException as e:
              # Specific case where the file didn't exist and couldn't be created/opened
              logger.error(f"Could not list tables, IO error connecting to {self.db_path}: {e}")
