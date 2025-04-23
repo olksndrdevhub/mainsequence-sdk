@@ -1,6 +1,5 @@
 import copy
 from mainsequence.tdag.utils import write_yaml
-from mainsequence.client import IndexAsset, POD_DEFAULT_DATA_SOURCE
 import os
 from typing import Dict, Any, List, Union, Optional
 import yaml
@@ -8,13 +7,10 @@ import re
 
 from .config_handling import configuration_sanitizer
 from .time_series import PortfolioStrategy
-from mainsequence.client import Asset, AssetFutureUSDM, MARKETS_CONSTANTS as CONSTANTS, TargetPortfolio
+from mainsequence.client import Asset, AssetFutureUSDM, MARKETS_CONSTANTS as CONSTANTS, TargetPortfolio, SessionDataSource
 
 from .models import PortfolioConfiguration
 from .utils import find_ts_recursively, get_vfb_logger
-from mainsequence.client.data_sources_interfaces.duckdb import DuckDBInterface
-from mainsequence.client.models_tdag import DataSource, DynamicTableDataSource, DynamicTableMetaData
-from mainsequence.client.utils import bios_uuid
 
 
 class PortfolioInterface():
@@ -134,29 +130,6 @@ class PortfolioInterface():
 
         return target_portfolio, index_asset
 
-    def init_duck_db(self):
-        host_uid = bios_uuid()
-        data_source = DataSource.get_or_create_duck_db(
-            display_name=f"DuckDB_{host_uid}",
-            host_mac_address=host_uid
-        )
-
-        duckdb_dynamic_data_source = DynamicTableDataSource.get_or_create_duck_db(
-            related_resource=data_source.id,
-        )
-
-        # drop local tables that are not in registered in the backend anymore (probably have been deleted)
-        remote_tables = DynamicTableMetaData.filter(data_source__id=duckdb_dynamic_data_source.id, list_tables=True)
-        remote_table_names = [t.table_name for t in remote_tables]
-        local_table_names = DuckDBInterface().list_tables()
-
-        tables_to_delete = set(local_table_names) - set(remote_table_names)
-        for table_name in tables_to_delete:
-            self.logger.debug(f"Deleting table in local duck db {table_name}")
-            DuckDBInterface().drop_table(table_name)
-
-        POD_DEFAULT_DATA_SOURCE.data_source = duckdb_dynamic_data_source
-
     def run(
             self,
             patch_build_configuration=True,
@@ -169,12 +142,17 @@ class PortfolioInterface():
             *args, **kwargs
     ):
         if local_database:
-            self.init_duck_db()
+            SessionDataSource.set_local_db()
 
         if not self._is_initialized or patch_build_configuration == True:
             self._initialize_nodes(patch_build_configuration=patch_build_configuration)
 
-        self.portfolio_strategy_time_serie.run(debug_mode=debug_mode, update_tree=update_tree, force_update=force_update, **kwargs)
+        self.portfolio_strategy_time_serie.run(
+            debug_mode=debug_mode,
+            update_tree=update_tree,
+            force_update=force_update,
+            **kwargs
+        )
         if add_portfolio_to_markets_backend:
             self.build_target_portfolio_in_backend(portfolio_tags=portfolio_tags)
 
