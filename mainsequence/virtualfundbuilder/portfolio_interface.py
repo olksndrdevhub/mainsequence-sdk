@@ -143,7 +143,6 @@ class PortfolioInterface():
 
         duckdb_dynamic_data_source = DynamicTableDataSource.get_or_create_duck_db(
             related_resource=data_source.id,
-            related_resource_class_type=data_source.class_type,
         )
 
         # drop local tables that are not in registered in the backend anymore (probably have been deleted)
