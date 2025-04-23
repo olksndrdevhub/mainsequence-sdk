@@ -15,8 +15,8 @@ from decimal import Decimal, ROUND_HALF_UP
 import pandas as pd
 import datetime
 #%% Configuration
-PORTFOLIO_TICKER="portfo135B"
-TARGET_ACCOUNT_ID=6
+PORTFOLIO_TICKER="portfo53B"
+ACCOUNT_NAME="Default MainSequence Portfolios Account"
 
 
 
@@ -29,7 +29,7 @@ portfolio_to_mock_trading=TargetPortfolio.get(portfolio_ticker=PORTFOLIO_TICKER)
 
 
 #%% Get Account to rebalance the portfolio
-account=Account.get(pk=TARGET_ACCOUNT_ID,timeout=10000000)
+account=Account.get(account_name=ACCOUNT_NAME,timeout=10000000)
 asset_only_portfolio=AssetOnlyPortfolio.get(tracking_asset__id=account.cash_asset.id)
 print("Account Latest Holdings")
 print(account.latest_holdings)
