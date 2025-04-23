@@ -1919,6 +1919,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
 
     def run_local_update(self, tdag_detached=True):
+        raise NotImplementedError("Legacy")
         self.local_persist_manager
         return self.get_df_between_dates()
 
