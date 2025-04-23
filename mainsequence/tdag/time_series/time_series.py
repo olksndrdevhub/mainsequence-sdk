@@ -1836,20 +1836,10 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
     def get_data_source_from_orm(self):
         from mainsequence.client import POD_DEFAULT_DATA_SOURCE
 
-        pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
+        if POD_DEFAULT_DATA_SOURCE.data_source.related_resource is None:
+            raise Exception("This Pod does not have a default data source")
+        return POD_DEFAULT_DATA_SOURCE.data_source
 
-        if pod_source == None:
-            if POD_DEFAULT_DATA_SOURCE.related_resource is None:
-                raise Exception("This Pod does not have a default data source")
-            return POD_DEFAULT_DATA_SOURCE
-        # returnn to pod to override with context manager
-        from mainsequence.client import models_tdag as models
-        pod_source = json.loads(pod_source)
-        ModelClass = pod_source["tdag_orm_class"]
-        pod_source.pop("tdag_orm_class", None)
-        ModelClass = getattr(models, ModelClass)
-        pod_source = ModelClass(**pod_source)
-        return pod_source
 
     @property
     def data_source(self):

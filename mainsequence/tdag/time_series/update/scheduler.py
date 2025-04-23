@@ -111,6 +111,7 @@ def set_data_source(pod_source=None, tdag_detached=False, override_all: bool = F
     :param override_all:
     :return:
     """
+    raise NotImplementedError("Legacy function")
     if pod_source is not None:
 
         vars = ["POD_DEFAULT_DATA_SOURCE", "POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE", ]

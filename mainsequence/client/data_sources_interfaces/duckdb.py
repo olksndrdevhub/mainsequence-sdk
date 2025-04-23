@@ -33,7 +33,7 @@ class DuckDBInterface:
                                              in the current directory if the variable is not set.
         """
         from mainsequence.tdag.config import TDAG_DATA_PATH
-        default_path = Path(os.getenv("DUCKDB_PATH", TDAG_DATA_PATH))
+        default_path = Path(os.getenv("DUCKDB_PATH", os.path.join(f"TDAG_DATA_PATH", "duck_db")))
         self.db_path = Path(db_path) if db_path else default_path
         logger.info(f"DuckDBInterface initialized with db_path: {self.db_path}")
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

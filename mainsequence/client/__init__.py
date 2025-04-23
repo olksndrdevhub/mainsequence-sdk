@@ -13,11 +13,13 @@ from mainsequence.logconf import logger
 from .models_helpers import *
 from .models_vam import *
 
+class PodDataSource:
+    def __init__(self, data_source):
+        self.data_source = data_source
+
 try:
     POD_PROJECT = Project.get_user_default_project()
-    POD_DEFAULT_DATA_SOURCE = POD_PROJECT.data_source
-    if POD_DEFAULT_DATA_SOURCE.related_resource.class_type == "duck_db":
-        POD_DEFAULT_DATA_SOURCE.init_duck_db()
+    POD_DEFAULT_DATA_SOURCE = PodDataSource(data_source=POD_PROJECT.data_source)
 except Exception as e:
     POD_PROJECT = None
     logger.exception(f"Could not retrive pod project {e}")
