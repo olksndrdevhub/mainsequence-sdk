@@ -1241,7 +1241,7 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
 
     @classmethod
     def get_or_create_duck_db(cls, time_out=None, *args, **kwargs):
-        url = cls.get_object_url() + f"/create_duck_db/"
+        url = cls.get_object_url() + f"/get_or_create_duck_db/"
         payload = {"json": serialize_to_json(kwargs)}
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload, time_out=time_out)
@@ -1358,30 +1358,6 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
     class Config:
         use_enum_values = True  # This ensures that enums are stored as their values (e.g., 'TEXT')
 
-    def init_duck_db(self):
-        assert self.related_resource.class_type == "duck_db"
-
-        # create and set new database
-        data_source = DataSource.get_or_create_duck_db(
-            display_name=f"DuckDB_{bios_uuid()}",
-            host_mac_address=bios_uuid()
-        )
-
-        dynamic_data_source = DynamicTableDataSource.create_duck_db(
-            related_resource=data_source.id,
-            related_resource_class_type=data_source.class_type,
-        )
-
-        # drop local tables that are not in registered in the backend anymore (probably have been deleted)
-        remote_tables = DynamicTableMetaData.filter(data_source__id=self.id, list_tables=True)
-        remote_table_names = [t.table_name for t in remote_tables]
-        local_table_names = DuckDBInterface().list_tables()
-
-        tables_to_delete = set(local_table_names) - set(remote_table_names)
-        for table_name in tables_to_delete:
-            logger.debug(f"Deleting table in local duck db {table_name}")
-            DuckDBInterface().drop_table(table_name)
-
     def model_dump_json(self, **json_dumps_kwargs) -> str:
         """
         Dump the current instance to a JSON string,
@@ -1417,11 +1393,11 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
             cloudpickle.dump(self, handle)
 
     @classmethod
-    def create_duck_db(cls, *args, **kwargs):
-        url = cls.get_object_url() + "/create_duck_db/"
+    def get_or_create_duck_db(cls, *args, **kwargs):
+        url = cls.get_object_url() + "/get_or_create_duck_db/"
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": kwargs})
-        if r.status_code not in [201]:
+        if r.status_code not in [200, 201]:
             raise Exception(f"Error in request {r.text}")
         return cls(**r.json())
 
