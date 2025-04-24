@@ -8,7 +8,7 @@ import pandas as pd
 import pytz
 
 from mainsequence.tdag.time_series import TimeSerie
-from mainsequence.client import CONSTANTS, Asset, AssetTranslationTable, AssetTranslationRule, AssetFilter
+from mainsequence.client import CONSTANTS, Asset, AssetTranslationTable, AssetTranslationRule, AssetFilter, DoesNotExist
 
 from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
@@ -125,50 +125,12 @@ class MarketCap(WeightsBase, TimeSerie):
         self.frequency_trading_percent = frequency_trading_percent
         self.min_number_of_assets = min_number_of_assets
 
-        translation_table = AssetTranslationTable(
-            rules=[
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                        security_type="Common Stock",
-                    ),
-                    markets_time_serie_unique_identifier="polygon_historical_marketcap",
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                ),
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                        security_type="Common Stock",
-                    ),
-                    markets_time_serie_unique_identifier="polygon_historical_marketcap",
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                ),
-
-                # From crypot main sequence assign binance
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
-                    ),
-                    markets_time_serie_unique_identifier="coingecko_market_cap",
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                    target_exchange_code=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-
-                ),
-                # From binance crypto assign binance
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
-                    ),
-                    markets_time_serie_unique_identifier="coingecko_market_cap",
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                    target_exchange_code=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-
-                ),
-
-            ]
-        )
+        translation_table = "marketcap_translation_table"
+        try:
+            # 1) fetch from server
+            translation_table = AssetTranslationTable.get(unique_identifier=translation_table)
+        except DoesNotExist:
+            self.logger.error(f"Translation table {translation_table} does not exist")
 
         self.historical_market_cap_ts = WrapperTimeSerie(translation_table=translation_table)
         self.volatility_control_configuration = volatility_control_configuration
