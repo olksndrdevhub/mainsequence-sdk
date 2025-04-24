@@ -422,7 +422,7 @@ class AssetTranslationTable(BaseObjectOrm, BasePydanticModel):
                 # Successfully created on server. Append locally
                 self.rules.append(new_rule)
             elif r.status_code not in (200, 201):
-                raise Exception(f"Error adding rule: {r.text()}")
+                raise Exception(f"Error adding rule: {r.text}")
 
     def remove_rules(self, rules: List[AssetTranslationRule]) -> None:
         """
