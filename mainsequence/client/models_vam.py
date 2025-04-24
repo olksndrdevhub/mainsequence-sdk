@@ -22,6 +22,9 @@ from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime,
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field, validator,root_validator,constr
 
+from ..logconf import logger
+
+
 def validator_for_string(value):
     if isinstance(value, str):
         # Parse the string to a datetime object
@@ -333,12 +336,8 @@ class AssetFilter(BaseModel):
         return True
 
 class AssetTranslationRule(BaseModel):
-
     asset_filter: AssetFilter
-
-    # API timeserie
     markets_time_serie_unique_identifier: str
-
     target_execution_venue_symbol: str
     target_exchange_code: Optional[str] = None
 
@@ -346,7 +345,36 @@ class AssetTranslationRule(BaseModel):
         return self.asset_filter.filter_triggered(asset)
 
 class AssetTranslationTable(BaseModel):
-    rules: List[AssetTranslationRule]
+    rules: List[AssetTranslationRule] = Field(default_factory=list)
+
+    def evaluate_asset(self, asset: "Asset") -> dict:
+        for rule in self.rules:
+            if rule.is_asset_in_rule(asset):
+                return {
+                    "markets_time_serie_unique_identifier": rule.markets_time_serie_unique_identifier,
+                    "execution_venue_symbol": rule.target_execution_venue_symbol,
+                    "exchange_code": rule.target_exchange_code,
+                }
+        raise TranslationError(f"No rules for asset {asset} found")
+
+    def evaluate_assets(self, assets: List["Asset"]) -> Dict[str, dict]:
+        """
+        Evaluate multiple assets at once, returning a dict:
+            { asset.unique_identifier: { 'markets_time_serie_unique_identifier':..., ...}, ...}
+        or raises TranslationError if an asset is unmatched.
+        """
+        results = {}
+        for asset in assets:
+            results[asset.unique_identifier] = self.evaluate_asset(asset)
+        return results
+
+class AssetTranslationTable(BaseObjectOrm, BasePydanticModel):
+    """
+    Mirrors the Django model 'AssetTranslationTableModel' in the backend.
+    """
+    id: int = None
+    unique_identifier: str
+    rules: List[AssetTranslationRule] = Field(default_factory=list)
 
     def evaluate_asset(self, asset):
         for rule in self.rules:
@@ -358,6 +386,82 @@ class AssetTranslationTable(BaseModel):
                 }
 
         raise TranslationError(f"No rules for asset {asset} found")
+
+    def add_rules(self, rules: List[AssetTranslationRule]) -> None:
+        """
+        Add each rule to the translation table by calling the backend's 'add_rule' endpoint.
+        Prevents local duplication. If the server also rejects a duplicate,
+        it returns an error which we silently ignore.
+        """
+        base_url = self.get_object_url()
+        for new_rule in rules:
+            # 1) Check for local duplicates
+            if any(
+                    r.asset_filter == new_rule.asset_filter
+                    and r.markets_time_serie_unique_identifier == new_rule.markets_time_serie_unique_identifier
+                    and r.target_execution_venue_symbol == new_rule.target_execution_venue_symbol
+                    and r.target_exchange_code == new_rule.target_exchange_code
+                    for r in self.rules
+            ):
+                # Already in local table, skip adding
+                logger.debug(f"Rule {new_rule} already present - skipping")
+                continue
+
+            # 2) Post to backend's "add_rule"
+            url = f"{base_url}/{self.id}/add_rule/"
+            payload = new_rule.model_dump()
+            r = make_request(
+                s=self.build_session(),
+                loaders=self.LOADERS,
+                r_type="POST",
+                url=url,
+                payload={"json": payload},
+            )
+
+            if r.status_code == 201:
+                # Successfully created on server. Append locally
+                self.rules.append(new_rule)
+            elif r.status_code not in (200, 201):
+                raise Exception(f"Error adding rule: {r.text()}")
+
+    def remove_rules(self, rules: List[AssetTranslationRule]) -> None:
+        """
+        Remove each rule from the translation table by calling the backend's 'remove_rule' endpoint.
+        Once successfully removed on the server, remove it from the local list `self.rules`.
+        If a rule is not found on the server, we skip silently.
+        """
+        base_url = self.get_object_url()
+        for rule_to_remove in rules:
+            # 1) Check if we even have it locally
+            matching_local = [
+                r for r in self.rules
+                if r.asset_filter == rule_to_remove.asset_filter
+                   and r.markets_time_serie_unique_identifier == rule_to_remove.markets_time_serie_unique_identifier
+                   and r.target_execution_venue_symbol == rule_to_remove.target_execution_venue_symbol
+                   and r.target_exchange_code == rule_to_remove.target_exchange_code
+            ]
+            if not matching_local:
+                # Not in local rules, skip
+                continue
+
+            # 2) Post to backend's "remove_rule"
+            url = f"{base_url}/{self.id}/remove_rule/"
+            payload = rule_to_remove.model_dump()
+            r = make_request(
+                s=self.build_session(),
+                loaders=self.LOADERS,
+                r_type="POST",
+                url=url,
+                payload={"json": payload},
+            )
+
+            if r.status_code == 200:
+                # Successfully removed from server => remove from local
+                for matched in matching_local:
+                    self.rules.remove(matched)
+            elif r.status_code not in (200, 204):
+                raise Exception(f"Error removing rule: {r.text()}")
+
 
 class Asset(AssetMixin, BaseObjectOrm):
 

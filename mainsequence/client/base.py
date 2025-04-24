@@ -112,6 +112,7 @@ class BaseObjectOrm:
         "HistoricalBarsSource": "data_sources/historical-bars-source",
         "MarketsTimeSeriesDetails": "data_sources/markets-time-series-details",
         "AssetCategory": "assets/asset-category",
+        "AssetTranslationTable": "assets/asset-translation-tables",
 
         # TDAG
         "TimeSerie": "ogm/time_serie",

@@ -491,52 +491,13 @@ class InterpolatedPrices(TimeSerie):
         self.bar_frequency_id = bar_frequency_id
         self.upsample_frequency_id = upsample_frequency_id
 
-        # define the translation rules
-        translation_table = AssetTranslationTable(
-            rules=[
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                        security_type="Common Stock",
-                    ),
-                    markets_time_serie_unique_identifier="alpaca_1d_bars",
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                    target_exchange_code="US",
-                ),
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                        security_type="Common Stock",
-                    ),
-                    markets_time_serie_unique_identifier="alpaca_1d_bars",
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL,
-                    target_exchange_code="US",
-                ),
-                # From crypot main sequence assign binance
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
-                    ),
-                    markets_time_serie_unique_identifier="binance_1d_bars",
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                    target_exchange_code=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-
-                ),
-                # From binance crypto assign binance
-                AssetTranslationRule(
-                    asset_filter=AssetFilter(
-                        execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                        security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO,
-                    ),
-                    markets_time_serie_unique_identifier="binance_1d_bars",
-                    target_execution_venue_symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-                    target_exchange_code=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
-
-                ),
-
-            ]
-        )
+        # get the translation rules
+        translation_table = f"prices_translation_table_{self.bar_frequency_id}"
+        try:
+            # 1) fetch from server
+            translation_table = AssetTranslationTable.get(unique_identifier=translation_table)
+        except DoesNotExist:
+            self.logger.error(f"Translation table {translation_table} does not exist")
 
         self.bars_ts = WrapperTimeSerie(translation_table=translation_table)
         super().__init__(*args, **kwargs)
