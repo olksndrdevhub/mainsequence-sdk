@@ -2597,9 +2597,11 @@ class WrapperTimeSerie(TimeSerie):
                 main_sequence_share_class__in=main_sequence_share_classes
             )
             if not pd.isna(target_exchange_code):
-                asset_query["exchange_code"] = target_exchange_code,
+                asset_query["exchange_code"] = target_exchange_code
 
             target_assets = Asset.filter(**asset_query)
+
+            assert len(main_sequence_share_classes) == len(target_assets), f"Not all assets were found in backend with translation information with query {asset_query}"
 
             # create the source-target mapping
             source_asset_share_class_map = {}
