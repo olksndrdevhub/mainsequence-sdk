@@ -60,7 +60,7 @@ class SentimentReport(BaseApp):
         self.end_date = end_date_dt.strftime("%Y-%m-%d")
 
         category = AssetCategory.get(unique_identifier=self.configuration.asset_category_unique_identifier)
-        self.tickers = [a.symbol for a in category.get_assets()]
+        self.tickers = [a.ticker for a in category.get_assets()]
         self.category_name = category.display_name
 
         # Initialize Polygon client once if API key exists
