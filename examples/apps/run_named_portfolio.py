@@ -12,7 +12,7 @@ class PortfolioRunParameters(BaseModel):
     update_tree: bool = True
 
 class NamedPortfolioConfiguration(BaseModel):
-    portfolio_name: str = "market_cap_example"
+    portfolio_name: str = "market_cap"
     portfolio_run_parameters: PortfolioRunParameters
 
 @register_app()
