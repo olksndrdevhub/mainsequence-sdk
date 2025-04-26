@@ -55,7 +55,7 @@ def make_request(
 
     TIMEOFF = 0.25
     TRIES = int(15 // TIMEOFF)
-    timeout = 30 if time_out is None else time_out
+    timeout = 120 if time_out is None else time_out
     payload = {} if payload is None else payload
 
     def get_req(session):
