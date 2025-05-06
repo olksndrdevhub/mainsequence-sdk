@@ -391,25 +391,34 @@ rebalance details:"""
         Reason for interpolation: Prices might have a lower frequency that the index, so we need to ffill (e.g. daily signals and prices, but at different times, price at 8pm, MC signal at 0am)
         NOTE: prices should be upsampled the same way as new_index, no need to upsample
         """
-        raw_prices = bars_ts.get_df_between_dates(start_date=new_index.min() - pd.Timedelta(index_freq),  end_date=new_index.max(), great_or_equal=True,
-                less_or_equal=True, unique_identifier_list=unique_identifier_list,).sort_values("time_index")
+        raw_prices = bars_ts.get_df_between_dates(
+            start_date=new_index.min() - pd.Timedelta(index_freq),
+            end_date=new_index.max(),
+            great_or_equal=True,
+            less_or_equal=True,
+            unique_identifier_list=unique_identifier_list
+        )
 
         # fallback if we need more data before to interpolate first value of new_index
         if len(raw_prices) == 0 or (raw_prices.index.get_level_values("time_index").min() > new_index.min()):
-            raw_prices =bars_ts.get_df_between_dates(start_date=None,
-                unique_identifier_list=unique_identifier_list,).sort_values("time_index")
+            raw_prices = bars_ts.get_df_between_dates(
+                start_date=None,
+                unique_identifier_list=unique_identifier_list
+            )
 
         if len(raw_prices) == 0:
             self.logger.info(f"No prices data in index interpolation for node {bars_ts.hash_id}")
             return pd.DataFrame(), pd.DataFrame()
 
+        raw_prices.sort_values("time_index", inplace=True)
         if any(new_index.isin(raw_prices.index.get_level_values("time_index")) == False):
-            bars_ts.logger.warning("Interpolating prices")
+            # TODO implement maximum forward fill, similar to Signal Weights
+            bars_ts.logger.warning("Interpolating prices for new index")
             interpolated_prices = raw_prices.unstack(["unique_identifier"])
-            #
+
             interpolated_prices = interpolated_prices.reindex(new_index, method="ffill")
             interpolated_prices.index.names = ["time_index"]
-            interpolated_prices = interpolated_prices.stack(["unique_identifier"]).dropna()
+            interpolated_prices = interpolated_prices.stack(["unique_identifier"])
         else:
             interpolated_prices = raw_prices.loc[new_index]
 

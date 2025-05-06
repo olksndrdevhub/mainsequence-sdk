@@ -9,9 +9,9 @@ dotenv.load_dotenv('../.env.dev')
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
 from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent
 from mainsequence.virtualfundbuilder.contrib.time_series import MarketCap
-portfolio = PortfolioInterface.load_from_configuration("market_cap_example")
+portfolio = PortfolioInterface.load_from_configuration("market_cap_crypto")
 
-res = portfolio.run(add_portfolio_to_markets_backend=False, local_database=True)
+res = portfolio.run(add_portfolio_to_markets_backend=True)
 print(res)
 # bars_ts = get_interpolated_prices_timeseries(portfolio.portfolio_build_configuration.assets_configuration)
 

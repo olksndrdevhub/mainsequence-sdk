@@ -1,5 +1,7 @@
 from importlib.metadata import metadata
 
+import yaml
+
 from .base import BasePydanticModel, BaseObjectOrm, TDAG_ENDPOINT
 from .data_sources_interfaces.duckdb import DuckDBInterface
 from .utils import (is_process_running, get_network_ip,
@@ -1445,6 +1447,13 @@ class Project(BasePydanticModel, BaseObjectOrm):
             raise Exception(f"Error in request {r.text}")
         return cls(**r.json())
 
+    def __str__(self):
+        return yaml.safe_dump(
+            self.model_dump(),
+            sort_keys=False,
+            default_flow_style=False,
+        )
+
 class TimeScaleDB(DataSource):
     database_user: str
     password: str
@@ -2089,7 +2098,7 @@ except Exception as e:
 class PodDataSource:
     def set_remote_db(self):
         self.data_source = POD_PROJECT.data_source
-        logger.debug(f"Set remote data source to {self.data_source.related_resource.display_name}")
+        logger.info(f"Set remote data source to {self.data_source.related_resource}")
 
     def set_local_db(self):
         host_uid = bios_uuid()
@@ -2114,7 +2123,10 @@ class PodDataSource:
             DuckDBInterface().drop_table(table_name)
 
         self.data_source = duckdb_dynamic_data_source
-        logger.debug(f"Set local data source to {self.data_source.related_resource.display_name}")
+        logger.info(f"Set local data source to {self.data_source.related_resource}")
+
+    def __repr__(self):
+        return f"{self.data_source.related_resource}"
 
 SessionDataSource = PodDataSource()
 SessionDataSource.set_remote_db()
