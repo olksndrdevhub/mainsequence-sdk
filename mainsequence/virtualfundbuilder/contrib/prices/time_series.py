@@ -518,13 +518,8 @@ class InterpolatedPrices(TimeSerie):
         return required
 
     def _run_post_update_routines(self, error_on_last_update, update_statistics):
-
-
         if not self.metadata.protect_from_deletion:
             self.local_persist_manager.protect_from_deletion()
-
-        if not self.metadata.open_for_everyone:
-            self.local_persist_manager.open_for_everyone()
 
     def _transform_raw_data_to_upsampled_df(
             self,
@@ -669,6 +664,15 @@ class InterpolatedPrices(TimeSerie):
         if duplicates_exist:
             raise Exception()
 
+        # adapt to InterpolatedPrices data schema
+        if "vwap" not in prices:
+            self.logger.warning("vwap not calculated in prices, set to NaN")
+            prices["vwap"] = np.nan
+        if "trade_count" not in prices:
+            self.logger.warning("trade_count not calculated in prices, set to NaN")
+            prices["trade_count"] = np.nan
+
+        prices = prices[['open_time', 'open', 'high', 'low', 'close', 'volume', 'trade_count', 'vwap', 'interpolated']]
         return prices
 
 
