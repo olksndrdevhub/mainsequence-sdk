@@ -68,7 +68,7 @@ class AssetsConfiguration(VFBConfigBaseModel):
         prices_configuration (PricesConfiguration): Configuration for price data handling.
     """
     assets_category_unique_id: str
-    price_type: PriceTypeNames = PriceTypeNames.VWAP
+    price_type: PriceTypeNames = PriceTypeNames.CLOSE
     prices_configuration: PricesConfiguration
 
 class BacktestingWeightsConfig(VFBConfigBaseModel):
