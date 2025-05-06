@@ -31,7 +31,7 @@ class RunPortfolio(BaseApp):
 
 
 if __name__ == "__main__":
-    portfolio_configuration = PortfolioInterface.load_from_configuration("market_cap_example").portfolio_config
+    portfolio_configuration = PortfolioInterface.load_from_configuration("market_cap").portfolio_config
     run_portfolio_configuration = RunPortfolioConfiguration(
         portfolio_configuration=portfolio_configuration,
         portfolio_run_parameters=PortfolioRunParameters(),
