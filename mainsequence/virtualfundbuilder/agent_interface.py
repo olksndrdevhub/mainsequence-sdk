@@ -73,7 +73,7 @@ class TDAGAgent:
             if response.status_code not in [200, 201]:
                 raise Exception(response.text)
 
-            generated_configuration = response.json()["generated_configuration"]
+            generated_configuration = response.json()["generated_configuration"]["configuration"]["portfolio_configuration"]
             portfolio = PortfolioInterface(generated_configuration)
 
             self.logger.info(f"Received configuration:\n{portfolio}")
