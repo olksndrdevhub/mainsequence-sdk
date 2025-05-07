@@ -655,7 +655,7 @@ class InterpolatedPrices(TimeSerie):
         )
 
         if update_statistics.is_empty() == False:
-            TARGET_COLS = ['open', 'close', 'high', 'low', 'volume', 'vwap', 'open_time']
+            TARGET_COLS = ['open', 'close', 'high', 'low', 'volume', 'open_time']
             assert prices[[c for c in prices.columns if c in TARGET_COLS]].isnull().sum().sum() == 0
 
         prices = update_statistics.filter_df_by_latest_value(prices)
