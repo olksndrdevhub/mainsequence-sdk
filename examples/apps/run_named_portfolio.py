@@ -1,4 +1,7 @@
+from enum import Enum
+
 from mainsequence.virtualfundbuilder.models import PortfolioConfiguration
+from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 
 from pydantic import BaseModel
@@ -11,8 +14,13 @@ class PortfolioRunParameters(BaseModel):
     add_portfolio_to_markets_backend: bool = True
     update_tree: bool = True
 
+PortfolioNameEnum = Enum(
+    "PortfolioNameEnum",
+    {name: name for name in PortfolioInterface.list_configurations()},
+    type=str,          # make each member a `str`, so validation works as before
+)
 class NamedPortfolioConfiguration(BaseModel):
-    portfolio_name: str = "market_cap"
+    portfolio_name: PortfolioNameEnum = PortfolioNameEnum.market_cap
     portfolio_run_parameters: PortfolioRunParameters
 
 @register_app()
@@ -32,6 +40,6 @@ class RunNamedPortfolio(BaseApp):
 if __name__ == "__main__":
     configuration = NamedPortfolioConfiguration(
         portfolio_run_parameters=PortfolioRunParameters(),
-        # portfolio_name="sentiment_portfolio"
+        portfolio_name="market_cap"
     )
     RunNamedPortfolio(configuration).run()
