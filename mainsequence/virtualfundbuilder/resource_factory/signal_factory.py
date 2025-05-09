@@ -47,6 +47,7 @@ class WeightsBase(BaseResource):
     def interpolate_index(self, new_index: pd.DatetimeIndex):
         """
         Get interpolated weights for a time index. Weights are only valid for a certain time, therefore forward fill is limited.
+        Especially needed for gaps within the weights
         """
         # get values between new index
         try:
