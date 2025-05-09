@@ -238,8 +238,6 @@ class PortfolioStrategy(TimeSerie):
 rebalance details:"""
         return json.dumps(portfolio_about)
 
-
-
     def build_prefix(self):
         reba_strat = self.rebalance_strategy_name
         signa_name = self.signal_weights_name
@@ -412,11 +410,13 @@ rebalance details:"""
 
         raw_prices.sort_values("time_index", inplace=True)
         if any(new_index.isin(raw_prices.index.get_level_values("time_index")) == False):
-            # TODO implement maximum forward fill, similar to Signal Weights
             bars_ts.logger.warning("Interpolating prices for new index")
             interpolated_prices = raw_prices.unstack(["unique_identifier"])
 
-            interpolated_prices = interpolated_prices.reindex(new_index, method="ffill")
+            # check the maximum forward period of the prices
+            max_forward_prices = interpolated_prices.index.get_level_values(level="time_index").max() + bars_ts.maximum_forward_fill
+            prices_new_index = new_index[new_index < max_forward_prices]
+            interpolated_prices = interpolated_prices.reindex(prices_new_index, method="ffill")
             interpolated_prices.index.names = ["time_index"]
             interpolated_prices = interpolated_prices.stack(["unique_identifier"])
         else:
