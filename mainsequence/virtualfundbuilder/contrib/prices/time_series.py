@@ -24,7 +24,7 @@ from tqdm import tqdm
 from joblib import Parallel, delayed
 
 from mainsequence.virtualfundbuilder.models import AssetsConfiguration
-from mainsequence.virtualfundbuilder.utils import logger
+from mainsequence.virtualfundbuilder.utils import logger, TIMEDELTA
 
 FULL_CALENDAR = "24/7"
 
@@ -486,6 +486,9 @@ class InterpolatedPrices(TimeSerie):
             upsample_frequency_id=upsample_frequency_id,
             intraday_bar_interpolation_rule=intraday_bar_interpolation_rule
         )
+
+        bars_frequency_min = string_frequency_to_minutes(bar_frequency_id)
+        self.maximum_forward_fill = datetime.timedelta(minutes=bars_frequency_min) - TIMEDELTA
 
         self.intraday_bar_interpolation_rule = intraday_bar_interpolation_rule
         self.bar_frequency_id = bar_frequency_id
