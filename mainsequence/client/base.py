@@ -111,7 +111,6 @@ class BaseObjectOrm:
         "TargetPortfolioIndexAsset": "assets/target_portfolio_index_asset",
         "HistoricalBarsSource": "data_sources/historical-bars-source",
         "MarketsTimeSeriesDetails": "data_sources/markets-time-series-details",
-        "AccountValuationTSDetails": "data_sources/account-valuation-ts-details",
         "AssetCategory": "assets/asset-category",
 
         # TDAG

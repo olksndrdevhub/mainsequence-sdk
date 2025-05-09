@@ -2,7 +2,6 @@ from .models_vam import *
 from .base import MARKETS_CONSTANTS
 from .models_tdag import LocalTimeSerie
 
-from pydantic import  ConfigDict
 
 
 def get_right_account_class(account: Account):
@@ -73,27 +72,47 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
         bar_source.append_asset_list_source(asset_list=asset_list)
 
 
-class  AccountValuationTSDetails(BaseObjectOrm, BasePydanticModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: Optional[int] = None
-    markets_time_serie_detail: int
-    execution_venue: int
-    valuation_column_name: str
-    missing_price_assets:List[int]
+class HistoricalBarsSource(MarketsTimeSeriesDetails):
+    execution_venues: list
+    data_mode: Literal['live', 'backtest'] = Field(
+        description="Indicates whether the source is for live data or backtesting."
+    )
+    adjusted:bool
 
     @classmethod
-    def create_or_update(cls,markets_time_serie_detail__id:int,execution_venue__symbol:str,
-                         valuation_column_name:str,
-                         timeout=None):
-        url = f"{cls.get_object_url()}/create_or_update/"
+    def register_in_backend(
+            cls,
+            unique_identifier:str,
+            time_serie,
+            execution_venues_symbol,
+            data_mode,
+            description: str = "",
+            create_bars: bool = True
+    ):
+        bar_source = None
+        try:
+            bar_source = cls.get(
+                data_frequency_id=time_serie.frequency_id,
+                execution_venues__symbol__in=[execution_venues_symbol],
+                data_mode=data_mode
+            )
 
-        payload = {"json": {"markets_time_serie_detail__id": markets_time_serie_detail__id,
-                            "execution_venue__symbol":execution_venue__symbol,
-                            "valuation_column_name":valuation_column_name
-                            }}
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url, payload=payload,
-                         time_out=timeout)
-        if r.status_code in [200,201] == False:
-            raise Exception(f" {r.text()}")
-        return cls(**r.json())
+            bar_source = bar_source.patch(related_local_time_serie__id=time_serie.local_time_serie.id)
+
+        except Exception as e:
+            print(f"Exception when getting historical bar source {e}")
+
+            # if run for the first time save this as reference in VAM
+            bar_source = cls.update_or_create(
+                unique_identifier=f"{execution_venues_symbol}_{time_serie.frequency_id}",
+                related_local_time_serie__id=time_serie.local_time_serie.id,
+                description=description,
+                execution_venues_symbol__in=[execution_venues_symbol],
+                data_frequency_id=time_serie.frequency_id,
+                data_mode=data_mode
+            )
+
+        if bar_source is None:
+            raise ValueError("No historical bars source found")
+
+        bar_source.append_asset_list_source(time_serie)
