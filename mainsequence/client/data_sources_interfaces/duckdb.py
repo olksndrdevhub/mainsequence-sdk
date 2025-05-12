@@ -78,7 +78,6 @@ class DuckDBInterface:
                 raise
             finally:
                 self.con.unregister("upd_df")
-                logger.debug("Unregistered temporary view 'upd_df'.")
         except duckdb.Error as e:
             logger.error(f"Failed to upsert data into table '{table}': {e}")
             raise

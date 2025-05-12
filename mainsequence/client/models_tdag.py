@@ -2123,7 +2123,15 @@ class PodDataSource:
             DuckDBInterface().drop_table(table_name)
 
         self.data_source = duckdb_dynamic_data_source
-        logger.info(f"Set local data source to {self.data_source.related_resource}")
+
+        physical_ds = self.data_source.related_resource
+        banner = (
+            f"\n{'-'*80}\n"
+            f"LOCAL data source SET: {physical_ds.display_name}  (engine={physical_ds.class_type})\n"
+            f"{'-'*80}\n"
+        )
+        logger.info(banner)
+
 
     def __repr__(self):
         return f"{self.data_source.related_resource}"
