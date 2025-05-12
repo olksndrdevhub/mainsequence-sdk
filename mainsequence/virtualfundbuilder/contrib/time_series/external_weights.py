@@ -91,8 +91,7 @@ class WeightsFromCSV(WeightsBase, TimeSerie):
             "security_type_2",
             "market_sector",
         ]:
-            if weights_source[col].isnull().any():
-                raise ValueError(f"Found missing values in '{col}' column")
+          
             if not ptypes.is_object_dtype(weights_source[col]):
                 raise ValueError(
                     f"'{col}' must be string/object dtype, but is "

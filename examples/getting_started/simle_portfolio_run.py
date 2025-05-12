@@ -19,5 +19,5 @@ SessionDataSource.set_local_db()
 ts=WeightsFromCSV(csv_file_path="/home/jose/tdag/data/weights_example.csv",
                   signal_assets_configuration=None)
 
-ts.run(debug_mode=True)
+ts.run(debug_mode=True,force_update=True)
 a=5
