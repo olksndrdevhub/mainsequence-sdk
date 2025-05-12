@@ -893,6 +893,9 @@ class Trade(BaseObjectOrm,BasePydanticModel):
     related_account: Optional[Union[Account,int]]
     related_order: Optional[Union["Order",int]]
 
+    settlement_cost:Optional[float]
+    settlement_asset: Optional[Union[AssetMixin,int]]
+
     comments: Optional[str]
     venue_specific_properties: Optional[Dict]
 

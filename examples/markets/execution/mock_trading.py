@@ -64,9 +64,10 @@ account.snapshot_account(timeout=1000000)
 
 #second lets get the tracking error detail
 fund_summary,account_tracking_error=account.get_tracking_error_details(timeout=1000000)
+fund_summary=pd.DataFrame(fund_summary["data"])
 print(pd.DataFrame(fund_summary)) #give us the state of the fund
 
-rebalance_df=pd.DataFrame(account_tracking_error)
+rebalance_df=pd.DataFrame(account_tracking_error['data'])
 
 #%%
 # Mock Execution
@@ -75,7 +76,7 @@ target_rebalance=[]
 for _, row in rebalance_df.iterrows():
     tmp_quantity = OrderManagerTargetQuantity(
         asset=row["asset_id"],
-        quantity=Decimal(row["asset_net_rebalance"]),
+        quantity=Decimal(row["asset_required_net_rebalance"]),
     )
     target_rebalance.append(tmp_quantity)
 
@@ -141,9 +142,11 @@ for target_position in order_manager.target_rebalance:
                     price = price,
                     commission=0,
                     commission_asset=account.cash_asset.id,
+                    settlement_asset=account.cash_asset.id,
+                    settlement_cost=float(target_position.quantity)*float(price),
                     related_account=account.id,
                     related_order=tmp_order.id,
-                    comments="Mock Trade",
+                    comments="Mock Trade",timeout=10000000
                     )
     #update order
     tmp_order.patch(status=OrderStatus.PARTIALLY_FILLED,filled_price=price,
