@@ -581,16 +581,21 @@ class PersistManager:
 
         future.add_done_callback(self.set_local_metadata_lazy_callback)
 
-
-
     def patch_table(self,**kwargs):
         self.metadata.patch( **kwargs)
 
     def protect_from_deletion(self,protect_from_deletion=True):
         self.metadata.patch( protect_from_deletion=protect_from_deletion)
 
-    def open_for_everyone(self,open_for_everyone=True):
-        self.metadata.patch(open_for_everyone=open_for_everyone)
+    def open_for_everyone(self, open_for_everyone=True):
+        if not self.local_metadata.open_for_everyone:
+            self.local_metadata.patch(open_for_everyone=open_for_everyone)
+
+        if not self.metadata.open_for_everyone:
+            self.metadata.patch(open_for_everyone=open_for_everyone)
+
+        if not self.metadata.sourcetableconfiguration.open_for_everyone:
+            self.metadata.sourcetableconfiguration.patch(open_for_everyone=open_for_everyone)
 
     def set_start_of_execution(self,**kwargs):
         return self.dth.set_start_of_execution(metadata=self.metadata,**kwargs)
