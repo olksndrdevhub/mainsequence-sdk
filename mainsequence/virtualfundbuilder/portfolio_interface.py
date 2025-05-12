@@ -7,7 +7,7 @@ import re
 
 from .config_handling import configuration_sanitizer
 from .time_series import PortfolioStrategy
-from mainsequence.client import Asset, AssetFutureUSDM, MARKETS_CONSTANTS as CONSTANTS, TargetPortfolio, SessionDataSource
+from mainsequence.client import Asset, AssetFutureUSDM, MARKETS_CONSTANTS as CONSTANTS, TargetPortfolio
 
 from .models import PortfolioConfiguration
 from .utils import find_ts_recursively, get_vfb_logger
@@ -138,11 +138,8 @@ class PortfolioInterface():
             update_tree=True,
             portfolio_tags:List[str] = None,
             add_portfolio_to_markets_backend=False,
-            local_database=False,
             *args, **kwargs
     ):
-        if local_database:
-            SessionDataSource.set_local_db()
 
         if not self._is_initialized or patch_build_configuration == True:
             self._initialize_nodes(patch_build_configuration=patch_build_configuration)

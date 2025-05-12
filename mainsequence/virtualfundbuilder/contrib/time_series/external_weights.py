@@ -20,18 +20,14 @@ import pandas.api.types as ptypes
 
 
 @register_signal_class(register_in_agent=True)
-class WeightsFromCsv(WeightsBase, TimeSerie):
+class WeightsFromCSV(WeightsBase, TimeSerie):
     @TimeSerie._post_init_routines()
     def __init__(self,
                  csv_file_path: str,
 
                  *args, **kwargs):
         """
-        Signal Weights using weighting by Market Capitalization or Equal Weights
 
-        Args:
-            source_frequency (str): Frequency of market cap source.
-            num_top_assets (Optional[int]): Number of largest assets by market cap to use for signals. Leave empty to include all assets.
         """
         super().__init__(*args, **kwargs)
         self.csv_file_path = csv_file_path
