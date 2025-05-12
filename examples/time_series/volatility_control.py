@@ -54,7 +54,7 @@ class PricesFromApi(TimeSerie):
 
         return data
 
-
-assets=Asset.filter(symbol=["NVDA","MSFT"],execution_venue__symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL)
-ts=PricesFromApi(asset_list=assets)
-ts.run(debug_mode=True,force_update=True)
+if __name__ == "__main__":
+    assets = Asset.filter(symbol=["NVDA","MSFT"], execution_venue__symbol=MARKETS_CONSTANTS.ALPACA_EV_SYMBOL)
+    ts = PricesFromApi(asset_list=assets)
+    ts.run(debug_mode=True, force_update=True)
