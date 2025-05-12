@@ -52,8 +52,8 @@ class PricesFromApi(TimeSerie):
         return data
 
 
-interpolated_prices=lambda x: x
-calcualte_risk_measurement=lambda x: x
+interpolated_prices = lambda x: x
+calcualte_risk_measurement = lambda x: x
 
 class PricesInterpolation(TimeSerie):
     @TimeSerie._post_init_routines()
@@ -73,5 +73,6 @@ class RiskMeasurement(TimeSerie):
         prices = calcualte_risk_measurement(self.prices_time_Series)
         return prices
 
-risk_measurement=RiskMeasurement()
-risk_measurement.run(debug_mode=True,force_update=True)
+if __name__ == "__main__":
+    risk_measurement = RiskMeasurement()
+    risk_measurement.run(debug_mode=True,force_update=True)

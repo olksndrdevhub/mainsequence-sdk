@@ -18,8 +18,6 @@ class TDAGAgent:
     backend_registered = False
 
     def __init__(self):
-        from mainsequence.virtualfundbuilder.__main__ import VirtualFundLauncher
-
         self.logger = logger
 
         # initialize default state once
