@@ -1516,11 +1516,10 @@ class APITimeSerie(CommonMethodsMixin):
 
         self._verify_local_data_source()
 
-        self._local_persist_manager = APIPersistManager(local_hash_id=self.local_hash_id,data_source_id=self.data_source_id
-                                                        )
+        self._local_persist_manager = APIPersistManager(local_hash_id=self.local_hash_id,data_source_id=self.data_source_id)
         local_metadata = self._local_persist_manager.local_metadata
 
-        assert local_metadata is not None, f"Verify that  {self.local_hash_id} exists if you are not the author reach to the author"
+        assert local_metadata is not None, f"Verify that {self.local_hash_id} exists if you are not the author reach to the author"
 
 
     def get_df_between_dates(self, start_date: Optional[datetime.datetime] = None,
