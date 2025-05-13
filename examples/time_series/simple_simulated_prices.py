@@ -8,7 +8,6 @@ dotenv.load_dotenv('../../.env')
 
 from mainsequence.tdag import TimeSerie, ModelList
 from mainsequence.client.models_tdag import DataUpdates
-import pandas_ta as ta
 from typing import Union,Optional
 
 class SimulatedPrices(TimeSerie):
@@ -349,8 +348,8 @@ def test_ta_feature_simulated_crypto_prices():
     print(result)
 
 
-# Run the test.
-test_ta_feature_simulated_crypto_prices()
+if __name__ == "__main__":
+    test_ta_feature_simulated_crypto_prices()
 
 
 

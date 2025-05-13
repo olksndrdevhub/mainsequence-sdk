@@ -200,6 +200,7 @@ class LocalTimeSerieNode(BasePydanticModel, BaseObjectOrm):
     updates_to: TimeSerieNode
 
 class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
+    id: Optional[int] = Field(None, description="Primary key, auto-incremented ID")
     related_table: Union[int, "DynamicTableMetaData"]
     time_index_name: str = Field(..., max_length=100, description="Time index name")
     column_dtypes_map: Dict[str, Any] = Field(..., description="Column data types map")
@@ -210,7 +211,9 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     earliest_index_value: Optional[datetime.datetime] = Field(None, description="Earliest index value")
     multi_index_stats: Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field")
     table_partition: Dict[str, Any] = Field(..., description="Table partition settings")
-    last_observation:Optional[Dict]
+    last_observation: Optional[Dict]
+    open_for_everyone: bool = Field(default=False, description="Whether the table configuration is open for everyone")
+
     def get_data_updates(self):
         max_per_asset = None
         if self.multi_index_stats is not None:
@@ -251,6 +254,15 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
             raise Exception(r.text)
         return r.json()
 
+    def patch(self, *args, **kwargs):
+        # related table is the primary key of this model
+        if isinstance(self.related_table, int):
+            id = self.related_table
+        else:
+            id = self.related_table.id
+        return self.__class__.patch_by_id(id, *args, **kwargs)
+
+
 class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     id: Optional[int] = Field(None, description="Primary key, auto-incremented ID")
     local_hash_id: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
@@ -263,6 +275,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     localtimeserieupdatedetails: Optional[Union["LocalTimeSerieUpdateDetails",int]] = None
     run_configuration: Optional["RunConfiguration"]=None
     data_schema:Optional[Dict] = None
+    open_for_everyone: bool = Field(default=False, description="Whether the ts is open for everyone")
 
     @property
     def data_source_id(self):
@@ -2123,7 +2136,15 @@ class PodDataSource:
             DuckDBInterface().drop_table(table_name)
 
         self.data_source = duckdb_dynamic_data_source
-        logger.info(f"Set local data source to {self.data_source.related_resource}")
+
+        physical_ds = self.data_source.related_resource
+        banner = (
+            f"\n{'-'*80}\n"
+            f"LOCAL data source SET: {physical_ds.display_name}  (engine={physical_ds.class_type})\n"
+            f"{'-'*80}\n"
+        )
+        logger.info(banner)
+
 
     def __repr__(self):
         return f"{self.data_source.related_resource}"

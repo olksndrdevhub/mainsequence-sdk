@@ -387,7 +387,7 @@ class AssetTranslationTable(BaseObjectOrm, BasePydanticModel):
 
         raise TranslationError(f"No rules for asset {asset} found")
 
-    def add_rules(self, rules: List[AssetTranslationRule]) -> None:
+    def add_rules(self, rules: List[AssetTranslationRule], open_for_everyone=False) -> None:
         """
         Add each rule to the translation table by calling the backend's 'add_rule' endpoint.
         Prevents local duplication. If the server also rejects a duplicate,
@@ -410,6 +410,10 @@ class AssetTranslationTable(BaseObjectOrm, BasePydanticModel):
             # 2) Post to backend's "add_rule"
             url = f"{base_url}/{self.id}/add_rule/"
             payload = new_rule.model_dump()
+            if open_for_everyone:
+                payload["open_for_everyone"] = True
+                payload["asset_filter"]["open_for_everyone"] = True
+
             r = make_request(
                 s=self.build_session(),
                 loaders=self.LOADERS,
@@ -892,6 +896,9 @@ class Trade(BaseObjectOrm,BasePydanticModel):
     related_fund: Optional[Union["VirtualFund",int]]
     related_account: Optional[Union[Account,int]]
     related_order: Optional[Union["Order",int]]
+
+    settlement_cost:Optional[float]
+    settlement_asset: Optional[Union[AssetMixin,int]]
 
     comments: Optional[str]
     venue_specific_properties: Optional[Dict]

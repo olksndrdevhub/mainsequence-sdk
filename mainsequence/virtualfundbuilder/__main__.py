@@ -149,7 +149,7 @@ class VirtualFundLauncher:
         self.logger = get_vfb_logger()
 
     def run_resource(self, execution_type, execution_object=None):
-        get_pod_configuration() # to make sure all resources are available
+        # get_pod_configuration() # to make sure all resources are available
         error_on_run = False
 
         try:

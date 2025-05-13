@@ -369,11 +369,12 @@ class BaseObjectOrm:
     @classmethod
     def patch_by_id(cls, instance_id, *args, **kwargs):
         base_url = cls.get_object_url()
+        url = f"{base_url}/{instance_id}/"
         data = cls.serialize_for_json(kwargs)
         payload = {"json": data}
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="PATCH", url=f"{base_url}/{instance_id}/", payload=payload)
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="PATCH", url=url, payload=payload)
         if r.status_code != 200:
-            raise HtmlSaveException(r.text)
+            raise Exception(r.text)
         return cls(**r.json())
 
     def patch(self, *args, **kwargs):
