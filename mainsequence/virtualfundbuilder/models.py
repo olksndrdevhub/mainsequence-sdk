@@ -99,12 +99,13 @@ class BacktestingWeightsConfig(VFBConfigBaseModel):
         if isinstance(values["signal_weights_configuration"]["signal_assets_configuration"], AssetsConfiguration):
             return values
 
+        asset_configuration = copy.deepcopy(values["signal_weights_configuration"]["signal_assets_configuration"])
+        if "prices_configuration" not in asset_configuration:
+            logger.info("No Price Configuration in Configuration - Use Default Price Configuration")
+            asset_configuration["prices_configuration"] = PricesConfiguration()
+
         values["signal_weights_configuration"]["signal_assets_configuration"] = AssetsConfiguration(
-            assets_category_unique_id=values["signal_weights_configuration"]["signal_assets_configuration"]["assets_category_unique_id"],
-            price_type=PriceTypeNames(
-                values["signal_weights_configuration"]["signal_assets_configuration"]['price_type']),
-            prices_configuration=PricesConfiguration(
-                **values["signal_weights_configuration"]["signal_assets_configuration"]['prices_configuration'])
+            **asset_configuration
         )
         return values
 
