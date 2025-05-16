@@ -815,3 +815,57 @@ class InterpolatedPricesLive():
             prices = prices[prices.index.get_level_values(level="time_index") > latest_value]
 
         return prices
+
+
+
+class ExternalPrices(TimeSerie):
+
+    @TimeSerie._post_init_routines()
+    def __init__(
+            self,
+            artifact_name: str,
+            bucket_name: str,
+            asset_category_unique_id,
+            *args,
+            **kwargs
+    ):
+        self.artifact_name = artifact_name
+        self.bucket_name = bucket_name
+        self.asset_category_unique_id = asset_category_unique_id
+        super().__init__(*args, **kwargs)
+
+    def _get_asset_list(self):
+        """
+        Creates mappings from symbols to IDs
+        """
+        asset_category = AssetCategory.get(unique_identifier=self.asset_category_unique_id)
+        asset_list = Asset.filter(id__in=asset_category.assets)
+        return asset_list
+
+    def update(
+            self,
+            update_statistics: DataUpdates
+    ) -> pd.DataFrame:
+        from mainsequence.client.models_tdag import Artifact
+        source_artifact = Artifact.get(bucket__name=self.bucket_name, name=self.artifact_name)
+        prices_source = pd.read_csv(source_artifact.content)
+
+        expected_cols = [
+            "time_index",
+            "figi",
+            "price",
+        ]
+        prices_source = prices_source[expected_cols].copy()
+        prices_source["time_index"] = pd.to_datetime(
+            prices_source["time_index"], utc=True
+        )
+
+        # convert figis in source data
+        for asset in update_statistics.asset_list:
+            prices_source.loc[prices_source["figi"] == asset.figi, "unique_identifier"] = asset.unique_identifier
+
+        prices_source.set_index(["time_index", "unique_identifier"], inplace=True)
+        prices = update_statistics.filter_df_by_latest_value(prices_source)
+
+        prices = prices.rename(columns={"price": "open"})[["open"]]
+        return prices

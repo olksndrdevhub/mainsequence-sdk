@@ -302,7 +302,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
         return AssetCategory(**r.json())
 
     @classmethod
-    def get_or_create(cls,*args,**kwargs):
+    def get_or_create(cls, *args, **kwargs):
         url = f"{cls.get_object_url()}/get-or-create/"
         payload = {"json": kwargs}
         r = make_request(
@@ -313,7 +313,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
             payload=payload
         )
         if r.status_code not in [200, 201]:
-            raise Exception(f"Error appending creating: {r.text()}")
+            raise Exception(f"Error appending creating: {r.text}")
         # Return a new instance of AssetCategory built from the response JSON.
         return AssetCategory(**r.json())
 
