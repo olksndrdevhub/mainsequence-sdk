@@ -15,9 +15,10 @@ portfolio_build_configuration:
     signal_weights_name: ExternalWeights
     rebalance_strategy_name: ImmediateSignal
     signal_weights_configuration:
-      csv_path: ""
+      bucket_name: ""
+      artifact_name: ""
       signal_assets_configuration:
-        assets_category_unique_id: magnificent_7
+        assets_category_unique_id: ""
     rebalance_strategy_configuration:
       calendar: 24/7
       rebalance_end: '23:00'
@@ -26,7 +27,7 @@ portfolio_build_configuration:
       max_percent_volume_in_bar: 0.01
       rebalance_frequency_strategy: daily
 portfolio_markets_configuration:
-  portfolio_name: External Magnificent 7 Weights
+  portfolio_name: ""
   front_end_details:
     description: "This is about this portfolios"
   tracking_funds_expected_exposure_from_latest_holdings: false
