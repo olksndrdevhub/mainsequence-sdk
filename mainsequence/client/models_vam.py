@@ -302,7 +302,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
         return AssetCategory(**r.json())
 
     @classmethod
-    def get_or_create(cls,*args,**kwargs):
+    def get_or_create(cls, *args, **kwargs):
         url = f"{cls.get_object_url()}/get-or-create/"
         payload = {"json": kwargs}
         r = make_request(
@@ -313,7 +313,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
             payload=payload
         )
         if r.status_code not in [200, 201]:
-            raise Exception(f"Error appending creating: {r.text()}")
+            raise Exception(f"Error appending creating: {r.text}")
         # Return a new instance of AssetCategory built from the response JSON.
         return AssetCategory(**r.json())
 
@@ -388,7 +388,7 @@ class AssetTranslationTable(BaseObjectOrm, BasePydanticModel):
 
         raise TranslationError(f"No rules for asset {asset} found")
 
-    def add_rules(self, rules: List[AssetTranslationRule]) -> None:
+    def add_rules(self, rules: List[AssetTranslationRule], open_for_everyone=False) -> None:
         """
         Add each rule to the translation table by calling the backend's 'add_rule' endpoint.
         Prevents local duplication. If the server also rejects a duplicate,
@@ -411,6 +411,10 @@ class AssetTranslationTable(BaseObjectOrm, BasePydanticModel):
             # 2) Post to backend's "add_rule"
             url = f"{base_url}/{self.id}/add_rule/"
             payload = new_rule.model_dump()
+            if open_for_everyone:
+                payload["open_for_everyone"] = True
+                payload["asset_filter"]["open_for_everyone"] = True
+
             r = make_request(
                 s=self.build_session(),
                 loaders=self.LOADERS,
