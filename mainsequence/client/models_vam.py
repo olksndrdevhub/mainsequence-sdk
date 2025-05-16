@@ -318,6 +318,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
         return AssetCategory(**r.json())
 
 
+
 class TranslationError(RuntimeError):
     """Raised when no translation rule (or more than one) matches an asset."""
 
@@ -496,6 +497,23 @@ class Asset(AssetMixin, BaseObjectOrm):
             raise Exception(f"{r.text}")
 
         return TargetPortfolioIndexAsset(**r.json())
+
+    @classmethod
+    def register_figi_as_asset_in_venue(cls,execution_venue__symbol,figi,timeout=None):
+        url = f"{cls.get_object_url()}/register_figi_as_asset_in_venue/"
+        payload = {"json": {"execution_venue__symbol":execution_venue__symbol, "figi":figi}}
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            payload=payload
+        )
+        if r.status_code not in [200, 201]:
+            raise Exception(f"Error appending creating: {r.text()}")
+        # Return a new instance of AssetCategory built from the response JSON.
+        return AssetCategory(**r.json())
+
 
 
 class IndexAsset(Asset):

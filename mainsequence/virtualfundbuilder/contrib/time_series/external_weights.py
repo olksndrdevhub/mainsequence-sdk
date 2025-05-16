@@ -50,7 +50,6 @@ class WeightsFromCSV(WeightsBase, TimeSerie):
     def _read_weights(self):
         weights_source = pd.read_csv(self.csv_file_path)
 
-        # exactly these columns, in order
         expected_cols = [
             "time_index",
             "signal_weight",
@@ -66,7 +65,7 @@ class WeightsFromCSV(WeightsBase, TimeSerie):
                 f"(in that order), but got {list(weights_source.columns)!r}"
             )
 
-        # time_index → integer Unix timestamp
+        # time_index → integer Unix timestamp → UTC datetime
         if not ptypes.is_integer_dtype(weights_source["time_index"]):
             raise ValueError(
                 f"'time_index' must be integer Unix timestamps, but dtype is "
@@ -83,18 +82,19 @@ class WeightsFromCSV(WeightsBase, TimeSerie):
                 f"{weights_source['signal_weight'].dtype}"
             )
 
-        # metadata columns → non-null strings
-        for col in [
-            "ticker",
-            "exchange_code",
-            "security_type",
-            "security_type_2",
-            "market_sector",
-        ]:
+        # ticker → non-null string
+        if weights_source["ticker"].isnull().any():
+            raise ValueError("Found missing values in 'ticker' column")
+        if not ptypes.is_string_dtype(weights_source["ticker"]):
+            raise ValueError(
+                f"'ticker' must be string dtype, but is {weights_source['ticker'].dtype}"
+            )
 
-            if not ptypes.is_object_dtype(weights_source[col]):
+        # other metadata columns → string dtype, but may be null
+        for col in ["exchange_code", "security_type", "security_type_2", "market_sector"]:
+            if not ptypes.is_string_dtype(weights_source[col]):
                 raise ValueError(
-                    f"'{col}' must be string/object dtype, but is "
+                    f"'{col}' must be string dtype (nulls allowed), but is "
                     f"{weights_source[col].dtype}"
                 )
 

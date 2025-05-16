@@ -4,7 +4,7 @@
 
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
 from mainsequence.virtualfundbuilder.contrib.time_series.external_weights import WeightsFromCSV
-from mainsequence.client import SessionDataSource
+from mainsequence.client import SessionDataSource,Asset,CONSTANTS
 #
 # PortfolioInterface.list_configurations()
 #
@@ -13,6 +13,11 @@ from mainsequence.client import SessionDataSource
 #
 # res = portfolio.run(local_database=True)
 # res.head()
+
+
+Asset.register_figi_as_asset_in_venue(figi="BBG00TFTKYK7",execution_venue__symbol=CONSTANTS.MAIN_SEQUENCE_EV,
+                                      timeout=100000
+                                      )
 
 
 SessionDataSource.set_local_db()
