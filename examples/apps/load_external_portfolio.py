@@ -1,9 +1,8 @@
 import pandas as pd
 
-from mainsequence.client import Asset, AssetCategory
+from mainsequence.client import Asset, AssetCategory, CONSTANTS
 from mainsequence.virtualfundbuilder.contrib.prices.time_series import ExternalPrices
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
-
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 
 from pydantic import BaseModel
@@ -48,9 +47,20 @@ class LoadExternalPortfolio(BaseApp):
             weights_source["time_index"], utc=True
         )
 
-        # create Assets
-        # assets = Assets.create_from_figi(weights_source["figi"].unique())
-        assets = Asset.filter(figi__in=list(weights_source["figi"].unique()))
+        # create assets from figi in the backend
+        assets = []
+        for figi in weights_source["figi"].unique():
+            asset = Asset.get_or_none(figi=figi)
+            if asset is None:
+                try:
+                    asset = Asset.register_figi_as_asset_in_venue(
+                        figi=figi,
+                        execution_venue__symbol=CONSTANTS.MAIN_SEQUENCE_EV,
+                    )
+                except Exception as e:
+                    print(f"Could not register asset with figi {figi}, error {e}")
+                    continue
+            assets.append(asset)
 
         # create asset category
         portfolio_category = AssetCategory.get_or_create(
