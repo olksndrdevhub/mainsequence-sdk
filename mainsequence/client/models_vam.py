@@ -534,7 +534,7 @@ class Asset(AssetMixin, BaseObjectOrm):
             loaders=cls.LOADERS,
             r_type="POST",
             url=url,
-            payload=payload,timeout=timeout
+            payload=payload,time_out=timeout
         )
         if r.status_code not in [200, 201]:
             raise Exception(f"Error appending creating: {r.text}")
