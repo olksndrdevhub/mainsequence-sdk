@@ -527,7 +527,7 @@ class Asset(AssetMixin, BaseObjectOrm):
 
     @classmethod
     def register_figi_as_asset_in_ms_share_class_venue(cls, figi, timeout=None):
-        url = f"{cls.get_object_url()}/register_figi_as_asset_in_venue/"
+        url = f"{cls.get_object_url()}/register_figi_as_asset_in_ms_share_class_venue/"
         payload = {"json": {"figi": figi}}
         r = make_request(
             s=cls.build_session(),
