@@ -15,9 +15,7 @@ from mainsequence.client import SessionDataSource,Asset,CONSTANTS
 # res.head()
 
 
-Asset.register_figi_as_asset_in_venue(figi="BBG00TFTKYK7",execution_venue__symbol=CONSTANTS.MAIN_SEQUENCE_EV,
-                                      timeout=100000
-                                      )
+
 
 
 SessionDataSource.set_local_db()
