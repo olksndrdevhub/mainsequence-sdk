@@ -515,7 +515,7 @@ class Asset(AssetMixin, BaseObjectOrm):
         )
         if r.status_code not in [200, 201]:
             raise Exception(f"Error appending creating: {r.text}")
-        return Asset(**r.json())
+        return r.json()
 
 
 
