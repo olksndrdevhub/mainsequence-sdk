@@ -634,7 +634,7 @@ class AccountTargetPortfolio(BaseObjectOrm, BasePydanticModel):
 
 class AccountMixin(BasePydanticModel):
     id: Optional[int] = None
-    uuid:[str]
+    uuid:str
     execution_venue: Union["ExecutionVenue",int]
     account_is_active: bool
     account_name: Optional[str] = None
