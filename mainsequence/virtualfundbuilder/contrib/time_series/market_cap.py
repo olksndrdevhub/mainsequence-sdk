@@ -170,8 +170,8 @@ class MarketCap(WeightsBase, TimeSerie):
 
     def _get_asset_list(self) -> Union[None, list]:
         asset_category = AssetCategory.get(unique_identifier=self.assets_configuration.assets_category_unique_id)
-        # asset_list = Asset.filter_with_asset_class(id__in=asset_category.assets)
-        asset_list = Asset.filter(id__in=asset_category.assets)
+        asset_list = Asset.filter_with_asset_class(id__in=asset_category.assets)
+        # asset_list = Asset.filter(id__in=asset_category.assets)
         return asset_list
 
     def update(self, update_statistics: "DataUpdates"):
@@ -193,12 +193,20 @@ class MarketCap(WeightsBase, TimeSerie):
             }
             for a in asset_list
         }
+        # Start Loop on unique identifier
+        market_cap_uid_to_asset_uid={a.get_spot_reference_asset_unique_identifier():a.unique_identifier for a in asset_list}
+        market_cap_uid_range_map={a.get_spot_reference_asset_unique_identifier():unique_identifier_range_market_cap_map[a.unique_identifier] for a in asset_list}
 
         mc = self.historical_market_cap_ts.get_df_between_dates(
-            unique_identifier_range_map=unique_identifier_range_market_cap_map,
+            unique_identifier_range_map=market_cap_uid_range_map,
             great_or_equal=False,
         )
         mc = mc[~mc.index.duplicated(keep='first')]
+
+        mc=mc.reset_index("unique_identifier")
+        mc["unique_identifier"]=mc["unique_identifier"].map(market_cap_uid_to_asset_uid)
+        mc=mc.set_index("unique_identifier",append=True)
+        #ends loop on unique identifier
         if mc.shape[0] == 0:
             self.logger.info("No data in Market Cap historical market cap")
             return pd.DataFrame()
