@@ -1060,9 +1060,11 @@ class TimeSerieRebuildMethods(ABC):
         :param metadatas: pre-requested metadatas to speed initiation of ts
         :return:
         """
-
-        local_time_serie_historical_update =self.local_persist_manager.local_metadata.set_start_of_execution(
-                                            active_update_scheduler_uid=update_tracker.scheduler_uid)
+        try:
+            local_time_serie_historical_update =self.local_persist_manager.local_metadata.set_start_of_execution(
+                                                active_update_scheduler_uid=update_tracker.scheduler_uid)
+        except Exception as e:
+            raise e
 
         latest_value, must_update = local_time_serie_historical_update.last_time_index_value, local_time_serie_historical_update.must_update
         update_statistics = local_time_serie_historical_update.update_statistics

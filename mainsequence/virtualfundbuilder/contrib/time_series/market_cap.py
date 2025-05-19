@@ -170,9 +170,13 @@ class MarketCap(WeightsBase, TimeSerie):
 
     def _get_asset_list(self) -> Union[None, list]:
         asset_category = AssetCategory.get(unique_identifier=self.assets_configuration.assets_category_unique_id)
-        asset_list = Asset.filter_with_asset_class(id__in=asset_category.assets)
-        # asset_list = Asset.filter(id__in=asset_category.assets)
+
+        asset_list = Asset.filter(id__in=asset_category.assets)
         return asset_list
+
+
+
+
 
     def update(self, update_statistics: "DataUpdates"):
         """
@@ -194,8 +198,27 @@ class MarketCap(WeightsBase, TimeSerie):
             for a in asset_list
         }
         # Start Loop on unique identifier
-        market_cap_uid_to_asset_uid={a.get_spot_reference_asset_unique_identifier():a.unique_identifier for a in asset_list}
-        market_cap_uid_range_map={a.get_spot_reference_asset_unique_identifier():unique_identifier_range_market_cap_map[a.unique_identifier] for a in asset_list}
+
+        ms_asset_list = Asset.filter_with_asset_class(exchange_code=None,
+                                                      execution_venue__symbol=CONSTANTS.MAIN_SEQUENCE_EV,
+                                                      main_sequence_share_class__in=[
+                                                          a.main_sequence_share_class
+                                                          for a in
+                                                          update_statistics.asset_list])
+
+        ms_asset_list={a.main_sequence_share_class:a for a in ms_asset_list}
+        asset_list_to_share_class={a.main_sequence_share_class:a for a in update_statistics.asset_list}
+
+
+
+        market_cap_uid_range_map={ms_asset.get_spot_reference_asset_unique_identifier():
+                                      unique_identifier_range_market_cap_map[asset_list_to_share_class[ms_share_class].unique_identifier]
+                                       for ms_share_class,ms_asset in ms_asset_list.items()}
+
+        market_cap_uid_to_asset_uid={ms_asset.get_spot_reference_asset_unique_identifier():
+                                      asset_list_to_share_class[ms_share_class].unique_identifier
+                                       for ms_share_class,ms_asset in ms_asset_list.items()}
+
 
         mc = self.historical_market_cap_ts.get_df_between_dates(
             unique_identifier_range_map=market_cap_uid_range_map,
@@ -203,14 +226,16 @@ class MarketCap(WeightsBase, TimeSerie):
         )
         mc = mc[~mc.index.duplicated(keep='first')]
 
-        mc=mc.reset_index("unique_identifier")
-        mc["unique_identifier"]=mc["unique_identifier"].map(market_cap_uid_to_asset_uid)
-        mc=mc.set_index("unique_identifier",append=True)
-        #ends loop on unique identifier
+
+
         if mc.shape[0] == 0:
             self.logger.info("No data in Market Cap historical market cap")
             return pd.DataFrame()
 
+        mc = mc.reset_index("unique_identifier")
+        mc["unique_identifier"] = mc["unique_identifier"].map(market_cap_uid_to_asset_uid)
+        mc = mc.set_index("unique_identifier", append=True)
+        # ends loop on unique identifier
         unique_in_mc = mc.index.get_level_values("unique_identifier").unique().shape[0]
 
         if unique_in_mc != len(asset_list):

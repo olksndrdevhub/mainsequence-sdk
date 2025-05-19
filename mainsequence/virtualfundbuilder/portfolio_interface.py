@@ -72,7 +72,7 @@ class PortfolioInterface():
 
         portfolio_ts = self.portfolio_strategy_time_serie
 
-        def build_markets_portfolio(ts, build_purpose):
+        def build_markets_portfolio(ts, build_purpose,portfolio_tags):
 
 
             # when is live target portfolio
@@ -96,8 +96,9 @@ class PortfolioInterface():
             standard_kwargs["calendar_name"] = self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
                                                         "calendar"]
 
-
-            # front end details
+            if portfolio_tags is not None:
+                standard_kwargs["tags"]=portfolio_tags
+                # front end details
             standard_kwargs["target_portfolio_about"] = {
                 "description": ts.get_portfolio_about_text(),
                 "signal_name": ts.backtesting_weights_config.signal_weights_name,
@@ -118,7 +119,8 @@ class PortfolioInterface():
 
             return target_portfolio,index_asset
 
-        target_portfolio,index_asset = build_markets_portfolio(portfolio_ts, build_purpose=self.build_purpose)
+        target_portfolio,index_asset = build_markets_portfolio(portfolio_ts, build_purpose=self.build_purpose,
+                                                               portfolio_tags=portfolio_tags)
 
         # create index Asset
         asset_symbol = target_portfolio.portfolio_ticker
