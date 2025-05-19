@@ -22,7 +22,7 @@ from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime,
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field, validator,root_validator,constr
 
-from ..logconf import logger
+from mainsequence.logconf import logger
 
 
 def validator_for_string(value):
