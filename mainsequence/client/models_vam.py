@@ -118,7 +118,7 @@ class User(BaseObjectOrm,BasePydanticModel):
 class AssetMixin(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
     can_trade: bool
-    calendar: Union[Calendar,int]
+    calendar: Union[Union[Calendar,int],None]=None
     execution_venue: Union["ExecutionVenue", int]
     delisted_datetime: Optional[datetime.datetime] = None
     unique_identifier: str
@@ -168,6 +168,29 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
     def __repr__(self) -> str:
         return f"{self.class_name()}: {self.unique_identifier}"
 
+    def pretty_print(self) -> None:
+        """
+        Print all asset properties in a neat, aligned table.
+        """
+        # Gather (field_name, value) pairs
+        rows = []
+        for field_name in self.__fields__:
+            value = getattr(self, field_name)
+            rows.append((field_name, value))
+
+        # Compute column widths
+        max_name_len = max(len(name) for name, _ in rows)
+        max_val_len = max(len(str(val)) for _, val in rows)
+
+        # Header
+        header = f"{'Property':<{max_name_len}} | {'Value':<{max_val_len}}"
+        separator = "-" * len(header)
+        print(header)
+        print(separator)
+
+        # Rows
+        for name, val in rows:
+            print(f"{name:<{max_name_len}} | {val}")
     @property
     def execution_venue_symbol(self):
         return self.execution_venue.symbol
@@ -302,7 +325,7 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
         return AssetCategory(**r.json())
 
     @classmethod
-    def get_or_create(cls,*args,**kwargs):
+    def get_or_create(cls, *args, **kwargs):
         url = f"{cls.get_object_url()}/get-or-create/"
         payload = {"json": kwargs}
         r = make_request(
@@ -313,9 +336,10 @@ class AssetCategory(BaseObjectOrm, BasePydanticModel):
             payload=payload
         )
         if r.status_code not in [200, 201]:
-            raise Exception(f"Error appending creating: {r.text()}")
+            raise Exception(f"Error appending creating: {r.text}")
         # Return a new instance of AssetCategory built from the response JSON.
         return AssetCategory(**r.json())
+
 
 
 class TranslationError(RuntimeError):
@@ -501,6 +525,22 @@ class Asset(AssetMixin, BaseObjectOrm):
 
         return TargetPortfolioIndexAsset(**r.json())
 
+    @classmethod
+    def register_figi_as_asset_in_ms_share_class_venue(cls, figi, timeout=None):
+        url = f"{cls.get_object_url()}/register_figi_as_asset_in_ms_share_class_venue/"
+        payload = {"json": {"figi": figi}}
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            payload=payload,time_out=timeout
+        )
+        if r.status_code not in [200, 201]:
+            raise Exception(f"Error appending creating: {r.text}")
+        return r.json()
+
+
 
 class IndexAsset(Asset):
     valuation_asset: AssetMixin
@@ -594,6 +634,7 @@ class AccountTargetPortfolio(BaseObjectOrm, BasePydanticModel):
 
 class AccountMixin(BasePydanticModel):
     id: Optional[int] = None
+    uuid:str
     execution_venue: Union["ExecutionVenue",int]
     account_is_active: bool
     account_name: Optional[str] = None
