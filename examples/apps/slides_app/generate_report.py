@@ -19,22 +19,40 @@ from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 from pydantic import BaseModel
 from jinja2 import Template
 
+from plotly.subplots import make_subplots
 
 from mainsequence.client import DoesNotExist, AssetCategory,TargetPortfolio
 from mainsequence.client.models_tdag import Artifact
 from mainsequence.virtualfundbuilder.resource_factory.app_factory import register_app, BaseApp
 #!/usr/bin/env python3
 
-def fig_to_base64_img(fig, img_id):
-    # use kaleido under the hood to export PNG bytes
-    img_bytes = fig.to_image(format="png", scale=2)
-    b64_str = base64.b64encode(img_bytes).decode('utf-8')
+
+
+# ----- Utility functions for DRY HTML construction -----
+def column_wrapper(content: str) -> str:
+    """Wraps given HTML content inside a flex column div."""
     return (
-        f'<div id="{img_id}" style="text-align:center;">'
-        f'<img src="data:image/png;base64,{b64_str}" '
-        f'style="max-width:100%; height:auto;" />'
-        f'</div>'
+        '<div class="col-6 d-flex flex-column h-100 p-0" style="min-height:0;">'
+        f'{content}'
+        '</div>'
     )
+
+
+def two_column_layout(left_content: str, right_content: str) -> str:
+    """Creates a two-column row layout with provided left and right column contents."""
+    return (
+        '<div class="row g-0 h-100">'
+        f'{column_wrapper(left_content)}'
+        f'{column_wrapper(right_content)}'
+        '</div>'
+    )
+
+
+def padded_div(content: str, pt: int = 0, pb: int = 0, pl: int = 0, pr: int = 0, flex_grow: bool = False) -> str:
+    """Creates a div with specified padding. Optionally adds flex-grow classes."""
+    classes = "flex-grow-1 position-relative" if flex_grow else ""
+    style = f"padding:{pt}px {pr}px {pb}px {pl}px; min-height:0;"
+    return f'<div class="{classes}" style="{style}">{content}</div>'
 
 
 class ReportConfig(BaseModel):
@@ -61,99 +79,104 @@ class SlideReport(BaseApp):
         target_portfolio = TargetPortfolio.get(portfolio_ticker=self.configuration.portfolio_ticker)
         self.target_portfolio = target_portfolio
 
-
-    def _fig_to_base64(self, fig) -> str:
-        """
-        Render a Plotly figure to PNG and return a Base64 string.
-        """
-        buf = BytesIO()
-        fig.write_image(buf, format="png")
-        buf.seek(0)
-        return base64.b64encode(buf.read()).decode("utf-8")
-
     def _build_interactive_chart_slide(self) -> str:
-        """
-        Build the “Asset Charts Interactive” slide.
-        The two Plotly charts are sized in the backend so they never exceed
-        their flex column.  No front-end CSS hacks required.
-        """
-        import plotly.express as px
-
-        # ----------------------------------------------------------------- constants
+        # ----- Constants -----
         palette = ['#0A1E3C', '#00A3E0', '#4A5A7A']
-        PIE_HEIGHT_PX = 200
-        BAR_ROW_PX = 40  # ≈ pixels per category (only used if < cap)
+        PIE_HEIGHT_PX = 350
+        BAR_ROW_PX = 40
         BAR_PADDING_PX = 60
-        MAX_BAR_HEIGHT = 300  # <-  cap the bar chart here  --------------
+        MAX_BAR_HEIGHT = 350
 
-        # ---------- data ------------------------------------------------------
+        # ----- Data -----
         pie_vals, pie_labels = [30, 45, 25], ['A', 'B', 'C']
         cats = [f'Category {i}' for i in range(1, 11)]
         vals = [i * 5 for i in range(1, 11)]
 
-        # ---------- table -----------------------------------------------------
-        table_rows = ''.join(f'<tr><td>{l}</td><td>{v}</td></tr>'
-                             for l, v in zip(pie_labels, pie_vals))
-        table_html = (
-            '<div class="overflow-auto" style="flex:0 0 25%;">'
-            '  <table class="table table-sm table-borderless mb-0" style="font-size:.8rem">'
-            '    <thead class="bg-info text-white"><tr><th>Label</th><th>Value</th></tr></thead>'
-            f'    <tbody>{table_rows}</tbody>'
-            '  </table>'
-            '</div>'
+        # ----- Pie + Table stacked vertically -----
+        fig = make_subplots(
+            rows=2, cols=1,
+            specs=[
+                [{"type": "domain"}],
+                [{"type": "table"}]
+            ],
+            row_heights=[0.6, 0.4],
+            vertical_spacing=0.02
         )
 
-        # ---------- pie chart -------------------------------------------------
-        pie_fig = px.pie(values=pie_vals, names=pie_labels,
-                         hole=.3, color_discrete_sequence=palette)
-        pie_fig.update_traces(textfont_size=16)
-        pie_fig.update_layout(height=PIE_HEIGHT_PX,
-                              margin=dict(l=0, r=0, t=20, b=0))
+        # pie trace with labels+percent, legend off
+        fig.add_trace(
+            go.Pie(
+                labels=pie_labels,
+                values=pie_vals,
+                hole=0.3,
+                marker=dict(colors=palette),
+                textinfo='label+percent',  # show labels on slices
+                showlegend=False  # hide the legend
+            ),
+            row=1, col=1
+        )
 
-        pie_html = pie_fig.to_html(
-            full_html=False, include_plotlyjs='cdn',
-            div_id='pie-chart-int',
-            default_width='100%', default_height=f'{PIE_HEIGHT_PX}px',
+        # table trace below
+        fig.add_trace(
+            go.Table(
+                header=dict(
+                    values=["Label", "Value"],
+                    font=dict(size=14, color="white"),
+                    fill_color="grey",
+                    align="left"
+                ),
+                cells=dict(
+                    values=[pie_labels, pie_vals],
+                    font=dict(size=12),
+                    fill_color="white",
+                    align="left"
+                )
+            ),
+            row=2, col=1
+        )
+
+        # transparent background and sizing
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=PIE_HEIGHT_PX,
+            margin=dict(l=0, r=0, t=20, b=0)
+        )
+
+        combined_html = fig.to_html(
+            full_html=False,
+            include_plotlyjs='cdn',
+            div_id='pie-table-chart-int',
+            default_width='100%',
+            default_height=f'{PIE_HEIGHT_PX}px',
             config={'responsive': True}
         )
+        left_col = padded_div(combined_html, flex_grow=True)
 
-        # ---------- bar chart -------------------------------------------------
-        # Calculate natural height, then cap at 300 px
+        # ----- Bar Chart HTML -----
         natural_height = BAR_ROW_PX * len(cats) + BAR_PADDING_PX
         bar_height_px = min(natural_height, MAX_BAR_HEIGHT)
-
         bar_fig = px.bar(x=vals, y=cats, orientation='h',
                          color_discrete_sequence=palette * 4)
         bar_fig.update_layout(
             height=bar_height_px,
             xaxis_title='Value',
             yaxis_title=None,
-            margin=dict(l=0, r=0, t=20, b=0)
-        )
+            margin=dict(l=0, r=0, t=20, b=0),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
 
+        )
         bar_html = bar_fig.to_html(
             full_html=False, include_plotlyjs=False,
             div_id='bar-chart-int',
             default_width='100%', default_height=f'{bar_height_px}px',
             config={'responsive': True}
         )
+        bar_html = padded_div(bar_html, flex_grow=True)
 
-        # ---------- assemble --------------------------------------------------
-        return (
-            '<div class="row g-0 h-100">'
-            '  <div class="col-6 d-flex flex-column h-100 p-0" style="min-height:0;">'
-            f'    {table_html}'
-            '    <div class="flex-grow-1 position-relative" style="min-height:0;">'
-            f'      {pie_html}'
-            '    </div>'
-            '  </div>'
-            '  <div class="col-6 d-flex flex-column h-100 p-0" style="min-height:0;">'
-            '    <div class="flex-grow-1 position-relative" style="min-height:0;">'
-            f'      {bar_html}'
-            '    </div>'
-            '  </div>'
-            '</div>'
-        )
+        # ----- Assemble two-column layout -----
+        return two_column_layout(left_col, bar_html)
     def _build_slide_table_html(self):
         # 2) Define 3 example assets
         assets = [
@@ -184,7 +207,7 @@ class SlideReport(BaseApp):
         )
 
         table_html = f"""
-        <table class="table table-sm table-borderless">
+        <table class="table table-sm table-borderless bg-transparent">
           <thead style="background-color: #cce5ff;">
             <tr>
               <th>Asset</th>
@@ -207,7 +230,7 @@ class SlideReport(BaseApp):
         </table>
         """
 
-        return table_html
+        return padded_div(content=table_html, pt=15, pb=15, pl=15, pr=15,)
 
 
     def run(self):

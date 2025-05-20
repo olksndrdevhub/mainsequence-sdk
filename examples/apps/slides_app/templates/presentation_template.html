@@ -93,12 +93,15 @@
     }
 
 
-    .table-borderless {
-  background-color: transparent !important;
-}
+
     /* give only the header row a light-blue bg */
 .table-borderless thead th {
   background-color: #cce5ff;
+}
+
+.table-borderless tbody tr,
+.table-borderless tbody td {
+  background-color: transparent !important;
 }
 /* Shrink font, padding and row height for all cells */
 .table-borderless th,
