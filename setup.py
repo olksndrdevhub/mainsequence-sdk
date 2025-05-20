@@ -60,4 +60,11 @@ setup(
   author_email = 'dev@main-sequence.io',
   install_requires=get_install_requirements(),
     packages=find_packages(include=['mainsequence', 'mainsequence.*']),  # Include only the `mainsequence` package
-    description='Main Sequence SDK')
+    package_data={
+        'mainsequence': [
+            '**/*.html',  # Include all .html files recursively within 'mainsequence'
+            '**/*.css',  # Include all .css files recursively within 'mainsequence'
+        ],
+    },
+    description='Main Sequence SDK'
+)
