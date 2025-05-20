@@ -25,8 +25,7 @@ class PricesFromApi(TimeSerie):
         yesterday at midnight (UTC).
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
-    CPUS=1
-    GPUS=0
+
 
     @TimeSerie._post_init_routines()
     def __init__(self, asset_list, *args, **kwargs):
