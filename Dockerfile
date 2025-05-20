@@ -24,6 +24,9 @@ WORKDIR ${CODE_DIR}
 RUN chown -R ${NB_UID}:${NB_UID} ${CODE_DIR}
 COPY --chown=${NB_UID}:${NB_GID} . ${CODE_DIR}/mainsequence-sdk
 
+RUN ls -R /opt/code/mainsequence-sdk/mainsequence/virtualfundbuilder/contrib/apps
+
+
 # Create a new virtual environment that is separate from conda
 RUN python -m venv /opt/venv
 
@@ -70,3 +73,7 @@ ENV TDAG_CONFIG_PATH=${HOME_DIR}/tdag/default_config.yml \
     TDAG_RAY_SERVE_HOST=0.0.0.0 \
     TDAG_RAY_SERVE_PORT=8003 \
     MLFLOW_ENDPOINT=http://localhost:5000
+
+
+RUN cat ${CODE_DIR}/mainsequence-sdk/requirements.txt
+RUN ls /opt/venv/lib/python3.9/site-packages/mainsequence/virtualfundbuilder/contrib/apps
