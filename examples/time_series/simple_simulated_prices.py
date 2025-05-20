@@ -20,7 +20,7 @@ class SimulatedPrices(TimeSerie):
       - Otherwise, simulate data per asset from one hour after its last update until
         yesterday at midnight (UTC).
     """
-    OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
+    OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
 
 
     @TimeSerie._post_init_routines()
@@ -172,7 +172,9 @@ class TAFeature(TimeSerie):
     """
     SIMULATION_OFFSET_START=datetime.timedelta(days=50)
     @TimeSerie._post_init_routines()
-    def __init__(self, asset_list: ModelList, ta_feature: str, ta_length: int = 14, *args, **kwargs):
+    def __init__(self, asset_list: ModelList, ta_feature: str, ta_length: int = 14,
+                 local_kwargs_to_ignore=["asset_list"],
+                 *args, **kwargs):
         """
         Initialize the TA feature time series.
 
@@ -324,7 +326,19 @@ def test_ta_feature_simulated_crypto_prices():
             force_update= False,
             update_only_tree = False,
            )
+    print("Two asset time serie updated",ts.local_hash_id)
+    assets = AssetCurrencyPair.filter(
+        ticker__in=["BTCUSDT"], exchange_code=None,
+        execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV
+    )
+    ts = TAFeature(asset_list=ModelList(assets), ta_feature="SMA", ta_length=14)
 
+    ts.run(debug_mode=True,
+           update_tree=True,
+           force_update=False,
+           update_only_tree=False,
+           )
+    print("one asset time serie updated", ts.local_hash_id)
 
 if __name__ == "__main__":
     test_ta_feature_simulated_crypto_prices()
