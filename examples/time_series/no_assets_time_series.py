@@ -9,8 +9,7 @@ from mainsequence.client import DataUpdates
 
 class SingleIndexSimulatedPrices(TimeSerie):
     OFFSET_START = datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
-    CPUS = 1
-    GPUS = 0
+
 
     @TimeSerie._post_init_routines()
     def __init__(self, *args, **kwargs):

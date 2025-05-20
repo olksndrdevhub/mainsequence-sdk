@@ -28,6 +28,8 @@ from mainsequence.tdag.time_series.persist_managers import PersistManager
 from mainsequence.client.models_tdag import (none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate,
                                              DataUpdates, UniqueIdentifierRangeMap
                                              )
+from pandas.api.types import is_datetime64_any_dtype
+
 from pydantic import BaseModel
 
 from abc import ABC
@@ -2445,6 +2447,13 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                     traceback.print_exc()
 
                     raise e
+                lvl0 = temp_df.index.get_level_values(0)
+
+                is_dt64_utc = str(lvl0.dtype) == "datetime64[ns, UTC]"
+
+                assert is_dt64_utc, "Time index must be datetime64[ns, UTC]"
+
+
                 for col, ddtype in temp_df.dtypes.items():
                     if "datetime64" in str(ddtype):
                         self.logger.info(f"WARNING DATETIME TYPE IN {self}")

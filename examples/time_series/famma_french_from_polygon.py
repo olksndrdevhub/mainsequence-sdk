@@ -221,26 +221,7 @@ def test_fama_french_time_serie():
     # 1) Create the TimeSerie instance
     ff_ts = FamaFrenchTimeSerie()
 
-    # 2) CASE 1: Simulation with empty DataUpdates
-    print("=== FIRST RUN WITH EMPTY DATA UPDATES ===")
-    data_df = ff_ts.update(DataUpdates())
-    print(data_df)
 
-    # 3) Extract the max time per unique_identifier
-    #    We'll store it in a new DataUpdates object.
-    if not data_df.empty:
-        update_dict = (
-            data_df.reset_index().groupby("unique_identifier")["time_index"].max().to_dict()
-        )
-        updates = DataUpdates(update_statistics=update_dict,
-                              max_time_index_value=data_df.index.get_level_values("time_index").max())
-    else:
-        updates = DataUpdates()
-
-    # 4) CASE 2: Another run, simulating an incremental update.
-    print("\n=== SECOND RUN USING EXTRACTED update_statistics ===")
-    df_updates = ff_ts.update(updates)
-    print(df_updates)
 
 if __name__ == "__main__":
     test_fama_french_time_serie()

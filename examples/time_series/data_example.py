@@ -28,8 +28,7 @@ class PricesFromApi(TimeSerie):
         yesterday at midnight (UTC).
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
-    CPUS=1
-    GPUS=0
+
 
     @TimeSerie._post_init_routines()
     def __init__(self, *args, **kwargs):
@@ -47,7 +46,7 @@ class PricesFromApi(TimeSerie):
 
     def update(self, update_statistics: DataUpdates)->pd.DataFrame:
 
-        asset=Asset.filter(symbol="NVDA")
+        asset=Asset.filter(ticker="NVDA")
         data=data_from_api(asset)
         return data
 
@@ -67,10 +66,10 @@ class PricesInterpolation(TimeSerie):
 class RiskMeasurement(TimeSerie):
     @TimeSerie._post_init_routines()
     def __init__(self, *args, **kwargs):
-        self.prices_time_Series = PricesInterpolation(*args, **kwargs)
+        self.prices_time_series = PricesInterpolation(*args, **kwargs)
 
     def update(self, update_statistics: DataUpdates) -> pd.DataFrame:
-        prices = calcualte_risk_measurement(self.prices_time_Series)
+        prices = calcualte_risk_measurement(self.prices_time_series)
         return prices
 
 if __name__ == "__main__":

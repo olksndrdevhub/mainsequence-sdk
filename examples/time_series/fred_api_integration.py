@@ -23,11 +23,14 @@ class FREDTimeSerie(TimeSerie):
     GPUS = 0
 
     @TimeSerie._post_init_routines()
-    def __init__(self, asset_list: list[str], *args, **kwargs):
+    def __init__(self, unique_identifiers: list[str],
+                 local_kwargs_to_ignore=["unique_identifiers"],
+
+                 *args, **kwargs):
         """
         :param fred_symbols: List of FRED series IDs, e.g., ["DGS10", "DEXUSEU", ...]
         """
-        self.asset_list = asset_list
+        self.unique_identifiers = unique_identifiers
         super().__init__(*args, **kwargs)
 
     def update(self, update_statistics: DataUpdates):
@@ -47,18 +50,18 @@ class FREDTimeSerie(TimeSerie):
 
 
         df_list = []
-        for asset in self.asset_list:
+        for ui in self.self.asset_list:
             # 3) Retrieve the last update date from update_statistics
-            last_update = update_statistics[asset.unique_identifier]  # a datetime object
+            last_update = update_statistics[ui]  # a datetime object
 
             # Fetch data from the day after last_update up to now
             observation_start = (last_update + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
             observation_end = now_utc.strftime('%Y-%m-%d')
 
             try:
-                series_data = self.fred.get_series(asset.unique_identifier, observation_start, observation_end)
+                series_data = self.fred.get_series(ui, observation_start, observation_end)
             except Exception as e:
-                print(f"Failed to fetch FRED series {asset.unique_identifier}: {e}")
+                print(f"Failed to fetch FRED series {ui}: {e}")
                 continue
 
             if series_data.empty:
@@ -67,7 +70,7 @@ class FREDTimeSerie(TimeSerie):
             # 4) Convert the returned Series into a DataFrame
             series_data = series_data.reset_index()
             series_data.columns = ['time_index', 'feature_1']
-            series_data['unique_identifier'] = asset.unique_identifier
+            series_data['unique_identifier'] = ui
 
             df_list.append(series_data)
 
@@ -76,6 +79,11 @@ class FREDTimeSerie(TimeSerie):
 
         # 5) Concatenate results & set a MultiIndex of (time_index, unique_identifier)
         data = pd.concat(df_list, axis=0)
+        data["time_index"] = pd.to_datetime(data["time_index"], errors="coerce")  # stays the same if already OK
+
+        #always needs to be UTC
+        data["time_index"] = data["time_index"].dt.tz_localize("UTC")
+
         data = data.set_index(['time_index', 'unique_identifier'])
 
         return data
@@ -89,25 +97,59 @@ def test_fred_time_serie():
     The API key is loaded from environment variable `FRED_API_KEY`.
     """
     # Two example FRED series: with synthethic assets ont in the database
-    dummy_asset_kwargs=dict(
 
-            asset_type=MARKETS_CONSTANTS.ASSET_TYPE_INDEX,
-            can_trade= False,
-            calendar= Calendar(name="FredCalendar"),
-            execution_venue=ExecutionVenue(symbol="FRED",name="FRED EV")
-    )
+
+
     assets = [
-        Asset(symbol="US10YR", unique_identifier="DGS10",name="US10YR",**dummy_asset_kwargs),
-        Asset(symbol="EURUSD_FX", unique_identifier="DEXUSEU",name="EURUSD_FX",**dummy_asset_kwargs),
-    ]
+        Asset(
+              **{"can_trade": False,
+                "execution_venue": ExecutionVenue(name="US Treasury Market",
+                                                  symbol="US Treasury Market"
+                                                  ),
+                "delisted_datetime": None,
+                "unique_identifier": "DGS10",
+                "real_figi": False,
+                "figi": "123456789ASG",
+                "composite": "123456789ASG",
+                "ticker": "US10YR",
+                "security_type": "Treasury Note",
+                "security_type_2": "Government Bond",
+                "security_market_sector": "Fixed Income",
+                "share_class": None,
+                "exchange_code": "XUSA",
+                "name": "U.S. Treasury Note 10-Year Constant Maturity",
+                "main_sequence_share_class": None}
 
+              ),
+        Asset(
+
+              **{
+                  "can_trade": False,
+                  "execution_venue": ExecutionVenue(name="Forex Market",
+                                                  symbol="Forex Market"
+                                                  ),
+                  "delisted_datetime": None,
+                  "unique_identifier": "DEXUSEU",
+                  "real_figi": False,
+                  "figi": "123456789ASD",
+                  "composite": "123456789ASD",
+                  "ticker": "EURUSD",
+                  "security_type": "Currency Pair",
+                  "security_type_2": "Foreign Exchange",
+                  "security_market_sector": "Forex",
+                  "share_class": None,
+                  "exchange_code": "XFXM",
+                  "name": "Euro / U.S. Dollar Currency Pair",
+                  "main_sequence_share_class": None
+              }
+              ),
+    ]
+    #Warninig the time series will run but this assets will not exist in the Backend
     # Instantiate the TimeSerie
     fred_ts = FREDTimeSerie(asset_list=ModelList(assets))
 
     # Call the update method
-    df = fred_ts.set_update_statistics_and_update(DataUpdates())
-    print(df)
-
+    fred_ts.run(debug_mode=True, force_update=True)
 
 if __name__ == "__main__":
     test_fred_time_serie()

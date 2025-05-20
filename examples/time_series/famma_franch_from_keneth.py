@@ -182,20 +182,6 @@ def test_kenneth_french_time_serie():
     df1 = kfts.update(DataUpdates())
     print(df1)
 
-    if not df1.empty:
-        # We store the max date as the last update
-        update_dict = (
-            df1.reset_index().groupby("unique_identifier")["time_index"].max().to_dict()
-        )
-        updates = DataUpdates(update_statistics=update_dict,
-                              max_time_index_value=df1.index.get_level_values("time_index").max())
-    else:
-        updates = DataUpdates()
-
-    # Second run => incremental from the last date
-    print("\n=== SECOND RUN (INCREMENTAL) ===")
-    df2 = kfts.set_update_statistics_and_update(updates)
-    print(df2)
 
 
 if __name__ == "__main__":
