@@ -21,8 +21,7 @@ class SimulatedPrices(TimeSerie):
         yesterday at midnight (UTC).
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
-    CPUS=1
-    GPUS=0
+
 
     @TimeSerie._post_init_routines()
     def __init__(self, asset_list: ModelList, *args, **kwargs):
@@ -310,42 +309,21 @@ def test_ta_feature_simulated_crypto_prices():
       - Creating a base simulation of crypto prices.
       - Calculating a TA feature (e.g., SMA) on the simulated prices.
     """
-    from mainsequence.client import Asset
+    from mainsequence.client import AssetCurrencyPair
     from mainsequence import MARKETS_CONSTANTS
 
     # Filter assets for BTCUSDT and ETHUSDT.
-    assets = Asset.filter(
-        symbol__in=["BTCUSDT", "ETHUSDT"],
-        asset_type=MARKETS_CONSTANTS.ASSET_TYPE_CURRENCY_PAIR,
-        execution_venue__symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL
+    assets = AssetCurrencyPair.filter(
+        ticker__in=["BTCUSDT", "ETHUSDT"],exchange_code=None,
+        execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV
     )
     ts = TAFeature(asset_list=ModelList(assets), ta_feature="SMA", ta_length=14)
 
-    # --- Monkey patch the get_df_between_dates method ---
-    def get_df_between_dates_patch(
-            self,
-            start_date: Union[datetime.datetime, None] = None,
-            end_date: Union[datetime.datetime, None] = None,
-            unique_identifier_list: Union[None, list] = None,
-            great_or_equal=True,
-            less_or_equal=True,
-            unique_identifier_range_map: Optional[dict] = None,
-    ):
-        """
-        A monkey-patched version of get_df_between_dates for testing.
-        For simplicity, this version returns the precomputed all_prices_data.
-        """
-        # In a more realistic scenario, you could filter all_prices_data based on parameters.
-        prices_data = ts.prices_time_serie.set_update_statistics_and_update(DataUpdates())
-        return prices_data
-
-    # Bind the patch to the instance. One way to do this is by using __get__ to
-    # bind the function to the instance as a method.
-    ts.prices_time_serie.get_df_between_dates = get_df_between_dates_patch.__get__( ts.prices_time_serie, type( ts.prices_time_serie))
-
-
-    result = ts.update(DataUpdates())
-    print(result)
+    ts.run(debug_mode=True,
+           update_tree= True,
+            force_update= False,
+            update_only_tree = False,
+           )
 
 
 if __name__ == "__main__":
