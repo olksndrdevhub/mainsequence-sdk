@@ -21,7 +21,6 @@ class SingleIndexSimulatedPrices(TimeSerie):
         mu = 0.0
         sigma = 0.01
 
-
         #because this time series is not multiindex we use max time in update statistics
         last_update = update_statistics._max_time_in_update_statistics
         sim_start = last_update + datetime.timedelta(hours=1)
@@ -42,15 +41,12 @@ class SingleIndexSimulatedPrices(TimeSerie):
 
         return df
 
-# Example test script
 def test_single_index_simulated_prices():
     ts = SingleIndexSimulatedPrices()
 
     # CASE 1: initial data
     print("=== Initial Simulation ===")
-    data_df = ts.set_update_statistics_and_update(DataUpdates())
-    print(data_df)
-
+    ts.run(debug_mode=True, force_update=True)
 
 # Run the test
 if __name__ == "__main__":

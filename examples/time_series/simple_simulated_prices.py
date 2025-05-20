@@ -316,17 +316,17 @@ def test_ta_feature_simulated_crypto_prices():
 
     # Filter assets for BTCUSDT and ETHUSDT.
     assets = AssetCurrencyPair.filter(
-        ticker__in=["BTCUSDT", "ETHUSDT"],exchange_code=None,
+        ticker__in=["BTCUSDT", "ETHUSDT"], exchange_code=None,
         execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV
     )
     ts = TAFeature(asset_list=ModelList(assets), ta_feature="SMA", ta_length=14)
 
     ts.run(debug_mode=True,
-           update_tree= True,
-            force_update= False,
-            update_only_tree = False,
-           )
-    print("Two asset time serie updated",ts.local_hash_id)
+           update_tree=True,
+           force_update=False,
+           update_only_tree=False,
+    )
+    print("Two asset time serie updated", ts.local_hash_id)
     assets = AssetCurrencyPair.filter(
         ticker__in=["BTCUSDT"], exchange_code=None,
         execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV
