@@ -1,6 +1,6 @@
 portfolio_build_configuration:
   valuation_asset:
-    unique_identifier: USDT_bnce_KKG000000H64
+    unique_identifier: VALUATION_ASSET
   assets_configuration:
     price_type: close
     prices_configuration:
