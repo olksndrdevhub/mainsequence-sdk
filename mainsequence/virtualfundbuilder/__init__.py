@@ -36,7 +36,8 @@ def register_default_strategies():
 
 if os.getenv("PROJECT_LIBRARY_NAME") is None:
     # TODO workaround for now to make local execution work
-    register_default_strategies()
     os.environ["PROJECT_LIBRARY_NAME"] = Path(os.environ.get("VFB_PROJECT_PATH")).name
+
+register_default_strategies()
 
 get_pod_configuration()
