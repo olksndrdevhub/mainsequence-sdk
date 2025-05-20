@@ -31,6 +31,7 @@ from mainsequence.virtualfundbuilder.utils import (
 # no more default strategies, everything should be for user
 def register_default_strategies():
     # Keep this in a function to not clutter the libs namespace
+    import mainsequence.virtualfundbuilder.contrib.apps
     import mainsequence.virtualfundbuilder.contrib.time_series
     import mainsequence.virtualfundbuilder.contrib.rebalance_strategies
 
