@@ -123,7 +123,6 @@ class PortfolioInterface():
                                                                portfolio_tags=portfolio_tags)
 
         # create index Asset
-        asset_symbol = target_portfolio.portfolio_ticker
 
         self.index_asset = index_asset
         self.target_portfolio = target_portfolio

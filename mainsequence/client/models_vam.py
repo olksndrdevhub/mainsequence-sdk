@@ -25,6 +25,27 @@ from pydantic import BaseModel, Field, validator,root_validator,constr
 from mainsequence.logconf import logger
 
 
+
+CRYPTO_EXCHANGE_CODE = ["abts","acxi","alcn","bbit","bbox","bbsp","bcex","bequ","bfly","bfnx","bfrx","bgon",
+                        "binc","bitc","bitz","bjex","bl3p","blc2","blcr","bnbd","bnce","bndx","bnf8","bnus",
+                        "bopt","bpnd","bt38","btba","btbu","btby","btca","btcb","btcc","bthb","btma","btmx",
+                        "btrk","btrx","btsh","btso","bull","bxth","bybt","cbse","ccck","ccex","cexi","cflr",
+                        "cflx","cnex","cngg","cnhd","cnmt","cone","crco","crfl","crtw","crv2","cucy","curv",
+                        "delt","drbt","dydx","eris","ethx","etrx","exxa","ftxu","ftxx","gacn","gate","gmni",
+                        "hbdm","hitb","huob","inch","indr","itbi","kcon","korb","krkn","lclb","lgom","lmax",
+                        "merc","mexc","mtgx","ngcs","nova","nvdx","okcn","okex","oslx","pksp","polo","qsp2",
+                        "qsp3","quon","sghd","stmp","sush"]
+
+COMPOSITE_TO_ISO = {
+    'AR': 'XBUE', 'AU': 'XASX', 'BZ': 'BVMF', 'CN': 'XTSE', 'CB': 'XBOG',
+    'CH': 'XSHG', 'CI': 'XSGO', 'CP': 'XPRA', 'DC': 'XCSE', 'FH': 'XHEL',
+    'FP': 'XPAR', 'GA': 'ASEX', 'GR': 'XFRA', 'HK': 'XHKG', 'IE': 'XDUB',
+    'IM': 'XMIL', 'IN': 'XBOM', 'IT': 'XTAE', 'JP': 'XTKS', 'KS': 'XKRX',
+    'KZ': 'AIXK', 'LN': 'XLON', 'MM': 'XMEX', 'MK': 'XKLS', 'NA': 'XAMS',
+    'PL': 'XLIS', 'PM': 'XPHS', 'PW': 'XWAR', 'RO': 'XBSE', 'SA': 'XSAU',
+    'SM': 'XMAD', 'SS': 'XSTO', 'SW': 'XSWX', 'TH': 'XBKK', 'TI': 'XIST',
+    'TT': 'XTAI', 'US': 'XNYS', 'AT': 'XWBO', 'BB': 'XBRU',
+}
 def validator_for_string(value):
     if isinstance(value, str):
         # Parse the string to a datetime object
@@ -70,6 +91,9 @@ class Calendar(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = None
     name: str
     calendar_dates:Optional[dict]=None
+
+    def __str__(self):
+        return self.name
 
 class Organization(BaseModel):
     id: int
@@ -118,7 +142,6 @@ class User(BaseObjectOrm,BasePydanticModel):
 class AssetMixin(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
     can_trade: bool
-    calendar: Union[Union[Calendar,int],None]=None
     execution_venue: Union["ExecutionVenue", int]
     delisted_datetime: Optional[datetime.datetime] = None
     unique_identifier: str
@@ -167,6 +190,22 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
 
     def __repr__(self) -> str:
         return f"{self.class_name()}: {self.unique_identifier}"
+
+    def get_calendar(self):
+
+        if self.execution_venue in CRYPTO_EXCHANGE_CODE:
+            return Calendar(name="24/7")
+        elif self.exchange_code in COMPOSITE_TO_ISO.keys():
+            return Calendar(name=COMPOSITE_TO_ISO[self.exchange_code])
+        elif self.security_type==CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO:
+            return Calendar(name="24/7")
+        elif self.security_type_2==CONSTANTS.FIGI_SECURITY_TYPE_2_CRYPTO:
+            return Calendar(name="24/7")
+        elif self.security_type_2==CONSTANTS.FIGI_SECURITY_TYPE_2_PERPETUAL:
+            return Calendar(name="24/7")
+        else:
+            return Calendar(name="XNYS")
+
 
     def pretty_print(self) -> None:
         """
@@ -501,7 +540,6 @@ class Asset(AssetMixin, BaseObjectOrm):
             cls,
             reference_portfolio: int,
             valuation_asset: int,
-            calendar: str,
             timeout = None
     ) -> "TargetPortfolioIndexAsset":
         url = f"{cls.get_object_url()}/create_or_update_index_asset_from_portfolios/"
@@ -509,7 +547,6 @@ class Asset(AssetMixin, BaseObjectOrm):
             "json": dict(
                 reference_portfolio=reference_portfolio,
                 valuation_asset=valuation_asset,
-                calendar=calendar
             )
         }
         r = make_request(
