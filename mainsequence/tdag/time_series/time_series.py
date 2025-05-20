@@ -2609,8 +2609,8 @@ class WrapperTimeSerie(TimeSerie):
 
             target_assets = Asset.filter(**asset_query)
 
-            assert len(main_sequence_share_classes) == len(
-                target_assets), f"Not all assets were found in backend with translation information with query {asset_query}"
+            if len(main_sequence_share_classes) != len( target_assets):
+                self.logger.warning(f"Not all assets were found in backend with translation information with query {asset_query}")
 
             # create the source-target mapping
             source_asset_share_class_map = {}
