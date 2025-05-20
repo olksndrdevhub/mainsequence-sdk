@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presentation</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      background-color: #e0e0e0; /* Page background for screen preview */
+    }
+
+    .slide {
+      position: relative;
+      background-color: #f8f9fa;
+      box-sizing: border-box;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+
+      width: 338.667mm;
+      height: 190.5mm;
+
+      /* Explicitly define all padding to ensure 15mm on all sides */
+      padding-top: 5mm;
+      padding-right: 5mm;
+      padding-bottom: 5mm; /* This should be the bottom page margin */
+      padding-left: 5mm;
+
+      page-break-after: always;
+    }
+
+    /* Cover slide specific styling */
+    .cover-slide {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: white;
+    }
+    .cover-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -1;
+    }
+    .cover-title {
+      font-size: 3rem;
+      color: black;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    .cover-subtitle {
+      font-size: 1.5rem;
+      margin-bottom: 2rem;
+      opacity: 0.85;
+      color: black;
+    }
+    .cover-logo {
+      position: absolute;
+      bottom: 20mm;
+      left: 20mm;
+    }
+    .cover-logo img {
+      height: 40px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    @media screen {
+      #slidesContainer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 30px;
+        padding: 30px 10px;
+      }
+      .slide {
+        width: 90vw;
+        height: auto;
+        aspect-ratio: 16 / 9;
+        max-width: 900px;
+        margin: 0 auto; /* Centering and removing potential extra bottom margin for screen */
+        border: 1px solid #ccc;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      }
+    }
+
+
+    .table-borderless {
+  background-color: transparent !important;
+}
+    /* give only the header row a light-blue bg */
+.table-borderless thead th {
+  background-color: #cce5ff;
+}
+/* Shrink font, padding and row height for all cells */
+.table-borderless th,
+.table-borderless td {
+  font-size: 0.75rem;      /* smaller text */
+  line-height: 1.1;        /* tighter lines */
+  padding: 0.25rem 0.5rem; /* less vertical & horizontal padding */
+}
+
+/* Optional: even more compact header padding */
+.table-borderless thead th {
+  padding: 0.3rem 0.5rem;
+}
+
+    @media print {
+      body, html {
+        background-color: white;
+      }
+      #slidesContainer {
+        padding: 0;
+        gap: 0;
+      }
+      .slide {
+        width: 338.667mm !important;
+        height: 190.5mm !important;
+        padding-top: 15mm !important;
+        padding-right: 15mm !important;
+        padding-bottom: 15mm !important;
+        padding-left: 15mm !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .no-print { display: none !important; }
+    }
+
+    .slide-header, .slide-footer {
+      position: absolute;
+      left: 15mm; /* Aligns with the start of the padding */
+      right: 15mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-sizing: border-box; /* Ensure padding/border don't alter this width */
+    }
+    .slide-header {
+      top: 5mm;
+    }
+    .slide-footer {
+      bottom: 5mm; /* Its bottom edge is 15mm from slide bottom border */
+      font-size: 0.85rem;
+      color: #555;
+      /* For debugging footer spacing, uncomment: */
+      /* background-color: rgba(0, 255, 0, 0.1); */
+      /* border-top: 1px dashed red; */
+    }
+    .slide-footer > div { /* Ensure no extra margin on direct children of footer */
+        margin-bottom: 0;
+    }
+
+
+    .slide-header .slide-logo img {
+      height: 30px;
+      width: auto;
+      object-fit: contain;
+    }
+    .slide-title {
+      flex-grow: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .slide-body {
+      margin-top: 3rem;
+      margin-bottom: 3rem;
+      flex: 1; /* This is key for filling space */
+      display: flex;
+      flex-direction: column; /* Allow content to flow naturally or be aligned */
+      justify-content: center; /* Vertically centers .slide-content if body is taller */
+      align-items: center; /* Horizontally centers .slide-content if it's narrower */
+      overflow: hidden;
+      /* For debugging body spacing, uncomment: */
+      /* background-color: rgba(0, 0, 255, 0.1); */
+    }
+    .slide-body .slide-content {
+      font-size: 1.1rem;
+      max-width: 100%;
+      max-height: 100%;
+      text-align: left;
+      overflow-y: auto; /* For screen preview */
+      /* For debugging content spacing, uncomment: */
+      /* background-color: rgba(255, 255, 0, 0.2); */
+    }
+
+    .no-print-container {
+      width: 100%;
+      padding: 1rem;
+      text-align: right;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print-container no-print">
+    <button id="exportPdf" class="btn btn-primary">Export to PDF</button>
+  </div>
+
+  <div id="slidesContainer">
+    <section class="slide cover-slide">
+      
+      <div>
+        <div class="cover-title">Presentation</div>
+        
+        <div class="cover-subtitle">Presentation Subtitle</div>
+        
+      </div>
+      
+      <div class="cover-logo">
+        <img src="https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png" alt="Logo" crossOrigin="anonymous">
+      </div>
+      
+    </section>
+
+    
+    <section class="slide">
+      <div class="slide-header">
+        <div class="slide-title fw-bold">Welcome</div>
+        
+        <div class="slide-logo">
+          <img src="https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png" alt="Logo" crossOrigin="anonymous">
+        </div>
+        
+      </div>
+      <div class="slide-body">
+        <div class="slide-content" style="width:100%; height:100%">
+          <p>Thank you for attending this demo presentation.</p>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <div class="slide-date">20-May-25</div>
+        <div class="slide-number">1 / 4</div>
+      </div>
+    </section>
+    
+    <section class="slide">
+      <div class="slide-header">
+        <div class="slide-title fw-bold">Next Steps</div>
+        
+        <div class="slide-logo">
+          <img src="https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png" alt="Logo" crossOrigin="anonymous">
+        </div>
+        
+      </div>
+      <div class="slide-body">
+        <div class="slide-content" style="width:100%; height:100%">
+          <ul><li>Review the template</li><li>Customize your own slides</li><li>Export to PDF using the button</li></ul>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <div class="slide-date">20-May-25</div>
+        <div class="slide-number">2 / 4</div>
+      </div>
+    </section>
+    
+    <section class="slide">
+      <div class="slide-header">
+        <div class="slide-title fw-bold">Assets Overview</div>
+        
+        <div class="slide-logo">
+          <img src="https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png" alt="Logo" crossOrigin="anonymous">
+        </div>
+        
+      </div>
+      <div class="slide-body">
+        <div class="slide-content" style="width:100%; height:100%">
+          
+        <table class="table table-sm table-borderless">
+          <thead style="background-color: #cce5ff;">
+            <tr>
+              <th>Asset</th>
+              <th>Units</th>
+              <th>Price</th>
+              <th>Notional</th>
+              <th>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Cash</td><td>1000</td><td>1.00</td><td>1000.00</td><td>2.92%</td></tr>
+<tr><td>Bonds</td><td>200</td><td>103.50</td><td>20700.00</td><td>60.53%</td></tr>
+<tr><td>Equities</td><td>50</td><td>250.00</td><td>12500.00</td><td>36.55%</td></tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="3">Total</th>
+              <th>34200.00</th>
+              <th>100.00%</th>
+            </tr>
+          </tfoot>
+        </table>
+        
+        </div>
+      </div>
+      <div class="slide-footer">
+        <div class="slide-date">20-May-25</div>
+        <div class="slide-number">3 / 4</div>
+      </div>
+    </section>
+    
+    <section class="slide">
+      <div class="slide-header">
+        <div class="slide-title fw-bold">Asset Charts Interactive</div>
+        
+        <div class="slide-logo">
+          <img src="https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png" alt="Logo" crossOrigin="anonymous">
+        </div>
+        
+      </div>
+      <div class="slide-body">
+        <div class="slide-content" style="width:100%; height:100%">
+          <div class="row g-0 h-100">  <div class="col-6 d-flex flex-column h-100 p-0" style="min-height:0;">    <div class="overflow-auto" style="flex:0 0 25%;">  <table class="table table-sm table-borderless mb-0" style="font-size:.8rem">    <thead class="bg-info text-white"><tr><th>Label</th><th>Value</th></tr></thead>    <tbody><tr><td>A</td><td>30</td></tr><tr><td>B</td><td>45</td></tr><tr><td>C</td><td>25</td></tr></tbody>  </table></div>    <div class="flex-grow-1 position-relative" style="min-height:0;">      <div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>                <div id="pie-chart-int" class="plotly-graph-div" style="height:200px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("pie-chart-int")) {                    Plotly.newPlot(                        "pie-chart-int",                        [{"domain":{"x":[0.0,1.0],"y":[0.0,1.0]},"hole":0.3,"hovertemplate":"label=%{label}\u003cbr\u003evalue=%{value}\u003cextra\u003e\u003c\u002fextra\u003e","labels":["A","B","C"],"legendgroup":"","name":"","showlegend":true,"values":{"dtype":"i1","bdata":"Hi0Z"},"type":"pie","textfont":{"size":16}}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"legend":{"tracegroupgap":0},"margin":{"t":20,"l":0,"r":0,"b":0},"piecolorway":["#0A1E3C","#00A3E0","#4A5A7A"],"height":200},                        {"responsive": true}                    )                };            </script>        </div>    </div>  </div>  <div class="col-6 d-flex flex-column h-100 p-0" style="min-height:0;">    <div class="flex-grow-1 position-relative" style="min-height:0;">      <div>                            <div id="bar-chart-int" class="plotly-graph-div" style="height:300px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("bar-chart-int")) {                    Plotly.newPlot(                        "bar-chart-int",                        [{"hovertemplate":"x=%{x}\u003cbr\u003ey=%{y}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"","marker":{"color":"#0A1E3C","pattern":{"shape":""}},"name":"","orientation":"h","showlegend":false,"textposition":"auto","x":{"dtype":"i1","bdata":"BQoPFBkeIygtMg=="},"xaxis":"x","y":["Category 1","Category 2","Category 3","Category 4","Category 5","Category 6","Category 7","Category 8","Category 9","Category 10"],"yaxis":"y","type":"bar"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"anchor":"y","domain":[0.0,1.0],"title":{"text":"Value"}},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{}},"legend":{"tracegroupgap":0},"margin":{"t":20,"l":0,"r":0,"b":0},"barmode":"relative","height":300},                        {"responsive": true}                    )                };            </script>        </div>    </div>  </div></div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <div class="slide-date">20-May-25</div>
+        <div class="slide-number">4 / 4</div>
+      </div>
+    </section>
+    
+
+
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.getElementById('exportPdf').addEventListener('click', () => {
+      const element = document.getElementById('slidesContainer');
+      const filename = ("presentation").replace(/[^a-z0-9_]+/gi, '_').toLowerCase() + '.pdf';
+
+      const opt = {
+        margin:       0, // Critical: html2pdf adds no margin. Slide padding IS the margin.
+        filename:     filename,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  {
+          scale: 2,
+          useCORS: true,
+          logging: true, // Enable logging for more insight during generation
+          // removeContainer: true // Cleans up the cloned container, default true
+        },
+        jsPDF:        {
+          unit: 'mm',
+          format: [338.667, 190.5], // Page size
+          orientation: 'landscape'
+        },
+        pagebreak:    { mode: ['css', 'avoid-all'], after: '.slide' }
+      };
+
+      html2pdf().set(opt).from(element).save().then(() => {
+        console.log('PDF Exported');
+      }).catch(err => {
+        console.error('PDF Export Error:', err);
+      });
+    });
+  </script>
+</body>
+</html>

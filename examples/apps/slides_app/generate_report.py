@@ -25,10 +25,25 @@ from mainsequence.client.models_tdag import Artifact
 from mainsequence.virtualfundbuilder.resource_factory.app_factory import register_app, BaseApp
 #!/usr/bin/env python3
 
+def fig_to_base64_img(fig, img_id):
+    # use kaleido under the hood to export PNG bytes
+    img_bytes = fig.to_image(format="png", scale=2)
+    b64_str = base64.b64encode(img_bytes).decode('utf-8')
+    return (
+        f'<div id="{img_id}" style="text-align:center;">'
+        f'<img src="data:image/png;base64,{b64_str}" '
+        f'style="max-width:100%; height:auto;" />'
+        f'</div>'
+    )
+
 
 class ReportConfig(BaseModel):
     """Pydantic model defining the parameters for report generation."""
+    presentation_title: str = "Presentation"
+    presentation_subtitle: str = "Presentation Subtitle"
     portfolio_ticker: str
+    logo_url:str
+    current_date:str
 
 
 @register_app()
@@ -43,7 +58,7 @@ class SlideReport(BaseApp):
     def __init__(self, configuration: ReportConfig):
         self.configuration = configuration
 
-        target_portfolio = TargetPortfolio.get(ticker=self.configuration.portfolio_ticker)
+        target_portfolio = TargetPortfolio.get(portfolio_ticker=self.configuration.portfolio_ticker)
         self.target_portfolio = target_portfolio
 
 
@@ -55,6 +70,145 @@ class SlideReport(BaseApp):
         fig.write_image(buf, format="png")
         buf.seek(0)
         return base64.b64encode(buf.read()).decode("utf-8")
+
+    def _build_interactive_chart_slide(self) -> str:
+        """
+        Build the “Asset Charts Interactive” slide.
+        The two Plotly charts are sized in the backend so they never exceed
+        their flex column.  No front-end CSS hacks required.
+        """
+        import plotly.express as px
+
+        # ----------------------------------------------------------------- constants
+        palette = ['#0A1E3C', '#00A3E0', '#4A5A7A']
+        PIE_HEIGHT_PX = 200
+        BAR_ROW_PX = 40  # ≈ pixels per category (only used if < cap)
+        BAR_PADDING_PX = 60
+        MAX_BAR_HEIGHT = 300  # <-  cap the bar chart here  --------------
+
+        # ---------- data ------------------------------------------------------
+        pie_vals, pie_labels = [30, 45, 25], ['A', 'B', 'C']
+        cats = [f'Category {i}' for i in range(1, 11)]
+        vals = [i * 5 for i in range(1, 11)]
+
+        # ---------- table -----------------------------------------------------
+        table_rows = ''.join(f'<tr><td>{l}</td><td>{v}</td></tr>'
+                             for l, v in zip(pie_labels, pie_vals))
+        table_html = (
+            '<div class="overflow-auto" style="flex:0 0 25%;">'
+            '  <table class="table table-sm table-borderless mb-0" style="font-size:.8rem">'
+            '    <thead class="bg-info text-white"><tr><th>Label</th><th>Value</th></tr></thead>'
+            f'    <tbody>{table_rows}</tbody>'
+            '  </table>'
+            '</div>'
+        )
+
+        # ---------- pie chart -------------------------------------------------
+        pie_fig = px.pie(values=pie_vals, names=pie_labels,
+                         hole=.3, color_discrete_sequence=palette)
+        pie_fig.update_traces(textfont_size=16)
+        pie_fig.update_layout(height=PIE_HEIGHT_PX,
+                              margin=dict(l=0, r=0, t=20, b=0))
+
+        pie_html = pie_fig.to_html(
+            full_html=False, include_plotlyjs='cdn',
+            div_id='pie-chart-int',
+            default_width='100%', default_height=f'{PIE_HEIGHT_PX}px',
+            config={'responsive': True}
+        )
+
+        # ---------- bar chart -------------------------------------------------
+        # Calculate natural height, then cap at 300 px
+        natural_height = BAR_ROW_PX * len(cats) + BAR_PADDING_PX
+        bar_height_px = min(natural_height, MAX_BAR_HEIGHT)
+
+        bar_fig = px.bar(x=vals, y=cats, orientation='h',
+                         color_discrete_sequence=palette * 4)
+        bar_fig.update_layout(
+            height=bar_height_px,
+            xaxis_title='Value',
+            yaxis_title=None,
+            margin=dict(l=0, r=0, t=20, b=0)
+        )
+
+        bar_html = bar_fig.to_html(
+            full_html=False, include_plotlyjs=False,
+            div_id='bar-chart-int',
+            default_width='100%', default_height=f'{bar_height_px}px',
+            config={'responsive': True}
+        )
+
+        # ---------- assemble --------------------------------------------------
+        return (
+            '<div class="row g-0 h-100">'
+            '  <div class="col-6 d-flex flex-column h-100 p-0" style="min-height:0;">'
+            f'    {table_html}'
+            '    <div class="flex-grow-1 position-relative" style="min-height:0;">'
+            f'      {pie_html}'
+            '    </div>'
+            '  </div>'
+            '  <div class="col-6 d-flex flex-column h-100 p-0" style="min-height:0;">'
+            '    <div class="flex-grow-1 position-relative" style="min-height:0;">'
+            f'      {bar_html}'
+            '    </div>'
+            '  </div>'
+            '</div>'
+        )
+    def _build_slide_table_html(self):
+        # 2) Define 3 example assets
+        assets = [
+            {"asset": "Cash", "units": 1000, "price": 1.00},
+            {"asset": "Bonds", "units": 200, "price": 103.50},
+            {"asset": "Equities", "units": 50, "price": 250.00},
+        ]
+
+        # 3) Compute notional and total
+        for a in assets:
+            a["notional"] = a["units"] * a["price"]
+        total_notional = sum(a["notional"] for a in assets)
+
+        # 4) Compute percentage share
+        for a in assets:
+            a["percent"] = round((a["notional"] / total_notional) * 100, 2)
+
+        # 5) Build the HTML table string
+        table_rows = "\n".join(
+            f"<tr>"
+            f"<td>{a['asset']}</td>"
+            f"<td>{a['units']}</td>"
+            f"<td>{a['price']:.2f}</td>"
+            f"<td>{a['notional']:.2f}</td>"
+            f"<td>{a['percent']:.2f}%</td>"
+            f"</tr>"
+            for a in assets
+        )
+
+        table_html = f"""
+        <table class="table table-sm table-borderless">
+          <thead style="background-color: #cce5ff;">
+            <tr>
+              <th>Asset</th>
+              <th>Units</th>
+              <th>Price</th>
+              <th>Notional</th>
+              <th>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {table_rows}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="3">Total</th>
+              <th>{total_notional:.2f}</th>
+              <th>100.00%</th>
+            </tr>
+          </tfoot>
+        </table>
+        """
+
+        return table_html
+
 
     def run(self):
         """
@@ -82,10 +236,24 @@ class SlideReport(BaseApp):
             }
         ]
 
+        slides.append({
+            "title": "Assets Overview",
+            "content": self._build_slide_table_html()
+        })
+
+
+        slides.append({
+            "title": "Asset Charts Interactive",
+            "content": self._build_interactive_chart_slide()
+        })
+
         # 3) Build context for Jinja2
         template_context = {
-            "title": self.configuration.get("title", "Demo Presentation"),
-            "slides": slides
+            "presentation_title": self.configuration.presentation_title,
+            "presentation_subtitle": self.configuration.presentation_subtitle,
+            "slides": slides,
+            "logo_url":self.configuration.logo_url,
+            "current_date":self.configuration.current_date,
         }
 
         # 4) Setup Jinja2 environment (point to templates directory)
@@ -107,6 +275,9 @@ class SlideReport(BaseApp):
 
 if __name__ == "__main__":
     # Example usage:
-    config = ReportConfig()  # Or override fields as needed
+    config = ReportConfig(portfolio_ticker="portfo48B",
+                          current_date=datetime.now().date().strftime('%d-%b-%y'),
+                          logo_url="https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png"
+                          )  # Or override fields as needed
     app = SlideReport(config)
     html_artifact = app.run()  # Creates output_report.html and weasy_output_report.pdf
