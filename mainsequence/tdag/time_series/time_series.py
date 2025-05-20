@@ -1060,9 +1060,11 @@ class TimeSerieRebuildMethods(ABC):
         :param metadatas: pre-requested metadatas to speed initiation of ts
         :return:
         """
-
-        local_time_serie_historical_update =self.local_persist_manager.local_metadata.set_start_of_execution(
-                                            active_update_scheduler_uid=update_tracker.scheduler_uid)
+        try:
+            local_time_serie_historical_update =self.local_persist_manager.local_metadata.set_start_of_execution(
+                                                active_update_scheduler_uid=update_tracker.scheduler_uid)
+        except Exception as e:
+            raise e
 
         latest_value, must_update = local_time_serie_historical_update.last_time_index_value, local_time_serie_historical_update.must_update
         update_statistics = local_time_serie_historical_update.update_statistics
@@ -2572,10 +2574,13 @@ class WrapperTimeSerie(TimeSerie):
 
         # we grouped the assets for the same rules together and now query all assets that have the same target
         translation_df = pd.DataFrame.from_dict(asset_translation_dict, orient="index")
-        grouped = translation_df.groupby(
-            ["markets_time_serie_unique_identifier", "execution_venue_symbol", "exchange_code"],
-            dropna=False
-        )
+        try:
+            grouped = translation_df.groupby(
+                ["markets_time_serie_unique_identifier", "execution_venue_symbol", "exchange_code"],
+                dropna=False
+            )
+        except Exception as e:
+            raise e
 
         data_df = []
         for (mkt_ts_id, target_execution_venue_symbol, target_exchange_code), group_df in grouped:
@@ -2592,34 +2597,16 @@ class WrapperTimeSerie(TimeSerie):
             # get correct target assets based on the share classes
             main_sequence_share_classes = [a.main_sequence_share_class for a in assets]
 
-            if target_execution_venue_symbol == MARKETS_CONSTANTS.BINANCE_EV_SYMBOL:
-                """ Special case for binance assets as they are composites e.g. XXXUSDT """
-                self.logger.warning("Use XXXUSDT tickers for binance assets")
-                tickers = [f"{a.ticker}USDT" for a in assets]
-                asset_query = dict(
-                    execution_venue__symbol=target_execution_venue_symbol,
-                    ticker__in=tickers
-                )
-                if not pd.isna(target_exchange_code):
-                    asset_query["exchange_code"] = target_exchange_code
 
-                target_assets = Asset.filter(**asset_query)
 
-                # fake mainsequence_share_class for target assets to correct mapping to base assets
-                base_ticker_share_class_map = {a.ticker: a.main_sequence_share_class for a in source_assets}
-                for ta in target_assets:
-                    base_ticker = ta.ticker[:-4] # remove USDT
-                    ta.main_sequence_share_class = base_ticker_share_class_map[base_ticker]
+            asset_query = dict(
+                execution_venue__symbol=target_execution_venue_symbol,
+                main_sequence_share_class__in=main_sequence_share_classes
+            )
+            if not pd.isna(target_exchange_code):
+                asset_query["exchange_code"] = target_exchange_code
 
-            else:
-                asset_query = dict(
-                    execution_venue__symbol=target_execution_venue_symbol,
-                    main_sequence_share_class__in=main_sequence_share_classes
-                )
-                if not pd.isna(target_exchange_code):
-                    asset_query["exchange_code"] = target_exchange_code
-
-                target_assets = Asset.filter(**asset_query)
+            target_assets = Asset.filter(**asset_query)
 
             assert len(main_sequence_share_classes) == len(
                 target_assets), f"Not all assets were found in backend with translation information with query {asset_query}"

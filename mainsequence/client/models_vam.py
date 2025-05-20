@@ -22,7 +22,7 @@ from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime,
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field, validator,root_validator,constr
 
-from ..logconf import logger
+from mainsequence.logconf import logger
 
 
 def validator_for_string(value):
@@ -493,8 +493,8 @@ class AssetTranslationTable(BaseObjectOrm, BasePydanticModel):
 
 class Asset(AssetMixin, BaseObjectOrm):
 
-    def get_spot_reference_asset_symbol(self):
-        return self.ticker
+    def get_spot_reference_asset_unique_identifier(self):
+        return self.unique_identifier
 
     @classmethod
     def create_or_update_index_asset_from_portfolios(
@@ -560,9 +560,9 @@ class AssetCurrencyPair(AssetMixin, BasePydanticModel):
     base_asset: Union[AssetMixin, int]
     quote_asset: Union[AssetMixin, int]
 
-    def get_spot_reference_asset_symbol(self):
-        base_asset_symbol = self.symbol.replace(self.quote_asset.symbol, "")
-        return base_asset_symbol
+    def get_spot_reference_asset_unique_identifier(self):
+
+        return self.base_asset.unique_identifier
 
     def get_ms_share_class(self):
         return self.base_asset.get_ms_share_class()
@@ -572,14 +572,14 @@ class FutureUSDMMixin(AssetMixin, BasePydanticModel):
     last_trade_time: Optional[datetime.datetime] = None
     currency_pair:AssetCurrencyPair
 
-    def get_spot_reference_asset_symbol(self):
-        FUTURE_TO_SPOT_MAP = {
-            CONSTANTS.BINANCE_FUTURES_EV_SYMBOL: {"1000SHIB": "SHIB"},
-        }
+    def get_spot_reference_asset_unique_identifier(self):
 
-        base_asset_symbol = self.symbol.replace(self.currency_pair.quote_asset.symbol, "")
-        spot = FUTURE_TO_SPOT_MAP[self.execution_venue_symbol].get(base_asset_symbol, base_asset_symbol)
-        return spot
+
+        base_asset_symbol = self.currency_pair.base_asset.unique_identifier
+        if self.execution_venue_symbol == CONSTANTS.BINANCE_FUTURES_EV_SYMBOL:
+            # replace() will do nothing if “1000SHIB” isn’t present
+            return base_asset_symbol.replace("1000SHIB", "SHIB")
+        return base_asset_symbol
 
 class AssetFutureUSDM(FutureUSDMMixin, BaseObjectOrm):
     pass
