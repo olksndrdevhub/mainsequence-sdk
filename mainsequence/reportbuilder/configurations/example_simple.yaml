@@ -1,0 +1,237 @@
+# slides.yaml
+title: Presentation
+subtitle: Presentation Subtitle
+theme:
+  logo_url: "https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png"
+  current_date: "21-May-25"
+
+slides:
+  - title: Welcome
+    background_color: "#f8f9fa"
+    layout:
+      type: AbsoluteLayout
+      elements:
+        - type: TextElement
+          text: "Thank you for attending this demo presentation."
+          font_size: 18
+          h_align: center
+          v_align: middle
+          position:
+            anchor: center
+          size:
+            width: "100%"
+
+  - title: Next Steps
+    background_color: "#f8f9fa"
+    layout:
+      type: GridLayout
+      rows: 3
+      cols: 1
+      gap: 10
+      cells:
+        - row: 1
+          col: 1
+          element:
+            type: TextElement
+            text: "• Review the template"
+            font_size: 16
+            size:
+              width: "100%"
+        - row: 2
+          col: 1
+          element:
+            type: TextElement
+            text: "• Customize your own slides"
+            font_size: 16
+            size:
+              width: "100%"
+        - row: 3
+          col: 1
+          element:
+            type: TextElement
+            text: "• Export to PDF using the button"
+            font_size: 16
+            size:
+              width: "100%"
+
+  - title: Assets Overview
+    background_color: "#f8f9fa"
+    layout:
+      type: GridLayout
+      rows: 5
+      cols: 5
+      gap: 5
+      cells:
+        # Header
+        - row: 1
+          col: 1
+          element:
+            type: TextElement
+            text: Asset
+            font_weight: bold
+            h_align: center
+        - row: 1
+          col: 2
+          element:
+            type: TextElement
+            text: Units
+            font_weight: bold
+            h_align: center
+        - row: 1
+          col: 3
+          element:
+            type: TextElement
+            text: Price
+            font_weight: bold
+            h_align: center
+        - row: 1
+          col: 4
+          element:
+            type: TextElement
+            text: Notional
+            font_weight: bold
+            h_align: center
+        - row: 1
+          col: 5
+          element:
+            type: TextElement
+            text: "%"
+            font_weight: bold
+            h_align: center
+
+        # Data rows
+        - row: 2
+          col: 1
+          element:
+            type: TextElement
+            text: Cash
+            h_align: center
+        - row: 2
+          col: 2
+          element:
+            type: TextElement
+            text: "1000"
+            h_align: center
+        - row: 2
+          col: 3
+          element:
+            type: TextElement
+            text: "1.00"
+            h_align: center
+        - row: 2
+          col: 4
+          element:
+            type: TextElement
+            text: "1000.00"
+            h_align: center
+        - row: 2
+          col: 5
+          element:
+            type: TextElement
+            text: "2.92%"
+            h_align: center
+
+        - row: 3
+          col: 1
+          element:
+            type: TextElement
+            text: Bonds
+            h_align: center
+        - row: 3
+          col: 2
+          element:
+            type: TextElement
+            text: "200"
+            h_align: center
+        - row: 3
+          col: 3
+          element:
+            type: TextElement
+            text: "103.50"
+            h_align: center
+        - row: 3
+          col: 4
+          element:
+            type: TextElement
+            text: "20700.00"
+            h_align: center
+        - row: 3
+          col: 5
+          element:
+            type: TextElement
+            text: "60.53%"
+            h_align: center
+
+        - row: 4
+          col: 1
+          element:
+            type: TextElement
+            text: Equities
+            h_align: center
+        - row: 4
+          col: 2
+          element:
+            type: TextElement
+            text: "50"
+            h_align: center
+        - row: 4
+          col: 3
+          element:
+            type: TextElement
+            text: "250.00"
+            h_align: center
+        - row: 4
+          col: 4
+          element:
+            type: TextElement
+            text: "12500.00"
+            h_align: center
+        - row: 4
+          col: 5
+          element:
+            type: TextElement
+            text: "36.55%"
+            h_align: center
+
+        # Total row
+        - row: 5
+          col: 1
+          col_span: 3
+          element:
+            type: TextElement
+            text: Total
+            font_weight: bold
+            h_align: center
+        - row: 5
+          col: 4
+          element:
+            type: TextElement
+            text: "34200.00"
+            h_align: center
+        - row: 5
+          col: 5
+          element:
+            type: TextElement
+            text: "100.00%"
+            h_align: center
+
+  - title: Asset Charts Interactive
+    background_color: "#f8f9fa"
+    layout:
+      type: GridLayout
+      rows: 1
+      cols: 2
+      gap: 10
+      cells:
+        - row: 1
+          col: 1
+          element:
+            type: HtmlElement
+            html: |
+              <div id="pie-table-chart-int" style="height:350px;width:100%;"></div>
+        - row: 1
+          col: 2
+          element:
+            type: HtmlElement
+            html: |
+              <div id="bar-chart-int" style="height:350px;width:100%;"></div>
