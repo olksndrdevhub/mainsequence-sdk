@@ -1,237 +1,179 @@
 # slides.yaml
-title: Presentation
-subtitle: Presentation Subtitle
+title: "Q1 2025 Financial Snapshot"
+subtitle: "Key Highlights and Asset Overview"
 theme:
   logo_url: "https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png"
-  current_date: "21-May-25"
+  current_date: "May 21, 2025" # Updated to match report
+  font_family: "Arial, Helvetica, sans-serif" # Added for consistency
+  base_font_size: 18 # Increased base font size
+  title_color: "#1a237e" # Added for better title appearance
 
 slides:
-  - title: Welcome
-    background_color: "#f8f9fa"
+  - title: "Welcome to Q1 2025 Review"
+    background_color: "#ffffff" # White background
     layout:
       type: AbsoluteLayout
       elements:
         - type: TextElement
-          text: "Thank you for attending this demo presentation."
-          font_size: 18
+          text: "Q1 2025 Financial Highlights"
+          font_size: 32 # Increased
+          font_weight: bold
+          color: "#0d47a1"
           h_align: center
-          v_align: middle
           position:
-            anchor: center
+            top: "35%"
+            left: "5%"
+            right: "5%"
           size:
-            width: "100%"
+            width: "90%"
+        - type: TextElement
+          text: "An overview of our performance and asset distribution."
+          font_size: 22 # Increased
+          color: "#1565c0"
+          h_align: center
+          position:
+            top: "50%"
+            left: "10%"
+            right: "10%"
+          size:
+            width: "80%"
+        - type: TextElement
+          text: "This presentation provides a concise summary of key financial metrics and strategic insights from the first quarter."
+          font_size: 18 # Added content
+          line_height: 1.6
+          h_align: center
+          position:
+            top: "65%"
+            left: "15%"
+            right: "15%"
+          size:
+            width: "70%"
 
-  - title: Next Steps
-    background_color: "#f8f9fa"
+  - title: "Key Focus & Next Steps"
+    background_color: "#ffffff" # White background
     layout:
       type: GridLayout
-      rows: 3
+      rows: 4 # Added a row for introductory text
       cols: 1
-      gap: 10
+      gap: 20 # Increased gap
       cells:
         - row: 1
           col: 1
           element:
             type: TextElement
-            text: "• Review the template"
-            font_size: 16
+            text: "Following this overview, our key areas of focus are:"
+            font_size: 20 # Increased and added content
+            font_weight: bold
+            h_align: left
+            v_align: middle
             size:
               width: "100%"
         - row: 2
           col: 1
           element:
             type: TextElement
-            text: "• Customize your own slides"
-            font_size: 16
+            text: "• Review the comprehensive Q1 2025 financial report for detailed insights."
+            font_size: 18 # Increased
+            line_height: 1.5
             size:
               width: "100%"
         - row: 3
           col: 1
           element:
             type: TextElement
-            text: "• Export to PDF using the button"
-            font_size: 16
+            text: "• Customize slide templates for departmental reviews and specific discussions."
+            font_size: 18 # Increased
+            line_height: 1.5
+            size:
+              width: "100%"
+        - row: 4
+          col: 1
+          element:
+            type: TextElement
+            text: "• Utilize the export-to-PDF functionality for sharing and archiving."
+            font_size: 18 # Increased
+            line_height: 1.5
             size:
               width: "100%"
 
-  - title: Assets Overview
-    background_color: "#f8f9fa"
+  - title: "Financial Snapshot - Q1 2025 Assets"
+    background_color: "#ffffff" # White background
+    layout:
+      type: GridLayout # Changed to GridLayout to easily add text below
+      rows: 2
+      cols: 1
+      gap: 15 # Added gap
+      cells:
+        - row: 1
+          col: 1
+          element:
+            type: FunctionElement
+            function: data_table
+            params:
+              title: "Asset Allocation Summary - Q1 2025" # Added table title
+              headers: ["Asset Class", "Units", "Price ($)", "Notional Value ($)", "Portfolio %"] # Clarified headers
+              rows:
+                - ["Cash", "1,000", "1.00", "1,000.00", "2.92%"]
+                - ["Bonds", "200", "103.50", "20,700.00", "60.53%"]
+                - ["Equities", "50", "250.00", "12,500.00", "36.55%"]
+                - ["Total", "", "", "34,200.00", "100.00%"] # Made total row consistent
+              table_class: "table table-hover table-bordered table-striped table-sm" # Enhanced table styling
+              max_height: "400px" # Ensured table is scrollable if needed
+        - row: 2
+          col: 1
+          element:
+            type: TextElement
+            text: "The table above provides a detailed breakdown of our asset allocation as of the end of Q1 2025, highlighting the distribution across cash, bonds, and equities. This strategic allocation supports our financial objectives for the year." # Added descriptive content
+            font_size: 18 # Increased
+            line_height: 1.6
+            h_align: left
+            v_align: top # Aligned to top to follow table
+
+  - title: "Visual Asset Distribution - Q1 2025"
+    background_color: "#ffffff" # White background
     layout:
       type: GridLayout
-      rows: 5
-      cols: 5
-      gap: 5
-      cells:
-        # Header
-        - row: 1
-          col: 1
-          element:
-            type: TextElement
-            text: Asset
-            font_weight: bold
-            h_align: center
-        - row: 1
-          col: 2
-          element:
-            type: TextElement
-            text: Units
-            font_weight: bold
-            h_align: center
-        - row: 1
-          col: 3
-          element:
-            type: TextElement
-            text: Price
-            font_weight: bold
-            h_align: center
-        - row: 1
-          col: 4
-          element:
-            type: TextElement
-            text: Notional
-            font_weight: bold
-            h_align: center
-        - row: 1
-          col: 5
-          element:
-            type: TextElement
-            text: "%"
-            font_weight: bold
-            h_align: center
-
-        # Data rows
-        - row: 2
-          col: 1
-          element:
-            type: TextElement
-            text: Cash
-            h_align: center
-        - row: 2
-          col: 2
-          element:
-            type: TextElement
-            text: "1000"
-            h_align: center
-        - row: 2
-          col: 3
-          element:
-            type: TextElement
-            text: "1.00"
-            h_align: center
-        - row: 2
-          col: 4
-          element:
-            type: TextElement
-            text: "1000.00"
-            h_align: center
-        - row: 2
-          col: 5
-          element:
-            type: TextElement
-            text: "2.92%"
-            h_align: center
-
-        - row: 3
-          col: 1
-          element:
-            type: TextElement
-            text: Bonds
-            h_align: center
-        - row: 3
-          col: 2
-          element:
-            type: TextElement
-            text: "200"
-            h_align: center
-        - row: 3
-          col: 3
-          element:
-            type: TextElement
-            text: "103.50"
-            h_align: center
-        - row: 3
-          col: 4
-          element:
-            type: TextElement
-            text: "20700.00"
-            h_align: center
-        - row: 3
-          col: 5
-          element:
-            type: TextElement
-            text: "60.53%"
-            h_align: center
-
-        - row: 4
-          col: 1
-          element:
-            type: TextElement
-            text: Equities
-            h_align: center
-        - row: 4
-          col: 2
-          element:
-            type: TextElement
-            text: "50"
-            h_align: center
-        - row: 4
-          col: 3
-          element:
-            type: TextElement
-            text: "250.00"
-            h_align: center
-        - row: 4
-          col: 4
-          element:
-            type: TextElement
-            text: "12500.00"
-            h_align: center
-        - row: 4
-          col: 5
-          element:
-            type: TextElement
-            text: "36.55%"
-            h_align: center
-
-        # Total row
-        - row: 5
-          col: 1
-          col_span: 3
-          element:
-            type: TextElement
-            text: Total
-            font_weight: bold
-            h_align: center
-        - row: 5
-          col: 4
-          element:
-            type: TextElement
-            text: "34200.00"
-            h_align: center
-        - row: 5
-          col: 5
-          element:
-            type: TextElement
-            text: "100.00%"
-            h_align: center
-
-  - title: Asset Charts Interactive
-    background_color: "#f8f9fa"
-    layout:
-      type: GridLayout
-      rows: 1
-      cols: 2
-      gap: 10
+      rows: 2 # 2 rows for chart + text pairs
+      cols: 2 # 2 columns for chart and text side-by-side
+      gap: 25 # Increased gap
       cells:
         - row: 1
           col: 1
           element:
-            type: HtmlElement
-            html: |
-              <div id="pie-table-chart-int" style="height:350px;width:100%;"></div>
+            type: FunctionElement
+            function: pie_chart
+            params:
+              title: "Asset Distribution (Pie Chart)" # Added chart title
+              labels: ["Cash", "Bonds", "Equities"]
+              values: [1000.00, 20700.00, 12500.00]
+              height: 300 # Adjusted height
         - row: 1
           col: 2
           element:
-            type: HtmlElement
-            html: |
-              <div id="bar-chart-int" style="height:350px;width:100%;"></div>
+            type: TextElement
+            text: "The pie chart visually represents the proportion of each asset class. Bonds constitute the largest share (60.53%), followed by Equities (36.55%) and Cash (2.92%), reflecting our diversified investment strategy." # Added detailed content
+            font_size: 18 # Increased
+            line_height: 1.6
+            h_align: left
+            v_align: middle
+        - row: 2
+          col: 1
+          element:
+            type: FunctionElement
+            function: bar_chart
+            params:
+              title: "Asset Notional Values (Bar Chart)" # Added chart title
+              x: ["Cash", "Bonds", "Equities"]
+              y: [1000.00, 20700.00, 12500.00]
+              orientation: "v"
+              height: 300 # Adjusted height
+              labels: {"x": "Asset Class", "y": "Notional Value ($)"} # Added axis labels
+        - row: 2
+          col: 2
+          element:
+            type: TextElement
+            text: "The bar chart provides a clear comparison of the notional values for each asset class. This visualization aids in quickly understanding the magnitude of our holdings in different investment categories." # Added detailed content
+            font_size: 18 # Increased
+            line_height: 1.6
+            h_align: left
+            v_align: middle

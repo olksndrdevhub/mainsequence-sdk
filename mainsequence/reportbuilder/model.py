@@ -11,28 +11,15 @@ from __future__ import annotations
 
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Union, Type
+from typing import List, Optional, Union, Type, Any
 
 from pydantic import BaseModel, Field, validator, ValidationError
 from jinja2 import Environment
 
 from typing import Callable, Dict
 
-# Every function must accept a *Pydantic model instance* and return raw HTML
-FUNCTION_REGISTRY: Dict[str, Callable] = {}
+from functions import FUNCTION_REGISTRY
 
-def register_function(name: str):
-    """
-    Decorator that registers `fn` under the given name.
-    The decorated function **must** take one positional argument
-    (a Pydantic model with the parameters) and return an HTML string.
-    """
-    def decorator(fn: Callable):
-        if name in FUNCTION_REGISTRY:
-            raise ValueError(f"Function '{name}' already registered")
-        FUNCTION_REGISTRY[name] = fn
-        return fn
-    return decorator
 
 # ────────────────────────────── Common enums ──────────────────────────────
 
@@ -208,12 +195,13 @@ class FunctionElement(ElementBase):
 
 # ─────────────────────────────── Layouts ──────────────────────────────────
 
+BaseElements = Union[TextElement, ImageElement, HtmlElement, FunctionElement]
 class GridCell(BaseModel):
     row:       int
     col:       int
     row_span:  int = 1
     col_span:  int = 1
-    element:   Union[TextElement, ImageElement, HtmlElement]
+    element:   BaseElements
 
     @validator("row", "col", "row_span", "col_span")
     def _positive(cls, v):  # noqa: N805
@@ -246,17 +234,38 @@ class GridLayout(BaseModel):
         )
         html_parts: List[str] = [f'<div class="slide-grid" style="{grid_style}">']
         for cell in self.cells:
-            cell_style = (
-                f"grid-column:{cell.col}/span {cell.col_span};"
-                f"grid-row:{cell.row}/span {cell.row_span};position:relative;"
-            )
-            html_parts.append(f'<div style="{cell_style}">{cell.element.render()}</div>')
+            cell_styles_list = [
+                f"grid-column:{cell.col}/span {cell.col_span};",
+                f"grid-row:{cell.row}/span {cell.row_span};",
+                "position:relative;",
+                "display:flex;",
+            ]
+
+            align_items_css_value = "flex-start"
+            justify_content_css_value = "flex-start"
+
+            if isinstance(cell.element, TextElement):
+                if cell.element.v_align == VerticalAlign.middle:
+                    align_items_css_value = "center"
+                elif cell.element.v_align == VerticalAlign.bottom:
+                    align_items_css_value = "flex-end"
+
+                if cell.element.h_align == HorizontalAlign.center:
+                    justify_content_css_value = "center"
+                elif cell.element.h_align == HorizontalAlign.right:
+                    justify_content_css_value = "flex-end"
+
+            cell_styles_list.append(f"align-items: {align_items_css_value};")
+            cell_styles_list.append(f"justify-content: {justify_content_css_value};")
+
+            final_cell_style = "".join(cell_styles_list)
+            html_parts.append(f'<div style="{final_cell_style}">{cell.element.render()}</div>')
         html_parts.append("</div>")
         return "".join(html_parts)
 
 
 class AbsoluteLayout(BaseModel):
-    elements: List[Union[TextElement, ImageElement, HtmlElement]]
+    elements: List[BaseElements]
 
     def render(self) -> str:
         return "".join(e.render() for e in self.elements)
