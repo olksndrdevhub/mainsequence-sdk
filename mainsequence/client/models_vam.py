@@ -187,6 +187,10 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         None,
         description="Sepcial Main Sequence class . Should be the maximum level of agroupation"
     )
+    isin: Optional[constr(max_length=12)] = Field(
+        None,
+        description="International Securities Identification Number"
+    )
 
     def __repr__(self) -> str:
         return f"{self.class_name()}: {self.unique_identifier}"
