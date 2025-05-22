@@ -187,6 +187,10 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         None,
         description="Sepcial Main Sequence class . Should be the maximum level of agroupation"
     )
+    isin:Optional[constr(max_length=12)] = Field(
+
+        description="Share class designation (e.g. 'Common', 'Class A', 'Preferred') as per FIGI"
+    )
 
     def __repr__(self) -> str:
         return f"{self.class_name()}: {self.unique_identifier}"
@@ -563,8 +567,8 @@ class Asset(AssetMixin, BaseObjectOrm):
         return TargetPortfolioIndexAsset(**r.json())
 
     @classmethod
-    def register_figi_as_asset_in_ms_share_class_venue(cls, figi, timeout=None):
-        url = f"{cls.get_object_url()}/register_figi_as_asset_in_ms_share_class_venue/"
+    def register_figi_as_asset_in_main_sequence_venue(cls, figi, timeout=None)->"Asset":
+        url = f"{cls.get_object_url()}/register_figi_as_asset_in_main_sequence_venue/"
         payload = {"json": {"figi": figi}}
         r = make_request(
             s=cls.build_session(),
@@ -575,8 +579,21 @@ class Asset(AssetMixin, BaseObjectOrm):
         )
         if r.status_code not in [200, 201]:
             raise Exception(f"Error appending creating: {r.text}")
-        return r.json()
-
+        return cls(**r.json())
+    @classmethod
+    def get_or_register_figi_from_isin_as_asset_in_main_sequence_venue(cls,isin,exchange_code, timeout=None)->"Asset":
+        url = f"{cls.get_object_url()}/get_or_register_figi_from_isin_as_asset_in_main_sequence_venue/"
+        payload = {"json": {"isin": isin,"exchange_code":exchange_code}}
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            payload=payload, time_out=timeout
+        )
+        if r.status_code not in [200, 201]:
+            raise Exception(f"Error appending creating: {r.text}")
+        return cls(**r.json())
 
 
 class IndexAsset(Asset):
@@ -645,7 +662,7 @@ class AccountExecutionConfiguration(BasePydanticModel):
 
 class AccountPortfolioPosition(BasePydanticModel):
     id: Optional[int]
-    parent_positions: int
+    parent_positions: Optional[int]
     target_portfolio: int
     weight_notional_exposure: Optional[float]=0.0
     constant_notional_exposure: Optional[float]=0.0
@@ -656,6 +673,8 @@ class AccountPortfolioHistoricalPositions(BaseObjectOrm, BasePydanticModel):
     positions_date: datetime.datetime
     comments: Optional[str]
     positions: list[AccountPortfolioPosition]
+
+
 
 class AccountTargetPortfolio(BaseObjectOrm, BasePydanticModel):
     id:int
@@ -787,7 +806,26 @@ class RebalanceTargetPosition(BasePydanticModel):
 
 class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
 
+    @classmethod
+    def get_or_create(cls,timeout=None,**kwargs,):
+        base_url = cls.get_object_url()
+        url = f"{base_url}/get-or-create/"
+        payload = {"json": kwargs}
 
+        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url,
+                         payload=payload,
+                         time_out=timeout)
+        if r.status_code not in [200, 201]:
+            raise Exception(f"Error Getting NAV in account {r.text}")
+        return cls(**r.json())
+
+    def set_account_target_portfolio_from_asset_holdings(self,timeout=None):
+        base_url = self.get_object_url()
+        url = f"{base_url}/{self.id}/set_account_target_portfolio_from_asset_holdings/"
+        r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="GET", url=url,
+                         time_out=timeout)
+        if r.status_code != 200:
+            raise Exception(f"Error set_account_target_portfolio_from_asset_holdings in account {r.text}")
     def snapshot_account(self,timeout=None):
 
         base_url = self.get_object_url()
@@ -846,6 +884,14 @@ class AccountLatestHoldingsSerializer(BaseObjectOrm,BasePydanticModel):
     holdings: list
 
 
+class AccountPositionDetail(BaseObjectOrm,BasePydanticModel):
+    id: Optional[int] = None
+    asset:Union[Asset,int] = None
+    missing_price :bool=False
+    price: float
+    quantity : float
+    parents_holdings: Optional[int]=None
+
 class AccountHistoricalHoldings(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = Field(None, primary_key=True)
     holdings_date: datetime.datetime
@@ -857,7 +903,7 @@ class AccountHistoricalHoldings(BaseObjectOrm,BasePydanticModel):
     target_trade_time: Optional[datetime.datetime] = None
     related_expected_asset_exposure_df: Optional[Dict[str, Any]] = None
 
-    holdings: list
+    holdings: List[AccountPositionDetail]
 
     @classmethod
     def destroy_holdings_before_date(cls,target_date:datetime.datetime,
@@ -876,6 +922,31 @@ class AccountHistoricalHoldings(BaseObjectOrm,BasePydanticModel):
         )
         if r.status_code != 204:
             raise Exception(r.text)
+
+    @classmethod
+    def  create_with_holdings(cls,position_list:List[AccountPositionDetail],
+                                                   holdings_date:int,
+                                                   related_account:int,timeout=None
+                                                   ):
+
+        base_url = cls.get_object_url()
+        payload = {"json": {"position_list": [{k:v for k,v in p.model_dump().items() if k not in ["orm_class","id","parents_holdings"]} for p in position_list],
+                            "holdings_date": holdings_date,
+                            "related_account":related_account
+                            }}
+
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=f"{base_url}/create_with_holdings/",
+            payload=payload,time_out=timeout
+        )
+        if r.status_code != 201:
+            raise Exception(r.text)
+        return cls(**r.json())
+
+
 
 class AccountRiskFactors(BaseObjectOrm,BasePydanticModel):
     related_holdings: Union[int,AccountHistoricalHoldings]
@@ -1425,7 +1496,7 @@ class OrderManager(BaseObjectOrm, BasePydanticModel):
 # ALPACA
 # ------------------------------
 
-class AlapaAccountRiskFactors(AccountRiskFactors):
+class AlpacaAccountRiskFactors(AccountRiskFactors):
     total_initial_margin: float
     total_maintenance_margin: float
     last_equity: float

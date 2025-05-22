@@ -53,7 +53,7 @@ class LoadExternalPortfolio(BaseApp):
             asset = Asset.get_or_none(figi=figi)
             if asset is None:
                 try:
-                    asset = Asset.register_figi_as_asset_in_venue(
+                    asset = Asset.register_figi_as_asset_in_main_sequence_venue(
                         figi=figi,
                         execution_venue__symbol=CONSTANTS.MAIN_SEQUENCE_EV,
                     )
