@@ -195,6 +195,8 @@ class GridCell(BaseModel):
     background_color: Optional[str] = None
     align_self: Optional[str] = None
     justify_self: Optional[str] = None
+    content_v_align: Optional[VerticalAlign] = None # For vertical alignment of content WITHIN the cell
+    content_h_align: Optional[HorizontalAlign] = None # For horizontal alignment of content WITHIN the cell
 
     @validator("row", "col", "row_span", "col_span", pre=True)
     def _positive(cls, v):
@@ -233,7 +235,7 @@ class GridLayout(BaseModel):
         if col_defs and cell.col + cell.col_span - 1 > len(col_defs):
             raise ValueError(f"GridCell definition (col={cell.col}, col_span={cell.col_span}) exceeds column count ({len(col_defs)})")
         return cell
-    
+
     def render(self) -> str:
         grid_style_parts = [
             "display:grid;",
@@ -257,20 +259,34 @@ class GridLayout(BaseModel):
                 "display:flex;",
             ]
 
-            align_items_css_value = "flex-start" 
-            justify_content_css_value = "flex-start"
-
-            if isinstance(cell.element, TextElement):
+            align_items_css_value = "flex-start"
+            if cell.content_v_align:
+                if cell.content_v_align == VerticalAlign.center:
+                    align_items_css_value = "center"
+                elif cell.content_v_align == VerticalAlign.bottom:
+                    align_items_css_value = "flex-end"
+                elif cell.content_v_align == VerticalAlign.top:
+                    align_items_css_value = "flex-start"
+            elif isinstance(cell.element, TextElement) and cell.element.v_align:
                 if cell.element.v_align == VerticalAlign.center:
                     align_items_css_value = "center"
                 elif cell.element.v_align == VerticalAlign.bottom:
                     align_items_css_value = "flex-end"
-                
+
+            justify_content_css_value = "flex-start"
+            if cell.content_h_align:
+                if cell.content_h_align == HorizontalAlign.center:
+                    justify_content_css_value = "center"
+                elif cell.content_h_align == HorizontalAlign.right:
+                    justify_content_css_value = "flex-end"
+                elif cell.content_h_align == HorizontalAlign.left:
+                    justify_content_css_value = "flex-start"
+            elif isinstance(cell.element, TextElement) and cell.element.h_align:
                 if cell.element.h_align == HorizontalAlign.center:
                     justify_content_css_value = "center"
                 elif cell.element.h_align == HorizontalAlign.right:
                     justify_content_css_value = "flex-end"
-            
+
             cell_styles_list.append(f"align-items: {align_items_css_value};")
             cell_styles_list.append(f"justify-content: {justify_content_css_value};")
 
@@ -278,6 +294,7 @@ class GridLayout(BaseModel):
                 cell_styles_list.append(f"padding:{cell.padding};")
             if cell.background_color:
                 cell_styles_list.append(f"background-color:{cell.background_color};")
+
             if cell.align_self:
                 cell_styles_list.append(f"align-self:{cell.align_self};")
             if cell.justify_self:
@@ -287,6 +304,7 @@ class GridLayout(BaseModel):
             html_parts.append(f'<div style="{final_cell_style}">{cell.element.render()}</div>')
         html_parts.append("</div>")
         return "".join(html_parts)
+
 
 class AbsoluteLayout(BaseModel):
     elements: List[BaseElements]
@@ -325,6 +343,25 @@ class Slide(BaseModel):
             f'<section class="slide" style="background-color:{self.background_color};">'
             f"{header_html}<div class='slide-body' style='{slide_body_style}'>{self.layout.render()}</div>{footer_html}</section>"
         )
+
+# TODO combine that with THEME. StyleSetting is currently used within code to keep DRY
+class StyleSettings(BaseModel):
+    section_title_font_size: int = 11
+    main_title_font_size: int = 22
+    main_color: str = "#003049"
+    title_column_width: str = "150px"
+    text_color_dark: str = "#333333"
+    chart_font_family: str = "Lato, Arial, Helvetica, sans-serif"
+    chart_label_font_size: int = 9
+    pie_chart_section_title_font_size: int = 16 # Added for the specific use in pie_chart_bars_slide
+    default_background_color: str = "#FFFFFF"
+    cover_slide_background_color: str = "#001f3f"
+    cover_slide_text_color: str = "#FFFFFF"
+    cover_slide_main_title_font_size: int = 52
+    cover_slide_subtitle_font_size: int = 32
+    cover_slide_tagline_font_size: int = 18
+    cover_slide_logo_height: str = "40px"
+    cover_slide_element_left_indent: str = "8%"
 
 class Theme(BaseModel):
     logo_url: Optional[str] = None

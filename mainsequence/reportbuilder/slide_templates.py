@@ -5,7 +5,7 @@ from mainsequence.reportbuilder.model import (
     GridLayout, GridCell, AbsoluteLayout,
     TextElement, FunctionElement, HtmlElement, ImageElement,
     HorizontalAlign, VerticalAlign, FontWeight,
-    Size, Position
+    Size, Position, StyleSettings
 )
 
 
@@ -19,7 +19,7 @@ def _transpose_for_plotly(data_rows: List[List[Any]], num_columns: int) -> List[
 def generic_plotly_table(
         headers: List[str],
         rows: List[List[Any]],
-        table_height: int,
+        table_height: Optional[int] = None,  # MODIFIED: Made optional for auto-sizing
         fig_width: Optional[int] = None,
         column_widths: Optional[List[Union[int, float]]] = None,
         cell_align: Union[str, List[str]] = 'left',
@@ -40,12 +40,12 @@ def generic_plotly_table(
         include_plotlyjs: bool = False,
         full_html: bool = False
 ) -> str:
+    effective_margin_dict = margin_dict if margin_dict is not None else dict(l=5, r=5, t=2, b=2)
+
     if cell_font_dict is None:
         cell_font_dict = dict(size=9)
     if header_font_dict is None:
         header_font_dict = dict(color=header_font_color, size=10)
-    if margin_dict is None:
-        margin_dict = dict(l=5, r=5, t=2, b=2)
 
     plotly_column_data = _transpose_for_plotly(rows, len(headers))
 
@@ -69,9 +69,20 @@ def generic_plotly_table(
         columnwidth=column_widths if column_widths else []
     )])
 
+    determined_fig_height: int
+    if table_height is None:
+        content_actual_height = (header_height if headers else 0) + (len(rows) * cell_height)
+        # Figure height needs to include its own top/bottom margins
+        determined_fig_height = content_actual_height + \
+                                effective_margin_dict.get('t', 0) + \
+                                effective_margin_dict.get('b', 0) + \
+                                4  # Small buffer for any internal Plotly paddings
+    else:
+        determined_fig_height = table_height
+
     layout_args = {
-        "height": table_height,
-        "margin": margin_dict,
+        "height": determined_fig_height,
+        "margin": effective_margin_dict,
         "paper_bgcolor": paper_bgcolor,
         "plot_bgcolor": plot_bgcolor
     }
@@ -229,6 +240,87 @@ def generic_plotly_bar_chart(
         bargap=bargap,
         font=font_dict
     )
+    return fig.to_html(
+        include_plotlyjs=include_plotlyjs,
+        full_html=full_html,
+        config={'responsive': responsive, 'displayModeBar': display_mode_bar}
+    )
+
+
+def generic_plotly_grouped_bar_chart(
+        x_values: List[str],
+        series_data: List[Dict[str, Any]],
+        chart_title: str,
+        styles: StyleSettings,
+        height: int,
+        width: Optional[int] = None,
+        y_axis_tick_format: Optional[str] = None,
+        bar_text_template: Optional[str] = None,
+        bar_text_position: str = "outside",
+        bar_text_font_size_factor: float = 1.0,
+        barmode: str = "group",
+        legend_dict: Optional[Dict[str, Any]] = None,
+        margin_dict: Optional[Dict[str, int]] = None,
+        title_x_position: float = 0.05,
+        xaxis_tickangle: Optional[float] = None,
+        paper_bgcolor: str = 'rgba(0,0,0,0)',
+        plot_bgcolor: str = 'rgba(0,0,0,0)',
+        include_plotlyjs: bool = False,
+        full_html: bool = False,
+        display_mode_bar: bool = False,
+        responsive: bool = True
+) -> str:
+    fig = go.Figure()
+
+    for series in series_data:
+        trace = go.Bar(
+            name=series['name'],
+            x=x_values,
+            y=series['y_values'],
+            marker_color=series.get('color', None)
+        )
+        if bar_text_template:
+            trace.texttemplate = bar_text_template
+            trace.textposition = bar_text_position
+            trace.textfont = dict(
+                size=int(styles.chart_label_font_size * bar_text_font_size_factor),
+                family=styles.chart_font_family,
+                color=styles.text_color_dark
+            )
+        fig.add_trace(trace)
+
+    default_legend_config = dict(
+        font=dict(size=styles.chart_label_font_size, family=styles.chart_font_family),
+        orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+        bgcolor='rgba(0,0,0,0)'
+    )
+    if legend_dict is not None:
+        default_legend_config.update(legend_dict)
+
+    final_margin_dict = margin_dict if margin_dict is not None else dict(l=40, r=20, t=50 if chart_title else 20, b=30)
+    if xaxis_tickangle is not None and xaxis_tickangle != 0:
+        final_margin_dict["b"] = max(final_margin_dict.get("b", 30), 70 + abs(xaxis_tickangle) // 10 * 5)
+
+    fig.update_layout(
+        title_text=chart_title,
+        title_font=dict(size=styles.pie_chart_section_title_font_size, family=styles.chart_font_family, color=styles.main_color),
+        title_x=title_x_position,
+        height=height,
+        width=width,
+        barmode=barmode,
+        xaxis_tickfont_size=styles.chart_label_font_size,
+        yaxis_tickfont_size=styles.chart_label_font_size,
+        yaxis_tickformat=y_axis_tick_format,
+        legend=default_legend_config,
+        margin=final_margin_dict,
+        paper_bgcolor=paper_bgcolor,
+        plot_bgcolor=plot_bgcolor,
+        font=dict(family=styles.chart_font_family)
+    )
+
+    if xaxis_tickangle is not None:
+        fig.update_xaxes(tickangle=xaxis_tickangle)
+
     return fig.to_html(
         include_plotlyjs=include_plotlyjs,
         full_html=full_html,
