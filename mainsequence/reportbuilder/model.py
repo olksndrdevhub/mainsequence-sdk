@@ -21,7 +21,7 @@ class HorizontalAlign(str, Enum):
 
 class VerticalAlign(str, Enum):
     top = "top"
-    middle = "middle"
+    center = "center"
     bottom = "bottom"
 
 class FontWeight(str, Enum):
@@ -261,7 +261,7 @@ class GridLayout(BaseModel):
             justify_content_css_value = "flex-start"
 
             if isinstance(cell.element, TextElement):
-                if cell.element.v_align == VerticalAlign.middle:
+                if cell.element.v_align == VerticalAlign.center:
                     align_items_css_value = "center"
                 elif cell.element.v_align == VerticalAlign.bottom:
                     align_items_css_value = "flex-end"
