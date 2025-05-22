@@ -6,6 +6,7 @@ from mainsequence.reportbuilder.model import (
     HorizontalAlign, VerticalAlign, FontWeight,
     Size, Position, Anchor
 )
+import plotly.graph_objects as go
 
 
 def title_card_template(
@@ -115,9 +116,8 @@ def _transpose_for_plotly(data_rows: List[List[Any]], num_columns: int) -> List[
     return transposed
 
 def create_plotly_table_html(headers, rows, table_height, column_widths=None, cell_align=None, fig_width=None,
-                             responsive_config=True, header_visible=True):
+                             responsive_config=True, header_visible=True, cell_font_size=9):
     header_font_size = 10
-    cell_font_size = 9
     header_fill_color = 'rgb(0, 32, 96)'
     header_font_color = 'white'
     cell_fill_color = 'rgb(240,245,255)'
