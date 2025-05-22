@@ -13,6 +13,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 
+
 from mainsequence.tdag import APITimeSerie
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 
@@ -21,7 +22,7 @@ from jinja2 import Template
 
 from plotly.subplots import make_subplots
 
-from mainsequence.client import DoesNotExist, AssetCategory,TargetPortfolio
+from mainsequence.client import DoesNotExist, AssetCategory,Asset, Account
 from mainsequence.client.models_tdag import Artifact
 from mainsequence.virtualfundbuilder.resource_factory.app_factory import register_app, BaseApp
 #!/usr/bin/env python3
@@ -59,7 +60,8 @@ class ReportConfig(BaseModel):
     """Pydantic model defining the parameters for report generation."""
     presentation_title: str = "Presentation"
     presentation_subtitle: str = "Presentation Subtitle"
-    portfolio_ticker: str
+    account_uuid: str
+    fixed_income_market_ts:str
     logo_url:str
     current_date:str
 
@@ -76,8 +78,8 @@ class SlideReport(BaseApp):
     def __init__(self, configuration: ReportConfig):
         self.configuration = configuration
 
-        target_portfolio = TargetPortfolio.get(portfolio_ticker=self.configuration.portfolio_ticker)
-        self.target_portfolio = target_portfolio
+        target_account = Account.get(uuid=self.configuration.account_uuid)
+        self.target_account = target_account
 
     def _build_interactive_chart_slide(self) -> str:
         # ----- Constants -----
@@ -179,11 +181,35 @@ class SlideReport(BaseApp):
         return two_column_layout(left_col, bar_html)
     def _build_slide_table_html(self):
         # 2) Define 3 example assets
-        assets = [
-            {"asset": "Cash", "units": 1000, "price": 1.00},
-            {"asset": "Bonds", "units": 200, "price": 103.50},
-            {"asset": "Equities", "units": 50, "price": 250.00},
-        ]
+
+        account_latest_holdings=self.target_account.latest_holdings.holdings
+        assets_in_holdings=Asset.filter(id__in=[a["asset"] for a in account_latest_holdings])
+        assets_in_holdings_map={a.id:a for a in assets_in_holdings}
+
+        #get asset risk measurements
+        from mainsequence.client.models_helpers import MarketsTimeSeriesDetails
+        from mainsequence.tdag import APITimeSerie
+        markets_ts=MarketsTimeSeriesDetails.get(unique_identifier=self.configuration.fixed_income_market_ts)
+
+        last_risk_observation=markets_ts.related_local_time_serie.remote_table.sourcetableconfiguration.last_observation
+
+        def get_from_last_observation(key,a_uid):
+
+            last_value=last_risk_observation.get(a_uid,None)
+            if last_value is None:
+                last_value= "None"
+            else:
+                last_value=last_risk_observation[a_uid][key]
+            return last_value
+
+        assets= [{"isin":assets_in_holdings_map[h["asset"]].isin,
+                  "name": assets_in_holdings_map[h["asset"]].name,
+                  "price":float(h["price"]),
+                  "units":float(h["quantity"]),
+
+                  "volume":get_from_last_observation(key="volume",a_uid=assets_in_holdings_map[h["asset"]].unique_identifier)
+
+                  } for h in account_latest_holdings]
 
         # 3) Compute notional and total
         for a in assets:
@@ -197,11 +223,13 @@ class SlideReport(BaseApp):
         # 5) Build the HTML table string
         table_rows = "\n".join(
             f"<tr>"
-            f"<td>{a['asset']}</td>"
+            f"<td>{a['isin']}</td>"
+            f"<td>{a['name']}</td>"
             f"<td>{a['units']}</td>"
             f"<td>{a['price']:.2f}</td>"
             f"<td>{a['notional']:.2f}</td>"
             f"<td>{a['percent']:.2f}%</td>"
+             f"<td>{a['volume']:.2f}%</td>"
             f"</tr>"
             for a in assets
         )
@@ -210,10 +238,12 @@ class SlideReport(BaseApp):
         <table class="table table-sm table-borderless bg-transparent">
           <thead style="background-color: #cce5ff;">
             <tr>
-              <th>Asset</th>
+              <th>ISIN</th>
+               <th>Name</th>
               <th>Units</th>
               <th>Price</th>
               <th>Notional</th>
+              <th>Volume</th>
               <th>%</th>
             </tr>
           </thead>
@@ -298,7 +328,8 @@ class SlideReport(BaseApp):
 
 if __name__ == "__main__":
     # Example usage:
-    config = ReportConfig(portfolio_ticker="portfo48B",
+    config = ReportConfig(account_uuid="15b323f6-5918-4ee2-8faa-2a590dff467f",
+                          fixed_income_market_ts="alpaca_1d_bars",
                           current_date=datetime.now().date().strftime('%d-%b-%y'),
                           logo_url="https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png"
                           )  # Or override fields as needed
