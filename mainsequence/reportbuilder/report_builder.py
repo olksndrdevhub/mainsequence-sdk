@@ -1,15 +1,3 @@
-from model import (
-    Presentation,
-    Theme,
-    Slide,
-    GridLayout,
-    GridCell,
-    TextElement,
-    FunctionElement,
-    HorizontalAlign,
-    VerticalAlign,
-    FontWeight
-)
 import yaml
 from pathlib import Path
 from model import Presentation
