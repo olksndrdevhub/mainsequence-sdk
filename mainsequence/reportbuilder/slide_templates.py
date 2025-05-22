@@ -38,7 +38,9 @@ def generic_plotly_table(
         responsive: bool = True,
         display_mode_bar: bool = False,
         include_plotlyjs: bool = False,
-        full_html: bool = False
+        full_html: bool = False,
+        column_formats: Optional[List[str]] = None,
+
 ) -> str:
     effective_margin_dict = margin_dict if margin_dict is not None else dict(l=5, r=5, t=2, b=2)
 
@@ -48,6 +50,18 @@ def generic_plotly_table(
         header_font_dict = dict(color=header_font_color, size=10)
 
     plotly_column_data = _transpose_for_plotly(rows, len(headers))
+    # Build cell properties, injecting formats if provided
+    cell_props = dict(
+        values=plotly_column_data,
+        fill_color=cell_fill_color,
+        font=cell_font_dict,
+        align=cell_align,
+        line_color=line_color,
+        height=cell_height
+    )
+    if column_formats:
+        cell_props['format'] = column_formats
+
 
     fig = go.Figure(data=[go.Table(
         header=dict(
@@ -58,14 +72,7 @@ def generic_plotly_table(
             line_color=line_color,
             height=header_height if headers else 0
         ),
-        cells=dict(
-            values=plotly_column_data,
-            fill_color=cell_fill_color,
-            font=cell_font_dict,
-            align=cell_align,
-            line_color=line_color,
-            height=cell_height
-        ),
+        cells=cell_props,
         columnwidth=column_widths if column_widths else []
     )])
 
