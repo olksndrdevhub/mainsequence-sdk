@@ -17,7 +17,7 @@ import importlib
 import cloudpickle
 from pathlib import Path
 
-from mainsequence import MARKETS_CONSTANTS
+from mainsequence.client import MARKETS_CONSTANTS
 from mainsequence.instrumentation import tracer, tracer_instrumentator
 from mainsequence.tdag.config import (
     ogm

@@ -1,4 +1,6 @@
 from typing import Dict, Callable, List, Optional, Union, Any
+
+from pandas import DataFrame
 from pydantic import BaseModel, conlist, PositiveFloat, Field, validator
 
 import plotly.express as px

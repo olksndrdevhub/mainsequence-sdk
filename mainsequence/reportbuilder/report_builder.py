@@ -14,9 +14,8 @@ import yaml
 from pathlib import Path
 from model import Presentation
 
-def create_presentation_from_code() -> None:
+def create_presentation_from_code() -> Presentation:
 
-    # Define the Theme
     theme_obj = Theme(
         logo_url="https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png",
         current_date="May 21, 2025",
@@ -25,7 +24,6 @@ def create_presentation_from_code() -> None:
         title_color="#005f73"
     )
 
-    # Define Slide 1: Welcome: Strategic Insights & Focus
     slide1_cells = [
         GridCell(
             row=1, col=1,
@@ -62,7 +60,7 @@ def create_presentation_from_code() -> None:
 <p style="text-align: left; font-size: 20px; color: #555555; margin-top: 15px;">These balanced segments ensure we are making data understandable and actionable across the organization.</p>""",
                 font_weight=FontWeight.normal,
                 h_align=HorizontalAlign.left,
-                v_align=VerticalAlign.middle,  # Assuming model.py GridLayout.render uses this
+                v_align=VerticalAlign.middle,
                 color="#333333"
             )
         ),
@@ -84,14 +82,13 @@ def create_presentation_from_code() -> None:
         title="Welcome: Strategic Insights & Focus",
         background_color="#ffffff",
         layout=GridLayout(
-            rows=4,
-            cols=2,
+            row_definitions=["1fr", "1fr", "1fr", "1fr"],
+            col_definitions=["1fr", "1fr"],
             gap=25,
             cells=slide1_cells
         )
     )
 
-    # Define Slide 2: Project Horizon: Performance Review
     slide2_cells = [
         GridCell(
             row=1, col=1,
@@ -111,16 +108,16 @@ def create_presentation_from_code() -> None:
         GridCell(
             row=1, col=2,
             element=TextElement(
-                text="""<ul style="list-style-position: outside; margin: 0; padding-left: 20px; text-align: left;">
-  <li><b>Consistent Upward Trend:</b> The Key Performance Index for Project Horizon has shown steady growth.</li>
+                text="""<b>Consistent Upward Trend</b><ul style="list-style-position: outside; margin: 0; padding-left: 20px; text-align: left;">
+  <li>The Key Performance Index for Project Horizon has shown steady growth.</li>
   <li>This indicates increasing positive impact and successful milestone achievement quarter over quarter.</li>
 </ul>""",
                 font_size=20,
                 font_weight=FontWeight.normal,
-                line_height=1.7,  # Note: line_height is not in the standard TextElement model, add if needed
+                line_height="1.7",
                 color="#333333",
                 h_align=HorizontalAlign.left,
-                v_align=VerticalAlign.middle  # Assuming model.py GridLayout.render uses this
+                v_align=VerticalAlign.middle
             )
         ),
         GridCell(
@@ -140,16 +137,16 @@ def create_presentation_from_code() -> None:
         GridCell(
             row=2, col=2,
             element=TextElement(
-                text="""<ul style="list-style-position: outside; margin: 0; padding-left: 20px; text-align: left;">
-  <li><b>Meeting Key Targets:</b> Project Horizon excels in its strategic pillars.</li>
+                text="""<b>Meeting Key Targets</b><ul style="list-style-position: outside; margin: 0; padding-left: 20px; text-align: left;">
+  <li> Project Horizon excels in its strategic pillars.</li>
   <li>Innovation is at 85%, Efficiency at 70%, and Market Reach has expanded to 92%, reflecting strong execution.</li>
 </ul>""",
                 font_size=20,
                 font_weight=FontWeight.normal,
-                line_height=1.7,  # Note: line_height is not in the standard TextElement model, add if needed
+                line_height="1.7",
                 color="#333333",
                 h_align=HorizontalAlign.left,
-                v_align=VerticalAlign.middle  # Assuming model.py GridLayout.render uses this
+                v_align=VerticalAlign.middle
             )
         )
     ]
@@ -158,14 +155,13 @@ def create_presentation_from_code() -> None:
         title="Project Horizon: Performance Review",
         background_color="#ffffff",
         layout=GridLayout(
-            rows=2,
-            cols=2,
+            row_definitions=["1fr", "1fr"],
+            col_definitions=["1fr", "1fr"],
             gap=35,
             cells=slide2_cells
         )
     )
 
-    # Create the Presentation object
     presentation_obj = Presentation(
         title="Visualizing Tomorrow's Insights",
         subtitle="A Showcase of Dynamic Data Presentation",
@@ -175,14 +171,9 @@ def create_presentation_from_code() -> None:
 
     return presentation_obj
 
-
-
 def load_and_render(slides_name: str) -> None:
-    """
-    Load a presentation definition from a YAML file and render it to HTML.
-    """
     output_dir = Path("output")
-    output_dir.mkdir(parents=True, exist_ok=True) # Ensure output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     yaml_path = Path("configurations") / f"{slides_name}.yaml"
     output_html_path = output_dir / f"{slides_name}.html"
@@ -194,19 +185,12 @@ def load_and_render(slides_name: str) -> None:
     html = pres.render()
     Path(output_html_path).write_text(html, encoding="utf-8")
     print(f"Rendered presentation to {output_html_path}")
-    # from weasyprint import HTML, CSS
-    #
-    # html_doc = HTML(string=html, base_url=str(output_dir.resolve()))
-    # html_doc.write_pdf(output_pdf_path)
 
 if __name__ == "__main__":
-    load_and_render(slides_name="actinver_example")
-
-
-    # my_presentation = create_presentation_from_code()
-    # try:
-    #     with open("presentation_from_code.html", "w", encoding="utf-8") as f:
-    #         f.write(my_presentation.render())
-    #     print("Presentation rendered to presentation_from_code.html")
-    # except Exception as e:
-    #     print(f"An error occurred during rendering: {e}")
+    my_presentation = create_presentation_from_code()
+    try:
+        with open("presentation_from_code.html", "w", encoding="utf-8") as f:
+            f.write(my_presentation.render())
+        print("Presentation rendered to presentation_from_code.html")
+    except Exception as e:
+        print(f"An error occurred during rendering: {e}")

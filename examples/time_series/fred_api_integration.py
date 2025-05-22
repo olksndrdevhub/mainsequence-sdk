@@ -9,7 +9,7 @@ dotenv.load_dotenv('../../.env')  # Load environment variables from .env
 from mainsequence.tdag import TimeSerie, ModelList
 from mainsequence.client import DataUpdates
 from mainsequence.client import Asset,Calendar, ExecutionVenue
-from mainsequence import MARKETS_CONSTANTS
+from mainsequence.client import MARKETS_CONSTANTS
 
 class FREDTimeSerie(TimeSerie):
     """

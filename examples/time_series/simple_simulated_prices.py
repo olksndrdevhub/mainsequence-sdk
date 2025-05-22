@@ -127,7 +127,7 @@ class SimulatedPrices(TimeSerie):
 # Mocking DataUpdates and Running the Test
 def test_simple_crypto_feature():
     from mainsequence.client import Asset
-    from mainsequence import MARKETS_CONSTANTS
+    from mainsequence.client import MARKETS_CONSTANTS
 
     # Filter assets for BTCUSDT and ETHUSDT.
     assets = Asset.filter(
@@ -312,7 +312,7 @@ def test_ta_feature_simulated_crypto_prices():
       - Calculating a TA feature (e.g., SMA) on the simulated prices.
     """
     from mainsequence.client import AssetCurrencyPair
-    from mainsequence import MARKETS_CONSTANTS
+    from mainsequence.client import MARKETS_CONSTANTS
 
     # Filter assets for BTCUSDT and ETHUSDT.
     assets = AssetCurrencyPair.filter(
