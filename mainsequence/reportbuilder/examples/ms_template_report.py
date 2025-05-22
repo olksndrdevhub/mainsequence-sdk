@@ -1,8 +1,8 @@
-from typing import Any, Optional, List, Union
+from typing import Any, Optional, List, Union, Dict
 
 from pathlib import Path
 import plotly.graph_objects as go
-from pydantic import BaseModel # Added for ReportStyleSettings
+from pydantic import BaseModel
 
 from mainsequence.reportbuilder.model import (
     Presentation,
@@ -23,12 +23,11 @@ from mainsequence.reportbuilder.model import (
 from mainsequence.reportbuilder.slide_templates import (
     generic_plotly_table,
     generic_plotly_pie_chart,
-    generic_plotly_bar_chart
+    generic_plotly_bar_chart,
+    generic_plotly_grouped_bar_chart  # Added import
 )
 
-# Instantiate the style settings
 styles = StyleSettings()
-
 
 fixed_income_local_headers = ["INSTRUMENT", "UNITS", "PRICE", "AMOUNT", "% TOTAL", "DURATION", "YIELD", "DxV"]
 fixed_income_local_rows = [
@@ -98,11 +97,11 @@ def create_portfolio_detail_slide() -> Slide:
     total_general_rows = [["TOTAL", "", "", "$441,687,650.00", "100.00%", "", "", ""]]
 
     total_table_html = generic_plotly_table(
-        headers=liquidity_headers, # Using liquidity_headers for structure, but they are hidden
+        headers=liquidity_headers,
         rows=total_general_rows,
         fig_width=table_figure_width,
         column_widths=shared_column_widths,
-        cell_align=['left', 'right', 'right', 'right', 'right', 'right', 'right', 'right'], # Match length
+        cell_align=['left', 'right', 'right', 'right', 'right', 'right', 'right', 'right'],
         header_height=0,
         cell_fill_color='rgba(0,0,0,0)',
         line_color='rgba(0,0,0,0)',
@@ -166,7 +165,8 @@ def pie_chart_bars_slide() -> Slide:
         fig_width=300,
         column_widths=[0.3, 0.2],
         header_font_dict=dict(color='white', size=10, family=styles.chart_font_family),
-        cell_font_dict=dict(size=styles.chart_label_font_size, family=styles.chart_font_family)
+        cell_font_dict=dict(size=styles.chart_label_font_size, family=styles.chart_font_family),
+        cell_align=['left', 'right'],
     )
     asset_class_table_el = HtmlElement(html=asset_class_table_html)
 
@@ -179,7 +179,7 @@ def pie_chart_bars_slide() -> Slide:
         height=400,
         width=430,
         textinfo='percent',
-        legend_dict = dict(
+        legend_dict=dict(
             font=dict(size=styles.chart_label_font_size, family=styles.chart_font_family),
             orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5, bgcolor='rgba(0,0,0,0)'
         ),
@@ -203,7 +203,6 @@ def pie_chart_bars_slide() -> Slide:
         autorange="reversed"
     )
 
-
     duration_bar_html = generic_plotly_bar_chart(
         y_values=duration_bar_labels,
         x_values=duration_bar_values,
@@ -224,7 +223,7 @@ def pie_chart_bars_slide() -> Slide:
         gap=10,
         cells=[
             GridCell(row=1, col=1, element=TextElement(
-                text=f"<span style='padding-bottom: 1px;'>Asset Allocation</span>",
+                text=f"Asset Allocation",
                 font_size=styles.pie_chart_section_title_font_size, font_weight=FontWeight.bold,
                 color=styles.main_color, h_align=HorizontalAlign.left
             ), align_self=VerticalAlign.bottom, padding="0 0 2px 0"),
@@ -255,11 +254,11 @@ def create_generic_table_and_grouped_bar_chart_slide() -> Slide:
     table_headers = ["Type", "Value Set 1", "Value Set 2", "Difference (VS1-VS2)"]
     raw_table_rows_data = [
         ["Alpha Group", 0.60, 0.40],
-        ["Beta Group",  0.45, 0.50],
+        ["Beta Group", 0.45, 0.50],
         ["Gamma Group", 0.70, 0.55],
         ["Delta Group", 0.25, 0.25],
-        ["Epsilon Group",0.50, 0.30],
-        ["Zeta Group",  0.10, 0.15],
+        ["Epsilon Group", 0.50, 0.30],
+        ["Zeta Group", 0.10, 0.15],
     ]
 
     table_rows_processed = []
@@ -292,59 +291,39 @@ def create_generic_table_and_grouped_bar_chart_slide() -> Slide:
         fig_width=700
     )
 
-    chart_categories = [f"Point {i+1}" for i in range(11)]
+    chart_categories = [f"Point {i + 1}" for i in range(11)]
     series_a_values = [0.50, 0.45, 0.60, 0.30, 0.75, 0.20, 0.55, 0.40, 0.65, 0.35, 0.70]
     series_b_values = [0.40, 0.50, 0.55, 0.35, 0.60, 0.25, 0.60, 0.30, 0.70, 0.25, 0.65]
     series_c_values = [round(a - b, 2) for a, b in zip(series_a_values, series_b_values)]
 
-    fig_bar = go.Figure()
-    fig_bar.add_trace(go.Bar(
-        name='Data Series A',
-        x=chart_categories,
-        y=series_a_values,
-        marker_color=styles.main_color
-    ))
-    fig_bar.add_trace(go.Bar(
-        name='Data Series B',
-        x=chart_categories,
-        y=series_b_values,
-        marker_color='rgb(200,200,200)'
-    ))
-    fig_bar.add_trace(go.Bar(
-        name='Difference (A-B)',
-        x=chart_categories,
-        y=series_c_values,
-        marker_color='rgb(160,120,70)'
-    ))
+    series_data_for_chart = [
+        {"name": "Data Series A", "y_values": series_a_values, "color": styles.main_color},
+        {"name": "Data Series B", "y_values": series_b_values, "color": 'rgb(200,200,200)'},
+        {"name": "Difference (A-B)", "y_values": series_c_values, "color": 'rgb(160,120,70)'}
+    ]
 
-    fig_bar.update_layout(
-        width=800,
-        height=380,
-        barmode='group',
-        xaxis_tickangle=-45,
-        legend=dict(
-            orientation="h",
-            yanchor="top",
-            y=-0.15,
-            xanchor="center",
-            x=0.5,
-            font=dict(size=styles.chart_label_font_size, family=styles.chart_font_family),  # Adjusted: Font consistent with styles
-            bgcolor='rgba(0,0,0,0)'  # Added: Ensures transparent background
-        ),
-        margin=dict(l=30, r=20, t=10, b=120),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        yaxis=dict(
-            gridcolor='rgb(220,220,220)',
-            zerolinecolor='rgb(180,180,180)',
-            tickformat=".2f"
-        ),
-        xaxis=dict(
-           tickfont=dict(size=9)
-        ),
-        font=dict(family=styles.chart_font_family)
+    custom_legend = dict(
+        orientation="h",
+        yanchor="top",
+        y=-0.15,  # Specific y position for this chart's legend
+        xanchor="center",
+        x=0.5,
+        font=dict(size=styles.chart_label_font_size, family=styles.chart_font_family),
+        bgcolor='rgba(0,0,0,0)'
     )
-    generic_bar_chart_html = fig_bar.to_html(include_plotlyjs=False, full_html=False, config={'displayModeBar': False})
+
+    generic_bar_chart_html = generic_plotly_grouped_bar_chart(
+        x_values=chart_categories,
+        series_data=series_data_for_chart,
+        chart_title="",
+        styles=styles,
+        height=380,
+        width=800,
+        y_axis_tick_format=".2f",
+        xaxis_tickangle=-45,
+        legend_dict=custom_legend,
+        margin_dict=dict(l=30, r=20, t=10, b=120)  # Specific margin for this chart
+    )
 
     slide_layout = GridLayout(
         row_definitions=["auto", "auto", "auto"],
@@ -363,8 +342,7 @@ def create_generic_table_and_grouped_bar_chart_slide() -> Slide:
                 col=1,
                 element=HtmlElement(html=generic_table_html),
                 justify_self=HorizontalAlign.center,
-                content_h_align=HorizontalAlign.center, # For horizontal centering of the table
-                content_v_align=VerticalAlign.center    # For vertical centering of the table
+                align_self=VerticalAlign.center  # This centers the cell content wrapper vertically in its grid area.
             ),
             GridCell(row=3, col=1, element=HtmlElement(html=generic_bar_chart_html), justify_self=HorizontalAlign.center, padding="5px 0 0 0")
         ]
@@ -377,13 +355,401 @@ def create_generic_table_and_grouped_bar_chart_slide() -> Slide:
     )
 
 
+def create_portfolio_performance_slide() -> Slide:
+    portfolio_bar_color = styles.main_color
+    benchmark_bar_color = "#CDA434"
+
+    # Data for Monthly Performance Chart
+    monthly_categories = ["JAN", "FEB", "MAR", "APR"]
+    monthly_series_data = [
+        {
+            "name": "Portfolio",
+            "y_values": [0.83, 1.13, 1.72, 1.08], # Example data
+            "color": portfolio_bar_color
+        },
+        {
+            "name": "Benchmark",
+            "y_values": [1.38, 1.47, 1.31, 1.02], # Example data
+            "color": benchmark_bar_color
+        }
+    ]
+
+    monthly_chart_html = generic_plotly_grouped_bar_chart(
+        x_values=monthly_categories,
+        series_data=monthly_series_data,
+        chart_title="Monthly Performance (LCY)",
+        styles=styles,
+        height=280,
+        width=750,
+        y_axis_tick_format=".2f",
+        bar_text_template="%{y:.2f}%",
+        legend_dict=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin_dict=dict(l=40, r=20, t=50, b=40),
+    )
+
+    # Data for Annual Performance Chart
+    annual_categories = ["2023", "2024"] # Example years
+    annual_series_data = [
+        {
+            "name": "Portfolio",
+            "y_values": [4.84, 11.45], # Example data
+            "color": portfolio_bar_color
+        },
+        {
+            "name": "Benchmark",
+            "y_values": [5.28, 9.91], # Example data
+            "color": benchmark_bar_color
+        }
+    ]
+
+    annual_chart_html = generic_plotly_grouped_bar_chart(
+        x_values=annual_categories,
+        series_data=annual_series_data,
+        chart_title="Annual Performance (LCY)",
+        styles=styles,
+        height=240, # Adjusted height
+        width=750,
+        y_axis_tick_format=".2f",
+        bar_text_template="%{y:.2f}%",
+        legend_dict=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin_dict=dict(l=40, r=20, t=50, b=40),
+    )
+
+    slide_layout = GridLayout(
+        row_definitions=["auto", "auto", "auto", "auto"], # Adjusted for content
+        col_definitions=["1fr"],
+        gap=15, # Adjusted gap
+        cells=[
+            GridCell(row=1, col=1, element=TextElement(
+                text="Portfolio Performance in Local Currency", # Generalized title
+                font_size=20, # Slightly larger than default section title
+                font_weight=FontWeight.bold,
+                color=styles.main_color,
+                h_align=HorizontalAlign.left
+            ), padding="0 0 5px 0"), # Added bottom padding
+
+            GridCell(row=2, col=1, element=HtmlElement(html=monthly_chart_html),
+                     justify_self=HorizontalAlign.center),
+
+            GridCell(row=3, col=1, element=HtmlElement(html=annual_chart_html),
+                     justify_self=HorizontalAlign.center),
+
+            GridCell(row=4, col=1, element=TextElement(
+                text="Data as of 04/30/2025", # Example date
+                font_size=9, # Smaller font for footer note
+                color="#555555", # Grey color
+                h_align=HorizontalAlign.left
+            ), padding="5px 0 0 0", align_self=VerticalAlign.bottom)
+        ]
+    )
+
+    return Slide(
+        title="Financial Performance Summary", # Generic slide title for header
+        layout=slide_layout,
+        background_color=styles.default_background_color
+    )
+
+
+def create_rate_sensitivity_analysis_slide() -> Slide:
+    slide_main_title_text = "Rate Sensitivity Analysis: USD Portfolio"
+
+    table1_headers = ["Factor", "Portfolio", "Benchmark", "Active"]
+    table1_rows = [
+        ["Factor A", "60%", "100%", "-40%"],
+        ["Factor B", "30%", "0%", "30%"],
+        ["Factor C", "10%", "0%", "10%"]
+    ]
+
+    table1_html = generic_plotly_table(
+        headers=table1_headers,
+        rows=table1_rows,
+        fig_width=350,
+        table_height=120,
+        column_widths=[0.8, 0.5, 0.5, 0.5],
+        cell_align=['left', 'center', 'center', 'center'],
+        header_font_dict=dict(color='white', size=10, family=styles.chart_font_family),
+        cell_font_dict=dict(size=styles.chart_label_font_size, family=styles.chart_font_family),
+        header_fill_color=styles.main_color,
+        cell_fill_color='rgb(245,245,245)',
+        line_color='rgb(220,220,220)'
+    )
+
+    table2_headers = ["Factor", "Portfolio", "Benchmark", "Active"]
+    table2_rows = [
+        ["Factor A", "1.30", "1.90", "-0.60"],
+        ["Factor B", "2.80", "-", "2.80"],
+        ["Factor C", "-", "-", "-"],
+        ["Total", "4.10", "1.90", "2.20"]
+    ]
+
+    table2_html = generic_plotly_table(
+        headers=table2_headers,
+        rows=table2_rows,
+        fig_width=350,
+        table_height=145,  # Adjusted height for total row
+        column_widths=[0.8, 0.5, 0.5, 0.5],
+        cell_align=['left', 'right', 'right', 'right'],
+        header_font_dict=dict(color='white', size=10, family=styles.chart_font_family),
+        cell_font_dict=dict(size=styles.chart_label_font_size, family=styles.chart_font_family),
+        header_fill_color=styles.main_color,
+        cell_fill_color='rgb(245,245,245)',
+        line_color='rgb(220,220,220)'
+    )
+
+    bar_chart_categories = ["Factor A", "Factor B"]
+    bar_chart_series_data = [
+        {"name": "Portfolio", "y_values": [1.30, 2.80], "color": styles.main_color},
+        {"name": "Benchmark", "y_values": [1.90, 0.00], "color": 'rgb(173, 216, 230)'},  # Light Blue for Benchmark
+        {"name": "Active", "y_values": [-0.60, 2.80], "color": 'rgb(205, 164, 52)'}  # Gold-like color
+    ]
+
+    bar_chart_html = generic_plotly_grouped_bar_chart(
+        x_values=bar_chart_categories,
+        series_data=bar_chart_series_data,
+        chart_title="",  # No title directly on chart, slide has main title
+        styles=styles,
+        height=350,
+        width=720,
+        y_axis_tick_format=".2f",
+        legend_dict=dict(
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="center", x=0.5,
+            font=dict(size=styles.chart_label_font_size, family=styles.chart_font_family),
+            bgcolor='rgba(0,0,0,0)'
+        ),
+        margin_dict=dict(l=40, r=20, t=30, b=40),
+        bar_text_template=None  # Values are clear from axes
+    )
+
+    slide_layout = GridLayout(
+        row_definitions=["auto", "auto", "1fr"],
+        col_definitions=["1fr", "1fr"],
+        gap=15,
+        cells=[
+            GridCell(row=1, col=1, col_span=2, element=TextElement(
+                text=slide_main_title_text,
+                font_size=styles.main_title_font_size - 2,  # Slightly smaller for this context
+                font_weight=FontWeight.bold,
+                color=styles.main_color,
+                h_align=HorizontalAlign.left
+            ), padding="0 0 10px 0"),
+            GridCell(row=2, col=1, element=HtmlElement(html=table1_html),
+                     justify_self=HorizontalAlign.center, align_self=VerticalAlign.top),
+            GridCell(row=2, col=2, element=HtmlElement(html=table2_html),
+                     justify_self=HorizontalAlign.center, align_self=VerticalAlign.top),
+            GridCell(row=3, col=1, col_span=2, element=HtmlElement(html=bar_chart_html),
+                     justify_self=HorizontalAlign.center, align_self=VerticalAlign.center, padding="20px 0 0 0")
+        ]
+    )
+
+    return Slide(
+        title="Rate Sensitivity Analysis",  # Slide header title
+        layout=slide_layout,
+        background_color=styles.default_background_color
+    )
+
+
+def create_issuer_performance_table_slide() -> Slide:
+    slide_content_main_title = "Performance Analysis: Key Segments"
+
+    table_super_header1_text = "PORTFOLIOS"
+    table_super_header2_text = "SUB-CATEGORY DETAILS"
+
+    table_headers = ["Category", "Weight (%)", "Return (%)", "Impact (%)"]
+    table_rows_data = [
+        ["Alpha Product Series 1", "-67.0%", "0.69%", "0.09%"],
+        ["Beta Service Line 2", "66.3%", "0.92%", "0.30%"],
+        ["Gamma Component Type 3", "0.7%", "-4.05%", "-0.03%"]
+    ]
+
+    cell_alignments = ['left', 'right', 'right', 'right']
+    header_alignments = ['center', 'center', 'center', 'center']
+    column_widths = [2, 1, 1, 1]
+
+    issuer_table_html = generic_plotly_table(
+        headers=table_headers,
+        rows=table_rows_data,
+        fig_width=800,
+        table_height=150,
+        column_widths=column_widths,
+        cell_align=cell_alignments,
+        header_align=header_alignments,
+        header_font_dict=dict(color='white', size=styles.chart_label_font_size + 1, family=styles.chart_font_family),
+        cell_font_dict=dict(size=styles.chart_label_font_size, family=styles.chart_font_family, color=styles.text_color_dark),
+        header_fill_color=styles.main_color,
+        cell_fill_color='white',
+        line_color='rgb(150,150,150)',
+        header_height=25,
+        cell_height=25,
+        margin_dict=dict(l=5, r=5, t=5, b=5)
+    )
+
+    slide_layout = GridLayout(
+        row_definitions=["auto", "auto", "auto", "auto", "1fr"],
+        col_definitions=["1fr"],
+        gap=0,
+        cells=[
+            GridCell(row=1, col=1, element=TextElement(
+                text=slide_content_main_title,
+                font_size=styles.main_title_font_size - 4,
+                font_weight=FontWeight.normal,
+                color=styles.main_color,
+                h_align=HorizontalAlign.left
+            ), padding="0 0 20px 0"),
+
+            GridCell(row=2, col=1, element=TextElement(
+                text=table_super_header1_text,
+                font_size=styles.section_title_font_size + 2,
+                font_weight=FontWeight.bold,
+                color=styles.text_color_dark,
+                h_align=HorizontalAlign.center
+            ), padding="5px 0 0 0", background_color="white"),
+
+            GridCell(row=3, col=1, element=TextElement(
+                text=table_super_header2_text,
+                font_size=styles.section_title_font_size + 1,
+                font_weight=FontWeight.bold,
+                color=styles.text_color_dark,
+                h_align=HorizontalAlign.center
+            ), padding="0 0 0 0", background_color="white"),
+
+            GridCell(row=4, col=1, element=HtmlElement(html=issuer_table_html),
+                     justify_self=HorizontalAlign.center,
+                     align_self=VerticalAlign.top,
+                     padding="0 0 0 0")
+        ]
+    )
+
+    return Slide(
+        title="Category Performance Summary",
+        layout=slide_layout,
+        background_color=styles.default_background_color
+    )
+
+
+def create_comparative_performance_charts_slide() -> Slide:
+    slide_content_main_title = "Overall Portfolio Performance: USD"
+
+    portfolio_color = styles.main_color
+    benchmark_color = 'rgb(189, 149, 58)' # A gold/brown color
+
+    # Monthly Performance Chart
+    monthly_chart_title = "Monthly USD Returns"
+    monthly_categories = ["Jan", "Feb", "Mar", "Apr"]
+    monthly_series_data = [
+        {
+            "name": "Portfolio",
+            "y_values": [0.2, 1.62, 0.6, 1.31],
+            "color": portfolio_color
+        },
+        {
+            "name": "Benchmark",
+            "y_values": [0.1, 0.32, 0.89, 0.12],
+            "color": benchmark_color
+        }
+    ]
+
+    monthly_legend_config = dict(
+        orientation="v",
+        yanchor="top", y=1,
+        xanchor="left", x=1.01, # Position to the right of plot area
+        font=dict(size=styles.chart_label_font_size -1, family=styles.chart_font_family),
+        bgcolor='rgba(0,0,0,0)'
+    )
+
+    monthly_chart_html = generic_plotly_grouped_bar_chart(
+        x_values=monthly_categories,
+        series_data=monthly_series_data,
+        chart_title=monthly_chart_title,
+        styles=styles,
+        height=300,
+        width=700,
+        y_axis_tick_format=".2f",
+        bar_text_template="%{y:.2f}%",
+        bar_text_position="outside",
+        legend_dict=monthly_legend_config,
+        margin_dict=dict(l=50, r=100, t=50, b=40), # Increased right margin for legend
+        title_x_position=0.5 # Center chart title
+    )
+
+    # Annual Performance Chart
+    annual_chart_title = "Annual Returns"
+    annual_categories = ["Prior Year", "Current Year"]
+    annual_series_data = [
+        {
+            "name": "Portfolio",
+            "y_values": [2.49, 5.78],
+            "color": portfolio_color
+        },
+        {
+            "name": "Benchmark",
+            "y_values": [3.30, 5.18],
+            "color": benchmark_color
+        }
+    ]
+
+    annual_legend_config = dict(
+        orientation="v",
+        yanchor="top", y=1,
+        xanchor="left", x=1.01,
+        font=dict(size=styles.chart_label_font_size -1, family=styles.chart_font_family),
+        bgcolor='rgba(0,0,0,0)'
+    )
+
+    annual_chart_html = generic_plotly_grouped_bar_chart(
+        x_values=annual_categories,
+        series_data=annual_series_data,
+        chart_title=annual_chart_title,
+        styles=styles,
+        height=330, # Slightly more height due to potentially larger y-axis range
+        width=700,
+        y_axis_tick_format=".2f",
+        bar_text_template="%{y:.2f}%",
+        bar_text_position="outside",
+        legend_dict=annual_legend_config,
+        margin_dict=dict(l=50, r=100, t=60, b=40), # Increased top and right margin
+        title_x_position=0.5 # Center chart title
+    )
+
+    slide_layout = GridLayout(
+        row_definitions=["auto", "auto", "auto", "auto"],
+        col_definitions=["1fr"],
+        gap=5, # Small gap between elements
+        cells=[
+            GridCell(row=1, col=1, element=TextElement(
+                text=slide_content_main_title,
+                font_size=styles.main_title_font_size - 2,
+                font_weight=FontWeight.normal,
+                color=styles.main_color,
+                h_align=HorizontalAlign.left
+            ), padding="0 0 15px 0"),
+
+            GridCell(row=2, col=1, element=HtmlElement(html=monthly_chart_html),
+                     justify_self=HorizontalAlign.center,
+                     align_self=VerticalAlign.center),
+
+            GridCell(row=3, col=1, element=HtmlElement(html=annual_chart_html),
+                     justify_self=HorizontalAlign.center,
+                     align_self=VerticalAlign.center,
+                     padding="15px 0 0 0") # Padding above the second chart
+        ]
+    )
+
+    return Slide(
+        title="Portfolio Performance Summary",
+        layout=slide_layout,
+        background_color=styles.default_background_color
+    )
+
+
 def create_full_presentation() -> Presentation:
     ms_theme = Theme(
         logo_url="https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png",
         current_date="May 2025",
-        font_family=styles.chart_font_family, # Using chart_font_family as the base
-        base_font_size=styles.section_title_font_size, # Using section_title_font_size as base
-        title_color="#005f73" # This could also be part of ReportStyleSettings if needed globally
+        font_family=styles.chart_font_family,
+        base_font_size=styles.section_title_font_size,
+        title_color="#005f73"
     )
     slide1_elements = [
         TextElement(text="Monthly Report", font_size=styles.cover_slide_main_title_font_size, font_weight=FontWeight.bold, color=styles.cover_slide_text_color,
@@ -392,8 +758,9 @@ def create_full_presentation() -> Presentation:
                     position=Position(top="35%", left=styles.cover_slide_element_left_indent)),
         ImageElement(src=ms_theme.logo_url, alt="Main Sequence Logo", size=Size(height=styles.cover_slide_logo_height, width="auto"),
                      position=Position(top="50%", left=styles.cover_slide_element_left_indent)),
-        TextElement(text="Data Insights & Solutions", font_size=styles.cover_slide_tagline_font_size, color=styles.cover_slide_text_color, h_align=HorizontalAlign.left,
-                    position=Position(top=f"calc(50% + {styles.cover_slide_logo_height} + 10px)", left=styles.cover_slide_element_left_indent)) # Adjusted top position
+        TextElement(text="Data Insights & Solutions", font_size=styles.cover_slide_tagline_font_size, color=styles.cover_slide_text_color,
+                    h_align=HorizontalAlign.left,
+                    position=Position(top=f"calc(50% + {styles.cover_slide_logo_height} + 10px)", left=styles.cover_slide_element_left_indent))
     ]
 
     presentation = Presentation(
@@ -405,7 +772,11 @@ def create_full_presentation() -> Presentation:
                   layout=AbsoluteLayout(elements=slide1_elements, width="100%", height="100%")),
             create_portfolio_detail_slide(),
             pie_chart_bars_slide(),
-            create_generic_table_and_grouped_bar_chart_slide()
+            create_generic_table_and_grouped_bar_chart_slide(),
+            create_portfolio_performance_slide(),
+            create_rate_sensitivity_analysis_slide(),
+            create_issuer_performance_table_slide(),
+            create_comparative_performance_charts_slide()
         ]
     )
     return presentation
