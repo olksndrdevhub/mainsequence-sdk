@@ -165,154 +165,158 @@ def create_portfolio_detail_slide() -> Slide:
 
 
 def pie_chart_bars_slide() -> Slide:
-    # --- Style Constants ---
-    main_blue_color = "#003049"  # Similar to Actinver's blue
+    main_blue_color = "#003049"
     text_color_dark = "#333333"
-    pie_chart_slice_colors = ['#B8A978', '#808080', main_blue_color]  # Khaki, Grey, Dark Blue
+    pie_chart_slice_colors = ['#B2DFDB', main_blue_color, '#4A90E2'] # Pale Aqua, MSBlue, Medium Blue
     bar_chart_bar_color = main_blue_color
 
-    section_title_font_size = 16  # Adjusted for visual hierarchy
-    table_font_size = "10px"
+    section_title_font_size = 16
+    table_font_size_int = 10  # Integer for Plotly font size
     chart_label_font_size = 9
+    chart_font_family = "Lato, Arial, Helvetica, sans-serif"
 
-    # --- Left Column: Instrument Table HTML ---
-    instrument_table_html = f"""
-<table style="width: 95%; border-collapse: collapse; margin-top: 5px;">
-  <thead>
-    <tr style="border-bottom: 1.5px solid {main_blue_color};">
-      <th style="text-align:left; padding: 5px 3px; font-weight:bold; color: {main_blue_color}; font-size: {table_font_size};">TIPO DE INSTRUMENTO</th>
-      <th style="text-align:right; padding: 5px 3px; font-weight:bold; color: {main_blue_color}; font-size: {table_font_size};">%</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td style="text-align:left; padding: 5px 3px; font-size: {table_font_size}; color: {text_color_dark};">RENTA FIJA PESOS</td><td style="text-align:right; padding: 5px 3px; font-size: {table_font_size}; color: {text_color_dark};">57%</td></tr>
-    <tr><td style="text-align:left; padding: 5px 3px; font-size: {table_font_size}; color: {text_color_dark};">RENTA FIJA DOLARES</td><td style="text-align:right; padding: 5px 3px; font-size: {table_font_size}; color: {text_color_dark};">30%</td></tr>
-    <tr><td style="text-align:left; padding: 5px 3px; font-size: {table_font_size}; color: {text_color_dark};">LIQUIDEZ</td><td style="text-align:right; padding: 5px 3px; font-size: {table_font_size}; color: {text_color_dark};">13%</td></tr>
-  </tbody>
-</table>
-"""
+    # Data
+    asset_table_headers_raw = ["ASSET CLASS", "%"]
+    asset_table_headers_bold = [f"<b>{h}</b>" for h in asset_table_headers_raw]
+    asset_table_cols_data = [
+        ["Domestic Equities", "International Bonds", "Cash & Equivalents"],
+        ["57%", "30%", "13%"]
+    ]
 
-    # --- Left Column: Pie Chart ---
-    pie_labels_legend = ["GUBERNAMENTAL", "RENTA FIJA DOLARES", "LIQUIDEZ"]
-    pie_values = [57, 30, 13]
+    asset_pie_labels = ["Domestic Equities", "Cash & Equivalents", "International Bonds"]
+    asset_pie_values = [57, 13, 30]
 
+    duration_bar_labels = [">7 Years", "3-7 Years", "2-3 Years", "1-2 Years", "0-1 Years", "Short-Term/Cash"]
+    duration_bar_values = [10.05, 12.07, 0.20, 41.52, 12.16, 12.76]
+
+    # --- Element Definitions ---
+
+    # Asset Allocation Title
+    asset_allocation_title_el = TextElement(
+        text=f"<span style='padding-bottom: 1px;'>Asset Allocation</span>",
+        font_size=section_title_font_size, font_weight=FontWeight.bold,
+        color=main_blue_color, h_align=HorizontalAlign.left
+    )
+
+    # Asset Class Table
+    fig_asset_table = go.Figure(data=[go.Table(
+        header=dict(
+            values=asset_table_headers_bold,  # Use bolded headers
+            font=dict(size=table_font_size_int, color=main_blue_color, family=chart_font_family),
+            align=['left', 'right'],
+            line_color=main_blue_color,  # Line for header bottom (will box header cells)
+            fill_color='rgba(0,0,0,0)',
+            height=28  # Adjusted height
+        ),
+        cells=dict(
+            values=asset_table_cols_data,
+            font=dict(size=table_font_size_int, color=text_color_dark, family=chart_font_family),
+            align=['left', 'right'],
+            fill_color='rgba(0,0,0,0)',
+            line_color='lightgrey',  # Faint lines for data cells, or use main_blue_color for consistency
+            height=24  # Adjusted height
+        ),
+        columnwidth=[0.3, 0.2]
+    )])
+    fig_asset_table.update_layout(
+        height=125,  # Adjusted based on 3 rows + header and cell heights
+        width=300,  # Set fixed width to make table thinner
+        margin=dict(l=5, r=5, t=5, b=5),
+        paper_bgcolor='rgba(0,0,0,0)'  # Ensure Plotly table bg is transparent
+    )
+    asset_class_table_html = fig_asset_table.to_html(include_plotlyjs=False, full_html=False, config={'displayModeBar': False})
+    asset_class_table_el = HtmlElement(html=asset_class_table_html)
+
+    # Pie Chart
     fig_pie = go.Figure(data=[go.Pie(
-        labels=pie_labels_legend,
-        values=pie_values,
-        marker_colors=pie_chart_slice_colors,
-        textinfo='percent',
-        textfont_size=10,
-        hoverinfo='label+percent+value',
-        sort=False,  # Keep order as specified
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom", y=0.01,  # Adjusted for closeness
-            xanchor="center", x=0.5,
-            font=dict(size=chart_label_font_size, color=text_color_dark),
-            bgcolor='rgba(0,0,0,0)'
-        )
+        labels=asset_pie_labels, values=asset_pie_values, marker_colors=pie_chart_slice_colors,
+        textinfo='percent', textfont_size=11,
+        hoverinfo='label+percent+value', sort=False, showlegend=True
     )])
     fig_pie.update_layout(
-        height=260,
-        width=280,  # Fixed width for pie
-        margin=dict(l=10, r=10, t=5, b=35),  # Bottom margin for legend
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Lato, Arial, Helvetica, sans-serif")
+        height=400, width=430,
+        margin=dict(l=5, r=5, t=5, b=70),  # Increased bottom margin for legend space
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(family=chart_font_family),
+        legend=dict(
+            orientation="h",
+            yanchor="top",  # Anchor legend by its top
+            y=-0.2,  # Position top of legend below plot area (-0.1 to -0.3 usually works)
+            xanchor="center",
+            x=0.5,
+            font=dict(size=chart_label_font_size, color=text_color_dark),
+            bgcolor='rgba(0,0,0,0)',
+            traceorder='normal'
+        )
     )
-    pie_html = fig_pie.to_html(include_plotlyjs=False, full_html=False, config={'displayModeBar': False, 'responsive': False})
+    asset_pie_el = HtmlElement(html=fig_pie.to_html(include_plotlyjs=False, full_html=False, config={'displayModeBar': False, 'responsive': False}))
 
-    # --- Right Column: Bar Chart ---
-    bar_y_labels = [">7", "3-7", "2-3", "1-2", "0-1", "Efectivo"]
-    bar_x_values = [10.05, 12.07, 0.00, 41.52, 12.16, 12.76]
+    # Duration Breakdown Title
+    duration_breakdown_title_el = TextElement(
+        text="Duration Breakdown",
+        font_size=section_title_font_size, font_weight=FontWeight.bold,
+        color=main_blue_color, h_align=HorizontalAlign.left
+    )
 
+    # Bar Chart
     fig_bar = go.Figure(data=[go.Bar(
-        y=bar_y_labels,
-        x=bar_x_values,
-        orientation='h',
-        marker_color=bar_chart_bar_color,
-        text=[f"{val:.2f}%" if val > 0.005 else "" for val in bar_x_values],  # Show % if value is not effectively zero
-        textposition='outside',
-        textfont_size=chart_label_font_size,
-        hoverinfo='y+x'
+        y=duration_bar_labels, x=duration_bar_values, orientation='h', marker_color=bar_chart_bar_color,
+        text=[f"{val:.2f}%" for val in duration_bar_values],
+        textposition='outside', textfont_size=chart_label_font_size, hoverinfo='y+x',
     )])
+    max_val = max(duration_bar_values)
     fig_bar.update_layout(
-        height=280,
-        margin=dict(l=40, r=35, t=0, b=25),  # l for y-axis labels, r for text values, b for x-axis
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
+        # height is removed to allow responsive fill, assuming container gives height
+        margin=dict(l=20, r=20, t=5, b=20),
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
         xaxis=dict(
-            showgrid=False,
-            zeroline=False,
-            showticklabels=True,
-            ticksuffix='%',
-            side='bottom',
-            tickfont=dict(size=chart_label_font_size, color=text_color_dark)
+            showgrid=False, zeroline=False, showline=False,
+            showticklabels=True, ticksuffix='%', side='bottom',
+            tickfont=dict(size=chart_label_font_size, color=text_color_dark),
+            range=[0, max_val * 1.115]
         ),
         yaxis=dict(
-            showgrid=False,
-            zeroline=False,
-            autorange="reversed",  # Ensures ">7" is at the top
+            showgrid=False, zeroline=False, showline=False,
+            autorange="reversed",
             tickfont=dict(size=chart_label_font_size, color=text_color_dark)
         ),
-        bargap=0.35,
-        font=dict(family="Lato, Arial, Helvetica, sans-serif")
+        bargap=0.4,
+        font=dict(family=chart_font_family),
+        width=450,
     )
-    bar_html = fig_bar.to_html(include_plotlyjs=False, full_html=False, config={'displayModeBar': False, 'responsive': True})
+    duration_bar_el = HtmlElement(html=fig_bar.to_html(include_plotlyjs=False, full_html=False, config={'displayModeBar': False, 'responsive': True}))
 
-    # --- Define Column Layouts ---
-    left_column_layout = GridLayout(
-        row_definitions=["auto", "auto", "minmax(200px, auto)"],
-        col_definitions=["1fr"],
-        gap=8,
-        cells=[
-            GridCell(row=1, col=1, element=TextElement(
-                text=f"<span style='border-bottom: 2px solid {main_blue_color}; padding-bottom: 1px;'>Cartera</span>",
-                font_size=section_title_font_size, font_weight=FontWeight.bold,
-                color=main_blue_color, h_align=HorizontalAlign.left
-            )),
-            GridCell(row=2, col=1, element=HtmlElement(html=instrument_table_html),
-                     align_self=VerticalAlign.top),
-            GridCell(row=3, col=1, element=HtmlElement(html=pie_html),
-                     align_self=VerticalAlign.center, justify_self=HorizontalAlign.center)
-        ]
-    )
-
-    right_column_layout = GridLayout(
-        row_definitions=["auto", "1fr"],
-        col_definitions=["1fr"],
-        gap=8,
-        cells=[
-            GridCell(row=1, col=1, element=TextElement(
-                text="Desglose por Duración",
-                font_size=section_title_font_size, font_weight=FontWeight.bold,
-                color=main_blue_color, h_align=HorizontalAlign.left
-            )),
-            GridCell(row=2, col=1, element=HtmlElement(html=bar_html),
-                     align_self=VerticalAlign.top, justify_self=HorizontalAlign.left)
-        ]
-    )
-
-    # --- Define Main Slide Layout ---
+    # --- Main Slide Layout ---
     slide_layout = GridLayout(
-        row_definitions=["1fr"],
-        col_definitions=["2fr", "3fr"],  # Relative widths for left and right columns
-        gap=35,  # Gap between the two main columns
+        row_definitions=["auto", "auto", "1fr"],
+        col_definitions=["1fr", "1fr"],
+        gap=10,
         cells=[
-            GridCell(row=1, col=1, element=left_column_layout,
-                     padding="0 10px 0 0", align_self=VerticalAlign.top),  # Add some padding to the right of left col
-            GridCell(row=1, col=2, element=right_column_layout,
-                     padding="0 0 0 10px", align_self=VerticalAlign.top)  # Add some padding to the left of right col
+            # Column 1 (Left)
+            GridCell(row=1, col=1, element=asset_allocation_title_el,
+                     align_self=VerticalAlign.bottom, padding="0 0 2px 0"),
+            GridCell(row=2, col=1, element=asset_class_table_el,
+                     align_self=VerticalAlign.top,
+                     justify_self=HorizontalAlign.center,
+                     padding="5px 0 0 0"),
+            GridCell(row=3, col=1, element=asset_pie_el,
+                     align_self=VerticalAlign.middle, justify_self=HorizontalAlign.center, padding="5px 0 0 0"),
+
+            # Column 2 (Right)
+            GridCell(row=1, col=2, element=duration_breakdown_title_el,
+                     align_self=VerticalAlign.bottom, padding="0 0 2px 0"),
+            GridCell(row=2, col=2, row_span=2, element=duration_bar_el,  # Bar chart spans row 2 and 3
+                     align_self=VerticalAlign.middle,  # Stretch the element within the cell
+                     justify_self=HorizontalAlign.left,  # Default, content will stretch if bar_el is 100% width
+                     padding="5px 0 0 0")
         ]
     )
 
     return Slide(
-        title="Cartera y Duración",  # This title appears in the slide's header bar
+        title="Portfolio Snapshot",
         layout=slide_layout,
         background_color="#FFFFFF"
     )
-
 
 def create_full_presentation() -> Presentation:
     ms_theme = Theme(
@@ -332,15 +336,17 @@ def create_full_presentation() -> Presentation:
         TextElement(text="Data Insights & Solutions", font_size=18, color="#FFFFFF", h_align=HorizontalAlign.left,
                     position=Position(top="calc(50% + 50px)", left="8%"))
     ]
-    slide1 = Slide(title="Main Cover", background_color="#001f3f",
-                   layout=AbsoluteLayout(elements=slide1_elements, width="100%", height="100%"))
-    slide2 = create_portfolio_detail_slide()
 
     presentation = Presentation(
         title="Main Sequence Monthly Report (Example)",
         subtitle="May 2025",
         theme=ms_theme,
-        slides=[slide1, slide2]
+        slides=[
+            Slide(title="Main Cover", background_color="#001f3f",
+                  layout=AbsoluteLayout(elements=slide1_elements, width="100%", height="100%")),
+            create_portfolio_detail_slide(),
+            pie_chart_bars_slide()
+        ]
     )
     return presentation
 
