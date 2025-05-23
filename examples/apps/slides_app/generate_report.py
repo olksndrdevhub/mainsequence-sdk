@@ -179,6 +179,7 @@ class SlideReport(BaseApp):
 
         # ----- Assemble two-column layout -----
         return two_column_layout(left_col, bar_html)
+
     def _build_slide_table_html(self):
         # 2) Define 3 example assets
 

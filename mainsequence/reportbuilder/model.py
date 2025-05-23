@@ -355,7 +355,7 @@ class StyleSettings(BaseModel):
     chart_label_font_size: int = 9
     pie_chart_section_title_font_size: int = 16 # Added for the specific use in pie_chart_bars_slide
     default_background_color: str = "#FFFFFF"
-    cover_slide_background_color: str = "#001f3f"
+    cover_slide_background_color: str = "#FFFFFF"
     cover_slide_text_color: str = "#FFFFFF"
     cover_slide_main_title_font_size: int = 52
     cover_slide_subtitle_font_size: int = 32
@@ -371,13 +371,6 @@ class Theme(BaseModel):
     title_color: str = "#000"
     current_date: str = Field(default_factory=lambda: "{{CURRENT_DATE}}")
 
-    def cover_html(self, presentation_title: str, subtitle: Optional[str]) -> str:
-        bg = f'<img class="cover-bg" src="{self.cover_background_url}" alt="cover" crossOrigin="anonymous">' \
-             if self.cover_background_url else ""
-        sub = f'<div class="cover-subtitle">{subtitle}</div>' if subtitle else ""
-        logo = self.logo_img_html(position="cover-logo")
-        return f'<section class="slide cover-slide">{bg}<div><div class="cover-title">{presentation_title}</div>{sub}</div>{logo}</section>'
-
     def logo_img_html(self, position: str = "slide-logo") -> str:
         return f'<div class="{position}"><img src="{self.logo_url}" alt="logo" crossOrigin="anonymous"></div>' if self.logo_url else ""
 
@@ -388,7 +381,7 @@ class Presentation(BaseModel):
     theme: Theme = Field(default_factory=Theme)
 
     def render(self) -> str:
-        slides_html = [self.theme.cover_html(self.title, self.subtitle)]
+        slides_html = []
         total = len(self.slides)
         slides_html += [s.render(i + 1, total, self.theme) for i, s in enumerate(self.slides)]
         return BASE_TEMPLATE.render(

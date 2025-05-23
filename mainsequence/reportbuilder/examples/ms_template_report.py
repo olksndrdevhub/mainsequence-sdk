@@ -61,7 +61,76 @@ liquidity_rows = [
 ]
 
 
-def create_portfolio_detail_slide() -> Slide:
+def title_slide() -> Slide:
+    cover_slide_main_title_text = "Strategic Portfolio Insights"
+    cover_slide_subtitle_text = f"Monthly Review & Performance Outlook"
+    cover_slide_tagline_text = "Navigating Your Financial Future with Precision"
+
+    # Logo size
+    enlarged_logo_height_str = "75px"
+
+    el_main_title = TextElement(
+        text=cover_slide_main_title_text,
+        font_size=styles.cover_slide_main_title_font_size,
+        font_weight=FontWeight.bold,
+        h_align=HorizontalAlign.left
+    )
+    el_subtitle = TextElement(
+        text=cover_slide_subtitle_text,
+        font_size=styles.cover_slide_subtitle_font_size,
+        h_align=HorizontalAlign.left
+    )
+    el_logo = ImageElement(
+        src="https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png",
+        alt="Main Sequence Logo",
+        size=Size(height=enlarged_logo_height_str, width="auto") # Intrinsic size of the image
+    )
+    el_tagline = TextElement(
+        text=cover_slide_tagline_text,
+        font_size=styles.cover_slide_tagline_font_size,
+        h_align=HorizontalAlign.left
+    )
+
+    cover_layout = GridLayout(
+        row_definitions=[
+            "20%",    # Row 1: Top margin (pushes content down)
+            "auto",   # Row 2: Main Title
+            "auto",   # Row 3: Subtitle
+            "auto",   # Row 4: Logo (with additional top padding in its cell)
+            "auto",   # Row 5: Tagline
+            "1fr"     # Row 6: Bottom filler (pushes content block upwards)
+        ],
+        col_definitions=[
+            styles.cover_slide_element_left_indent, # Col 1: Left indent (e.g., "8%")
+            "auto",                                 # Col 2: Content elements, column width fits content
+            "1fr"                                   # Col 3: Takes up remaining space on the right
+        ],
+        gap=12,  # General vertical spacing between elements in consecutive rows (e.g. title and subtitle)
+        cells=[
+            GridCell(row=2, col=2, element=el_main_title,
+                     justify_self=HorizontalAlign.left, # Align element's box to left of cell
+                     align_self=VerticalAlign.bottom), # Align element to bottom of its row
+            GridCell(row=3, col=2, element=el_subtitle,
+                     justify_self=HorizontalAlign.left,
+                     align_self=VerticalAlign.top),    # Align element to top of its row
+            GridCell(row=4, col=2, element=el_logo,
+                     justify_self=HorizontalAlign.left,
+                     align_self=VerticalAlign.center, # Center logo vertically in its space
+                     padding="20px 0 0 0"), # Add 20px top padding for more space after subtitle
+            GridCell(row=5, col=2, element=el_tagline,
+                     justify_self=HorizontalAlign.left,
+                     align_self=VerticalAlign.top)
+        ],
+        width="100%", # Grid takes full width of its container
+        height="100%" # Grid takes full height of its container
+    )
+
+    return Slide(
+        title="Main Cover", # Title for the slide header bar
+        layout=cover_layout,
+    )
+
+def portfolio_detail_slide() -> Slide:
     shared_column_widths = [1.8, 1, 1, 1.5, 0.7, 0.8, 0.8, 0.7]
     shared_cell_align: Union[str, List[str]] = ['left', 'right', 'right', 'right', 'right', 'right', 'right', 'right']
     table_figure_width = 900
@@ -248,7 +317,7 @@ def pie_chart_bars_slide() -> Slide:
     )
 
 
-def create_generic_table_and_grouped_bar_chart_slide() -> Slide:
+def generic_table_and_grouped_bar_chart_slide() -> Slide:
     slide_main_title_text = "Component Analysis: Multi-Series Data"
 
     table_headers = ["Type", "Value Set 1", "Value Set 2", "Difference (VS1-VS2)"]
@@ -355,7 +424,7 @@ def create_generic_table_and_grouped_bar_chart_slide() -> Slide:
     )
 
 
-def create_portfolio_performance_slide() -> Slide:
+def portfolio_performance_slide() -> Slide:
     portfolio_bar_color = styles.main_color
     benchmark_bar_color = "#CDA434"
 
@@ -450,7 +519,7 @@ def create_portfolio_performance_slide() -> Slide:
     )
 
 
-def create_rate_sensitivity_analysis_slide() -> Slide:
+def rate_sensitivity_analysis_slide() -> Slide:
     slide_main_title_text = "Rate Sensitivity Analysis: USD Portfolio"
 
     table1_headers = ["Factor", "Portfolio", "Benchmark", "Active"]
@@ -550,7 +619,7 @@ def create_rate_sensitivity_analysis_slide() -> Slide:
     )
 
 
-def create_issuer_performance_table_slide() -> Slide:
+def issuer_performance_table_slide() -> Slide:
     slide_content_main_title = "Performance Analysis: Key Segments"
 
     table_super_header1_text = "PORTFOLIOS"
@@ -628,7 +697,7 @@ def create_issuer_performance_table_slide() -> Slide:
     )
 
 
-def create_comparative_performance_charts_slide() -> Slide:
+def comparative_performance_charts_slide() -> Slide:
     slide_content_main_title = "Overall Portfolio Performance: USD"
 
     portfolio_color = styles.main_color
@@ -743,6 +812,128 @@ def create_comparative_performance_charts_slide() -> Slide:
     )
 
 
+def data_table_summary_slide() -> Slide:
+    slide_content_title = "Transactions Summary"
+
+    table_headers = ["Date", "Deposits", "Withdrawals", "Net Amount"]
+
+    # Example data with 10 data rows + 1 total row, similar to the image structure.
+    # Numbers are formatted as strings. Bolding for the total row is done with HTML <b> tags.
+    example_table_rows = [
+        ["05/01/2025", "", "1,200,000.50", "-1,200,000.50"],
+        ["10/01/2025", "", "500,000.00", "-500,000.00"],
+        ["15/01/2025", "", "7,000,000.00", "-7,000,000.00"],
+        ["16/01/2025", "6,500,000.00", "6,500,000.00", "0.00"],
+        ["02/02/2025", "10,000,000.00", "", "10,000,000.00"],
+        ["08/02/2025", "", "10,000,000.00", "-10,000,000.00"],
+        ["12/02/2025", "", "100,000.75", "-100,000.75"],
+        ["25/02/2025", "2,000,000.00", "3,500,000.00", "-1,500,000.00"],
+        ["10/03/2025", "", "250,000.00", "-250,000.00"],
+        ["20/03/2025", "", "1,500,000.00", "-1,500,000.00"],
+        ["<b>Total</b>", "<b>18,500,000.00</b>", "<b>40,550,000.25</b>", "<b>-22,050,000.25</b>"]
+    ]
+
+    # Styling to mimic the provided image
+    table_html = generic_plotly_table(
+        headers=table_headers,
+        rows=example_table_rows,
+        column_widths=[1, 1.5, 1.5, 1.5],
+        cell_align=['left', 'right', 'right', 'right'],  # Date left, numbers right
+        header_align='center',
+    )
+
+    slide_layout = GridLayout(
+        row_definitions=["auto", "1fr"],
+        col_definitions=["1fr"],
+        gap=10,
+        cells=[
+            GridCell(row=1, col=1, element=TextElement(
+                text=slide_content_title,
+                font_size=styles.main_title_font_size - 2,
+                font_weight=FontWeight.normal,
+                color=styles.main_color,
+                h_align=HorizontalAlign.left
+            ), padding="0 0 15px 0"),
+            GridCell(row=2, col=1, element=HtmlElement(html=table_html),
+                     justify_self=HorizontalAlign.center,
+                     align_self=VerticalAlign.center,
+                     padding="0 0 0 0")
+        ]
+    )
+
+    return Slide(
+        title="Data Table Summary",  # Generic title for the slide header
+        layout=slide_layout,
+        background_color=styles.default_background_color if hasattr(styles, 'default_background_color') else "#FFFFFF"
+    )
+
+
+def contact_information_slide() -> Slide:
+    # Determine text color for dark background, defaulting to white
+    text_color_on_dark_bg = styles.text_color_light if hasattr(styles, 'text_color_light') else "#FFFFFF"
+
+    # Define font sizes based on styles or fallbacks
+    main_sequence_font_size = styles.cover_slide_subtitle_font_size if hasattr(styles, 'cover_slide_subtitle_font_size') else 32
+    asset_management_font_size = styles.main_title_font_size if hasattr(styles, 'main_title_font_size') else 22
+    address_font_size = (styles.section_title_font_size + 5) if hasattr(styles, 'section_title_font_size') else 16
+
+    # Create TextElements
+    el_main_sequence = TextElement(
+        text="Main Sequence",
+        font_size=main_sequence_font_size,
+        font_weight=FontWeight.bold,
+        color=text_color_on_dark_bg,
+        h_align=HorizontalAlign.left  # Text alignment within the element
+    )
+    el_asset_management = TextElement(
+        text="Asset Management",
+        font_size=asset_management_font_size,
+        font_weight=FontWeight.normal,
+        color=text_color_on_dark_bg,
+        h_align=HorizontalAlign.left
+    )
+    el_address1 = TextElement(
+        text="123 Finance Street, Suite 100",
+        font_size=address_font_size,
+        font_weight=FontWeight.normal,
+        color=text_color_on_dark_bg,
+        h_align=HorizontalAlign.left
+    )
+    el_address2 = TextElement(
+        text="NY 10201, USA",  # As per the uploaded image
+        font_size=address_font_size,
+        font_weight=FontWeight.normal,
+        color=text_color_on_dark_bg,
+        h_align=HorizontalAlign.left
+    )
+
+    slide_layout = GridLayout(
+        row_definitions=["18%", "auto", "auto", "auto", "auto", "1fr"],
+        col_definitions=["8%", "auto", "1fr"],
+        gap=6,
+        cells=[
+            GridCell(row=2, col=2, element=el_main_sequence,
+                     justify_self=HorizontalAlign.left,
+                     align_self=VerticalAlign.bottom),
+            GridCell(row=3, col=2, element=el_asset_management,
+                     justify_self=HorizontalAlign.left,
+                     align_self=VerticalAlign.top),
+            GridCell(row=4, col=2, element=el_address1,
+                     justify_self=HorizontalAlign.left,
+                     align_self=VerticalAlign.bottom,
+                     padding="15px 0 0 0"),
+            GridCell(row=5, col=2, element=el_address2,
+                     justify_self=HorizontalAlign.left,
+                     align_self=VerticalAlign.top)
+        ]
+    )
+
+    return Slide(
+        title="Contact Information",
+        layout=slide_layout,
+        background_color=styles.main_color if hasattr(styles, 'main_color') else "#002060"
+    )
+
 def create_full_presentation() -> Presentation:
     ms_theme = Theme(
         logo_url="https://cdn.prod.website-files.com/67d166ea95c73519badbdabd/67d166ea95c73519badbdc60_Asset%25202%25404x-8-p-800.png",
@@ -751,36 +942,25 @@ def create_full_presentation() -> Presentation:
         base_font_size=styles.section_title_font_size,
         title_color="#005f73"
     )
-    slide1_elements = [
-        TextElement(text="Monthly Report", font_size=styles.cover_slide_main_title_font_size, font_weight=FontWeight.bold, color=styles.cover_slide_text_color,
-                    h_align=HorizontalAlign.left, position=Position(top="20%", left=styles.cover_slide_element_left_indent)),
-        TextElement(text="May 2025", font_size=styles.cover_slide_subtitle_font_size, color=styles.cover_slide_text_color, h_align=HorizontalAlign.left,
-                    position=Position(top="35%", left=styles.cover_slide_element_left_indent)),
-        ImageElement(src=ms_theme.logo_url, alt="Main Sequence Logo", size=Size(height=styles.cover_slide_logo_height, width="auto"),
-                     position=Position(top="50%", left=styles.cover_slide_element_left_indent)),
-        TextElement(text="Data Insights & Solutions", font_size=styles.cover_slide_tagline_font_size, color=styles.cover_slide_text_color,
-                    h_align=HorizontalAlign.left,
-                    position=Position(top=f"calc(50% + {styles.cover_slide_logo_height} + 10px)", left=styles.cover_slide_element_left_indent))
-    ]
 
     presentation = Presentation(
         title="Main Sequence Monthly Report (Example)",
         subtitle="May 2025",
         theme=ms_theme,
         slides=[
-            Slide(title="Main Cover", background_color=styles.cover_slide_background_color,
-                  layout=AbsoluteLayout(elements=slide1_elements, width="100%", height="100%")),
-            create_portfolio_detail_slide(),
+            title_slide(),
+            portfolio_detail_slide(),
             pie_chart_bars_slide(),
-            create_generic_table_and_grouped_bar_chart_slide(),
-            create_portfolio_performance_slide(),
-            create_rate_sensitivity_analysis_slide(),
-            create_issuer_performance_table_slide(),
-            create_comparative_performance_charts_slide()
+            generic_table_and_grouped_bar_chart_slide(),
+            portfolio_performance_slide(),
+            rate_sensitivity_analysis_slide(),
+            issuer_performance_table_slide(),
+            comparative_performance_charts_slide(),
+            data_table_summary_slide(),
+            contact_information_slide()
         ]
     )
     return presentation
-
 
 if __name__ == "__main__":
     output_dir = Path("output")

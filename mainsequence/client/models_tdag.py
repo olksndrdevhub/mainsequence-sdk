@@ -285,10 +285,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             return self.remote_table.data_source.id
 
     @classmethod
-    def get(cls,*args,**kwargs):
-        return super().get(*args,**kwargs)
-
-    @classmethod
     def get_or_create(cls, **kwargs):
         url = cls.get_object_url() + "/get_or_create/"
         kwargs = serialize_to_json(kwargs)

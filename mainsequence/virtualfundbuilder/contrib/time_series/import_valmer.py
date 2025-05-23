@@ -43,30 +43,34 @@ class ImportValmer(TimeSerie):
 
     def _get_asset_list(self) -> Union[None, list]:
         source_data = self._get_artifact_data()
+
+        asset_columns = ["ticker", "name", "isin", "security_type", "security_type_2", "security_market_sector", "exchange_code"]
+        #buld register
+        source_data['ticker'] = source_data["Instrumento"]
+        source_data['name'] = source_data["Instrumento"]
+        source_data['isin'] = source_data['Isin'].apply(lambda x: None if pd.isna(x) else x)
+        source_data['security_type'] = None
+        source_data['security_type_2'] = None
+        source_data['security_market_sector'] = None
+        source_data['exchange_code'] = None
+        bulk_data = source_data[asset_columns].to_dict('records')
+
         assets = []
-        for i, row in source_data[["Instrumento", "Isin"]].iterrows():
-            instrument = row["Instrumento"]
-            isin = str(row["Isin"])
-            if np.isnan(row["Isin"]):
-                isin = None
+        batch_size = 500
+        for i in range(0, len(bulk_data), batch_size):
+            self.logger.info(f"Batch register assets {i} to {i + batch_size}")
+            batch = bulk_data[i:i + batch_size]
+            asset_ids_batch = Asset.batch_get_or_register_custom_assets(asset_list=batch)
+            self.logger.info(f"Query assets {i} to {i + batch_size}")
+            bulk_assets = Asset.filter(id__in=asset_ids_batch, timeout=60*5)
+            assets += bulk_assets
 
-            asset = None
-            try:
-                asset = Asset.get_or_register_custom_asset_in_main_sequence_venue(ticker=instrument,
-                                                                                name=instrument,
-                                                                                security_type=None,
-                                                                                security_type_2=None,
-                                                                                security_market_sector=None,
-                                                                                isin=isin,
-                                                                                exchange_code=None
-                                                                                )
-                source_data.loc[source_data["Instrumento"] == instrument, "unique_identifier"] = asset.unique_identifier
-                assets.append(asset)
-            except Exception as e:
-                print(f"Could not register asset with Instrumento {instrument} and Isin {isin}, error {e}")
-                continue
+        ticker_map =  {
+            a.ticker: a.unique_identifier for a in assets
+        }
 
-        self.source_data = source_data
+        source_data.unique_identifier = source_data["ticker"].map(ticker_map)
+        self.source_data = source_data.drop(columns=asset_columns)
         return assets
 
     def update(self, update_statistics: "DataUpdates"):
