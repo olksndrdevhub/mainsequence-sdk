@@ -147,6 +147,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
     unique_identifier: str
 
     real_figi: bool = Field(default=True, description="FIGI identifier is real (default: True)")
+    is_custom_by_organization:bool
     figi: constr(max_length=12) = Field(
         ...,
         description="FIGI identifier (unique to a specific instrument on a particular market/exchange)"
@@ -594,6 +595,29 @@ class Asset(AssetMixin, BaseObjectOrm):
         if r.status_code not in [200, 201]:
             raise Exception(f"Error appending creating: {r.text}")
         return cls(**r.json())
+    @classmethod
+    def get_or_register_custom_asset_in_main_sequence_venue(cls, name,ticker,security_type,security_type_2,
+                                                            security_market_sector,isin,exchange_code,
+                                                            timeout=None)->"Asset":
+        url = f"{cls.get_object_url()}/get_or_register_custom_asset_in_main_sequence_venue/"
+        payload = {"json": {"name":name,
+                            "ticker":ticker,
+                            "security_type":security_type,
+                            "security_type_2":security_type_2,
+                            "security_market_sector":security_market_sector,
+                            "isin":isin,
+                            "exchange_code":exchange_code,}}
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            payload=payload, time_out=timeout
+        )
+        if r.status_code not in [200, 201]:
+            raise Exception(f"Error appending creating: {r.text}")
+        return cls(**r.json())
+
 
 
 class IndexAsset(Asset):
