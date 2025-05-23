@@ -310,7 +310,7 @@ def generic_plotly_grouped_bar_chart(
 
     fig.update_layout(
         title_text=chart_title,
-        title_font=dict(size=styles.pie_chart_section_title_font_size, family=styles.chart_font_family, color=styles.main_color),
+        title_font=dict(size=styles.section_title_font_size, family=styles.chart_font_family, color=styles.main_color),
         title_x=title_x_position,
         height=height,
         width=width,

@@ -353,7 +353,6 @@ class StyleSettings(BaseModel):
     text_color_dark: str = "#333333"
     chart_font_family: str = "Lato, Arial, Helvetica, sans-serif"
     chart_label_font_size: int = 9
-    pie_chart_section_title_font_size: int = 16 # Added for the specific use in pie_chart_bars_slide
     default_background_color: str = "#FFFFFF"
     cover_slide_background_color: str = "#FFFFFF"
     cover_slide_text_color: str = "#FFFFFF"

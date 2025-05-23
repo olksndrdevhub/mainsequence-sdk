@@ -171,9 +171,10 @@ def portfolio_detail_slide() -> Slide:
         fig_width=table_figure_width,
         column_widths=shared_column_widths,
         cell_align=['left', 'right', 'right', 'right', 'right', 'right', 'right', 'right'],
-        header_height=0,
         cell_fill_color='rgba(0,0,0,0)',
         line_color='rgba(0,0,0,0)',
+        header_fill_color='rgba(0,0,0,0)',
+        header_font_color='rgba(0,0,0,0)',
         margin_dict=dict(l=0, r=0, t=5, b=0),
         cell_font_dict=dict(size=12, family=styles.chart_font_family)
     )
@@ -293,7 +294,7 @@ def pie_chart_bars_slide() -> Slide:
         cells=[
             GridCell(row=1, col=1, element=TextElement(
                 text=f"Asset Allocation",
-                font_size=styles.pie_chart_section_title_font_size, font_weight=FontWeight.bold,
+                font_size=styles.section_title_font_size, font_weight=FontWeight.bold,
                 color=styles.main_color, h_align=HorizontalAlign.left
             ), align_self=VerticalAlign.bottom, padding="0 0 2px 0"),
             GridCell(row=2, col=1, element=asset_class_table_el,
@@ -302,7 +303,7 @@ def pie_chart_bars_slide() -> Slide:
                      align_self=VerticalAlign.center, justify_self=HorizontalAlign.center, padding="5px 0 0 0"),
 
             GridCell(row=1, col=2, element=TextElement(
-                text="Duration Breakdown", font_size=styles.pie_chart_section_title_font_size, font_weight=FontWeight.bold,
+                text="Duration Breakdown", font_size=styles.section_title_font_size, font_weight=FontWeight.bold,
                 color=styles.main_color, h_align=HorizontalAlign.left
             ), align_self=VerticalAlign.bottom, padding="0 0 2px 0"),
             GridCell(row=2, col=2, row_span=2, element=duration_bar_el,
@@ -374,7 +375,7 @@ def generic_table_and_grouped_bar_chart_slide() -> Slide:
     custom_legend = dict(
         orientation="h",
         yanchor="top",
-        y=-0.15,  # Specific y position for this chart's legend
+        y=-0.15,
         xanchor="center",
         x=0.5,
         font=dict(size=styles.chart_label_font_size, family=styles.chart_font_family),
@@ -391,7 +392,7 @@ def generic_table_and_grouped_bar_chart_slide() -> Slide:
         y_axis_tick_format=".2f",
         xaxis_tickangle=-45,
         legend_dict=custom_legend,
-        margin_dict=dict(l=30, r=20, t=10, b=120)  # Specific margin for this chart
+        margin_dict=dict(l=30, r=20, t=10, b=120)
     )
 
     slide_layout = GridLayout(
@@ -428,17 +429,16 @@ def portfolio_performance_slide() -> Slide:
     portfolio_bar_color = styles.main_color
     benchmark_bar_color = "#CDA434"
 
-    # Data for Monthly Performance Chart
     monthly_categories = ["JAN", "FEB", "MAR", "APR"]
     monthly_series_data = [
         {
             "name": "Portfolio",
-            "y_values": [0.83, 1.13, 1.72, 1.08], # Example data
+            "y_values": [0.83, 1.13, 1.72, 1.08],
             "color": portfolio_bar_color
         },
         {
             "name": "Benchmark",
-            "y_values": [1.38, 1.47, 1.31, 1.02], # Example data
+            "y_values": [1.38, 1.47, 1.31, 1.02],
             "color": benchmark_bar_color
         }
     ]
@@ -456,17 +456,16 @@ def portfolio_performance_slide() -> Slide:
         margin_dict=dict(l=40, r=20, t=50, b=40),
     )
 
-    # Data for Annual Performance Chart
-    annual_categories = ["2023", "2024"] # Example years
+    annual_categories = ["2023", "2024"]
     annual_series_data = [
         {
             "name": "Portfolio",
-            "y_values": [4.84, 11.45], # Example data
+            "y_values": [4.84, 11.45],
             "color": portfolio_bar_color
         },
         {
             "name": "Benchmark",
-            "y_values": [5.28, 9.91], # Example data
+            "y_values": [5.28, 9.91],
             "color": benchmark_bar_color
         }
     ]
@@ -485,9 +484,9 @@ def portfolio_performance_slide() -> Slide:
     )
 
     slide_layout = GridLayout(
-        row_definitions=["auto", "auto", "auto", "auto"], # Adjusted for content
+        row_definitions=["auto", "auto", "auto", "auto"],
         col_definitions=["1fr"],
-        gap=15, # Adjusted gap
+        gap=15,
         cells=[
             GridCell(row=1, col=1, element=TextElement(
                 text="Portfolio Performance in Local Currency", # Generalized title
@@ -495,7 +494,7 @@ def portfolio_performance_slide() -> Slide:
                 font_weight=FontWeight.bold,
                 color=styles.main_color,
                 h_align=HorizontalAlign.left
-            ), padding="0 0 5px 0"), # Added bottom padding
+            ), padding="0 0 5px 0"),
 
             GridCell(row=2, col=1, element=HtmlElement(html=monthly_chart_html),
                      justify_self=HorizontalAlign.center),
@@ -504,16 +503,16 @@ def portfolio_performance_slide() -> Slide:
                      justify_self=HorizontalAlign.center),
 
             GridCell(row=4, col=1, element=TextElement(
-                text="Data as of 04/30/2025", # Example date
-                font_size=9, # Smaller font for footer note
-                color="#555555", # Grey color
+                text="Data as of 04/30/2025",
+                font_size=9,
+                color="#555555",
                 h_align=HorizontalAlign.left
             ), padding="5px 0 0 0", align_self=VerticalAlign.bottom)
         ]
     )
 
     return Slide(
-        title="Financial Performance Summary", # Generic slide title for header
+        title="Financial Performance Summary",
         layout=slide_layout,
         background_color=styles.default_background_color
     )
@@ -555,7 +554,7 @@ def rate_sensitivity_analysis_slide() -> Slide:
         headers=table2_headers,
         rows=table2_rows,
         fig_width=350,
-        table_height=145,  # Adjusted height for total row
+        table_height=145,
         column_widths=[0.8, 0.5, 0.5, 0.5],
         cell_align=['left', 'right', 'right', 'right'],
         header_font_dict=dict(color='white', size=10, family=styles.chart_font_family),
@@ -568,8 +567,8 @@ def rate_sensitivity_analysis_slide() -> Slide:
     bar_chart_categories = ["Factor A", "Factor B"]
     bar_chart_series_data = [
         {"name": "Portfolio", "y_values": [1.30, 2.80], "color": styles.main_color},
-        {"name": "Benchmark", "y_values": [1.90, 0.00], "color": 'rgb(173, 216, 230)'},  # Light Blue for Benchmark
-        {"name": "Active", "y_values": [-0.60, 2.80], "color": 'rgb(205, 164, 52)'}  # Gold-like color
+        {"name": "Benchmark", "y_values": [1.90, 0.00], "color": 'rgb(173, 216, 230)'},
+        {"name": "Active", "y_values": [-0.60, 2.80], "color": 'rgb(205, 164, 52)'}
     ]
 
     bar_chart_html = generic_plotly_grouped_bar_chart(
@@ -588,7 +587,7 @@ def rate_sensitivity_analysis_slide() -> Slide:
             bgcolor='rgba(0,0,0,0)'
         ),
         margin_dict=dict(l=40, r=20, t=30, b=40),
-        bar_text_template=None  # Values are clear from axes
+        bar_text_template=None
     )
 
     slide_layout = GridLayout(
@@ -598,7 +597,7 @@ def rate_sensitivity_analysis_slide() -> Slide:
         cells=[
             GridCell(row=1, col=1, col_span=2, element=TextElement(
                 text=slide_main_title_text,
-                font_size=styles.main_title_font_size - 2,  # Slightly smaller for this context
+                font_size=styles.main_title_font_size - 2,
                 font_weight=FontWeight.bold,
                 color=styles.main_color,
                 h_align=HorizontalAlign.left
@@ -613,7 +612,7 @@ def rate_sensitivity_analysis_slide() -> Slide:
     )
 
     return Slide(
-        title="Rate Sensitivity Analysis",  # Slide header title
+        title="Rate Sensitivity Analysis",
         layout=slide_layout,
         background_color=styles.default_background_color
     )
@@ -661,8 +660,8 @@ def issuer_performance_table_slide() -> Slide:
         cells=[
             GridCell(row=1, col=1, element=TextElement(
                 text=slide_content_main_title,
-                font_size=styles.main_title_font_size - 4,
-                font_weight=FontWeight.normal,
+                font_size=styles.main_title_font_size - 2,
+                font_weight=FontWeight.bold,
                 color=styles.main_color,
                 h_align=HorizontalAlign.left
             ), padding="0 0 20px 0"),
@@ -701,9 +700,8 @@ def comparative_performance_charts_slide() -> Slide:
     slide_content_main_title = "Overall Portfolio Performance: USD"
 
     portfolio_color = styles.main_color
-    benchmark_color = 'rgb(189, 149, 58)' # A gold/brown color
+    benchmark_color = 'rgb(189, 149, 58)'
 
-    # Monthly Performance Chart
     monthly_chart_title = "Monthly USD Returns"
     monthly_categories = ["Jan", "Feb", "Mar", "Apr"]
     monthly_series_data = [
@@ -722,7 +720,7 @@ def comparative_performance_charts_slide() -> Slide:
     monthly_legend_config = dict(
         orientation="v",
         yanchor="top", y=1,
-        xanchor="left", x=1.01, # Position to the right of plot area
+        xanchor="left", x=1.01,
         font=dict(size=styles.chart_label_font_size -1, family=styles.chart_font_family),
         bgcolor='rgba(0,0,0,0)'
     )
@@ -738,11 +736,10 @@ def comparative_performance_charts_slide() -> Slide:
         bar_text_template="%{y:.2f}%",
         bar_text_position="outside",
         legend_dict=monthly_legend_config,
-        margin_dict=dict(l=50, r=100, t=50, b=40), # Increased right margin for legend
-        title_x_position=0.5 # Center chart title
+        margin_dict=dict(l=50, r=100, t=50, b=40),
+        title_x_position=0.5,
     )
 
-    # Annual Performance Chart
     annual_chart_title = "Annual Returns"
     annual_categories = ["Prior Year", "Current Year"]
     annual_series_data = [
@@ -777,14 +774,14 @@ def comparative_performance_charts_slide() -> Slide:
         bar_text_template="%{y:.2f}%",
         bar_text_position="outside",
         legend_dict=annual_legend_config,
-        margin_dict=dict(l=50, r=100, t=60, b=40), # Increased top and right margin
-        title_x_position=0.5 # Center chart title
+        margin_dict=dict(l=50, r=100, t=60, b=40),
+        title_x_position=0.5
     )
 
     slide_layout = GridLayout(
         row_definitions=["auto", "auto", "auto", "auto"],
         col_definitions=["1fr"],
-        gap=5, # Small gap between elements
+        gap=5,
         cells=[
             GridCell(row=1, col=1, element=TextElement(
                 text=slide_content_main_title,
@@ -801,7 +798,7 @@ def comparative_performance_charts_slide() -> Slide:
             GridCell(row=3, col=1, element=HtmlElement(html=annual_chart_html),
                      justify_self=HorizontalAlign.center,
                      align_self=VerticalAlign.center,
-                     padding="15px 0 0 0") # Padding above the second chart
+                     padding="15px 0 0 0")
         ]
     )
 
@@ -817,8 +814,6 @@ def data_table_summary_slide() -> Slide:
 
     table_headers = ["Date", "Deposits", "Withdrawals", "Net Amount"]
 
-    # Example data with 10 data rows + 1 total row, similar to the image structure.
-    # Numbers are formatted as strings. Bolding for the total row is done with HTML <b> tags.
     example_table_rows = [
         ["05/01/2025", "", "1,200,000.50", "-1,200,000.50"],
         ["10/01/2025", "", "500,000.00", "-500,000.00"],
@@ -833,13 +828,13 @@ def data_table_summary_slide() -> Slide:
         ["<b>Total</b>", "<b>18,500,000.00</b>", "<b>40,550,000.25</b>", "<b>-22,050,000.25</b>"]
     ]
 
-    # Styling to mimic the provided image
     table_html = generic_plotly_table(
         headers=table_headers,
         rows=example_table_rows,
         column_widths=[1, 1.5, 1.5, 1.5],
-        cell_align=['left', 'right', 'right', 'right'],  # Date left, numbers right
+        cell_align=['left', 'right', 'right', 'right'],
         header_align='center',
+        table_height=400
     )
 
     slide_layout = GridLayout(
@@ -862,48 +857,40 @@ def data_table_summary_slide() -> Slide:
     )
 
     return Slide(
-        title="Data Table Summary",  # Generic title for the slide header
+        title="Data Table Summary",
         layout=slide_layout,
         background_color=styles.default_background_color if hasattr(styles, 'default_background_color') else "#FFFFFF"
     )
 
 
 def contact_information_slide() -> Slide:
-    # Determine text color for dark background, defaulting to white
-    text_color_on_dark_bg = styles.text_color_light if hasattr(styles, 'text_color_light') else "#FFFFFF"
 
-    # Define font sizes based on styles or fallbacks
     main_sequence_font_size = styles.cover_slide_subtitle_font_size if hasattr(styles, 'cover_slide_subtitle_font_size') else 32
     asset_management_font_size = styles.main_title_font_size if hasattr(styles, 'main_title_font_size') else 22
     address_font_size = (styles.section_title_font_size + 5) if hasattr(styles, 'section_title_font_size') else 16
 
-    # Create TextElements
     el_main_sequence = TextElement(
         text="Main Sequence",
         font_size=main_sequence_font_size,
         font_weight=FontWeight.bold,
-        color=text_color_on_dark_bg,
-        h_align=HorizontalAlign.left  # Text alignment within the element
+        h_align=HorizontalAlign.left
     )
     el_asset_management = TextElement(
         text="Asset Management",
         font_size=asset_management_font_size,
         font_weight=FontWeight.normal,
-        color=text_color_on_dark_bg,
         h_align=HorizontalAlign.left
     )
     el_address1 = TextElement(
-        text="123 Finance Street, Suite 100",
+        text="Karlsplatz 3",
         font_size=address_font_size,
         font_weight=FontWeight.normal,
-        color=text_color_on_dark_bg,
         h_align=HorizontalAlign.left
     )
     el_address2 = TextElement(
-        text="NY 10201, USA",  # As per the uploaded image
+        text="1010 Vienna, Austria",
         font_size=address_font_size,
         font_weight=FontWeight.normal,
-        color=text_color_on_dark_bg,
         h_align=HorizontalAlign.left
     )
 
@@ -931,7 +918,7 @@ def contact_information_slide() -> Slide:
     return Slide(
         title="Contact Information",
         layout=slide_layout,
-        background_color=styles.main_color if hasattr(styles, 'main_color') else "#002060"
+        background_color="#d6e2ff"
     )
 
 def create_full_presentation() -> Presentation:
@@ -963,15 +950,14 @@ def create_full_presentation() -> Presentation:
     return presentation
 
 if __name__ == "__main__":
-    output_dir = Path("output")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_html_path = output_dir / "ms_template_report.html"
+    script_dir = Path(__file__).resolve().parent
+    output_html_path = script_dir / "ms_template_report.html"
     final_presentation = create_full_presentation()
     try:
         html_content = final_presentation.render()
         with open(output_html_path, "w", encoding="utf-8") as f:
             f.write(html_content)
-        print(f"Presentation rendered successfully to {output_html_path}")
+        print(f"Presentation rendered successfully to {output_html_path.resolve()}")
     except Exception as e:
         print(f"An error occurred during rendering: {e}")
         import traceback
