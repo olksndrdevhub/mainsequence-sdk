@@ -617,7 +617,21 @@ class Asset(AssetMixin, BaseObjectOrm):
         if r.status_code not in [200, 201]:
             raise Exception(f"Error appending creating: {r.text}")
         return cls(**r.json())
-
+    @classmethod
+    def batch_get_or_register_custom_assets(cls,asset_list:List["Asset"],timeout=None)->List[int]:
+        url = f"{cls.get_object_url()}/batch_get_or_register_custom_assets/"
+        payload = {"json": {"asset_list": asset_list,
+                           }}
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=url,
+            payload=payload, time_out=timeout
+        )
+        if r.status_code not in [200, 201]:
+            raise Exception(f"Error appending creating: {r.text}")
+        return r.json()
 
 
 class IndexAsset(Asset):
