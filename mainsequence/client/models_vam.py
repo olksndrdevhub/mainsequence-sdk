@@ -845,9 +845,12 @@ class RebalanceTargetPosition(BasePydanticModel):
 class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
 
     @classmethod
-    def get_or_create(cls,timeout=None,**kwargs,):
+    def get_or_create(cls,
+                      create_without_holdings=False,
+                      timeout=None,**kwargs,):
         base_url = cls.get_object_url()
         url = f"{base_url}/get-or-create/"
+        kwargs["create_without_holdings"]=create_without_holdings
         payload = {"json": kwargs}
 
         r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="POST", url=url,

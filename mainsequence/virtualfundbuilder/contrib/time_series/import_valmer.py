@@ -5,7 +5,10 @@ from typing import Union
 import pandas as pd
 
 from mainsequence.tdag.time_series import TimeSerie
-from mainsequence.client import  Asset
+from mainsequence.client import  Asset,DataUpdates
+from mainsequence.client.models_helpers import MarketsTimeSeriesDetails,DataFrequency
+from mainsequence.client.utils import DoesNotExist
+
 
 from mainsequence.virtualfundbuilder.utils import TIMEDELTA
 import numpy as np
@@ -58,10 +61,10 @@ class ImportValmer(TimeSerie):
         assets = []
         batch_size = 500
         for i in range(0, len(bulk_data), batch_size):
-            self.logger.info(f"Batch register assets {i} to {i + batch_size}")
+            self.logger.info(f"Batch register assets {i} to {i + batch_size} / {len(bulk_data)}")
             batch = bulk_data[i:i + batch_size]
             asset_ids_batch = Asset.batch_get_or_register_custom_assets(asset_list=batch)
-            self.logger.info(f"Query assets {i} to {i + batch_size}")
+            self.logger.info(f"Query assets {i} to {i + batch_size} / {len(bulk_data)}")
             bulk_assets = Asset.filter(id__in=asset_ids_batch, timeout=60*5)
             assets += bulk_assets
 
@@ -69,7 +72,7 @@ class ImportValmer(TimeSerie):
             a.ticker: a.unique_identifier for a in assets
         }
 
-        source_data.unique_identifier = source_data["ticker"].map(ticker_map)
+        self.source_data["unique_identifier"] = source_data["ticker"].map(ticker_map)
         self.source_data = source_data.drop(columns=asset_columns)
         return assets
 
@@ -78,7 +81,7 @@ class ImportValmer(TimeSerie):
 
         assert source_data is not None, "Source data is not available"
 
-        source_data.rename(columns={"Instrumento": "unique_identifier", "Fecha": "time_index"}, inplace=True)
+        source_data.rename(columns={"Fecha": "time_index"}, inplace=True)
         source_data['time_index'] = pd.to_datetime(source_data['time_index'], utc=True)
 
         # make columns lower case
@@ -86,7 +89,34 @@ class ImportValmer(TimeSerie):
             source_data.rename(columns={col: col.lower()}, inplace=True)
 
         source_data.set_index(["time_index", "unique_identifier"], inplace=True)
+
+        source_data=update_statistics.filter_df_by_latest_value(source_data)
+
+
         return source_data
+
+    def  _run_post_update_routines(self, error_on_last_update,update_statistics:DataUpdates):
+
+        MARKET_TIME_SERIES_UNIQUE_IDENTIFIER="vector_de_precios_valmer"
+        try:
+            markets_time_series_details = MarketsTimeSeriesDetails.get(
+                unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+            )
+            if markets_time_series_details.related_local_time_serie.id != self.local_time_serie.id:
+                markets_time_series_details = markets_time_series_details.patch(related_local_time_serie__id=self.local_time_serie.id)
+        except DoesNotExist:
+            markets_time_series_details = MarketsTimeSeriesDetails.update_or_create(
+                unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+                related_local_time_serie__id=self.local_time_serie.id,
+                data_frequency_id=DataFrequency.one_d,
+                description="Vector de precios Valmer",
+            )
+        markets_time_series_details.append_asset_list_source(asset_list=update_statistics.asset_list)
+
+
+
+
+
 
 if __name__ == "__main__":
     ts = ImportValmer(
