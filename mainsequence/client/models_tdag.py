@@ -1173,6 +1173,12 @@ class DataUpdates(BaseModel):
         if df.shape[0] == 0:
             return df
         if not self.is_empty():
+
+            if self.update_statistics is None and self.max_time_index_value is not None:
+                #single index time serie
+                return df[df.index>=self.max_time_index_value]
+
+
             for unique_identifier, last_update in self.update_statistics.items():
                 df = df[
                     (

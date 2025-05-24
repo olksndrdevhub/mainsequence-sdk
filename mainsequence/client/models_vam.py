@@ -932,6 +932,7 @@ class AccountPositionDetail(BaseObjectOrm,BasePydanticModel):
     price: float
     quantity : float
     parents_holdings: Optional[int]=None
+    extra_details:Optional[dict]=None
 
 class AccountHistoricalHoldings(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = Field(None, primary_key=True)
@@ -967,13 +968,15 @@ class AccountHistoricalHoldings(BaseObjectOrm,BasePydanticModel):
     @classmethod
     def  create_with_holdings(cls,position_list:List[AccountPositionDetail],
                                                    holdings_date:int,
-                                                   related_account:int,timeout=None
+                                                   related_account:int,
+                              extra_details: dict = None,
+                              timeout=None
                                                    ):
 
         base_url = cls.get_object_url()
         payload = {"json": {"position_list": [{k:v for k,v in p.model_dump().items() if k not in ["orm_class","id","parents_holdings"]} for p in position_list],
                             "holdings_date": holdings_date,
-                            "related_account":related_account
+                            "related_account":related_account,
                             }}
 
         r = make_request(

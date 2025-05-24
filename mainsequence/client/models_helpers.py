@@ -17,7 +17,7 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
     unique_identifier: str
     related_local_time_serie: Union[LocalTimeSerie,int]
     description: Optional[str] = Field(None, description="Descriptions of the data source")
-    data_frequency_id: str = DataFrequency
+    data_frequency_id: Optional[DataFrequency] =None
     assets_in_data_source:Optional[List[int]]
     extra_properties: Optional[Dict]
 
