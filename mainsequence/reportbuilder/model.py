@@ -327,17 +327,33 @@ class Slide(BaseModel):
     layout: Union[GridLayout, AbsoluteLayout]
     background_color: Optional[str] = "#ffffff"
     notes: Optional[str] = None
+    title_font_size: int = 24  # default title size in px
+    body_margin_top: int = 40           # default margin (px) between header and body
+    include_logo_in_header:bool=True
+    footer_text_color: str = "#000000"  # default text color for footer items
+
 
     def render(self, slide_number: int, total: int, theme: "Theme") -> str:
+        title_style = f"font-size: {self.title_font_size}px;"
+        logo_html = theme.logo_img_html() if self.include_logo_in_header else ''
+
         header_html = (
-            f'<div class="slide-header"><div class="slide-title fw-bold">{self.title}</div>'
-            f'{theme.logo_img_html()}</div>'
+            f'<div class="slide-header">'
+            f'<div class="slide-title fw-bold" style="{title_style}">{self.title}</div>'
+              f'{logo_html}'
+            f'</div>'
         )
+        text_style = f"color: {self.footer_text_color};"
         footer_html = (
-            f'<div class="slide-footer"><div class="slide-date">{theme.current_date}</div>'
-            f'<div class="slide-number">{slide_number} / {total}</div></div>'
+            f'<div class="slide-footer">'
+            f'<div class="slide-date" style="{text_style}">{theme.current_date}</div>'
+            f'<div class="slide-number" style="{text_style}">{slide_number} / {total}</div>'
+            f'</div>'
         )
-        slide_body_style = "flex:1;display:flex;flex-direction:column;overflow:hidden;"
+        slide_body_style = (
+            f"flex:1;display:flex;flex-direction:column;"
+            f"overflow:hidden; margin-top:{self.body_margin_top}px;"
+        )
 
         return (
             f'<section class="slide" style="background-color:{self.background_color};">'
@@ -349,10 +365,12 @@ class StyleSettings(BaseModel):
     section_title_font_size: int = 11
     main_title_font_size: int = 22
     main_color: str = "#003049"
+    secondary_color:str = "#b4a269",
+    third_color:str = "#aea06c",
     title_column_width: str = "150px"
     text_color_dark: str = "#333333"
     chart_font_family: str = "Lato, Arial, Helvetica, sans-serif"
-    chart_label_font_size: int = 9
+    chart_label_font_size: int = 12
     default_background_color: str = "#FFFFFF"
     cover_slide_background_color: str = "#FFFFFF"
     cover_slide_text_color: str = "#FFFFFF"

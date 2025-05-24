@@ -304,9 +304,10 @@ def generic_plotly_grouped_bar_chart(
     if legend_dict is not None:
         default_legend_config.update(legend_dict)
 
-    final_margin_dict = margin_dict if margin_dict is not None else dict(l=40, r=20, t=50 if chart_title else 20, b=30)
+    final_margin_dict = margin_dict if margin_dict is not None else dict(l=40, r=20, t=50 if chart_title else 50, b=50)
     if xaxis_tickangle is not None and xaxis_tickangle != 0:
         final_margin_dict["b"] = max(final_margin_dict.get("b", 30), 70 + abs(xaxis_tickangle) // 10 * 5)
+
 
     fig.update_layout(
         title_text=chart_title,
@@ -325,8 +326,11 @@ def generic_plotly_grouped_bar_chart(
         font=dict(family=styles.chart_font_family)
     )
 
+
+
     if xaxis_tickangle is not None:
         fig.update_xaxes(tickangle=xaxis_tickangle)
+
 
     return fig.to_html(
         include_plotlyjs=include_plotlyjs,
