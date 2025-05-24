@@ -72,7 +72,7 @@ class ImportValmer(TimeSerie):
             a.ticker: a.unique_identifier for a in assets
         }
 
-        self.source_data["unique_identifier"] = source_data["ticker"].map(ticker_map)
+        source_data["unique_identifier"] = source_data["ticker"].map(ticker_map)
         self.source_data = source_data.drop(columns=asset_columns)
         return assets
 
