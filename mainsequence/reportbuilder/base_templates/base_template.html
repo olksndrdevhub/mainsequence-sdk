@@ -6,6 +6,9 @@
   <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+ <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" ></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.min.js"></script>
   <style>
     body,html{margin:0;padding:0;width:100%;background:#e0e0e0;font-family:{{ font_family }};}
 
@@ -115,14 +118,27 @@
 
   <div id="buttonContainer">
       <button id="playButton" title="Toggle Fullscreen View"><i class="bi bi-play-fill"></i></button>
-      <button id="exportPdfButton" title="Export to PDF">PDF</button>
+         <!-- Hamburger Menu Dropdown -->
+     <div class="dropdown">
+      <button
+        class="btn btn-primary dropdown-toggle"
+        type="button"
+        id="menuButton"
+        data-bs-toggle="dropdown"
+        aria-expanded="false">
+        <i class="bi bi-list"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="menuButton">
+        <li><a class="dropdown-item" href="#" id="pdfOption">Export to PDF</a></li>
+      </ul>
+    </div>
   </div>
 
   <script>
-    document.getElementById('exportPdfButton').addEventListener('click', function() {
-      window.print();
-    });
 
+    document.getElementById('pdfOption').addEventListener('click', function() {
+  window.print();
+});
     const playButton = document.getElementById('playButton');
     const body = document.body;
     const slidesContainer = document.getElementById('slidesContainer');
