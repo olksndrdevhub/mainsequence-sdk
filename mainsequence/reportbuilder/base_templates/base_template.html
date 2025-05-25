@@ -36,11 +36,71 @@
       overflow: auto; /* Allow scrolling if content overflows */
       z-index: 5; position: relative; transition: all 0.3s ease;
     }
-    .cover-slide{align-items:center;justify-content:center;text-align:center;}
-    .cover-bg{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:-1;}
-    .cover-title{font-size:3rem;font-weight:700;color:{{ title_color }};}
-    .cover-subtitle{font-size:1.5rem;margin-top:1rem;color:{{ title_color }};}
     .slide-logo img { max-height: 30px; width: auto; }
+
+
+    {#Vertical image slide style#}
+/* === Vertical Image Slide === */
+.vertical-image-slide {
+  /* define your column splits here (fallbacks: 20% / 80%) */
+  --left: 20%;
+  --right: 80%;
+
+  display: flex;
+  flex-direction: row;
+  padding: 0;               /* so the right image can go full-bleed */
+}
+
+/* Left column: mimics the original slide padding, minus right side */
+.vertical-image-slide .left-column {
+  width: var(--left);
+  padding: 15mm;            /* top, right, bottom, left */
+  padding-right: 0;         /* remove inner gutter to image */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Make body stretch to push footer down */
+.vertical-image-slide .left-column .slide-body {
+  flex: 1;
+}
+
+/* Stick footer to bottom of left column */
+.vertical-image-slide .left-column .slide-footer {
+  margin-top: auto;
+}
+
+/* Right column: completely flush, no padding or margin */
+.vertical-image-slide .right-column {
+  width: var(--right);
+  padding: 0;
+  margin: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Image fills its container exactly */
+.vertical-image-slide .right-column img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;        /* change to `contain` if you prefer */
+  display: block;
+}
+
+/* Header/Footer flow inside the left-column */
+.vertical-image-slide .slide-header,
+.vertical-image-slide .slide-footer {
+  position: relative !important;
+  left: auto; right: auto;
+  top: auto; bottom: auto;
+  margin: 0 0 0.5em;
+  justify-content: space-between;
+}
+
+
+
+
     #buttonContainer { position: fixed; bottom: 20px; right: 20px; z-index: 1000; display: flex; gap: 10px; }
     #exportPdfButton, #playButton { padding: 10px 20px; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: background-color 0.2s ease; display: flex; justify-content: center; align-items: center; }
     #exportPdfButton { background-color: #007bff; } #exportPdfButton:hover { background-color: #0056b3; }

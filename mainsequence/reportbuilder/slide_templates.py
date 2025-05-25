@@ -5,7 +5,7 @@ from mainsequence.reportbuilder.model import (
     GridLayout, GridCell, AbsoluteLayout,
     TextElement, FunctionElement, HtmlElement, ImageElement,
     HorizontalAlign, VerticalAlign, FontWeight,
-    Size, Position, StyleSettings
+    Size, Position, ThemeMode,get_theme_settings
 )
 
 
@@ -258,7 +258,6 @@ def generic_plotly_grouped_bar_chart(
         x_values: List[str],
         series_data: List[Dict[str, Any]],
         chart_title: str,
-        styles: StyleSettings,
         height: int,
         width: Optional[int] = None,
         y_axis_tick_format: Optional[str] = None,
@@ -275,9 +274,14 @@ def generic_plotly_grouped_bar_chart(
         include_plotlyjs: bool = False,
         full_html: bool = False,
         display_mode_bar: bool = False,
-        responsive: bool = True
+        responsive: bool = True,
+        theme_mode:ThemeMode =ThemeMode.light
+
 ) -> str:
     fig = go.Figure()
+
+
+    styles=get_theme_settings(theme_mode)
 
     for series in series_data:
         trace = go.Bar(
@@ -292,7 +296,7 @@ def generic_plotly_grouped_bar_chart(
             trace.textfont = dict(
                 size=int(styles.chart_label_font_size * bar_text_font_size_factor),
                 family=styles.chart_font_family,
-                color=styles.text_color_dark
+                color=styles.main_color
             )
         fig.add_trace(trace)
 
