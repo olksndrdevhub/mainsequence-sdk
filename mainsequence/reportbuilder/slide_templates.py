@@ -16,8 +16,6 @@ def _transpose_for_plotly(data_rows: List[List[Any]], num_columns: int) -> List[
     return transposed
 
 
-
-
 def generic_plotly_table(
         headers: List[str],
         rows: List[List[Any]],
@@ -46,7 +44,6 @@ def generic_plotly_table(
 ) -> str:
     settings = get_theme_settings(theme_mode)
 
-
     effective_margin_dict = margin_dict if margin_dict is not None else dict(l=5, r=5, t=2, b=2)
 
     if header_fill_color is None:
@@ -68,7 +65,6 @@ def generic_plotly_table(
     )
     if column_formats:
         cell_props['format'] = column_formats
-
 
     fig = go.Figure(data=[go.Table(
         header=dict(
@@ -136,7 +132,7 @@ def generic_plotly_pie_chart(
         theme_mode: ThemeMode = ThemeMode.light
 ) -> str:
     
-    settings=get_theme_settings(theme_mode)
+    settings = get_theme_settings(theme_mode)
     if textfont_dict is None:
         textfont_dict = dict(size=11)
     if legend_dict is None:
@@ -154,7 +150,7 @@ def generic_plotly_pie_chart(
     if font_dict is None:
         font_dict = dict(family="Lato, Arial, Helvetica, sans-serif")
     if colors is None:
-        colors=settings.chart_palette_categorical
+        colors = settings.chart_palette_categorical
 
     fig = go.Figure(data=[go.Pie(
         labels=labels,
@@ -297,15 +293,13 @@ def generic_plotly_grouped_bar_chart(
 
 ) -> str:
     fig = go.Figure()
-
-
-    styles=get_theme_settings(theme_mode)
+    styles = get_theme_settings(theme_mode)
 
 
     for counter,series in enumerate(series_data):
         marker_color = series.get('color', None)
         if marker_color is None:
-            marker_color=styles.chart_palette_categorical[counter%len(styles.chart_palette_categorical)]
+            marker_color = styles.chart_palette_categorical[counter%len(styles.chart_palette_categorical)]
         trace = go.Bar(
             name=series['name'],
             x=x_values,
@@ -338,7 +332,6 @@ def generic_plotly_grouped_bar_chart(
     if xaxis_tickangle is not None and xaxis_tickangle != 0:
         final_margin_dict["b"] = max(final_margin_dict.get("b", 30), 70 + abs(xaxis_tickangle) // 10 * 5)
 
-
     fig.update_layout(
         title_text=chart_title,
         title_font=dict(size=styles.font_size_h4, family=styles.font_family_paragraphs, color=styles.heading_color),
@@ -357,11 +350,8 @@ def generic_plotly_grouped_bar_chart(
         font=dict(family=styles.font_family_paragraphs)
     )
 
-
-
     if xaxis_tickangle is not None:
         fig.update_xaxes(tickangle=xaxis_tickangle)
-
 
     return fig.to_html(
         include_plotlyjs=include_plotlyjs,

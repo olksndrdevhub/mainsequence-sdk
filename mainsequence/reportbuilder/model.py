@@ -112,13 +112,12 @@ class TextElement(ElementBase):
     size: Size = Field(default_factory=Size)
     position: Optional[Position] = None
 
-    style_theme: Optional[ThemeMode]=None
+    style_theme: Optional[ThemeMode] = None
 
-    def render(self,override_theme_mode_if_none) -> str:
+    def render(self, override_theme_mode_if_none) -> str:
         if self.style_theme is None:
-            self.style_theme=override_theme_mode_if_none
-      
-      
+            self.style_theme = override_theme_mode_if_none
+
         settings = self.style_theme
         style = []
 
@@ -275,7 +274,6 @@ class GridLayout(BaseModel):
     height: Optional[str] = "100%"
     style_theme: Optional[ThemeMode] =None
 
-
     @validator("gap",pre=True)
     def _coerce_gap_to_int(cls,v):
         if isinstance(v,str) and v.endswith("px"):
@@ -285,7 +283,6 @@ class GridLayout(BaseModel):
         if isinstance(v,int):
             return v
         raise ValueError("gap must be an int or string like '10px'")
-
 
     @validator("cells", each_item=True)
     def _within_grid(cls, cell: GridCell, values: Dict[str, Any]) -> GridCell:
@@ -396,7 +393,6 @@ class Slide(BaseModel):
 
     style_theme: Optional[StyleSettings] = None
 
-
     def _section_style(self) -> str:
         # only background color; size determined by container
         return f"background-color:{self.style_theme.background_color};"
@@ -440,7 +436,8 @@ class Slide(BaseModel):
             self.style_theme = theme_mode
         if self.layout.style_theme is None:
             self.layout.style_theme=theme_mode
-    def render(self, slide_number: int, total: int, 
+
+    def render(self, slide_number: int, total: int,
                override_theme_mode_if_none:ThemeMode
                ) -> str:
         self._override_theme(override_theme_mode_if_none)
@@ -454,7 +451,6 @@ class Slide(BaseModel):
             f'{header}{body}{footer}'
             f'</section>'
         )
-
 
 class VerticalImageSlide(Slide):
     image_url: HttpUrl = Field(
@@ -536,8 +532,6 @@ class StyleSettings(BaseModel):
     title_column_width: str = "150px"
     chart_label_font_size: int = 12
     logo_url: Optional[str] = None
-
-    
 
     # theme-driven colors (auto-filled)
     primary_color:       Optional[str] = Field(None)
@@ -648,9 +642,6 @@ def update_settings_from_dict(overrides: dict, mode: ThemeMode) -> None:
         setattr(instance, key, value)
 
 
-
-
-
 class Presentation(BaseModel):
     title: str
     subtitle: Optional[str] = None
@@ -664,10 +655,9 @@ class Presentation(BaseModel):
         self.slides.append(self._slide_template())
         for slide in self.slides:
             if slide.style_theme is None:
-                slide.style_theme=self.style_theme
+                slide.style_theme = self.style_theme
 
         total = len(self.slides)-1 # do not add the final template slide
-
 
         slides_html += [s.render(i + 1, total, 
                                  override_theme_mode_if_none=s.style_theme
@@ -678,7 +668,7 @@ class Presentation(BaseModel):
             slides="".join(slides_html),
         )
 
-    def _slide_template(self)->Slide:
+    def _slide_template(self) -> Slide:
 
         # 1) Four rows:
         #    - First row “auto” for our split tutorial
