@@ -156,7 +156,24 @@ class TextElement(ElementBase):
             f'<{tag} id="{self.id}" {class_attr} '
             f'style="{"".join(style)}">{self.text}</{tag}>'
         )
+class TextH1(TextElement):
+    # force element_type to always be "h1" and disallow overrides
+    element_type: Literal["h1"] = Field("h1", literal=True)
 
+    def __init__(self, **data):
+        # Remove any attempt to pass element_type in data
+        data.pop("element_type", None)
+        super().__init__(**data)
+class TextH2(TextElement):
+    # force element_type to always be "h1" and disallow overrides
+    element_type: Literal["h1"] = Field("h2", literal=True)
+
+    def __init__(self, **data):
+        # Remove any attempt to pass element_type in data
+        data.pop("element_type", None)
+        super().__init__(**data)
+        
+        
 class ImageElement(ElementBase):
     src: str
     alt: str = ""
@@ -374,11 +391,10 @@ class Slide(BaseModel):
     layout: Union["GridLayout", "AbsoluteLayout"]
     notes: Optional[str] = None
     include_logo_in_header: bool = True
-    footer_text_color: str =  Field(default_factory=lambda: light_settings.paragraph_color)
     footer_info:str =""
     body_margin_top: int = 40
 
-    style_theme: Optional[ThemeMode] = None
+    style_theme: Optional[StyleSettings] = None
 
 
     def _section_style(self) -> str:
@@ -386,11 +402,15 @@ class Slide(BaseModel):
         return f"background-color:{self.style_theme.background_color};"
 
     def _render_header(self) -> str:
-        title_style = f"font-size: {self.style_theme.font_size_h2}px;"
+        title_style = (
+            f"font-size: {self.style_theme.font_size_h2}px;"
+            f" color: {self.style_theme.heading_color};"
+        )
         logo_html = self.style_theme.logo_img_html() if self.include_logo_in_header else ""
         return (
             f'<div class="slide-header">'
-            f'<div class="slide-title fw-bold" style="{title_style}">{self.title}</div>'
+            f'  <div class="slide-title fw-bold" style="{title_style}">'
+            f'{self.title}</div>'
             f'{logo_html}'
             f'</div>'
         )
@@ -407,7 +427,7 @@ class Slide(BaseModel):
         )
 
     def _render_footer(self, slide_number: int, total: int, ) -> str:
-        text_style = f"color: {self.footer_text_color};"
+        text_style = f"color: {self.style_theme.light_paragraph_color};"
         return (
             f'<div class="slide-footer">'
             f'<div class="slide-date" style="{text_style}">{self.footer_info}</div>'
@@ -527,6 +547,7 @@ class StyleSettings(BaseModel):
     heading_color:    Optional[str] = Field(None)
     paragraph_color:  Optional[str] = Field(None)
     background_color: Optional[str] = Field(None)
+    light_paragraph_color: Optional[str] = Field(None, description="Paragraph text color on light backgrounds")
 
     # chart color palettes
     chart_palette_sequential:   Optional[List[str]] = Field(None)
@@ -548,22 +569,46 @@ class StyleSettings(BaseModel):
                 "heading_color":    "#c0d8fb",
                 "paragraph_color":  "#303238",
                 "background_color": "#FFFFFF",
+                "light_paragraph_color": "#303238",
+
                 # chart palettes
                 "chart_palette_sequential":   ["#f7fbff","#deebf7","#9ecae1","#3182bd"],
                 "chart_palette_diverging":    ["#d7191c","#fdae61","#ffffbf","#abdda4","#2b83ba"],
                 "chart_palette_categorical":  ["#1b9e77","#d95f02","#7570b3","#e7298a","#66a61e"],
             },
             ThemeMode.dark: {
-                "primary_color":       "#FAFAFA",
-                "secondary_color":  "#FFD700",
-                "accent_color_1":   "#FFA500",
-                "accent_color_2":   "#FF8C00",
-                "heading_color":    "#FAFAFA",
-                "paragraph_color":  "#EEEEEE",
-                "background_color": "#121212",
-                "chart_palette_sequential":   ["#2c3e50","#34495e","#4b6584","#78a5a3"],
-                "chart_palette_diverging":    ["#b2182b","#f4a582","#f7f7f7","#92c5de","#2166ac"],
-                "chart_palette_categorical":  ["#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00"],
+                "primary_color": "#E0E0E0",  # light gray for primary text
+                "secondary_color": "#BB86FC",  # soft purple accent
+                "accent_color_1": "#03DAC6",  # vibrant teal
+                "accent_color_2": "#CF6679",  # warm pink/red
+                "heading_color": "#FFFFFF",  # pure white for headings
+                "paragraph_color": "#E0E0E0",  # slightly muted white for body text
+                "background_color": "#121212",  # deep charcoal
+                "light_paragraph_color": "#E0E0E0",
+
+                "chart_palette_sequential": [
+        "#37474F",  # slate blue-gray
+        "#455A64",
+        "#546E7A",
+        "#607D8B",  # progressively lighter
+        "#78909C"
+    ],
+    "chart_palette_diverging": [
+        "#D32F2F",  # strong red
+        "#F57C00",  # orange
+        "#EEEEEE",  # near-white neutral mid-point
+        "#0288D1",  # bright blue
+        "#1976D2"   # deeper blue
+    ],
+    "chart_palette_categorical": [
+        "#F94144",  # red
+        "#F3722C",  # orange
+        "#F9C74F",  # yellow
+        "#90BE6D",  # green
+        "#577590",  # indigo
+        "#43AA8B",  # teal
+        "#8E44AD"   # purple
+    ],
             }
         }
         mode = values.get("mode", ThemeMode.light)

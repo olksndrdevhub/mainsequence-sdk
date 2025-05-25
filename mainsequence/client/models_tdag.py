@@ -262,6 +262,13 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
             id = self.related_table.id
         return self.__class__.patch_by_id(id, *args, **kwargs)
 
+class ColumnMetaData(BasePydanticModel):
+    source_config_id: Optional[int] = Field(None, description="FK to SourceTableConfiguration")
+    column_name: constr(max_length=255) = Field(..., description="Name of the column")
+    dtype: constr(max_length=100) = Field(..., description="Data type of the column")
+    label: constr(max_length=250) = Field(..., description="Human-readable label")
+    description: str = Field(..., description="Detailed description")
+
 
 class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     id: Optional[int] = Field(None, description="Primary key, auto-incremented ID")

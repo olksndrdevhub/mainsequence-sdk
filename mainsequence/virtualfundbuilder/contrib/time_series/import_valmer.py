@@ -75,7 +75,29 @@ class ImportValmer(TimeSerie):
         source_data["unique_identifier"] = source_data["ticker"].map(ticker_map)
         self.source_data = source_data.drop(columns=asset_columns)
         return assets
-
+    
+    def _set_column_metadata(self):
+        from mainsequence.client.models_tdag import ColumnMetaData
+        columns_metadata = [ColumnMetaData(column_name="instrumento",
+                                          dtype="str",
+                                          label="Instrumento",
+                                          description=(
+                                              "Unique identifier provided by Valmer; it’s a composition of the "
+                                              "columns `tv_emisora_serie`, and is also used as a ticker for custom "
+                                              "assets in Valmer."
+                                          )
+                                          ),
+                            ColumnMetaData(column_name="moneda",
+                                           dtype="str",
+                                           label="Moneda",
+                                           description=(
+                                               "Correspondes to Valmen code for curries be aware this may not match Figi Currency assets"
+                                           )
+                                           ),
+                            
+                            ]
+        return columns_metadata
+    
     def update(self, update_statistics: "DataUpdates"):
         source_data = self.source_data
 
@@ -92,7 +114,7 @@ class ImportValmer(TimeSerie):
 
         source_data=update_statistics.filter_df_by_latest_value(source_data)
 
-
+        self._set_column_metadata()
         return source_data
 
     def  _run_post_update_routines(self, error_on_last_update,update_statistics:DataUpdates):
@@ -109,7 +131,7 @@ class ImportValmer(TimeSerie):
                 unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
                 related_local_time_serie__id=self.local_time_serie.id,
                 data_frequency_id=DataFrequency.one_d,
-                description="Vector de precios Valmer",
+                description="This time series contains the valuation prices from the price provider VALMER",
             )
         markets_time_series_details.append_asset_list_source(asset_list=update_statistics.asset_list)
 
