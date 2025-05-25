@@ -204,7 +204,6 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     related_table: Union[int, "DynamicTableMetaData"]
     time_index_name: str = Field(..., max_length=100, description="Time index name")
     column_dtypes_map: Dict[str, Any] = Field(..., description="Column data types map")
-    column_metadata: Optional[Dict[str, Any]] = Field(..., description="Column metadata")
     index_names: List
     column_index_names: List
     last_time_index_value: Optional[datetime.datetime] = Field(None, description="Last time index value")
@@ -264,9 +263,9 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
 
 class ColumnMetaData(BasePydanticModel):
     source_config_id: Optional[int] = Field(None, description="FK to SourceTableConfiguration")
-    column_name: constr(max_length=255) = Field(..., description="Name of the column")
-    dtype: constr(max_length=100) = Field(..., description="Data type of the column")
-    label: constr(max_length=250) = Field(..., description="Human-readable label")
+    column_name:str=  Field(...,max_length=63, description="Name of the column")
+    dtype:   str=Field(..., max_length=100,description="Data type of the column")
+    label:  str=Field(..., max_length=255,description="Human-readable label")
     description: str = Field(..., description="Detailed description")
 
 
