@@ -20,7 +20,7 @@
     }
     .slide{
       position:relative; display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box;
-      width:338.667mm; height:190.5mm; /* Original 16:9 A4 Landscape base */
+      width:338.667mm; height:190.5mm;
       padding:15mm; page-break-after:always; background:#f8f9fa;
       margin-bottom: 10mm; box-shadow: 0 0 5px rgba(0,0,0,0.1);
       transition: width 0.3s ease, height 0.3s ease, margin 0.3s ease, box-shadow 0.3s ease, padding 0.3s ease, transform 0.3s ease;
@@ -31,74 +31,101 @@
     .slide-header{top:5mm;} .slide-footer{bottom:5mm;font-size:0.85em;color:#555;}
     .slide-body{
       flex:1; display:flex; flex-direction:column;
-      justify-content: center; align-items: center; text-align: center;
-      overflow: auto; z-index: 5; position: relative; transition: all 0.3s ease;
+      justify-content: center; /* Vertical Centering */
+      align-items: center; /* Horizontal Centering */
+      text-align: center; /* Center inline/text content */
+      overflow: auto; /* Allow scrolling if content overflows */
+      z-index: 5; position: relative; transition: all 0.3s ease;
     }
     .slide-logo img { max-height: 30px; width: auto; }
 
-    /* === Vertical Image Slide === */
-    .vertical-image-slide {
-      --left: 20%; --right: 80%; display: flex; flex-direction: row; padding: 0;
-    }
-    .vertical-image-slide .left-column {
-      width: var(--left); padding: 15mm; padding-right: 0; display: flex; flex-direction: column; overflow: hidden;
-    }
-    .vertical-image-slide .left-column .slide-body { flex: 1; }
-    .vertical-image-slide .left-column .slide-footer { margin-top: auto; }
-    .vertical-image-slide .right-column { width: var(--right); padding: 0; margin: 0; display: flex; overflow: hidden; }
-    .vertical-image-slide .right-column img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .vertical-image-slide .slide-header, .vertical-image-slide .slide-footer {
-      position: relative !important; left: auto; right: auto; top: auto; bottom: auto; margin: 0 0 0.5em; justify-content: space-between;
-    }
 
-    #buttonContainer { position: fixed; bottom: 20px; right: 20px; z-index: 1050; /* Ensure buttons above fullscreen */ display: flex; gap: 10px; }
+    {#Vertical image slide style#}
+/* === Vertical Image Slide === */
+.vertical-image-slide {
+  /* define your column splits here (fallbacks: 20% / 80%) */
+  --left: 20%;
+  --right: 80%;
+
+  display: flex;
+  flex-direction: row;
+  padding: 0;               /* so the right image can go full-bleed */
+}
+
+/* Left column: mimics the original slide padding, minus right side */
+.vertical-image-slide .left-column {
+  width: var(--left);
+  padding: 15mm;            /* top, right, bottom, left */
+  padding-right: 0;         /* remove inner gutter to image */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Make body stretch to push footer down */
+.vertical-image-slide .left-column .slide-body {
+  flex: 1;
+}
+
+/* Stick footer to bottom of left column */
+.vertical-image-slide .left-column .slide-footer {
+  margin-top: auto;
+}
+
+/* Right column: completely flush, no padding or margin */
+.vertical-image-slide .right-column {
+  width: var(--right);
+  padding: 0;
+  margin: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Image fills its container exactly */
+.vertical-image-slide .right-column img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;        /* change to `contain` if you prefer */
+  display: block;
+}
+
+/* Header/Footer flow inside the left-column */
+.vertical-image-slide .slide-header,
+.vertical-image-slide .slide-footer {
+  position: relative !important;
+  left: auto; right: auto;
+  top: auto; bottom: auto;
+  margin: 0 0 0.5em;
+  justify-content: space-between;
+}
+
+
+
+
+    #buttonContainer { position: fixed; bottom: 20px; right: 20px; z-index: 1000; display: flex; gap: 10px; }
     #exportPdfButton, #playButton { padding: 10px 20px; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: background-color 0.2s ease; display: flex; justify-content: center; align-items: center; }
     #exportPdfButton { background-color: #007bff; } #exportPdfButton:hover { background-color: #0056b3; }
     #playButton { background-color: #28a745; width: 50px; height: 40px; padding: 10px; font-size: 1.2rem; } #playButton:hover { background-color: #218838; }
 
     /* --- Fullscreen Mode Styles --- */
     body.fullscreen-mode {
-      padding: 0; display: block; background: #333;
-      overflow: hidden; /* Hide body scroll, only container scrolls */
-      height: 100vh;
+      padding: 0; display: block; background: #333; overflow-y: scroll; min-height: 100vh;
     }
     body.fullscreen-mode #slidesContainer {
-       width: 100%; height: 100vh;
-       overflow-y: scroll; /* Scroll the container */
-       scroll-snap-type: y mandatory; /* Enable snap scrolling */
-       padding: 0; display: block; /* Change from flex to block */
+       width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+       gap: 5vh; padding: 5vh 0; box-sizing: border-box; min-height: 100vh;
     }
-    /* The Wrapper (Added via JS) */
-    .fullscreen-wrapper {
-        width: 100vw;
-        height: 100vh; /* Each wrapper is full height */
-        scroll-snap-align: start; /* Snap here */
-        display: flex; /* Use flex to center the .slide inside */
-        justify-content: center;
-        align-items: center;
-        background: #333; /* Dark background */
-        box-sizing: border-box;
-    }
-    /* The Slide when inside the Wrapper */
     body.fullscreen-mode .slide {
         width: 90vw;
-        height: calc(90vw / (338.667 / 190.5)); /* Maintain original ratio */
+        height: calc(90vw / (338.667 / 190.5));
         aspect-ratio: 338.667 / 190.5;
         max-width: 1600px;
-        max-height: 90vh; /* Max height */
-
-        margin-bottom: 0; /* Override default margin */
-        box-shadow: 0 0 30px rgba(0,0,0,0.7); /* Add nice shadow */
+        max-height: 90vh;
+        margin-bottom: 0;
+        box-shadow: 0 0 30px rgba(0,0,0,0.7);
         page-break-after: unset;
-        border-radius: 8px; /* Optional: rounded corners */
-        overflow: hidden; /* Crucial: Keep overflow hidden */
-        /* --- WE LET ORIGINAL STYLES (background, padding, display, etc.) APPLY --- */
+        border-radius: 8px;
     }
-    /* Ensure internal elements like body still behave */
-    body.fullscreen-mode .slide .slide-body {
-        overflow: auto; /* Ensure body can scroll if its content overflows */
-    }
-
 
     /* --- Print Styles --- */
     @media print {
@@ -125,45 +152,21 @@
 
     const playButton = document.getElementById('playButton');
     const body = document.body;
-    const slidesContainer = document.getElementById('slidesContainer');
     let isFullscreen = false;
 
     const playIcon = '<i class="bi bi-play-fill"></i>';
     const stopIcon = '<i class="bi bi-stop-fill"></i>';
-
-    function wrapSlides() {
-        document.querySelectorAll('.slide:not(.wrapped)').forEach(slide => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'fullscreen-wrapper';
-            slide.parentNode.insertBefore(wrapper, slide);
-            wrapper.appendChild(slide);
-            slide.classList.add('wrapped'); // Mark as wrapped
-        });
-    }
-
-    function unwrapSlides() {
-        document.querySelectorAll('.fullscreen-wrapper').forEach(wrapper => {
-            const slide = wrapper.querySelector('.slide');
-            if (slide) {
-                wrapper.parentNode.insertBefore(slide, wrapper);
-                slide.classList.remove('wrapped');
-            }
-            wrapper.remove();
-        });
-    }
 
     playButton.addEventListener('click', function() {
       isFullscreen = !isFullscreen;
       body.classList.toggle('fullscreen-mode', isFullscreen);
 
       if (isFullscreen) {
-        wrapSlides(); // Wrap slides on entering fullscreen
         playButton.innerHTML = stopIcon;
         playButton.title = 'Exit Fullscreen View';
         playButton.style.backgroundColor = '#dc3545';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-        unwrapSlides(); // Unwrap slides on exiting fullscreen
         playButton.innerHTML = playIcon;
         playButton.title = 'Toggle Fullscreen View';
         playButton.style.backgroundColor = '#28a745';

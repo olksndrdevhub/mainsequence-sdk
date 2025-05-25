@@ -375,7 +375,7 @@ class Slide(BaseModel):
     notes: Optional[str] = None
     include_logo_in_header: bool = True
     footer_text_color: str =  Field(default_factory=lambda: light_settings.paragraph_color)
-    self.footer_info:str =""
+    footer_info:str =""
     body_margin_top: int = 40
 
     style_theme: Optional[ThemeMode] = None

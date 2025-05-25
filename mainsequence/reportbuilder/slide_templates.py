@@ -150,7 +150,7 @@ def generic_plotly_pie_chart(
             bgcolor='rgba(0,0,0,0)'
         )
     if margin_dict is None:
-        margin_dict = dict(l=10, r=10, t=10, b=50 if showlegend else 20)
+        margin_dict = dict(l=10, r=10, t=10, b=100 if showlegend else 20)
     if font_dict is None:
         font_dict = dict(family="Lato, Arial, Helvetica, sans-serif")
     if colors is None:
@@ -191,7 +191,7 @@ def generic_plotly_bar_chart(
         height: int = 400,
         width: int = 450,
         title: Optional[str] = None,
-        bar_color: Union[str, List[str]] = '#003049',
+        bar_color: Union[str, List[str]] = None,
         text_template: Optional[str] = None,
         textposition: str = 'outside',
         textfont_dict: Optional[Dict[str, Any]] = None,
@@ -206,8 +206,14 @@ def generic_plotly_bar_chart(
         responsive: bool = True,
         display_mode_bar: bool = False,
         include_plotlyjs: bool = False,
-        full_html: bool = False
+        full_html: bool = False,
+        theme_mode: ThemeMode = ThemeMode.light
+
 ) -> str:
+
+    settings=get_theme_settings(theme_mode)
+    if bar_color is None:
+        bar_color = settings.chart_palette_categorical
     if textfont_dict is None:
         textfont_dict = dict(size=9)
     if margin_dict is None:
@@ -269,11 +275,11 @@ def generic_plotly_bar_chart(
 def generic_plotly_grouped_bar_chart(
         x_values: List[str],
         series_data: List[Dict[str, Any]],
-        chart_title: str,
         height: int,
+        chart_title: str = "",
         width: Optional[int] = None,
-        y_axis_tick_format: Optional[str] = None,
-        bar_text_template: Optional[str] = None,
+        y_axis_tick_format: Optional[str] = ".2f",
+        bar_text_template: Optional[str] = "%{y:.2f}",
         bar_text_position: str = "outside",
         bar_text_font_size_factor: float = 1.0,
         barmode: str = "group",
@@ -295,6 +301,7 @@ def generic_plotly_grouped_bar_chart(
 
     styles=get_theme_settings(theme_mode)
 
+
     for counter,series in enumerate(series_data):
         marker_color = series.get('color', None)
         if marker_color is None:
@@ -314,6 +321,10 @@ def generic_plotly_grouped_bar_chart(
                 color=styles.paragraph_color
             )
         fig.add_trace(trace)
+
+    all_y = [y for series in series_data for y in series['y_values']]
+    y_max = max(all_y) * 1.1  # 10% above the tallest bar
+    y_min = min(all_y) * 1.1  if min(all_y)<0 else min(all_y)*.9
 
     default_legend_config = dict(
         font=dict(size=styles.chart_label_font_size, family=styles.font_family_paragraphs),
@@ -338,6 +349,7 @@ def generic_plotly_grouped_bar_chart(
         xaxis_tickfont_size=styles.chart_label_font_size,
         yaxis_tickfont_size=styles.chart_label_font_size,
         yaxis_tickformat=y_axis_tick_format,
+        yaxis=dict(range=[y_min, y_max]),  # <-- set min/max here
         legend=default_legend_config,
         margin=final_margin_dict,
         paper_bgcolor=paper_bgcolor,
