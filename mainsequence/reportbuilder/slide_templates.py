@@ -295,13 +295,13 @@ def generic_plotly_grouped_bar_chart(
             trace.textposition = bar_text_position
             trace.textfont = dict(
                 size=int(styles.chart_label_font_size * bar_text_font_size_factor),
-                family=styles.chart_font_family,
+                family=styles.font_family_paragraphs,
                 color=styles.main_color
             )
         fig.add_trace(trace)
 
     default_legend_config = dict(
-        font=dict(size=styles.chart_label_font_size, family=styles.chart_font_family),
+        font=dict(size=styles.chart_label_font_size, family=styles.font_family_paragraphs),
         orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
         bgcolor='rgba(0,0,0,0)'
     )
@@ -315,7 +315,7 @@ def generic_plotly_grouped_bar_chart(
 
     fig.update_layout(
         title_text=chart_title,
-        title_font=dict(size=styles.section_title_font_size, family=styles.chart_font_family, color=styles.main_color),
+        title_font=dict(size=styles.font_size_h4, family=styles.font_family_paragraphs, color=styles.main_color),
         title_x=title_x_position,
         height=height,
         width=width,
@@ -327,7 +327,7 @@ def generic_plotly_grouped_bar_chart(
         margin=final_margin_dict,
         paper_bgcolor=paper_bgcolor,
         plot_bgcolor=plot_bgcolor,
-        font=dict(family=styles.chart_font_family)
+        font=dict(family=styles.font_family_paragraphs)
     )
 
 

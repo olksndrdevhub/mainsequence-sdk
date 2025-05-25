@@ -100,30 +100,60 @@ class ElementBase(BaseModel):
 
 class TextElement(ElementBase):
     text: str
-    font_size: int = 16
+
+    # 1) semantic element type
+    element_type: Literal["h1", "h2", "h3", "h4", "h5", "h6", "p"] = "p"
+
     font_weight: FontWeight = FontWeight.normal
     h_align: HorizontalAlign = HorizontalAlign.left
     v_align: VerticalAlign = VerticalAlign.top
-    color: str = "#000"
+    color: Optional[str] = None
     line_height: Optional[str] = None
     size: Size = Field(default_factory=Size)
     position: Optional[Position] = None
 
-    def render(self) -> str:
+    style_theme: Optional[ThemeMode]=None
+
+    def render(self,override_theme_mode_if_none) -> str:
+        if self.style_theme is None:
+            self.style_theme=override_theme_mode_if_none
+        settings = get_theme_settings(self.style_theme)
         style = []
+
         if self.position:
             style.append("position:absolute;")
             style.append(self.position.css())
         style.append(self.size.css())
-        style.append(f"font-size:{self.font_size}px;")
+
+        # choose font-size and default color
+        if self.element_type.startswith("h"):
+            fs = getattr(settings, f"font_size_{self.element_type}")
+            ff = settings.font_family_headings
+            default_color = settings.heading_color
+        else:
+            fs = settings.font_size_p
+            ff = settings.font_family_paragraphs
+            default_color = settings.paragraph_color
+
+        # use explicit color if given, else default
+        c = self.color if self.color is not None else default_color
+
+        style.append(f"font-size:{fs}px;")
         style.append(f"font-weight:{self.font_weight.value};")
-        style.append(f"color:{self.color};")
+        style.append(f"font-family:{ff};")
+        style.append(f"color:{c};")
         style.append(f"text-align:{self.h_align.value};")
+
         if self.line_height:
             style.append(f"line-height:{self.line_height};")
-        
+
         class_attr = f'class="{self.css_class}"' if self.css_class else ""
-        return f'<div id="{self.id}" {class_attr} style="{"".join(style)}">{self.text}</div>'
+        tag = self.element_type
+
+        return (
+            f'<{tag} id="{self.id}" {class_attr} '
+            f'style="{"".join(style)}">{self.text}</{tag}>'
+        )
 
 class ImageElement(ElementBase):
     src: str
@@ -131,8 +161,11 @@ class ImageElement(ElementBase):
     size: Size = Field(default_factory=lambda: Size(width="100%", height="auto"))
     position: Optional[Position] = None
     object_fit: str = "contain"
+    style_theme: Optional[ThemeMode]=None
 
-    def render(self) -> str:
+    def render(self,override_theme_mode_if_none) -> str:
+        if self.style_theme is None:
+            self.style_theme = override_theme_mode_if_none
         style = []
         if self.position:
             style.append("position:absolute;")
@@ -215,6 +248,8 @@ class GridLayout(BaseModel):
     cells: List[GridCell]
     width: Optional[str] = "100%"
     height: Optional[str] = "100%"
+    style_theme: Optional[ThemeMode] =None
+
 
     @validator("gap",pre=True)
     def _coerce_gap_to_int(cls,v):
@@ -237,7 +272,7 @@ class GridLayout(BaseModel):
             raise ValueError(f"GridCell definition (col={cell.col}, col_span={cell.col_span}) exceeds column count ({len(col_defs)})")
         return cell
 
-    def render(self) -> str:
+    def render(self,) -> str:
         grid_style_parts = [
             "display:grid;",
             f"grid-template-columns:{' '.join(self.col_definitions)};",
@@ -302,7 +337,10 @@ class GridLayout(BaseModel):
                 cell_styles_list.append(f"justify-self:{cell.justify_self};")
 
             final_cell_style = "".join(cell_styles_list)
-            html_parts.append(f'<div style="{final_cell_style}">{cell.element.render()}</div>')
+            try:
+                html_parts.append(f'<div style="{final_cell_style}">{cell.element.render(self.style_theme)}</div>')
+            except Exception as e:
+                raise e
         html_parts.append("</div>")
         return "".join(html_parts)
 
@@ -326,20 +364,21 @@ class AbsoluteLayout(BaseModel):
 class Slide(BaseModel):
     title: str
     layout: Union["GridLayout", "AbsoluteLayout"]
-    background_color: str = Field(default_factory=lambda: light_settings.background_color)
     notes: Optional[str] = None
-    title_font_size: int = 24
-    body_margin_top: int = 40
     include_logo_in_header: bool = True
     footer_text_color: str =  Field(default_factory=lambda: light_settings.main_color)
+    body_margin_top: int = 40
+
+    style_theme: ThemeMode = Field(default_factory=lambda: light_settings)
+
 
     def _section_style(self) -> str:
         # only background color; size determined by container
-        return f"background-color:{self.background_color};"
+        return f"background-color:{self.style_theme.background_color};"
 
-    def _render_header(self, theme: "Theme") -> str:
-        title_style = f"font-size: {self.title_font_size}px;"
-        logo_html = theme.logo_img_html() if self.include_logo_in_header else ""
+    def _render_header(self) -> str:
+        title_style = f"font-size: {self.style_theme.font_size_h1}px;"
+        logo_html = self.style_theme.logo_img_html() if self.include_logo_in_header else ""
         return (
             f'<div class="slide-header">'
             f'<div class="slide-title fw-bold" style="{title_style}">{self.title}</div>'
@@ -358,19 +397,27 @@ class Slide(BaseModel):
             f'</div>'
         )
 
-    def _render_footer(self, slide_number: int, total: int, theme: "Theme") -> str:
+    def _render_footer(self, slide_number: int, total: int, ) -> str:
         text_style = f"color: {self.footer_text_color};"
         return (
             f'<div class="slide-footer">'
-            f'<div class="slide-date" style="{text_style}">{theme.current_date}</div>'
+            # f'<div class="slide-date" style="{text_style}">{theme.current_date}</div>'
             f'<div class="slide-number" style="{text_style}">{slide_number} / {total}</div>'
             f'</div>'
         )
-
-    def render(self, slide_number: int, total: int, theme: "Theme") -> str:
-        header = self._render_header(theme)
+    
+    def _override_theme(self,theme_mode:ThemeMode):
+        if self.style_theme is None:
+            self.style_theme = theme_mode
+        if self.layout.style_theme is None:
+            self.layout.style_theme=theme_mode
+    def render(self, slide_number: int, total: int, 
+               override_theme_mode_if_none:ThemeMode
+               ) -> str:
+        self._override_theme(override_theme_mode_if_none)
+        header = self._render_header()
         body = self._render_body()
-        footer = self._render_footer(slide_number, total, theme)
+        footer = self._render_footer(slide_number, total, )
         section_style = self._section_style()
 
         return (
@@ -395,10 +442,13 @@ class VerticalImageSlide(Slide):
         description="How the image should fit its container"
     )
 
-    def render(self, slide_number: int, total: int, theme: "Theme") -> str:
-        header = self._render_header(theme)
+    def render(self, slide_number: int, total: int, 
+               override_theme_mode_if_none: ThemeMode
+               ) -> str:
+        self._override_theme(override_theme_mode_if_none)
+        header = self._render_header()
         body = self._render_body()
-        footer = self._render_footer(slide_number, total, theme)
+        footer = self._render_footer(slide_number, total )
 
         # Determine inline widths
         left_pct = 100 - self.image_width_pct
@@ -456,6 +506,9 @@ class StyleSettings(BaseModel):
     # layout
     title_column_width: str = "150px"
     chart_label_font_size: int = 12
+    logo_url: Optional[str] = None
+
+    
 
     # theme-driven colors (auto-filled)
     main_color:       Optional[str] = Field(None)
@@ -470,7 +523,10 @@ class StyleSettings(BaseModel):
     chart_palette_sequential:   Optional[List[str]] = Field(None)
     chart_palette_diverging:    Optional[List[str]] = Field(None)
     chart_palette_categorical:  Optional[List[str]] = Field(None)
-
+    
+    def logo_img_html(self, position: str = "slide-logo") -> str:
+        return f'<div class="{position}"><img src="{self.logo_url}" alt="logo" crossOrigin="anonymous"></div>' if self.logo_url else ""
+    
     @root_validator(pre=True)
     def _fill_theme_defaults(cls, values: Dict) -> Dict:
         palettes = {
@@ -539,23 +595,12 @@ def update_settings_from_dict(overrides: dict, mode: ThemeMode) -> None:
 
 
 
-class Theme(BaseModel):
-    logo_url: Optional[str] = None
-    font_family: str = "Helvetica, Arial, sans-serif"
-    base_font_size: int = 14
-    cover_background_url: Optional[str] = None
-    title_color: str = "#000"
-    current_date: str = Field(default_factory=lambda: "{{CURRENT_DATE}}")
-
-    def logo_img_html(self, position: str = "slide-logo") -> str:
-        return f'<div class="{position}"><img src="{self.logo_url}" alt="logo" crossOrigin="anonymous"></div>' if self.logo_url else ""
 
 
 class Presentation(BaseModel):
     title: str
     subtitle: Optional[str] = None
     slides: List[Slide]
-    theme: Theme = Field(default_factory=Theme)
 
     def render(self) -> str:
         slides_html = []
@@ -567,7 +612,9 @@ class Presentation(BaseModel):
         total = len(self.slides)-1 # do not add the final template slide
 
 
-        slides_html += [s.render(i + 1, total, self.theme) for i, s in enumerate(self.slides)]
+        slides_html += [s.render(i + 1, total, 
+                                 override_theme_mode_if_none=s.style_theme
+                                 ) for i, s in enumerate(self.slides)]
         return BASE_TEMPLATE.render(
             title=self.title,
             font_family=self.theme.font_family,
