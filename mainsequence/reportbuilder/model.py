@@ -117,7 +117,9 @@ class TextElement(ElementBase):
     def render(self,override_theme_mode_if_none) -> str:
         if self.style_theme is None:
             self.style_theme=override_theme_mode_if_none
-        settings = get_theme_settings(self.style_theme)
+      
+      
+        settings = self.style_theme
         style = []
 
         if self.position:
@@ -181,8 +183,11 @@ class ImageElement(ElementBase):
 
 class HtmlElement(ElementBase):
     html: str
+    style_theme: Optional[ThemeMode]=None
 
-    def render(self) -> str:
+    def render(self, override_theme_mode_if_none) -> str:
+        if self.style_theme is None:
+            self.style_theme = override_theme_mode_if_none
         class_attr = f'class="{self.css_class}"' if self.css_class else ""
         return f'<div id="{self.id}" {class_attr}">{self.html}</div>'
 
@@ -192,8 +197,11 @@ class FunctionElement(ElementBase):
     """
     function: str                         # key in FUNCTION_REGISTRY
     params:   Dict[str, Any] = {}         # raw args coming from YAML
+    style_theme: Optional[ThemeMode]=None
 
     def render(self) -> str:
+        if self.style_theme is None:
+            self.style_theme = override_theme_mode_if_none
         if self.function not in FUNCTION_REGISTRY:
             raise ValueError(f"Unknown function '{self.function}'")
 
@@ -366,10 +374,11 @@ class Slide(BaseModel):
     layout: Union["GridLayout", "AbsoluteLayout"]
     notes: Optional[str] = None
     include_logo_in_header: bool = True
-    footer_text_color: str =  Field(default_factory=lambda: light_settings.main_color)
+    footer_text_color: str =  Field(default_factory=lambda: light_settings.paragraph_color)
+    self.footer_info:str =""
     body_margin_top: int = 40
 
-    style_theme: ThemeMode = Field(default_factory=lambda: light_settings)
+    style_theme: Optional[ThemeMode] = None
 
 
     def _section_style(self) -> str:
@@ -377,7 +386,7 @@ class Slide(BaseModel):
         return f"background-color:{self.style_theme.background_color};"
 
     def _render_header(self) -> str:
-        title_style = f"font-size: {self.style_theme.font_size_h1}px;"
+        title_style = f"font-size: {self.style_theme.font_size_h2}px;"
         logo_html = self.style_theme.logo_img_html() if self.include_logo_in_header else ""
         return (
             f'<div class="slide-header">'
@@ -401,7 +410,7 @@ class Slide(BaseModel):
         text_style = f"color: {self.footer_text_color};"
         return (
             f'<div class="slide-footer">'
-            # f'<div class="slide-date" style="{text_style}">{theme.current_date}</div>'
+            f'<div class="slide-date" style="{text_style}">{self.footer_info}</div>'
             f'<div class="slide-number" style="{text_style}">{slide_number} / {total}</div>'
             f'</div>'
         )
@@ -511,7 +520,7 @@ class StyleSettings(BaseModel):
     
 
     # theme-driven colors (auto-filled)
-    main_color:       Optional[str] = Field(None)
+    primary_color:       Optional[str] = Field(None)
     secondary_color:  Optional[str] = Field(None)
     accent_color_1:   Optional[str] = Field(None)
     accent_color_2:   Optional[str] = Field(None)
@@ -532,12 +541,12 @@ class StyleSettings(BaseModel):
         palettes = {
             ThemeMode.light: {
                 # base colors
-                "main_color":       "#003049",
-                "secondary_color":  "#b4a269",
-                "accent_color_1":   "#aea06c",
+                "primary_color":       "#c0d8fb",
+                "secondary_color":  "#1254ff",
+                "accent_color_1":   "#553ffe",
                 "accent_color_2":   "#aea06c",
-                "heading_color":    "#003049",
-                "paragraph_color":  "#333333",
+                "heading_color":    "#c0d8fb",
+                "paragraph_color":  "#303238",
                 "background_color": "#FFFFFF",
                 # chart palettes
                 "chart_palette_sequential":   ["#f7fbff","#deebf7","#9ecae1","#3182bd"],
@@ -545,7 +554,7 @@ class StyleSettings(BaseModel):
                 "chart_palette_categorical":  ["#1b9e77","#d95f02","#7570b3","#e7298a","#66a61e"],
             },
             ThemeMode.dark: {
-                "main_color":       "#FAFAFA",
+                "primary_color":       "#FAFAFA",
                 "secondary_color":  "#FFD700",
                 "accent_color_1":   "#FFA500",
                 "accent_color_2":   "#FF8C00",
@@ -601,13 +610,16 @@ class Presentation(BaseModel):
     title: str
     subtitle: Optional[str] = None
     slides: List[Slide]
+    style_theme: ThemeMode = Field(default_factory=lambda: light_settings)
 
     def render(self) -> str:
         slides_html = []
 
         # add the slide template
         self.slides.append(self._slide_template())
-
+        for slide in self.slides:
+            if slide.style_theme is None:
+                slide.style_theme=self.style_theme
 
         total = len(self.slides)-1 # do not add the final template slide
 
@@ -617,9 +629,7 @@ class Presentation(BaseModel):
                                  ) for i, s in enumerate(self.slides)]
         return BASE_TEMPLATE.render(
             title=self.title,
-            font_family=self.theme.font_family,
-            base_font_size=self.theme.base_font_size,
-            title_color=self.theme.title_color,
+            font_family=self.style_theme.font_family_paragraphs,
             slides="".join(slides_html),
         )
 

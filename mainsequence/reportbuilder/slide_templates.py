@@ -16,6 +16,8 @@ def _transpose_for_plotly(data_rows: List[List[Any]], num_columns: int) -> List[
     return transposed
 
 
+
+
 def generic_plotly_table(
         headers: List[str],
         rows: List[List[Any]],
@@ -26,10 +28,9 @@ def generic_plotly_table(
         header_align: str = 'center',
         cell_font_dict: Optional[Dict[str, Any]] = None,
         header_font_dict: Optional[Dict[str, Any]] = None,
-        header_fill_color: str = 'rgb(0, 32, 96)',
-        header_font_color: str = 'white',
-        cell_fill_color: str = 'rgb(240,245,255)',
-        line_color: str = 'rgb(200,200,200)',
+        header_fill_color: Optional[str] = None,
+        cell_fill_color: str =  '#F5F5F5',
+        line_color: str = '#DCDCDC',
         header_height: int = 22,
         cell_height: int = 20,
         margin_dict: Optional[Dict[str, int]] = None,
@@ -40,14 +41,20 @@ def generic_plotly_table(
         include_plotlyjs: bool = False,
         full_html: bool = False,
         column_formats: Optional[List[str]] = None,
+        theme_mode: ThemeMode = ThemeMode.light
 
 ) -> str:
+    settings = get_theme_settings(theme_mode)
+
+
     effective_margin_dict = margin_dict if margin_dict is not None else dict(l=5, r=5, t=2, b=2)
 
+    if header_fill_color is None:
+        header_fill_color = settings.primary_color
     if cell_font_dict is None:
-        cell_font_dict = dict(size=9)
+        cell_font_dict = dict(size=12)
     if header_font_dict is None:
-        header_font_dict = dict(color=header_font_color, size=10)
+        header_font_dict = dict(color= settings.background_color, size=14, )
 
     plotly_column_data = _transpose_for_plotly(rows, len(headers))
     # Build cell properties, injecting formats if provided
@@ -125,8 +132,11 @@ def generic_plotly_pie_chart(
         responsive: bool = True,
         display_mode_bar: bool = False,
         include_plotlyjs: bool = False,
-        full_html: bool = False
+        full_html: bool = False,
+        theme_mode: ThemeMode = ThemeMode.light
 ) -> str:
+    
+    settings=get_theme_settings(theme_mode)
     if textfont_dict is None:
         textfont_dict = dict(size=11)
     if legend_dict is None:
@@ -143,6 +153,8 @@ def generic_plotly_pie_chart(
         margin_dict = dict(l=10, r=10, t=10, b=50 if showlegend else 20)
     if font_dict is None:
         font_dict = dict(family="Lato, Arial, Helvetica, sans-serif")
+    if colors is None:
+        colors=settings.chart_palette_categorical
 
     fig = go.Figure(data=[go.Pie(
         labels=labels,
@@ -283,12 +295,15 @@ def generic_plotly_grouped_bar_chart(
 
     styles=get_theme_settings(theme_mode)
 
-    for series in series_data:
+    for counter,series in enumerate(series_data):
+        marker_color = series.get('color', None)
+        if marker_color is None:
+            marker_color=styles.chart_palette_categorical[counter%len(styles.chart_palette_categorical)]
         trace = go.Bar(
             name=series['name'],
             x=x_values,
             y=series['y_values'],
-            marker_color=series.get('color', None)
+            marker_color=marker_color
         )
         if bar_text_template:
             trace.texttemplate = bar_text_template
@@ -296,7 +311,7 @@ def generic_plotly_grouped_bar_chart(
             trace.textfont = dict(
                 size=int(styles.chart_label_font_size * bar_text_font_size_factor),
                 family=styles.font_family_paragraphs,
-                color=styles.main_color
+                color=styles.paragraph_color
             )
         fig.add_trace(trace)
 
@@ -315,7 +330,7 @@ def generic_plotly_grouped_bar_chart(
 
     fig.update_layout(
         title_text=chart_title,
-        title_font=dict(size=styles.font_size_h4, family=styles.font_family_paragraphs, color=styles.main_color),
+        title_font=dict(size=styles.font_size_h4, family=styles.font_family_paragraphs, color=styles.heading_color),
         title_x=title_x_position,
         height=height,
         width=width,
