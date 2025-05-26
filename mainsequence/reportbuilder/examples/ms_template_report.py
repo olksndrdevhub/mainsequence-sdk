@@ -130,21 +130,21 @@ def portfolio_detail_slide(footer_text: str, slide_styles: StyleSettings) -> Sli
 
     fi_local_html = generic_plotly_table(
         headers=fixed_income_local_headers, rows=fixed_income_local_rows,
-        column_widths=shared_column_widths, cell_align=shared_cell_align, fig_width=table_figure_width,
+        column_widths=shared_column_widths, cell_align=shared_cell_align,
         header_font_dict=dict(color=slide_styles.background_color, size=10, family=chart_font_family),
         cell_font_dict=dict(size=chart_label_font_size, family=chart_font_family, color=slide_styles.paragraph_color),
         theme_mode=slide_styles.mode
     )
     fi_usd_html = generic_plotly_table(
         headers=fixed_income_usd_headers, rows=fixed_income_usd_rows,
-        column_widths=shared_column_widths, cell_align=shared_cell_align, fig_width=table_figure_width,
+        column_widths=shared_column_widths, cell_align=shared_cell_align,
         header_font_dict=dict(color=slide_styles.background_color, size=10, family=chart_font_family),
         cell_font_dict=dict(size=chart_label_font_size, family=chart_font_family, color=slide_styles.paragraph_color),
         theme_mode=slide_styles.mode
     )
     liquidity_html = generic_plotly_table(
         headers=liquidity_headers, rows=liquidity_rows,
-        column_widths=shared_column_widths, cell_align=shared_cell_align, fig_width=table_figure_width,
+        column_widths=shared_column_widths, cell_align=shared_cell_align,
         header_font_dict=dict(color=slide_styles.background_color, size=10, family=chart_font_family),
         cell_font_dict=dict(size=chart_label_font_size, family=chart_font_family, color=slide_styles.paragraph_color),
         theme_mode=slide_styles.mode
@@ -152,7 +152,7 @@ def portfolio_detail_slide(footer_text: str, slide_styles: StyleSettings) -> Sli
 
     total_general_rows = [["TOTAL", "", "", "$441,687,650.00", "100.00%", "", "", ""]]
     total_table_html = generic_plotly_table(
-        headers=liquidity_headers, rows=total_general_rows, fig_width=table_figure_width,
+        headers=liquidity_headers, rows=total_general_rows,
         column_widths=shared_column_widths,
         cell_align=['left', 'right', 'right', 'right', 'right', 'right', 'right', 'right'],
         cell_fill_color='rgba(0,0,0,0)', line_color='rgba(0,0,0,0)',
@@ -205,7 +205,7 @@ def pie_chart_bars_slide(footer_text: str, slide_styles: StyleSettings) -> Slide
     asset_table_headers_raw = ["ASSET CLASS", "%"]
     asset_table_rows_data = [["Domestic Equities", "57%"], ["International Bonds", "30%"], ["Cash & Equivalents", "13%"]]
     asset_class_table_html = generic_plotly_table(
-        headers=asset_table_headers_raw, rows=asset_table_rows_data, table_height=125, fig_width=300,
+        headers=asset_table_headers_raw, rows=asset_table_rows_data, table_height=125,
         column_widths=[0.3, 0.2],
         header_font_dict=dict(color=slide_styles.background_color, size=10, family=chart_font_family),
         cell_font_dict=dict(size=chart_label_font_size, family=chart_font_family, color=slide_styles.paragraph_color),
@@ -293,7 +293,7 @@ def generic_table_and_grouped_bar_chart_slide(footer_text: str, slide_styles: St
         cell_align=['left', 'right', 'right', 'right'],
         header_font_dict=dict(color=slide_styles.background_color, size=10, family=chart_font_family),
         cell_font_dict=dict(size=chart_label_font_size, family=chart_font_family, color=slide_styles.paragraph_color),
-        fig_width=700, theme_mode=slide_styles.mode
+        theme_mode=slide_styles.mode
     )
 
     chart_categories = [f"Point {i + 1}" for i in range(11)]
@@ -384,7 +384,7 @@ def rate_sensitivity_analysis_slide(footer_text: str, slide_styles: StyleSetting
     table1_headers, table1_rows = ["Factor", "Portfolio", "Benchmark", "Active"], [["Factor A", "60%", "100%", "-40%"], ["Factor B", "30%", "0%", "30%"],
                                                                                    ["Factor C", "10%", "0%", "10%"]]
     table1_html = generic_plotly_table(
-        headers=table1_headers, rows=table1_rows, fig_width=350, table_height=120, column_widths=[0.8, 0.5, 0.5, 0.5],
+        headers=table1_headers, rows=table1_rows, table_height=120, column_widths=[0.8, 0.5, 0.5, 0.5],
         cell_align=['left', 'center', 'center', 'center'],
         header_font_dict=dict(color=slide_styles.background_color, size=10, family=chart_font_family),
         cell_font_dict=dict(size=chart_label_font_size, family=chart_font_family, color=slide_styles.paragraph_color),
@@ -394,7 +394,7 @@ def rate_sensitivity_analysis_slide(footer_text: str, slide_styles: StyleSetting
     table2_headers, table2_rows = ["Factor", "Portfolio", "Benchmark", "Active"], [["Factor A", "1.30", "1.90", "-0.60"], ["Factor B", "2.80", "-", "2.80"],
                                                                                    ["Factor C", "-", "-", "-"], ["Total", "4.10", "1.90", "2.20"]]
     table2_html = generic_plotly_table(
-        headers=table2_headers, rows=table2_rows, fig_width=350, table_height=145, column_widths=[0.8, 0.5, 0.5, 0.5],
+        headers=table2_headers, rows=table2_rows, table_height=145, column_widths=[0.8, 0.5, 0.5, 0.5],
         cell_align=['left', 'right', 'right', 'right'],
         header_font_dict=dict(color=slide_styles.background_color, size=10, family=chart_font_family),
         cell_font_dict=dict(size=chart_label_font_size, family=chart_font_family, color=slide_styles.paragraph_color),
@@ -442,7 +442,7 @@ def issuer_performance_table_slide(footer_text: str, slide_styles: StyleSettings
     chart_label_font_size = slide_styles.chart_label_font_size
 
     issuer_table_html = generic_plotly_table(
-        headers=table_headers, rows=table_rows_data, fig_width=800, table_height=150, column_widths=[2, 1, 1, 1],
+        headers=table_headers, rows=table_rows_data, table_height=150, column_widths=[2, 1, 1, 1],
         cell_align=['left', 'right', 'right', 'right'], header_align=['center', 'center', 'center', 'center'],
         header_font_dict=dict(color=slide_styles.background_color, size=chart_label_font_size + 1, family=chart_font_family),
         cell_font_dict=dict(size=chart_label_font_size, family=chart_font_family, color=report_text_color_dark),

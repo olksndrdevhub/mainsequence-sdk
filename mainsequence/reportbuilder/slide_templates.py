@@ -2,7 +2,7 @@ from typing import List, Dict, Any, Optional, Union
 import plotly.graph_objects as go
 from mainsequence.reportbuilder.model import (
     Slide,
-    GridLayout, GridCell, AbsoluteLayout,
+    GridLayout, GridCell,
     TextElement, HtmlElement, ImageElement,
     HorizontalAlign, VerticalAlign, FontWeight,
     Size, Position, ThemeMode,get_theme_settings
@@ -80,6 +80,8 @@ def generic_plotly_table(
     )])
 
     determined_fig_height: int
+
+    table_height = None
     if table_height is None:
         content_actual_height = (header_height if headers else 0) + (len(rows) * cell_height)
         # Figure height needs to include its own top/bottom margins

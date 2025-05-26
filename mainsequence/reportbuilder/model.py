@@ -127,18 +127,15 @@ class TextElement(ElementBase):
 
         # choose font-size and default color
         if self.element_type.startswith("h"):
-            fs = getattr(settings, f"font_size_{self.element_type}")
             ff = settings.font_family_headings
             default_color = settings.heading_color
         else:
-            fs = settings.font_size_p
             ff = settings.font_family_paragraphs
             default_color = settings.paragraph_color
 
         # use explicit color if given, else default
         c = self.color if self.color is not None else default_color
 
-        style.append(f"font-size:{fs}px;")
         style.append(f"font-weight:{self.font_weight.value};")
         style.append(f"font-family:{ff};")
         style.append(f"color:{c};")
@@ -147,7 +144,7 @@ class TextElement(ElementBase):
         if self.line_height:
             style.append(f"line-height:{self.line_height};")
 
-        class_attr = f'class="{self.css_class}"' if self.css_class else ""
+        class_attr = f'class="text-element-{self.element_type}"' if self.element_type else ""
         tag = self.element_type
 
         return (
@@ -166,7 +163,7 @@ class TextH1(TextElement):
 
 class TextH2(TextElement):
     # force element_type to always be "h1" and disallow overrides
-    element_type: Literal["h1"] = Field("h2", literal=True)
+    element_type: Literal["h2"] = Field("h2", literal=True)
 
     def __init__(self, **data):
         # Remove any attempt to pass element_type in data
@@ -333,30 +330,13 @@ class GridLayout(BaseModel):
         html_parts.append("</div>")
         return "".join(html_parts)
 
-
-class AbsoluteLayout(BaseModel):
-    elements: List[BaseElements]
-    width: Optional[str] = "100%"
-    height: Optional[str] = "100%"
-
-    def render(self) -> str:
-        style_parts = ["position:relative;"]
-        if self.width:
-            style_parts.append(f"width:{self.width};")
-        if self.height:
-            style_parts.append(f"height:{self.height};")
-
-        style = "".join(style_parts)
-        elements_html = "".join(e.render() for e in self.elements)
-        return f'<div style="{style}">{elements_html}</div>'
-
 class Slide(BaseModel):
     title: str
-    layout: Union["GridLayout", "AbsoluteLayout"]
+    layout: GridLayout
     notes: Optional[str] = None
     include_logo_in_header: bool = True
-    footer_info:str =""
-    body_margin_top: int = 40
+    footer_info: str = ""
+    body_margin_top: int = 0
 
     style_theme: Optional[StyleSettings] = None
 
@@ -365,14 +345,13 @@ class Slide(BaseModel):
         return f"background-color:{self.style_theme.background_color};"
 
     def _render_header(self) -> str:
-        title_style = (
-            f"font-size: {self.style_theme.font_size_h2}px;"
-            f" color: {self.style_theme.heading_color};"
-        )
+        title_class = "text-element-h2"
+        title_inline_style = f"color: {self.style_theme.heading_color};"  # Only color here
+
         logo_html = self.style_theme.logo_img_html() if self.include_logo_in_header else ""
         return (
             f'<div class="slide-header">'
-            f'  <div class="slide-title fw-bold" style="{title_style}">'
+            f'  <div class="slide-title {title_class} fw-bold" style="{title_inline_style}">'
             f'{self.title}</div>'
             f'{logo_html}'
             f'</div>'
@@ -380,7 +359,7 @@ class Slide(BaseModel):
 
     def _render_body(self) -> str:
         style = (
-            f"flex:1; display:flex; flex-direction:column; overflow:hidden;"
+            f"flex:1; display:flex; flex-direction:column;"
             f" margin-top:{self.body_margin_top}px;"
         )
         return (

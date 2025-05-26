@@ -24,12 +24,12 @@
     .slide{
       position:relative; display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box;
       width:338.667mm; height:190.5mm; /* Original 16:9 A4 Landscape base */
-      padding:15mm; page-break-after:always; background:#f8f9fa;
+      padding:7mm; page-break-after:always; background:#f8f9fa;
       margin-bottom: 10mm; box-shadow: 0 0 5px rgba(0,0,0,0.1);
       transition: width 0.3s ease, height 0.3s ease, margin 0.3s ease, box-shadow 0.3s ease, padding 0.3s ease, transform 0.3s ease;
     }
     .slide-header,.slide-footer{
-      position:absolute; left:15mm; right:15mm; display:flex; justify-content:space-between; align-items:center; z-index: 10;
+      left:15mm; right:15mm; display:flex; justify-content:space-between; align-items:center; z-index: 10;
     }
     .slide-header{top:5mm;} .slide-footer{bottom:5mm;font-size:0.85em;color:#555;}
     .slide-body{
@@ -38,6 +38,49 @@
       overflow: auto; z-index: 5; position: relative; transition: all 0.3s ease;
     }
     .slide-logo img { max-height: 30px; width: auto; }
+
+    html { font-size: 20px; }
+
+    /* --- Responsive Typography for TextElements --- */
+    .text-element { /* Common properties if any, e.g., line-height */
+      line-height: 1.5;
+      margin: 0.5em 0; /* Default vertical rhythm */
+    }
+    .text-element-h1, .slide-title {
+      font-size: 2rem;
+      font-weight: bold;
+      line-height: 1.2;
+      margin: 0.2em 0;
+    }
+    .text-element-h2 {
+      font-size: 1.75rem;
+      font-weight: bold;
+      line-height: 1.3;
+      margin: 0.2em 0;
+    }
+    .text-element-h3 {
+      font-size: 1.5rem;
+      font-weight: bold;
+      line-height: 1.4;
+      margin: 0.2em 0;
+    }
+    .text-element-h4 {
+      font-size: 1.25rem;
+      font-weight: normal;
+      line-height: 1.4;
+      margin: 0.2em 0;
+    }
+    .text-element-h5 { font-size: 1.1rem; font-weight: bold; margin: 1.2em 0;}
+    .text-element-h6 { font-size: 1rem; font-weight: bold; margin: 1.5em 0;}
+    .text-element-p { font-size: 0.9rem; margin: 1em 0;}
+
+    .slide-footer div.text-element-p {
+      font-size: 0.75rem;
+      margin: 0;
+    }
+    .slide-footer .slide-date, .slide-footer .slide-number {
+        font-size: 0.75rem;
+    }
 
     /* === Vertical Image Slide === */
     .vertical-image-slide {
@@ -110,6 +153,98 @@
       .slide { margin-bottom: 0; box-shadow: none; width:338.667mm !important; height:190.5mm !important; }
       #buttonContainer { display: none; }
       @page { size: A4 landscape; margin: 0; }
+    }
+
+    @media (max-width: 768px) { /* Target tablets and mobile phones. Adjust breakpoint as needed. */
+      html { font-size: 12px; }
+      .slide-logo img { max-height: 20px; width: auto; }
+
+      .slide-grid {
+        grid-template-columns: minmax(0, 1fr) !important; /* Single column that takes full available width */
+        grid-template-rows: auto !important;  /* Let rows size automatically based on content when stacked */
+          /* gap: 5px !important; */
+      }
+
+      .slide-grid > div {
+        /* Make each direct child (GridCell wrapper) span the full width of the new single column */
+        grid-column: 1 / -1 !important;
+
+        /* Reset the explicit grid-row, allowing items to stack naturally in the new auto rows.
+           If cells have specific row spans that cause issues, this might need more granular control
+           or adjustment in how Python defines rows for mobile-first layouts. */
+        grid-row: auto !important;
+
+        /* Example: To ensure cells take available width if their content is small */
+        /* justify-self: stretch !important; */
+      }
+
+      .slide {
+        width: 95vw !important;
+        height: auto !important; /* MODIFIED: Allow height to adjust to content */
+        padding: 3vw !important;
+        margin-left: auto;
+        margin-right: auto;
+        margin-bottom: 15px;
+        overflow: hidden; /* Will clip horizontal overflow; vertical growth is allowed by height:auto */
+        display: flex;
+        flex-direction: column;
+      }
+      .slide-body {
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+      }
+      .slide-header, .slide-footer {
+        left: 3vw !important;
+        right: 3vw !important;
+      }
+      .slide-header {
+        top: 1.5vw !important;
+      }
+      .slide-footer {
+        bottom: 1.5vw !important;
+      }
+
+      .vertical-image-slide .left-column {
+        padding: 2.5vw !important;
+        padding-right: 0 !important;
+      }
+
+      /* TODO manage how plotly size is determined, does not overwrite existing style and sometimes needs long width */
+      .plotly-graph-div .js-plotly-plot,
+      .plotly-graph-div .js-plotly-plot .svg-container,
+      .plotly-graph-div .js-plotly-plot svg {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      .js-plotly-plot .cell-text {
+          font-size: 9px !important;
+      }
+
+      body.fullscreen-mode .slide {
+        width: 95vw !important;         /* Consistent width for mobile */
+        height: auto !important;         /* Allow height to adjust to content */
+        aspect-ratio: unset !important;  /* Override fixed aspect ratio from general fullscreen style */
+        max-height: none !important;     /* Override max-height constraint from general fullscreen style */
+        margin-bottom: 0 !important;     /* Maintain fullscreen margin behavior */
+        /* Padding is 3vw !important (inherited from .slide rule in this media query) */
+        /* overflow: hidden; is inherited from general body.fullscreen-mode .slide and is fine */
+      }
+
+      body.fullscreen-mode .slide .slide-body {
+          /* Ensure consistent scroll behavior for slide content in mobile fullscreen */
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+          -webkit-overflow-scrolling: touch;
+      }
+    }
+
+    /* General responsive images within slide body */
+    .slide-body img {
+        max-width: 100%;
+        height: auto;
+        display: block;
     }
   </style>
 </head>
