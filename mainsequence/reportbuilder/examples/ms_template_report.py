@@ -357,7 +357,7 @@ def portfolio_performance_slide(footer_text: str, slide_styles: StyleSettings) -
     )
 
     slide_layout = GridLayout(
-        row_definitions=["auto", "auto", "auto", "auto"], col_definitions=["1fr"], gap=15,
+        row_definitions=["auto", "auto", "auto"], col_definitions=["1fr"], gap=10,
         cells=[
             GridCell(row=1, col=1, element=TextElement(
                 text="Portfolio Performance in Local Currency", element_type="h4", font_weight=FontWeight.bold,
@@ -365,10 +365,6 @@ def portfolio_performance_slide(footer_text: str, slide_styles: StyleSettings) -
             ), padding="0 0 5px 0"),
             GridCell(row=2, col=1, element=HtmlElement(html=monthly_chart_html), justify_self=HorizontalAlign.center),
             GridCell(row=3, col=1, element=HtmlElement(html=annual_chart_html), justify_self=HorizontalAlign.center),
-            GridCell(row=4, col=1, element=TextElement(
-                text="Data as of 04/30/2025", element_type="p",
-                color=report_text_color_light_gray, h_align=HorizontalAlign.left
-            ), padding="5px 0 0 0", align_self=VerticalAlign.bottom)
         ]
     )
     return Slide(
