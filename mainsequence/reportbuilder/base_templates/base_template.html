@@ -185,11 +185,34 @@
         bottom: 1.5vw !important;
       }
 
-      .vertical-image-slide .left-column {
-        padding: 2.5vw !important;
-        padding-right: 0 !important;
+      .vertical-image-slide {
+        flex-direction: column-reverse !important; /* Stack image (.right-column) on top of text (.left-column) */
       }
 
+      .vertical-image-slide .left-column,
+      .vertical-image-slide .right-column {
+        width: 100% !important;
+        max-width: 100% !important; /* Ensure it doesn't overflow container */
+        /* height will be auto by default or set specifically below */
+      }
+
+      .vertical-image-slide .left-column {
+        padding: 2.5vw !important; /* Consistent padding on all sides for the text content block */
+        height: auto !important; /* Ensure height is determined by content */
+      }
+
+      .vertical-image-slide .right-column {
+        padding: 0 !important; /* Image container should have no padding */
+        margin: 0 !important; /* Reset any margins */
+        height: auto;         /* Height of this container is determined by the image */
+      }
+
+      .vertical-image-slide .right-column img {
+        /* width: 100% is set by inline style and is appropriate */
+        height: auto !important; /* CRITICAL: Override inline style 'height:100%'
+                                        to allow image to set its own height based on aspect ratio. */
+        display: block; /* Ensure proper block rendering for the image */
+      }
       /* Mobile Plotly specific styling */
       .js-plotly-plot .cell-text { /* Keep mobile-specific font size for table cells */
           font-size: 9px !important;

@@ -16,7 +16,7 @@ from mainsequence.reportbuilder.model import (
     VerticalAlign,
     Size,
     StyleSettings,
-    ThemeMode,
+    ThemeMode, TextH1, TextH2,
 )
 from mainsequence.reportbuilder.slide_templates import (
     generic_plotly_table,
@@ -588,6 +588,75 @@ def contact_information_slide(footer_text: str, slide_styles: StyleSettings) -> 
         title="Contact Information", layout=slide_layout, footer_info=footer_text, style_theme=contact_slide_specific_styles
     )
 
+def contact_information_slide() -> Slide:
+    slide_title = "Contact Details"
+    page_main_title_text = "Main Sequence | Asset Management"
+
+    contact_1_details = "<strong>CONTACT NAME 1</strong><br>contact1@example.com<br>Tel. (555) 100-1001"
+    contact_2_details = "<strong>CONTACT NAME 2</strong><br>contact2@example.com<br>Ext. 1002"
+    contact_3_details = "<strong>CONTACT NAME 3</strong><br>contact3@example.com<br>Ext. 1003"
+    contact_4_details = "<strong>CONTACT NAME 4</strong><br>contact4@example.com<br>Ext. 1004"
+    contact_5_details = "<strong>CONTACT NAME 5</strong><br>contact5@example.com<br>Ext. 1005"
+
+    address_details = "Placeholder Company Name<br>123 Anonymous Street, Placeholder City, ST 98765, Floor X."
+
+    contact_slide_cells = [
+        GridCell(
+            row=1, col=1, col_span=12,
+            element=TextH2(text=page_main_title_text, h_align=HorizontalAlign.center),
+            padding="5px 0 15px 0"
+        ),
+        GridCell(
+            row=2, col=4, col_span=3,
+            element=TextElement(text=contact_1_details, h_align=HorizontalAlign.center, v_align=VerticalAlign.top),
+            padding="10px"
+        ),
+        GridCell(
+            row=2, col=7, col_span=3,
+            element=TextElement(text=contact_2_details, h_align=HorizontalAlign.center, v_align=VerticalAlign.top),
+            padding="10px"
+        ),
+        GridCell(
+            row=3, col=3, col_span=2,
+            element=TextElement(text=contact_3_details, h_align=HorizontalAlign.center, v_align=VerticalAlign.top),
+            padding="10px"
+        ),
+        GridCell(
+            row=3, col=6, col_span=2,
+            element=TextElement(text=contact_4_details, h_align=HorizontalAlign.center, v_align=VerticalAlign.top),
+            padding="10px"
+        ),
+        GridCell(
+            row=3, col=9, col_span=2,
+            element=TextElement(text=contact_5_details, h_align=HorizontalAlign.center, v_align=VerticalAlign.top),
+            padding="10px"
+        ),
+        GridCell(
+            row=4, col=1, col_span=12,
+            element=TextElement(text=address_details, h_align=HorizontalAlign.center, element_type="p"),
+            padding="15px 0 5px 0"
+        )
+    ]
+
+    contacts_layout = GridLayout(
+        col_definitions=[
+            "1fr", "1fr", "1fr", "1fr", "1fr", "1fr",
+            "1fr", "1fr", "1fr", "1fr", "1fr", "1fr"
+        ],
+        row_definitions=["auto", "auto", "auto", "auto"],
+        cells=contact_slide_cells,
+        gap="5px",
+        width="100%",
+        height="auto"
+    )
+
+    contact_slide = Slide(
+        title=slide_title,
+        layout=contacts_layout,
+        footer_info="Confidential"
+    )
+    return contact_slide
+
 
 def create_full_presentation() -> Presentation:
     # Use the global `styles` object configured at the top for the presentation's base theme.
@@ -611,7 +680,7 @@ def create_full_presentation() -> Presentation:
         issuer_performance_table_slide(footer_text=current_date_footer_text, slide_styles=presentation_styles),
         comparative_performance_charts_slide(footer_text=current_date_footer_text, slide_styles=presentation_styles),
         data_table_summary_slide(footer_text=current_date_footer_text, slide_styles=presentation_styles),
-        contact_information_slide(footer_text=current_date_footer_text, slide_styles=contact_slide_styles)
+        contact_information_slide(),
     ]
 
     return Presentation(
