@@ -9,7 +9,6 @@ from jinja2 import Environment
 
 from typing import Callable, Dict
 
-from mainsequence.reportbuilder.functions import FUNCTION_REGISTRY
 from pydantic import  HttpUrl
 
 
@@ -155,6 +154,7 @@ class TextElement(ElementBase):
             f'<{tag} id="{self.id}" {class_attr} '
             f'style="{"".join(style)}">{self.text}</{tag}>'
         )
+
 class TextH1(TextElement):
     # force element_type to always be "h1" and disallow overrides
     element_type: Literal["h1"] = Field("h1", literal=True)
@@ -163,6 +163,7 @@ class TextH1(TextElement):
         # Remove any attempt to pass element_type in data
         data.pop("element_type", None)
         super().__init__(**data)
+
 class TextH2(TextElement):
     # force element_type to always be "h1" and disallow overrides
     element_type: Literal["h1"] = Field("h2", literal=True)
@@ -171,8 +172,7 @@ class TextH2(TextElement):
         # Remove any attempt to pass element_type in data
         data.pop("element_type", None)
         super().__init__(**data)
-        
-        
+
 class ImageElement(ElementBase):
     src: str
     alt: str = ""
@@ -190,7 +190,7 @@ class ImageElement(ElementBase):
             style.append(self.position.css())
         style.append(self.size.css())
         style.append(f"object-fit:{self.object_fit};")
-        
+
         class_attr = f'class="{self.css_class}"' if self.css_class else ""
         return (
             f'<img id="{self.id}" {class_attr} src="{self.src}" alt="{self.alt}" '
@@ -207,41 +207,8 @@ class HtmlElement(ElementBase):
         class_attr = f'class="{self.css_class}"' if self.css_class else ""
         return f'<div id="{self.id}" {class_attr}">{self.html}</div>'
 
-class FunctionElement(ElementBase):
-    """
-    A slide element whose visual output is produced by a registered function.
-    """
-    function: str                         # key in FUNCTION_REGISTRY
-    params:   Dict[str, Any] = {}         # raw args coming from YAML
-    style_theme: Optional[ThemeMode]=None
 
-    def render(self) -> str:
-        if self.style_theme is None:
-            self.style_theme = override_theme_mode_if_none
-        if self.function not in FUNCTION_REGISTRY:
-            raise ValueError(f"Unknown function '{self.function}'")
-
-        fn = FUNCTION_REGISTRY[self.function]
-        args_model_field = fn.__annotations__.get('args') 
-        if args_model_field is None :
-            args_model_field = fn.__annotations__.get('return_model')
-
-        args_model: Type[BaseModel] = args_model_field
-
-        try:
-            typed_args = args_model(**self.params) if args_model else self.params
-        except ValidationError as e:
-            raise ValueError(
-                f"Invalid parameters for '{self.function}':\n{e}"
-            ) from None
-        
-        html_output: str = fn(typed_args) if args_model else fn(**self.params)
-
-        if self.css_class:
-            return f'<div class="{self.css_class}">{html_output}</div>'
-        return html_output
-
-BaseElements = Union[TextElement, ImageElement, HtmlElement, FunctionElement]
+BaseElements = Union[TextElement, ImageElement, HtmlElement]
 
 class GridCell(BaseModel):
     row: int
@@ -378,7 +345,7 @@ class AbsoluteLayout(BaseModel):
             style_parts.append(f"width:{self.width};")
         if self.height:
             style_parts.append(f"height:{self.height};")
-        
+
         style = "".join(style_parts)
         elements_html = "".join(e.render() for e in self.elements)
         return f'<div style="{style}">{elements_html}</div>'
@@ -430,7 +397,7 @@ class Slide(BaseModel):
             f'<div class="slide-number" style="{text_style}">{slide_number} / {total}</div>'
             f'</div>'
         )
-    
+
     def _override_theme(self,theme_mode:ThemeMode):
         if self.style_theme is None:
             self.style_theme = theme_mode
@@ -467,7 +434,7 @@ class VerticalImageSlide(Slide):
         description="How the image should fit its container"
     )
 
-    def render(self, slide_number: int, total: int, 
+    def render(self, slide_number: int, total: int,
                override_theme_mode_if_none: ThemeMode
                ) -> str:
         self._override_theme(override_theme_mode_if_none)
@@ -500,7 +467,6 @@ class VerticalImageSlide(Slide):
             f'{left_html}{right_html}'
             f'</section>'
         )
-
 
 class ThemeMode(str, Enum):
     light = "light"
@@ -547,10 +513,10 @@ class StyleSettings(BaseModel):
     chart_palette_sequential:   Optional[List[str]] = Field(None)
     chart_palette_diverging:    Optional[List[str]] = Field(None)
     chart_palette_categorical:  Optional[List[str]] = Field(None)
-    
+
     def logo_img_html(self, position: str = "slide-logo") -> str:
         return f'<div class="{position}"><img src="{self.logo_url}" alt="logo" crossOrigin="anonymous"></div>' if self.logo_url else ""
-    
+
     @root_validator(pre=True)
     def _fill_theme_defaults(cls, values: Dict) -> Dict:
         palettes = {
@@ -659,7 +625,7 @@ class Presentation(BaseModel):
 
         total = len(self.slides)-1 # do not add the final template slide
 
-        slides_html += [s.render(i + 1, total, 
+        slides_html += [s.render(i + 1, total,
                                  override_theme_mode_if_none=s.style_theme
                                  ) for i, s in enumerate(self.slides)]
         return BASE_TEMPLATE.render(

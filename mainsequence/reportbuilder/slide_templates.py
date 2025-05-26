@@ -3,7 +3,7 @@ import plotly.graph_objects as go
 from mainsequence.reportbuilder.model import (
     Slide,
     GridLayout, GridCell, AbsoluteLayout,
-    TextElement, FunctionElement, HtmlElement, ImageElement,
+    TextElement, HtmlElement, ImageElement,
     HorizontalAlign, VerticalAlign, FontWeight,
     Size, Position, ThemeMode,get_theme_settings
 )
@@ -358,101 +358,3 @@ def generic_plotly_grouped_bar_chart(
         full_html=full_html,
         config={'responsive': responsive, 'displayModeBar': display_mode_bar}
     )
-
-
-def title_card_template(
-        slide_title: str,
-        main_heading: str,
-        sub_heading: Optional[str] = None,
-        background_color: str = "#f8f9fa",
-        title_font_size: int = 48,
-        subtitle_font_size: int = 24,
-        title_color: str = "#333333",
-        subtitle_color: str = "#555555"
-) -> Slide:
-    elements = [
-        TextElement(
-            text=main_heading,
-            font_size=title_font_size,
-            font_weight=FontWeight.bold,
-            color=title_color,
-            h_align=HorizontalAlign.center,
-            position=Position(top="35%", left="5%", right="5%")
-        )
-    ]
-    if sub_heading:
-        elements.append(
-            TextElement(
-                text=sub_heading,
-                font_size=subtitle_font_size,
-                color=subtitle_color,
-                h_align=HorizontalAlign.center,
-                position=Position(top="50%", left="10%", right="10%")
-            )
-        )
-    layout = AbsoluteLayout(elements=elements, width="100%", height="100%")
-    return Slide(title=slide_title, layout=layout, background_color=background_color)
-
-
-def two_column_text_chart_template(
-        slide_title_text: str,
-        text_html_content: str,
-        chart_function_name: str,
-        chart_params: Dict[str, Any],
-        text_col_definition: str = "1fr",
-        chart_col_definition: str = "1.5fr",
-        background_color: str = "#ffffff",
-        gap: int = 20
-) -> Slide:
-    text_el = HtmlElement(
-        html=f'<div style="padding: 10px; font-size: 18px; line-height: 1.7;">{text_html_content}</div>'
-    )
-    chart_el = FunctionElement(function=chart_function_name, params=chart_params)
-
-    layout = GridLayout(
-        row_definitions=["1fr"],
-        col_definitions=[text_col_definition, chart_col_definition],
-        gap=gap,
-        cells=[
-            GridCell(row=1, col=1, element=text_el, padding="10px", align_self="stretch"),
-            GridCell(row=1, col=2, element=chart_el, padding="10px", align_self="stretch")
-        ]
-    )
-    return Slide(title=slide_title_text, layout=layout, background_color=background_color)
-
-
-def bullet_points_main_image_template(
-        slide_title_text: str,
-        image_src: str,
-        image_alt: str = "Slide image",
-        bullet_points_html: List[str] = [],
-        background_color: str = "#ffffff",
-        image_col_def: str = "1.8fr",
-        text_col_def: str = "1fr",
-        gap: int = 25
-) -> Slide:
-    image_el = ImageElement(
-        src=image_src,
-        alt=image_alt,
-        size=Size(width="100%", height="100%"),
-        object_fit="contain"
-    )
-
-    text_elements_html = "".join(
-        [f'<div style="margin-bottom: 15px; font-size: 18px; line-height:1.6;">{point}</div>' for point in
-         bullet_points_html])
-
-    combined_text_el = HtmlElement(
-        html=f'<div style="padding: 15px;">{text_elements_html}</div>'
-    )
-
-    layout = GridLayout(
-        row_definitions=["1fr"],
-        col_definitions=[image_col_def, text_col_def],
-        gap=gap,
-        cells=[
-            GridCell(row=1, col=1, element=image_el, padding="10px", align_self="center", justify_self="center"),
-            GridCell(row=1, col=2, element=combined_text_el, padding="10px", align_self="stretch")
-        ]
-    )
-    return Slide(title=slide_title_text, layout=layout, background_color=background_color)
