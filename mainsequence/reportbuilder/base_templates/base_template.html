@@ -147,14 +147,17 @@
           overflow-x:auto;                /* provides the scrollbar on phones        */
           -webkit-overflow-scrolling:touch;
       }
-        .slide-grid {
+      .slide-grid {
         grid-template-columns: minmax(0, 1fr) !important;
         grid-template-rows: auto !important;
       }
 
-      .slide-grid > div { /* This is the GridCell's wrapper div */
+      .slide-grid > div {
         grid-column: 1 / -1 !important;
         grid-row: auto !important;
+      }
+
+      .slide-grid > div:has(.plotly-graph-div) { /* This is the GridCell's wrapper div, applies only if it contains a Plotly graph */
         justify-self: stretch !important; /* CRITICAL: Override inline justify-self for mobile to ensure it fills the column */
       }
 
