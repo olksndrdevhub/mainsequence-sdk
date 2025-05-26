@@ -239,6 +239,11 @@ class BaseObjectOrm:
                 try:
                     accumulated.append(cls(**item) if issubclass(cls, BasePydanticModel) else item)
                 except Exception as e:
+                    print(item)
+                    print(cls)
+                    print(cls(**item))
+                    import traceback
+                    traceback.print_exc()
                     raise e
 
             # We set `params = None` (or empty) after the first loop to avoid appending repeatedly
