@@ -81,7 +81,6 @@ def generic_plotly_table(
 
     determined_fig_height: int
 
-    table_height = None
     if table_height is None:
         content_actual_height = (header_height if headers else 0) + (len(rows) * cell_height)
         # Figure height needs to include its own top/bottom margins

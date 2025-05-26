@@ -70,17 +70,9 @@
       line-height: 1.4;
       margin: 0.2em 0;
     }
-    .text-element-h5 { font-size: 1.1rem; font-weight: bold; margin: 1.2em 0;}
-    .text-element-h6 { font-size: 1rem; font-weight: bold; margin: 1.5em 0;}
-    .text-element-p { font-size: 0.9rem; margin: 1em 0;}
-
-    .slide-footer div.text-element-p {
-      font-size: 0.75rem;
-      margin: 0;
-    }
-    .slide-footer .slide-date, .slide-footer .slide-number {
-        font-size: 0.75rem;
-    }
+    .text-element-h5 { font-size: 1.1rem; font-weight: bold; margin: 0.05em 0;}
+    .text-element-h6 { font-size: 1rem; font-weight: bold; margin: 0.05em 0;}
+    .text-element-p { font-size: 0.9rem; margin: 0.05em 0;}
 
     /* === Vertical Image Slide === */
     .vertical-image-slide {
@@ -145,42 +137,30 @@
         overflow: auto; /* Ensure body can scroll if its content overflows */
     }
 
-
-    /* --- Print Styles --- */
-    @media print {
-      body, html { background: #fff; }
-      body { display: block; padding-top: 0; padding-bottom: 0; }
-      .slide { margin-bottom: 0; box-shadow: none; width:338.667mm !important; height:190.5mm !important; }
-      #buttonContainer { display: none; }
-      @page { size: A4 landscape; margin: 0; }
-    }
-
     @media (max-width: 768px) { /* Target tablets and mobile phones. Adjust breakpoint as needed. */
-      html { font-size: 12px; }
+      html { font-size: 16px; }
       .slide-logo img { max-height: 20px; width: auto; }
 
-      .slide-grid {
-        grid-template-columns: minmax(0, 1fr) !important; /* Single column that takes full available width */
-        grid-template-rows: auto !important;  /* Let rows size automatically based on content when stacked */
-          /* gap: 5px !important; */
+      /* --- Plotly specific styles for scrolling (General) --- */
+      div[id^="elem_"]{
+          max-width:100%;                 /* never overflow its grid cell            */
+          overflow-x:auto;                /* provides the scrollbar on phones        */
+          -webkit-overflow-scrolling:touch;
+      }
+        .slide-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+        grid-template-rows: auto !important;
       }
 
-      .slide-grid > div {
-        /* Make each direct child (GridCell wrapper) span the full width of the new single column */
+      .slide-grid > div { /* This is the GridCell's wrapper div */
         grid-column: 1 / -1 !important;
-
-        /* Reset the explicit grid-row, allowing items to stack naturally in the new auto rows.
-           If cells have specific row spans that cause issues, this might need more granular control
-           or adjustment in how Python defines rows for mobile-first layouts. */
         grid-row: auto !important;
-
-        /* Example: To ensure cells take available width if their content is small */
-        /* justify-self: stretch !important; */
+        justify-self: stretch !important; /* CRITICAL: Override inline justify-self for mobile to ensure it fills the column */
       }
 
       .slide {
         width: 95vw !important;
-        height: auto !important; /* MODIFIED: Allow height to adjust to content */
+        height: auto !important;
         padding: 3vw !important;
         margin-left: auto;
         margin-right: auto;
@@ -210,15 +190,8 @@
         padding-right: 0 !important;
       }
 
-      /* TODO manage how plotly size is determined, does not overwrite existing style and sometimes needs long width */
-      .plotly-graph-div .js-plotly-plot,
-      .plotly-graph-div .js-plotly-plot .svg-container,
-      .plotly-graph-div .js-plotly-plot svg {
-        width: 100% !important;
-        max-width: 100% !important;
-      }
-
-      .js-plotly-plot .cell-text {
+      /* Mobile Plotly specific styling */
+      .js-plotly-plot .cell-text { /* Keep mobile-specific font size for table cells */
           font-size: 9px !important;
       }
 
@@ -228,8 +201,6 @@
         aspect-ratio: unset !important;  /* Override fixed aspect ratio from general fullscreen style */
         max-height: none !important;     /* Override max-height constraint from general fullscreen style */
         margin-bottom: 0 !important;     /* Maintain fullscreen margin behavior */
-        /* Padding is 3vw !important (inherited from .slide rule in this media query) */
-        /* overflow: hidden; is inherited from general body.fullscreen-mode .slide and is fine */
       }
 
       body.fullscreen-mode .slide .slide-body {
@@ -238,13 +209,27 @@
           overflow-x: hidden !important;
           -webkit-overflow-scrolling: touch;
       }
+
+      .slide-logo {
+        display: none !important;
+      }
+      #playButton {
+        display: none !important;
+      }
     }
 
-    /* General responsive images within slide body */
-    .slide-body img {
-        max-width: 100%;
-        height: auto;
-        display: block;
+    @media (max-width: 480px) {
+        html {
+            font-size: 12px;
+        }
+    }
+    /* --- Print Styles --- */
+    @media print {
+      body, html { background: #fff; }
+      body { display: block; padding-top: 0; padding-bottom: 0; }
+      .slide { margin-bottom: 0; box-shadow: none; width:338.667mm !important; height:190.5mm !important; }
+      #buttonContainer { display: none; }
+      @page { size: A4 landscape; margin: 0; }
     }
   </style>
 </head>

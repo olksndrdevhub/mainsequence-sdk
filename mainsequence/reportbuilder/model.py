@@ -336,7 +336,7 @@ class Slide(BaseModel):
     notes: Optional[str] = None
     include_logo_in_header: bool = True
     footer_info: str = ""
-    body_margin_top: int = 0
+    body_margin_top: int = 5
 
     style_theme: Optional[StyleSettings] = None
 
@@ -597,7 +597,7 @@ class Presentation(BaseModel):
         slides_html = []
 
         # add the slide template
-        self.slides.append(self._slide_template())
+        # self.slides.append(self._slide_template())
         for slide in self.slides:
             if slide.style_theme is None:
                 slide.style_theme = self.style_theme
