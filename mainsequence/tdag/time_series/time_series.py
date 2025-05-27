@@ -2447,9 +2447,11 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                     traceback.print_exc()
 
                     raise e
-                lvl0 = temp_df.index.get_level_values(0)
-                is_dt64_utc = str(lvl0.dtype) == "datetime64[ns, UTC]"
-                assert is_dt64_utc, "Time index must be datetime64[ns, UTC]"
+
+                if not temp_df.empty:
+                    lvl0 = temp_df.index.get_level_values(0)
+                    is_dt64_utc = str(lvl0.dtype) == "datetime64[ns, UTC]"
+                    assert is_dt64_utc, f"Time index must be datetime64[ns, UTC] ({lvl0} is used)"
 
                 for col in temp_df.columns:
                     assert col.islower(), f"Error Column '{col}': Column names must be lower case"
