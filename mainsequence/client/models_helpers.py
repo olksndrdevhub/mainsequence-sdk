@@ -18,7 +18,7 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
     related_local_time_serie: Union[LocalTimeSerie,int]
     description: Optional[str] = Field(None, description="Descriptions of the data source")
     data_frequency_id: Optional[DataFrequency] =None
-    assets_in_data_source:Optional[List[int]]
+    assets_in_data_source: Optional[List[int]]
     extra_properties: Optional[Dict]
 
     def __str__(self):
@@ -41,7 +41,7 @@ class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
     def append_assets(self, asset_id_list:list, timeout=None):
         url = f"{self.get_object_url()}/{self.id}/append_assets/"
 
-        payload = {"json": {"asset_id_list":asset_id_list}}
+        payload = {"json": {"asset_id_list": asset_id_list}}
         r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload,
                          time_out=timeout)
         if r.status_code in [200] == False:

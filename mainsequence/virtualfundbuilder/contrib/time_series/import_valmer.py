@@ -112,14 +112,13 @@ class ImportValmer(TimeSerie):
 
         source_data.set_index(["time_index", "unique_identifier"], inplace=True)
 
-        source_data=update_statistics.filter_df_by_latest_value(source_data)
+        source_data = update_statistics.filter_df_by_latest_value(source_data)
 
         self._set_column_metadata()
         return source_data
 
     def  _run_post_update_routines(self, error_on_last_update,update_statistics:DataUpdates):
-
-        MARKET_TIME_SERIES_UNIQUE_IDENTIFIER="vector_de_precios_valmer"
+        MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "vector_de_precios_valmer"
         try:
             markets_time_series_details = MarketsTimeSeriesDetails.get(
                 unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
@@ -133,11 +132,13 @@ class ImportValmer(TimeSerie):
                 data_frequency_id=DataFrequency.one_d,
                 description="This time series contains the valuation prices from the price provider VALMER",
             )
-        markets_time_series_details.append_asset_list_source(asset_list=update_statistics.asset_list)
 
+        new_assets = []
+        for asset in update_statistics.asset_list:
+            if asset.id not in markets_time_series_details.assets_in_data_source:
+                new_assets.append(asset)
 
-
-
+        markets_time_series_details.append_asset_list_source(asset_list=new_assets)
 
 
 if __name__ == "__main__":

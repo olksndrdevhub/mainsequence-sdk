@@ -122,7 +122,7 @@ def example_data(assets):
 
     return chart1_base64, chart2_base64
 
-class ReportConfig(BaseModel):
+class ExampleReportConfig(BaseModel):
     """Pydantic model defining the parameters for report generation."""
     report_id: str = "MC-2025"
     report_title: str = "Global Strategy Views: Diversify to Amplify"
@@ -140,15 +140,15 @@ class ReportConfig(BaseModel):
     )
 
 @register_app()
-class ReportApp(BaseApp):
+class ExampleReportApp(BaseApp):
     """
     Minimal example of a 'ReportApp' that can:
     1) Generate dummy data and create charts (line + heatmap).
     2) Embed those charts into an HTML template.
     3) Optionally export the HTML to PDF using WeasyPrint.
     """
-    configuration_class = ReportConfig
-    def __init__(self, configuration: ReportConfig):
+    configuration_class = ExampleReportConfig
+    def __init__(self, configuration: ExampleReportConfig):
         self.configuration = configuration
 
         category = AssetCategory.get(unique_identifier=self.configuration.asset_category_unique_identifier)
@@ -288,6 +288,6 @@ class ReportApp(BaseApp):
 
 if __name__ == "__main__":
     # Example usage:
-    config = ReportConfig()  # Or override fields as needed
-    app = ReportApp(config)
+    config = ExampleReportConfig()  # Or override fields as needed
+    app = ExampleReportApp(config)
     html_artifact = app.run()  # Creates output_report.html and weasy_output_report.pdf
