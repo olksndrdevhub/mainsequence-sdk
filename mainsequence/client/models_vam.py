@@ -95,6 +95,9 @@ class Calendar(BaseObjectOrm,BasePydanticModel):
     def __str__(self):
         return self.name
 
+    def __repr__(self) -> str:
+        return self.name
+
 class Organization(BaseModel):
     id: int
     uid: str
@@ -198,7 +201,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
 
     def get_calendar(self):
 
-        if self.execution_venue in CRYPTO_EXCHANGE_CODE:
+        if self.execution_venue.symbol in CRYPTO_EXCHANGE_CODE:
             return Calendar(name="24/7")
         elif self.exchange_code in COMPOSITE_TO_ISO.keys():
             return Calendar(name=COMPOSITE_TO_ISO[self.exchange_code])
