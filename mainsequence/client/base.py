@@ -23,6 +23,7 @@ def build_session(loaders):
     s.headers.update(loaders.auth_headers)
     retries = Retry(total=2, backoff_factor=2, )
     s.mount('http://', HTTPAdapter(max_retries=retries))
+    s.headers["Accept-Encoding"] = "gzip"
     return s
 
 session = build_session(loaders=loaders)

@@ -20,7 +20,7 @@ PortfolioNameEnum = Enum(
     type=str,          # make each member a `str`, so validation works as before
 )
 class NamedPortfolioConfiguration(BaseModel):
-    portfolio_name: PortfolioNameEnum = PortfolioNameEnum.market_cap
+    portfolio_name: PortfolioNameEnum
     portfolio_run_parameters: PortfolioRunParameters
 
 @register_app()

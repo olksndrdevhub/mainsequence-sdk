@@ -1648,7 +1648,7 @@ class Artifact(BasePydanticModel, BaseObjectOrm):
                 "created_by_resource_name": created_by_resource_name,
                 "bucket_name": bucket_name if bucket_name else "default_bucket",
             }
-            files = {"content": (filepath, f, "application/pdf")}
+            files = {"content": (str(filepath), f, "application/pdf")}
             artifact = Artifact.create(files=files, **data)
             return artifact
 
