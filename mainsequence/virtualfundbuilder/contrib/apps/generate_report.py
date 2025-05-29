@@ -284,7 +284,6 @@ class ReportApp(BaseApp):
             created_by_resource_name=self.__class__.__name__,
             bucket_name=self.configuration.bucket_name
         )
-        return html_artifact
 
 if __name__ == "__main__":
     # Example usage:

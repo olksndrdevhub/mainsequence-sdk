@@ -589,7 +589,6 @@ def update_settings_from_dict(overrides: dict, mode: ThemeMode) -> None:
 
 class Presentation(BaseModel):
     title: str
-    subtitle: Optional[str] = None
     slides: List[Slide]
     style_theme: ThemeMode = Field(default_factory=lambda: light_settings)
 
