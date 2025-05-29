@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
+  <title>{{ title }}</title>
+  <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" ></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.min.js"></script>
+  <style>
+    :root {
+      --app-header-height: 56px;
+      --filmstrip-width: 220px; /* Width of the filmstrip panel */
+    }
+
+    body,html{margin:0;padding:0;width:100%;background:#e0e0e0;font-family:{{ font_family }};}
+
+    body {
+      display: flex; flex-direction: column;
+      min-height: 100vh;
+      padding-top: var(--app-header-height);
+      padding-bottom: 20px;
+      transition: padding-left 0.3s ease-in-out, background 0.3s ease; /* Added padding-left transition */
+      box-sizing: border-box;
+    }
+    body.filmstrip-open {
+        padding-left: var(--filmstrip-width); /* Shift body content when filmstrip is open */
+    }
+
+
+    #app-top-header {
+      position: fixed; top: 0;
+      /* Adjust left & right when filmstrip opens to keep header full-width over content area */
+      left: 0; right: 0;
+      height: var(--app-header-height); background-color: #343a40; color: white;
+      display: flex; align-items: center;
+      padding: 0 15px; z-index: 1050; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: left 0.3s ease-in-out;
+    }
+    body.filmstrip-open #app-top-header {
+        left: var(--filmstrip-width);
+    }
+
+
+    #app-top-header .header-left { flex: 1; display: flex; justify-content: flex-start; }
+    #app-top-header .app-title { font-size: 1.2rem; font-weight: bold; }
+    #app-top-header .header-center { flex-shrink: 0; display: flex; justify-content: center; align-items: center; }
+    #app-top-header .header-right { flex: 1; display: flex; justify-content: flex-end; align-items: center; }
+
+    .viewport-controls .btn-icon,
+    #presentation-toggle-button,
+    #filmstrip-toggle-button { /* Added filmstrip toggle to common styling */
+      background-color: transparent; color: white; border: 1px solid transparent;
+      margin: 0 3px; padding: 0; border-radius: 0.25rem; font-size: 1.3rem;
+      height: 38px; width: 38px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+    }
+    .viewport-controls .btn-icon:hover,
+    #presentation-toggle-button:hover,
+    #filmstrip-toggle-button:hover {
+      border-color: rgba(255,255,255,0.5);
+      background-color: rgba(255,255,255,0.1);
+    }
+    .viewport-controls .btn-icon.active {
+      background-color: rgba(255,255,255,0.2);
+      border-color: rgba(255,255,255,0.75);
+      box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+    }
+    #filmstrip-toggle-button {
+        /* Specific styles if any, for now inherits btn-icon */
+        margin-left: 8px; /* Space from PDF button */
+    }
+
+
+    #app-top-header #pdf-export-button { height: 40px; display: flex; align-items: center; justify-content: center; }
+    #app-top-header #pdf-export-button i { font-size: 1.2rem; }
+
+    /* --- Filmstrip Panel --- */
+    #filmstrip-panel {
+        position: fixed;
+        left: 0;
+        top: var(--app-header-height);
+        bottom: 0;
+        width: var(--filmstrip-width);
+        background-color: #f8f9fa;
+        border-right: 1px solid #dee2e6;
+        overflow-y: auto;
+        transform: translateX(calc(-1 * var(--filmstrip-width))); /* Initially hidden */
+        transition: transform 0.3s ease-in-out;
+        z-index: 1040; /* Below header but above content */
+        padding: 10px 0;
+        display: none; /* Hidden by default, shown in design mode */
+    }
+    body.design-mode #filmstrip-panel {
+        display: block; /* Visible in design mode, transform controls open/close */
+    }
+    #filmstrip-panel.open {
+        transform: translateX(0);
+    }
+    .filmstrip-header {
+        padding: 0px 15px 10px 15px;
+        font-weight: bold;
+        border-bottom: 1px solid #dee2e6;
+        margin-bottom: 10px;
+        color: #343a40;
+    }
+    #filmstrip-thumbnails-container {
+        padding: 0 10px;
+    }
+    .filmstrip-thumbnail {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background-color: #ffffff;
+        border: 1px solid #ccc;
+        margin-bottom: 10px;
+        cursor: pointer;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 12px;
+        color: #333;
+        transition: border-color 0.2s ease;
+        padding: 5px;
+        box-sizing: border-box;
+        border-radius: 3px;
+    }
+    .filmstrip-thumbnail:hover {
+        border-color: #007bff;
+    }
+    .filmstrip-thumbnail.active-thumbnail { /* Renamed from active-thumb */
+        border: 2px solid #007bff;
+        font-weight: bold;
+    }
+    .thumbnail-content-text {
+        text-align: center;
+        white-space: normal;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        max-height: 100%;
+        overflow: hidden;
+        padding: 2px;
+        line-height: 1.2;
+    }
+
+
+    /* --- #slidesContainer Styling --- */
+    #slidesContainer {
+      /* width: 100%; default will be affected by body padding-left */
+      display: flex; flex-direction: column; align-items: center;
+      transition: width 0.3s ease-in-out, margin 0.3s ease-in-out, border 0.3s ease-in-out, box-shadow 0.3s ease-in-out, background-color 0.3s ease-in-out, padding-top 0.3s ease-in-out;
+      padding-top: 10px;
+      background-color: transparent;
+      border: none;
+      box-shadow: none;
+      margin: 0 auto;
+    }
+    /* When filmstrip is open, slidesContainer doesn't need margin if body is padded */
+
+
+    /* ... (emulation styles for #slidesContainer, .slide, presentation-mode styles, @media queries etc. remain the same as the previous full code version) ... */
+    body.emulate-tablet #slidesContainer, body.emulate-mobile #slidesContainer { margin: 20px auto !important; border: 3px solid #007bff !important; box-shadow: 0 0 15px rgba(0,0,0,0.3) !important; background-color: #f0f0f0 !important; padding: 0 !important; }
+    body.emulate-tablet #slidesContainer { width: 768px !important; }
+    body.emulate-mobile #slidesContainer { width: 375px !important; }
+    body.presentation-mode #slidesContainer { height: 100vh !important; overflow-y: scroll !important; scroll-snap-type: y mandatory !important; padding-top: 0 !important; margin: 0 auto !important; }
+    body.presentation-mode:not(.emulate-tablet):not(.emulate-mobile) #slidesContainer { width: 100% !important; background-color: #333 !important; border: none !important; box-shadow: none !important; margin: 0 !important; }
+    .slide{ position:relative; display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; width:338.667mm; height:190.5mm; padding:7mm; page-break-after:always; background:#f8f9fa; margin-bottom: 10mm; box-shadow: 0 0 5px rgba(0,0,0,0.1); transition: width 0.3s ease, height 0.3s ease, margin 0.3s ease, box-shadow 0.3s ease, padding 0.3s ease, transform 0.3s ease; }
+    body.emulate-tablet .slide:not(.vertical-image-slide), body.emulate-mobile .slide:not(.vertical-image-slide) { width: 100% !important; height: auto !important; padding: 3% !important; margin-bottom: 15px !important; box-sizing: border-box !important; box-shadow: 0 0 5px rgba(0,0,0,0.1) !important; }
+    body.emulate-tablet .slide.vertical-image-slide, body.emulate-mobile .slide.vertical-image-slide { width: 100% !important; height: auto !important; padding: 0 !important; margin-bottom: 15px !important; box-sizing: border-box !important; box-shadow: 0 0 5px rgba(0,0,0,0.1) !important; flex-direction: column-reverse !important; }
+    body.emulate-tablet .vertical-image-slide .left-column, body.emulate-mobile .vertical-image-slide .left-column { width: 100% !important; max-width: 100% !important; padding: 3% !important; height: auto !important; overflow: hidden !important; }
+    body.emulate-tablet .vertical-image-slide .right-column, body.emulate-mobile .vertical-image-slide .right-column { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; height: auto; }
+    body.emulate-tablet .vertical-image-slide .right-column img, body.emulate-mobile .vertical-image-slide .right-column img { height: auto !important; }
+    body.emulate-tablet .slide-logo img, body.emulate-mobile .slide-logo img { max-height: 20px !important; width: auto !important; }
+    body.emulate-tablet .slide:not(.vertical-image-slide) .slide-header, body.emulate-tablet .slide:not(.vertical-image-slide) .slide-footer, body.emulate-mobile .slide:not(.vertical-image-slide) .slide-header, body.emulate-mobile .slide:not(.vertical-image-slide) .slide-footer { position: absolute !important; left: 3% !important; right: 3% !important; }
+    body.emulate-tablet .slide:not(.vertical-image-slide) .slide-header, body.emulate-mobile .slide:not(.vertical-image-slide) .slide-header { top: 1.5% !important; }
+    body.emulate-tablet .slide:not(.vertical-image-slide) .slide-footer, body.emulate-mobile .slide:not(.vertical-image-slide) .slide-footer { bottom: 1.5% !important; }
+    body.emulate-tablet .js-plotly-plot .cell-text, body.emulate-mobile .js-plotly-plot .cell-text { font-size: 9px !important; }
+    body.presentation-mode:not(.emulate-tablet):not(.emulate-mobile) .slide { width: 90vw !important; height: calc(90vw / (338.667 / 190.5)) !important; aspect-ratio: 338.667 / 190.5 !important; max-width: 1600px !important; max-height: 90vh !important; margin: 0 auto !important; box-shadow: 0 0 30px rgba(0,0,0,0.7) !important; border-radius: 8px !important; overflow: hidden !important; padding: 7mm !important; }
+    body.presentation-mode:not(.emulate-tablet):not(.emulate-mobile) .slide.vertical-image-slide { padding: 0 !important; }
+    .slide-header,.slide-footer{ position:absolute; left:15mm; right:15mm; display:flex; justify-content:space-between; align-items:center; z-index: 10;}
+    .slide-header{top:5mm;} .slide-footer{bottom:5mm;font-size:0.85em;color:#555;}
+    .slide-body{ flex:1; display:flex; flex-direction:column; justify-content: center; align-items: center; text-align: center; overflow: auto; z-index: 5; position: relative; padding: 0; }
+    .slide-logo img { max-height: 30px; width: auto; }
+    html { font-size: 20px; }
+    .text-element { line-height: 1.5; margin: 0.5em 0; }
+    .text-element-h1, .slide-title { font-size: 2rem; font-weight: bold; line-height: 1.2; margin: 0.2em 0; }
+    .text-element-h2 { font-size: 1.75rem; font-weight: bold; line-height: 1.3; margin: 0.2em 0; }
+    .text-element-h3 { font-size: 1.5rem; font-weight: bold; line-height: 1.4; margin: 0.2em 0; }
+    .text-element-h4 { font-size: 1.25rem; font-weight: normal; line-height: 1.4; margin: 0.2em 0; }
+    .text-element-h5 { font-size: 1.1rem; font-weight: bold; margin: 0.05em 0;}
+    .text-element-h6 { font-size: 1rem; font-weight: bold; margin: 0.05em 0;}
+    .text-element-p { font-size: 0.9rem; margin: 0.05em 0;}
+    .vertical-image-slide { --left: 20%; --right: 80%; display: flex; flex-direction: row; padding: 0 !important; }
+    .vertical-image-slide .left-column { width: var(--left); padding: 15mm; padding-right: 0; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; }
+    .vertical-image-slide .left-column .slide-body { flex: 1; justify-content: flex-start; align-items: flex-start; text-align: left; padding: 0; overflow: auto; }
+    .vertical-image-slide .left-column .slide-footer { margin-top: auto; }
+    .vertical-image-slide .right-column { width: var(--right); padding: 0; margin: 0; display: flex; overflow: hidden; box-sizing: border-box;}
+    .vertical-image-slide .right-column img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .vertical-image-slide .slide-header, .vertical-image-slide .slide-footer { position: relative !important; left: auto; right: auto; top: auto; bottom: auto; margin: 0 0 0.5em; justify-content: space-between; }
+    .fullscreen-wrapper { width: 100%; height: 100vh; scroll-snap-align: start; display: flex; justify-content: center; align-items: center; box-sizing: border-box; }
+    body.presentation-mode:not(.emulate-tablet):not(.emulate-mobile) .fullscreen-wrapper { background: #333; }
+    body.presentation-mode.emulate-tablet .fullscreen-wrapper, body.presentation-mode.emulate-mobile .fullscreen-wrapper { background: transparent; }
+    html.emulate-tablet-html { font-size: 16px !important; }
+    html.emulate-mobile-html { font-size: 12px !important; }
+    @media (max-width: 768px) {
+      html:not(.emulate-tablet-html):not(.emulate-mobile-html) { font-size: 16px; }
+      body:not(.emulate-tablet):not(.emulate-mobile) .slide { width: 95vw !important; height: auto !important; padding: 3vw !important; margin-left: auto !important; margin-right: auto !important; margin-bottom: 15px !important; aspect-ratio: unset !important; max-height: none !important; border-radius: 0 !important; box-shadow: 0 0 10px rgba(0,0,0,0.2) !important; }
+      body:not(.emulate-tablet):not(.emulate-mobile) .slide.vertical-image-slide { padding: 0 !important; }
+      body.presentation-mode:not(.emulate-tablet):not(.emulate-mobile) .slide { width: 95vw !important; height: auto !important; padding: 3vw !important; aspect-ratio: unset !important; max-height: none !important; margin-bottom: 0 !important; border-radius: 0 !important; box-shadow: 0 0 10px rgba(0,0,0,0.1) !important; }
+      body.presentation-mode:not(.emulate-tablet):not(.emulate-mobile) .slide.vertical-image-slide { padding: 0 !important; }
+      body:not(.emulate-tablet):not(.emulate-mobile) .slide-logo img { max-height: 20px !important; width: auto !important; }
+      body:not(.emulate-tablet):not(.emulate-mobile) .slide .slide-header, body:not(.emulate-tablet):not(.emulate-mobile) .slide .slide-footer { left: 3vw !important; right: 3vw !important; top: 1.5vw !important; bottom: 1.5vw !important; }
+      body:not(.emulate-tablet):not(.emulate-mobile) .vertical-image-slide { flex-direction: column-reverse !important; }
+      body:not(.emulate-tablet):not(.emulate-mobile) .vertical-image-slide .left-column, body:not(.emulate-tablet):not(.emulate-mobile) .vertical-image-slide .right-column { width: 100% !important; max-width: 100% !important; }
+      body:not(.emulate-tablet):not(.emulate-mobile) .vertical-image-slide .left-column { padding: 2.5vw !important; height: auto !important; }
+    }
+    @media (max-width: 480px) { html:not(.emulate-tablet-html):not(.emulate-mobile-html) { font-size: 12px; } }
+    @media print { body, html { background: #fff !important; font-size: 12pt !important; } body { display: block !important; padding-top: 0 !important; padding-bottom: 0 !important; } #app-top-header { display: none !important; } .slide { margin-bottom: 0 !important; box-shadow: none !important; width:297mm !important; height:210mm !important; padding: 10mm !important; background-color: #fff !important; } .slide * { color: #000 !important; background-color: transparent !important; } @page { size: A4 landscape; margin: 0; } }
+  </style>
+</head>
+<body class="design-mode"> <header id="app-top-header">
+    <div class="header-left">
+      <span class="app-title">{{ title }}</span>
+    </div>
+    <div class="header-center viewport-controls">
+      <button id="presentation-toggle-button" class="btn-icon" title="Enter Presentation Mode"><i class="bi bi-display"></i></button>
+      <button id="viewport-tablet" class="btn-icon" title="Tablet View"><i class="bi bi-tablet-landscape"></i></button>
+      <button id="viewport-mobile" class="btn-icon" title="Mobile View"><i class="bi bi-phone"></i></button>
+    </div>
+    <div class="header-right">
+      <button id="filmstrip-toggle-button" class="btn-icon" title="Toggle Filmstrip">
+          <i class="bi bi-collection-play-fill"></i> </button>
+      <button id="pdf-export-button" class="btn btn-outline-light ms-2" title="Export to PDF">
+        <i class="bi bi-file-earmark-pdf"></i>
+      </button>
+    </div>
+  </header>
+
+  <aside id="filmstrip-panel">
+    <div class="filmstrip-header">Slides Overview</div>
+    <div id="filmstrip-thumbnails-container"></div>
+  </aside>
+
+  <div id='slidesContainer'>{{ slides|safe }}</div>
+
+  <script>
+    const pdfExportButton = document.getElementById('pdf-export-button');
+    const body = document.body;
+    const slidesContainer = document.getElementById('slidesContainer');
+    const htmlElement = document.documentElement;
+    const appHeader = document.getElementById('app-top-header'); // Get header
+
+    let isInPresentationMode = false;
+
+    const enterPresentationIcon = '<i class="bi bi-display"></i>';
+    const exitPresentationIcon = '<i class="bi bi-arrows-angle-contract"></i>';
+
+    const presentationToggleButton = document.getElementById('presentation-toggle-button');
+    const tabletSimButton = document.getElementById('viewport-tablet');
+    const mobileSimButton = document.getElementById('viewport-mobile');
+
+    const filmstripToggleButton = document.getElementById('filmstrip-toggle-button');
+    const filmstripPanel = document.getElementById('filmstrip-panel');
+    const filmstripThumbnailsContainer = document.getElementById('filmstrip-thumbnails-container');
+
+
+    if(pdfExportButton) {
+        pdfExportButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        window.print();
+        });
+    }
+
+    function wrapSlides() {
+        if (!slidesContainer) return;
+        document.querySelectorAll('#slidesContainer > .slide:not(.wrapped)').forEach(slide => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'fullscreen-wrapper';
+            if (slide.parentNode === slidesContainer) {
+                 slidesContainer.insertBefore(wrapper, slide);
+                 wrapper.appendChild(slide);
+                 slide.classList.add('wrapped');
+            }
+        });
+    }
+    function unwrapSlides() {
+        if (!slidesContainer) return;
+        document.querySelectorAll('#slidesContainer .fullscreen-wrapper').forEach(wrapper => {
+            const slide = wrapper.querySelector('.slide');
+            if (slide) {
+                if (wrapper.parentNode) {
+                    wrapper.parentNode.insertBefore(slide, wrapper);
+                    slide.classList.remove('wrapped');
+                }
+            }
+            wrapper.remove();
+        });
+    }
+
+    function setActiveSimButton(simulationType) {
+      if(tabletSimButton) tabletSimButton.classList.toggle('active', simulationType === 'tablet');
+      if(mobileSimButton) mobileSimButton.classList.toggle('active', simulationType === 'mobile');
+    }
+
+    function applyViewportSimulation(simulationType) {
+        body.classList.remove('emulate-tablet', 'emulate-mobile');
+        htmlElement.classList.remove('emulate-tablet-html', 'emulate-mobile-html');
+
+        if (simulationType === 'tablet') {
+            body.classList.add('emulate-tablet');
+            htmlElement.classList.add('emulate-tablet-html');
+        } else if (simulationType === 'mobile') {
+            body.classList.add('emulate-mobile');
+            htmlElement.classList.add('emulate-mobile-html');
+        }
+        setActiveSimButton(simulationType);
+    }
+
+    function enterPresentationMode() {
+        if (isInPresentationMode) return;
+        isInPresentationMode = true;
+        body.classList.remove('design-mode'); // Ensure design-mode class is removed
+        body.classList.add('presentation-mode');
+
+        // Close filmstrip if open, and hide toggle
+        if (filmstripPanel && filmstripPanel.classList.contains('open')) {
+            filmstripPanel.classList.remove('open');
+            body.classList.remove('filmstrip-open'); // Also remove class from body
+            if(appHeader) appHeader.classList.remove('filmstrip-open'); // If header also shifts
+        }
+        if (filmstripToggleButton) filmstripToggleButton.style.display = 'none';
+        if (filmstripPanel) filmstripPanel.style.display = 'none';
+
+
+        applyViewportSimulation('desktop');
+        wrapSlides();
+        if (presentationToggleButton) {
+            presentationToggleButton.innerHTML = exitPresentationIcon;
+            presentationToggleButton.title = 'Exit Presentation Mode';
+        }
+        if (slidesContainer) slidesContainer.scrollTo({ top: 0, behavior: 'auto' });
+    }
+
+    function exitPresentationMode() {
+        if (!isInPresentationMode) return;
+        isInPresentationMode = false;
+        body.classList.remove('presentation-mode');
+        body.classList.add('design-mode'); // Return to design mode
+        unwrapSlides();
+
+        if (presentationToggleButton) {
+            presentationToggleButton.innerHTML = enterPresentationIcon;
+            presentationToggleButton.title = 'Enter Presentation Mode';
+        }
+
+        // Show filmstrip toggle and panel (if it was open before, it will re-open via class)
+        if (filmstripToggleButton) filmstripToggleButton.style.display = 'flex'; // or 'inline-flex'
+        if (filmstripPanel) filmstripPanel.style.display = 'block'; // Let CSS transform control visibility
+        generateFilmstrip(); // Refresh filmstrip
+        updateActiveThumbnail(); // Update highlight
+
+        applyViewportSimulation('desktop');
+        if (window) window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+
+    if (presentationToggleButton) {
+      presentationToggleButton.addEventListener('click', () => {
+        if (isInPresentationMode) {
+            exitPresentationMode();
+        } else {
+            enterPresentationMode();
+        }
+      });
+    }
+
+    if (tabletSimButton) {
+      tabletSimButton.addEventListener('click', () => {
+        applyViewportSimulation('tablet');
+      });
+    }
+
+    if (mobileSimButton) {
+      mobileSimButton.addEventListener('click', () => {
+        applyViewportSimulation('mobile');
+      });
+    }
+
+    // --- Filmstrip Logic ---
+    function createFilmstripThumbnail(slide, index) {
+        const thumb = document.createElement('div');
+        thumb.className = 'filmstrip-thumbnail';
+        thumb.dataset.targetSlideId = slide.id;
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'thumbnail-content-text';
+
+        let text = `Slide ${index + 1}`;
+        const titleEl = slide.querySelector('.slide-title, h1, .text-element-h1');
+        if (titleEl && titleEl.textContent.trim()) {
+            text = titleEl.textContent.trim();
+        } else {
+            const firstP = slide.querySelector('p, .text-element-p');
+            if (firstP && firstP.textContent.trim()) {
+                text = firstP.textContent.trim().substring(0, 50) + (firstP.textContent.trim().length > 50 ? '...' : '');
+            }
+        }
+        contentDiv.textContent = text;
+        thumb.appendChild(contentDiv);
+
+        thumb.addEventListener('click', () => {
+            const targetSlide = document.getElementById(slide.id);
+            if (targetSlide) {
+                targetSlide.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Manually update active thumbnail after click-scroll
+                // setTimeout(() => updateActiveThumbnail(), 350); // Allow scroll to finish
+            }
+        });
+        return thumb;
+    }
+
+    function generateFilmstrip() {
+        if (!filmstripThumbnailsContainer || !slidesContainer) return;
+        filmstripThumbnailsContainer.innerHTML = ''; // Clear old thumbnails
+        const slides = slidesContainer.querySelectorAll('.slide');
+        slides.forEach((slide, index) => {
+            if (!slide.id) {
+                slide.id = `slide-${index}`; // Ensure slides have IDs
+            }
+            const thumbnail = createFilmstripThumbnail(slide, index);
+            filmstripThumbnailsContainer.appendChild(thumbnail);
+        });
+    }
+
+    function updateActiveThumbnail() {
+        if (isInPresentationMode || !filmstripPanel || !filmstripPanel.classList.contains('open') || !slidesContainer) {
+            // Clear active state if not relevant
+            document.querySelectorAll('.filmstrip-thumbnail.active-thumbnail').forEach(thumb => thumb.classList.remove('active-thumbnail'));
+            return;
+        }
+
+        let currentMostVisibleSlideId = null;
+        let maxVisibility = 0; // For slides partially in view, can be intersection area or simple top check
+
+        const viewportHeight = window.innerHeight;
+        const slides = slidesContainer.querySelectorAll('.slide');
+
+        slides.forEach(slide => {
+            const rect = slide.getBoundingClientRect();
+            // Consider a slide "active" if its top part is within the top 2/3 of the viewport,
+            // or if it's the one closest to the center.
+            // For simplicity: closest to center of viewport.
+            const slideCenter = rect.top + rect.height / 2;
+            const viewportCenter = viewportHeight / 2;
+            const distanceToCenter = Math.abs(slideCenter - viewportCenter);
+
+            // A more robust way: the slide that occupies the most space in the "middle" band of the viewport
+            const visibleTop = Math.max(0, rect.top);
+            const visibleBottom = Math.min(viewportHeight, rect.bottom);
+            const visibleHeight = visibleBottom - visibleTop;
+
+            if (visibleHeight > 0) { // Slide is at least partially visible
+                 // Heuristic: slide whose center is closest to viewport center
+                if (currentMostVisibleSlideId === null || distanceToCenter < maxVisibility) {
+                    maxVisibility = distanceToCenter; // Storing distance, lower is better
+                    currentMostVisibleSlideId = slide.id;
+                }
+            }
+        });
+
+        document.querySelectorAll('.filmstrip-thumbnail').forEach(thumb => {
+            if (thumb.dataset.targetSlideId === currentMostVisibleSlideId) {
+                if (!thumb.classList.contains('active-thumbnail')) {
+                    thumb.classList.add('active-thumbnail');
+                    thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            } else {
+                thumb.classList.remove('active-thumbnail');
+            }
+        });
+    }
+
+    if (filmstripToggleButton) {
+        filmstripToggleButton.addEventListener('click', () => {
+            if (filmstripPanel) {
+                filmstripPanel.classList.toggle('open');
+                body.classList.toggle('filmstrip-open'); // For body padding shift
+                if(appHeader) appHeader.classList.toggle('filmstrip-open'); // For header position shift
+
+                if (filmstripPanel.classList.contains('open')) {
+                    generateFilmstrip(); // Populate if opening for the first time or if slides changed
+                    updateActiveThumbnail();
+                }
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      isInPresentationMode = false;
+      body.classList.add('design-mode'); // Start in design mode
+      body.classList.remove('presentation-mode', 'emulate-tablet', 'emulate-mobile', 'filmstrip-open');
+      htmlElement.classList.remove('emulate-tablet-html', 'emulate-mobile-html');
+      if(appHeader) appHeader.classList.remove('filmstrip-open');
+
+
+      if (presentationToggleButton) {
+        presentationToggleButton.innerHTML = enterPresentationIcon;
+        presentationToggleButton.title = 'Enter Presentation Mode';
+      }
+      if (filmstripToggleButton) filmstripToggleButton.style.display = 'flex'; // Show in design mode
+      if (filmstripPanel) filmstripPanel.style.display = 'block'; // Make it part of layout for transform
+
+      applyViewportSimulation('desktop');
+      generateFilmstrip(); // Initial population
+      updateActiveThumbnail(); // Set initial active thumbnail
+    });
+
+    // Update active thumbnail on scroll in design mode
+    window.addEventListener('scroll', () => {
+        if (!isInPresentationMode) {
+            updateActiveThumbnail();
+        }
+    }, { passive: true });
+    window.addEventListener('resize', () => {
+         if (!isInPresentationMode) {
+            updateActiveThumbnail();
+        }
+    }, { passive: true });
+
+  </script>
+</body>
+</html>
