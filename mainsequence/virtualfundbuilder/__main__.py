@@ -26,6 +26,7 @@ def update_job_status(status_message):
     payload = {
         "status": status_message,
         "git_hash": os.getenv("GIT_HASH"),
+        "command_id": os.getenv("COMMAND_ID")
     }
 
     response = requests.post(url, json=payload, headers=get_tdag_headers())
@@ -178,9 +179,7 @@ class VirtualFundLauncher:
             error_on_run = True
 
         finally:
-            if execution_type != "app":
-                # apps are executed on a standby pod
-                postrun_routines(error_on_run)
+            postrun_routines(error_on_run)
 
 
 if __name__ == "__main__":
