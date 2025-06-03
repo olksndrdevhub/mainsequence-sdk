@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+
+# check if has command id
+if [ -n "${1:-}" ]; then
+  export COMMAND_ID="$1"
+fi
+
+
 # Source our new utils
 source "$(dirname "$0")/utils.sh"
 
