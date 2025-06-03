@@ -169,14 +169,24 @@ def build_application_logger(
 
         project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/orm/api/pods/job/get_job_startup_state/'
 
-        response = requests.get(project_info_endpoint, headers=headers)
+        command_id = os.getenv("COMMAND_ID")
+        params = {}
+        if command_id:
+            params['command_id'] = command_id
+
+        response = requests.get(project_info_endpoint, headers=headers, params=params)
+
         if response.status_code != 200:
             print(f"Got Status Code {response.status_code} with response {response.text}")
 
         json_response = response.json()
-
         if "project_id" not in json_response:
             raise ValueError(f"Project ID not found, server response {json_response}")
+
+        # set additional args from backend
+        if "additional_environment" in json_response:
+            for key, value in json_response["additional_environment"].items():
+                os.environ[key] = value
 
         logger = logger.bind(project_id=json_response["project_id"], **metadata)
         logger = logger.bind(data_source_id=json_response["data_source_id"], **metadata)

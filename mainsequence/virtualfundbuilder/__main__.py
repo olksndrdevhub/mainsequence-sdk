@@ -1,3 +1,5 @@
+import time
+
 import fire
 
 import json
@@ -37,7 +39,7 @@ def update_job_status(status_message):
         return None
 
 def run_configuration(configuration_name):
-    # TODO legacy, remove with new RunNamedPortfolio app
+    # TODO replace with new RunNamedPortfolio app
     from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
     print("Run Timeseries Configuration")
     portfolio = PortfolioInterface.load_from_configuration(configuration_name)
@@ -164,6 +166,8 @@ class VirtualFundLauncher:
                 pass # placeholder, get_pod_configuration already called above
             elif execution_type == "app":
                 run_app(app_name=os.getenv("APP_NAME"), configuration=os.getenv("APP_CONFIGURATION"))
+            elif execution_type == "standby":
+                time.sleep(int(os.getenv("STANDBY_DURATION_SECONDS")))
             else:
                 raise NotImplementedError(f"Unknown execution type {execution_type}")
 
@@ -174,7 +178,9 @@ class VirtualFundLauncher:
             error_on_run = True
 
         finally:
-            postrun_routines(error_on_run)
+            if execution_type != "app":
+                # apps are executed on a standby pod
+                postrun_routines(error_on_run)
 
 
 if __name__ == "__main__":
