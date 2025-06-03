@@ -169,7 +169,7 @@ class VirtualFundLauncher:
                 run_app(app_name=os.getenv("APP_NAME"), configuration=os.getenv("APP_CONFIGURATION"))
             elif execution_type == "standby":
                 sleep_seconds = int(os.getenv("STANDBY_DURATION_SECONDS"))
-                self.logger(f"Sleep for {sleep_seconds} seconds")
+                print(f"Sleep for {sleep_seconds} seconds")
                 time.sleep(sleep_seconds)
             else:
                 raise NotImplementedError(f"Unknown execution type {execution_type}")
