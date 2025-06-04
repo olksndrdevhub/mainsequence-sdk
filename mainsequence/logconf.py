@@ -88,10 +88,6 @@ def build_application_logger(
 
     logger_file = os.getenv("LOGGER_FILE_PATH", "/var/log/tdag/tdag.log")
 
-    if command_id:
-        # overwrite to store logs in separete file
-        logger_file = f"/var/log/tdag/tdag_{command_id}.log"
-
     logger_name = "tdag"
 
     # Define the timestamper and pre_chain processors
