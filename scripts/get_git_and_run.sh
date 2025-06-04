@@ -7,7 +7,7 @@ export VFB_PROJECT_PATH="$REPO_PATH/$PROJECT_LIBRARY_NAME"
 # check if we only execute a command on running
 if [ -n "${1:-}" ]; then
   export COMMAND_ID="$1"
-  python -m mainsequence.virtualfundbuilder run_resource "$EXECUTION_TYPE"
+  python -m mainsequence.virtualfundbuilder run_resource "app"
   exit 0
 fi
 
