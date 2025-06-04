@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_PATH="/tmp/repo"
+export VFB_PROJECT_PATH="$REPO_PATH/$PROJECT_LIBRARY_NAME"
 
-# check if has command id
+# check if we only execute a command on running
 if [ -n "${1:-}" ]; then
   export COMMAND_ID="$1"
+  python -m mainsequence.virtualfundbuilder run_resource "$EXECUTION_TYPE"
+  exit 0
 fi
 
 
@@ -14,7 +18,7 @@ source "$(dirname "$0")/utils.sh"
 # -------------------------------------------------------------
 # Decide whether to clone via SSH or API token
 # -------------------------------------------------------------
-REPO_PATH="/tmp/repo"
+
 
 if [ "${AUTHENTICATION_METHOD:-ssh}" = "api" ] && [ -n "${GIT_API_TOKEN:-}" ] && [ -n "${GIT_REPO_URL:-}" ]; then
   clone_via_api_token
@@ -26,7 +30,6 @@ fi
 # Set necessary variables
 # (Note: the $REPO_PATH above is where we cloned the code)
 # -------------------------------------------------------------
-export VFB_PROJECT_PATH="$REPO_PATH/$PROJECT_LIBRARY_NAME"
 export TDAG_CONFIG_PATH=~/tdag/default_config.yml
 export TDAG_RAY_CLUSTER_ADDRESS="ray://localhost:10001"
 export TDAG_RAY_API_ADDRESS="http://localhost:8265"
