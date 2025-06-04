@@ -189,9 +189,7 @@ def build_application_logger(
         logger = logger.bind(project_id=json_response["project_id"], **metadata)
         logger = logger.bind(data_source_id=json_response["data_source_id"], **metadata)
         logger = logger.bind(job_run_id=json_response["job_run_id"], **metadata)
-
-        if command_id:
-            logger = logger.bind(command_id=command_id, **metadata)
+        logger = logger.bind(command_id=command_id, **metadata)
 
     except Exception as e:
         logger.exception(f"Could not retrive pod project {e}")
