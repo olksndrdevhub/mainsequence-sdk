@@ -88,7 +88,7 @@ class SentimentReport(BaseApp):
                 - News items (title, url) per ticker per date.
         """
         if not self.polygon_client:
-            print("Error: Polygon API key not configured. Cannot fetch data.")
+            logger.info("Error: Polygon API key not configured. Cannot fetch data.")
             empty_sentiment = {ticker: pd.DataFrame() for ticker in self.tickers}
             empty_news = {ticker: {} for ticker in self.tickers}
             return empty_sentiment, empty_news
@@ -101,10 +101,10 @@ class SentimentReport(BaseApp):
         all_news = {}
         date_range = pd.date_range(start=start_date, end=end_date)
 
-        print(f"Fetching data for tickers: {tickers} from {start_date} to {end_date}")
+        logger.info(f"Fetching data for tickers: {tickers} from {start_date} to {end_date}")
 
         for ticker in tickers:
-            print(f" -> Fetching for {ticker}...")
+            logger.info(f" -> Fetching for {ticker}...")
             sentiment_count = []
             ticker_news_by_date = {}
 
@@ -118,7 +118,7 @@ class SentimentReport(BaseApp):
                         )
                     )
                 except Exception as e:
-                    print(f"    Error fetching news for {ticker} on {day_str}: {e}")
+                    logger.info(f"    Error fetching news for {ticker} on {day_str}: {e}")
                     daily_news_response = []
 
                 daily_sentiment = {"date": day, "positive": 0, "negative": 0, "neutral": 0}
@@ -154,7 +154,7 @@ class SentimentReport(BaseApp):
                 all_news[ticker] = ticker_news_by_date
             else:
                 # No sentiment data found
-                print(f"    No sentiment data found for {ticker} in the date range.")
+                logger.info(f"    No sentiment data found for {ticker} in the date range.")
                 results[ticker] = pd.DataFrame(index=date_range, columns=['positive','negative','neutral']).fillna(0)
                 all_news[ticker] = {}
 
@@ -165,7 +165,7 @@ class SentimentReport(BaseApp):
 
         article_snippets = []
         if self.polygon_client and Article is not None:
-            print("\nGathering first 50 words from each article...")
+            logger.info("\nGathering first 50 words from each article...")
             for ticker, date_dict in all_news_data.items():
                 for date_str, articles in date_dict.items():
                     # restrict to 2 items per day
@@ -183,9 +183,9 @@ class SentimentReport(BaseApp):
                             if snippet:
                                 article_snippets.append(snippet)
                         except Exception as e:
-                            print(f"    Could not retrieve/parse text from {url} for {ticker} due to: {e}")
+                            logger.info(f"    Could not retrieve/parse text from {url} for {ticker} due to: {e}")
         else:
-            print("\nSkipping article text retrieval (Polygon client or newspaper not available).")
+            logger.info("\nSkipping article text retrieval (Polygon client or newspaper not available).")
 
         return article_snippets
 
@@ -195,7 +195,7 @@ class SentimentReport(BaseApp):
         Returns None if no data to plot or if image generation fails.
         """
         if df_sentiment.empty or (df_sentiment[['positive','negative','neutral']].sum().sum() == 0):
-            print(f"    No data to plot for '{chart_title}'. Skipping chart generation.")
+            logger.info(f"    No data to plot for '{chart_title}'. Skipping chart generation.")
             return None
 
         fig = go.Figure()
@@ -229,18 +229,18 @@ class SentimentReport(BaseApp):
             encoded_plot = base64.b64encode(buf.read()).decode("utf-8")
             return encoded_plot
         except Exception as e:
-            print(f"    Error generating PNG for '{chart_title}': {e}")
+            logger.info(f"    Error generating PNG for '{chart_title}': {e}")
             return None
 
 
     def _format_ticker_sections(self, all_sentiment_data, all_news_data):
         ticker_sections_html = ""
-        print("\nGenerating individual ticker sections...")
+        logger.info("\nGenerating individual ticker sections...")
         for ticker in self.tickers:
             df_sentiment = all_sentiment_data.get(ticker)
             ticker_news = all_news_data.get(ticker, {})
             ticker_html = f"<h2>{ticker} Sentiment & News</h2>\n"
-            print(f" -> Processing {ticker}")
+            logger.info(f" -> Processing {ticker}")
 
             # Plot for this ticker
             chart_base64 = self._generate_plot(df_sentiment, ticker)
@@ -325,7 +325,7 @@ class SentimentReport(BaseApp):
                 f"Please summarize the following text in about 150 words, focus on the assets {self.tickers}:\n\n"
                 f"{combined_text}"
             )
-            print("\nGenerating combined summary of article snippets...")
+            logger.info("\nGenerating combined summary of article snippets...")
             try:
                 combined_summary_text = self.tdag_agent.query_agent(summary_prompt)
                 combined_article_snippets_summary_html = f"""
@@ -333,7 +333,7 @@ class SentimentReport(BaseApp):
                     <p>{combined_summary_text}</p>
                     <hr style="margin: 30px 0;">"""
             except Exception as e:
-                print(f"    Error generating combined summary: {e}")
+                logger.info(f"    Error generating combined summary: {e}")
                 combined_article_snippets_summary_html = (
                     "<h3>Summary (AI-Generated)</h3>"
                     f"<p>Error generating summary: {e}</p><hr>"
@@ -385,10 +385,10 @@ class SentimentReport(BaseApp):
         try:
             with open(output_html_path, "w", encoding="utf-8") as f:
                 f.write(rendered_html)
-            print(f"\nHTML report generated successfully: {output_html_path}")
-            print(f"View the report at: file://{os.path.abspath(output_html_path)}")
+            logger.info(f"\nHTML report generated successfully: {output_html_path}")
+            logger.info(f"View the report at: file://{os.path.abspath(output_html_path)}")
         except Exception as e:
-            print(f"\nError writing HTML report to file: {e}")
+            logger.info(f"\nError writing HTML report to file: {e}")
 
         html_artifact = None
         try:
@@ -398,9 +398,9 @@ class SentimentReport(BaseApp):
                 created_by_resource_name=self.__class__.__name__,
                 bucket_name=self.configuration.bucket_name
             )
-            print(f"Artifact uploaded successfully: {html_artifact.id if html_artifact else 'Failed'}")
+            logger.info(f"Artifact uploaded successfully: {html_artifact.id if html_artifact else 'Failed'}")
         except Exception as e:
-            print(f"Error uploading artifact: {e}")
+            logger.info(f"Error uploading artifact: {e}")
 
         # Return artifact or None
         return html_artifact
@@ -410,8 +410,8 @@ if __name__ == "__main__":
     try:
         import kaleido
     except ImportError:
-        print("Warning: 'kaleido' package not found. Plotly image export might fail.")
-        print("Consider installing it: pip install kaleido")
+        logger.info("Warning: 'kaleido' package not found. Plotly image export might fail.")
+        logger.info("Consider installing it: pip install kaleido")
 
     # Example configuration
     config = SentimentReportConfig(
@@ -426,6 +426,6 @@ if __name__ == "__main__":
     # Run the report
     generated_artifact = app.run()
     if generated_artifact:
-        print(f"\nReport generation complete. Artifact ID: {generated_artifact.id}")
+        logger.info(f"\nReport generation complete. Artifact ID: {generated_artifact.id}")
     else:
-        print("\nReport generation completed, but artifact upload failed or was skipped.")
+        logger.info("\nReport generation completed, but artifact upload failed or was skipped.")
