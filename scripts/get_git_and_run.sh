@@ -3,7 +3,6 @@ set -euo pipefail
 
 REPO_PATH="/tmp/repo"
 export VFB_PROJECT_PATH="$REPO_PATH/$PROJECT_LIBRARY_NAME"
-cd "$REPO_PATH"
 
 # Source our new utils
 source "$(dirname "$0")/utils.sh"
@@ -26,6 +25,8 @@ if [ "${AUTHENTICATION_METHOD:-ssh}" = "api" ] && [ -n "${GIT_API_TOKEN:-}" ] &&
 else
   clone_via_ssh_key
 fi
+
+cd "$REPO_PATH"
 
 # -------------------------------------------------------------
 # Set necessary variables
