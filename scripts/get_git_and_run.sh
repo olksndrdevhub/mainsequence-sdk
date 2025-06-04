@@ -11,8 +11,9 @@ source "$(dirname "$0")/utils.sh"
 if [ -n "${1:-}" ]; then
   export COMMAND_ID="$1"
   # fix wrong python env set by shell execution TODO: set the correct path to the .bashrc
-  conda deactivate
   source /opt/venv/bin/activate
+  conda deactivate # this needs to be called after activate, otherwise conda shell error
+
   python -m mainsequence.virtualfundbuilder run_resource "app"
   exit 0
 fi
