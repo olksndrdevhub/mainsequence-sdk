@@ -118,9 +118,6 @@ def insert_in_registry(registry, cls, register_in_agent, name=None, attributes: 
     """ helper for strategy decorators """
     key = name or cls.__name__  # Use the given name or the class name as the key
 
-    if SKIP_REGISTRATION:
-        return cls
-
     if key in registry and register_in_agent:
         logger.debug(f"{cls.TYPE} '{key}' is already registered.")
         return cls
@@ -128,7 +125,7 @@ def insert_in_registry(registry, cls, register_in_agent, name=None, attributes: 
     registry[key] = cls
     logger.debug(f"Registered {cls.TYPE} class '{key}': {cls}")
 
-    if register_in_agent:
+    if register_in_agent and not SKIP_REGISTRATION:
         # send_resource_to_backend(cls, attributes)
         Thread(
             target=send_resource_to_backend,
