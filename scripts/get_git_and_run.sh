@@ -10,6 +10,7 @@ source "$(dirname "$0")/utils.sh"
 # check if we only execute a command on running
 if [ -n "${1:-}" ]; then
   export COMMAND_ID="$1"
+  export SKIP_REGISTRATION=true
   # fix wrong python env set by shell execution TODO: set the correct path to the .bashrc
   source /opt/venv/bin/activate
 
