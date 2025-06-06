@@ -51,18 +51,25 @@ def run_configuration(configuration_name):
 
 def run_app(app_name, configuration):
     from mainsequence.virtualfundbuilder.resource_factory.app_factory import APP_REGISTRY
-    app_cls = APP_REGISTRY[app_name]
+    from mainsequence.virtualfundbuilder.utils import get_vfb_logger
+    logger = get_vfb_logger()
+    logger.info(f"Start App {app_name}")
+    try:
+        app_cls = APP_REGISTRY[app_name]
 
-    configuration_json = yaml.load(configuration, Loader=yaml.UnsafeLoader)
-    # Pull out the dict under "configuration" (or flatten it, your choice)
-    actual_config = configuration_json.get("configuration", {})
+        configuration_json = yaml.load(configuration, Loader=yaml.UnsafeLoader)
+        # Pull out the dict under "configuration" (or flatten it, your choice)
+        actual_config = configuration_json.get("configuration", {})
 
-    # Now pass the unpacked dictionary:
-    pydantic_config = app_cls.configuration_class(**actual_config)
+        # Now pass the unpacked dictionary:
+        pydantic_config = app_cls.configuration_class(**actual_config)
 
-    app_instance = app_cls(pydantic_config)
-    results = app_instance.run()
-    print(f"Finished App {app_name} run with results: {results}")
+        app_instance = app_cls(pydantic_config)
+        results = app_instance.run()
+    except Exception as e:
+        logger.error("Error running app", exc_info=True)
+        return
+    logger.info(f"Finished App {app_name} run with results: {results}")
 
 def run_notebook(notebook_name):
     from mainsequence.virtualfundbuilder.notebook_handling import convert_notebook_to_python_file
