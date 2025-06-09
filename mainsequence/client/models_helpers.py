@@ -1,7 +1,9 @@
 from .models_vam import *
 from .base import MARKETS_CONSTANTS
 from .models_tdag import LocalTimeSerie
+import datetime
 
+from pydantic import BaseModel, Field, PositiveInt
 
 
 def get_right_account_class(account: Account):
@@ -116,3 +118,39 @@ class HistoricalBarsSource(MarketsTimeSeriesDetails):
             raise ValueError("No historical bars source found")
 
         bar_source.append_asset_list_source(time_serie)
+
+
+
+
+
+class Slide(BasePydanticModel):
+    id:Optional[int]=None
+
+    number: PositiveInt = Field(
+        ...,
+        description="1-based position of the slide within its presentation",
+        example=3,
+    )
+    body: Optional[str] = Field(
+        default=None,
+        description="Raw slide content in markdown/HTML/etc.",
+    )
+    created_at: datetime.datetime = Field(
+        default_factory=datetime.datetime.utcnow,
+        description="Timestamp when the slide row was created",
+        example="2025-06-02T12:34:56Z",
+    )
+    updated_at: datetime.datetime = Field(
+        default_factory=datetime.datetime.utcnow,
+        description="Timestamp automatically updated on save",
+        example="2025-06-02T12:34:56Z",
+    )
+class Presentation(BaseObjectOrm,BasePydanticModel):
+    id:Optional[int]=None
+    title: str = Field(..., max_length=255)
+    description: str = Field("", description="Free-form description of the deck")
+    slides:List[Slide]
+
+    # These come from the DB and are read-only in normal create/update requests
+    created_at: Optional[datetime.datetime] = None
+    updated_at: Optional[datetime.datetime] = None

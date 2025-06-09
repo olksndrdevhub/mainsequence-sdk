@@ -54,6 +54,7 @@ docstring-parser = "*"
 concurrent-log-handler = "*"
 duckdb = "*"
 plotly = "*"
+twine = "*"
 
 [dev-packages]
 mkdocs = "*"

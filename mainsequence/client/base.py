@@ -131,6 +131,10 @@ class BaseObjectOrm:
         "SourceTableConfiguration": "ts_manager/source_table_config",
         "DynamicResource": "tdag-gpt/dynamic_resource",
         "Artifact": "pods/artifact",
+
+        #ReportBuilder
+        "Presentation": "reports/presentations",
+
     }
     ROOT_URL = API_ENDPOINT
     LOADERS = loaders
