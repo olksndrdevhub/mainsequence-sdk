@@ -58,13 +58,37 @@ def build_application_logger(
     """
     Create a logger that logs to console and file in JSON format.
     """
+
+    # do initial request when on logger initialization
+    headers = CaseInsensitiveDict()
+    headers["Content-Type"] = "application/json"
+    headers["Authorization"] = "Token " + os.getenv("MAINSEQUENCE_TOKEN")
+
+    project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/orm/api/pods/job/get_job_startup_state/'
+
+    command_id = os.getenv("COMMAND_ID")
+    params = {}
+    if command_id:
+        params['command_id'] = command_id
+
+    response = requests.get(project_info_endpoint, headers=headers, params=params)
+
+    if response.status_code != 200:
+        print(f"Got Status Code {response.status_code} with response {response.text}")
+
+    json_response = response.json()
+    if "project_id" not in json_response:
+        raise ValueError(f"Project ID not found, server response {json_response}")
+
+    # set additional args from backend
+    if "additional_environment" in json_response:
+        for key, value in json_response["additional_environment"].items():
+            os.environ[key] = value
+
+
     logger_file = os.getenv("LOGGER_FILE_PATH", "/var/log/tdag/tdag.log")
-    # Ensure the directory for the log file exists
-    logger_name="tdag"
-    logger = logging.getLogger(logger_name)
-    # if logger.hasHandlers():
-    #     logger = structlog.get_logger(logger_name)
-    #     return logger
+
+    logger_name = "tdag"
 
     # Define the timestamper and pre_chain processors
     timestamper = structlog.processors.TimeStamper( fmt="iso",
@@ -83,7 +107,7 @@ def build_application_logger(
         },
     }
     if logger_file is not None:
-        ensure_dir(logger_file)
+        ensure_dir(logger_file) # Ensure the directory for the log file exists
 
         handlers.update(
             {
@@ -162,25 +186,10 @@ def build_application_logger(
     logger = logger.bind(application_name=application_name,**metadata)
 
     try:
-        # do initial request when on logger initialization TODO create startup script
-        headers = CaseInsensitiveDict()
-        headers["Content-Type"] = "application/json"
-        headers["Authorization"] = "Token " + os.getenv("MAINSEQUENCE_TOKEN")
-
-        project_info_endpoint = f'{os.getenv("TDAG_ENDPOINT")}/orm/api/pods/job/get_job_startup_state/'
-
-        response = requests.get(project_info_endpoint, headers=headers)
-        if response.status_code != 200:
-            print(f"Got Status Code {response.status_code} with response {response.text}")
-
-        json_response = response.json()
-
-        if "project_id" not in json_response:
-            raise ValueError(f"Project ID not found, server response {json_response}")
-
         logger = logger.bind(project_id=json_response["project_id"], **metadata)
         logger = logger.bind(data_source_id=json_response["data_source_id"], **metadata)
         logger = logger.bind(job_run_id=json_response["job_run_id"], **metadata)
+        logger = logger.bind(command_id=int(command_id) if command_id else None, **metadata)
 
     except Exception as e:
         logger.exception(f"Could not retrive pod project {e}")
