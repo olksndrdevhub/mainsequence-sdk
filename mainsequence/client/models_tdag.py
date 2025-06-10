@@ -2139,10 +2139,19 @@ class PodDataSource:
         db_interface=DuckDBInterface()
         local_table_names = db_interface.list_tables()
 
-        tables_to_delete = set(local_table_names) - set(remote_table_names)
-        for table_name in tables_to_delete:
+        tables_to_delete_locally = set(local_table_names) - set(remote_table_names)
+        for table_name in tables_to_delete_locally:
             logger.debug(f"Deleting table in local duck db {table_name}")
             db_interface.drop_table(table_name)
+
+        tables_to_delete_remotely = set(remote_table_names) - set(local_table_names)
+        for remote_table in remote_tables:
+            if remote_table.table_name in tables_to_delete_remotely:
+                logger.debug(f"Deleting table remotely {remote_table.table_name}")
+                if remote_table.protect_from_deletion:
+                    remote_table.patch(protect_from_deletion=False)
+
+                remote_table.delete()
 
         self.data_source = duckdb_dynamic_data_source
 
