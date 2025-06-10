@@ -1651,6 +1651,8 @@ class APITimeSerie(CommonMethodsMixin):
             persisted = True
         return persisted
 
+class TimeSerieInitMeta(BaseModel):
+    detach_from_backend:bool=False
 
 class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):
     """
@@ -1668,7 +1670,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
     def __init__(
             self,
-            init_meta=None,
+            init_meta:Optional[TimeSerieInitMeta]=None,
             build_meta_data: Union[dict, None] = None,
             local_kwargs_to_ignore: Union[List[str], None] = None,
             *args,
@@ -1905,10 +1907,10 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         """
 
         if "init_meta" in kwargs.keys():
-            init_meta = kwargs["init_meta"] if kwargs["init_meta"] is not None else {}
+            init_meta = kwargs["init_meta"] if kwargs["init_meta"] is not None else TimeSerieInitMeta()
             kwargs.pop("init_meta", None)
         else:
-            init_meta = {}
+            init_meta = TimeSerieInitMeta()
         return kwargs, init_meta
 
 
@@ -2026,7 +2028,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
     @property
     def local_persist_manager(self):
-
         if hasattr(self, "_local_persist_manager") == False:
             self.logger.debug(f"Setting local persist manager for {self.hash_id}")
             self._set_local_persist_manager(local_hash_id=self.local_hash_id,

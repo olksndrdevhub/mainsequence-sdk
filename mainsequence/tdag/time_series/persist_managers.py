@@ -114,10 +114,10 @@ class PersistManager:
     def __init__(self,
                  data_source,
                  local_hash_id: int,
-
+                 detach_from_backend:bool,
                  description: Union[str, None] = None,
                  class_name: Union[str, None] = None,
-                  metadata: Union[dict, None] = None,
+                 metadata: Union[dict, None] = None,
                  local_metadata: Union[dict, None] = None
 
                  ):
@@ -694,11 +694,6 @@ class TimeScaleLocalPersistManager(PersistManager):
     """
     Main Controler to interacti with TimeSerie ORM
     """
-
-
-
-
-
 
 
     def get_full_source_data(self,remote_table_hash_id, engine="pandas"):

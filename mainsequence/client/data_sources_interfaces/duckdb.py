@@ -42,6 +42,7 @@ class DuckDBInterface:
         # Sane defaults
         self.con.execute("PRAGMA threads = 4")  # tweak to your cores
         self.con.execute("PRAGMA enable_object_cache = true")
+        self.con.execute("SET TIMEZONE = 'UTC';")
 
     def launch_gui(self, host='localhost', port=4213, timeout=0.5):
         import duckdb
@@ -156,7 +157,7 @@ class DuckDBInterface:
             raise ValueError("Cannot provide both 'ids' and 'unique_identifier_range_map'.")
 
         logger.debug(
-            f"Reading from table '{table}' with filters: start={start}, end={end}, "
+            f"Duck DB: Reading from table '{table}' with filters: start={start}, end={end}, "
             f"ids={ids is not None}, columns={columns}, range_map={unique_identifier_range_map is not None}"
         )
 
