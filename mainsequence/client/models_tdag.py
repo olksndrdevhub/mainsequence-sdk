@@ -39,55 +39,6 @@ loaders = AuthLoaders()
 # Global executor (or you could define one on your class)
 _executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
-def none_if_backend_detached(func):
-    """
-    Decorator that evaluates BACKEND_DETACHED before executing the function.
-    If BACKEND_DETACHED() returns True, the function is skipped, and None is returned.
-    Otherwise, the function is executed as normal.
-
-    It supports regular functions, property methods, classmethods, and staticmethods.
-    """
-    # Handle property methods
-    if isinstance(func, property):
-        getter = func.fget
-
-        @wraps(getter)
-        def wrapper_getter(*args, **kwargs):
-
-            return getter(*args, **kwargs)
-
-        return property(wrapper_getter, func.fset, func.fdel, func.__doc__)
-
-    # Handle classmethods
-    elif isinstance(func, classmethod):
-        original_func = func.__func__
-
-        @wraps(original_func)
-        def wrapper(*args, **kwargs):
-
-            return original_func(*args, **kwargs)
-
-        return classmethod(wrapper)
-
-    # Handle staticmethods
-    elif isinstance(func, staticmethod):
-        original_func = func.__func__
-
-        @wraps(original_func)
-        def wrapper(*args, **kwargs):
-
-            return original_func(*args, **kwargs)
-
-        return staticmethod(wrapper)
-
-    # Handle regular functions
-    else:
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-
-            return func(*args, **kwargs)
-
-        return wrapper
 
 class AlreadyExist(Exception):
     pass
@@ -130,7 +81,6 @@ class TimeSerieNode(BasePydanticModel, BaseObjectOrm):
     creation_date: datetime.datetime
     relation_tree_frozen: bool
 
-    @none_if_backend_detached
     @classmethod
     def get_all_dependencies(cls, hash_id):
         s = cls.build_session()
@@ -826,7 +776,6 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             raise Exception(f"Error in request {r.text}")
 
 
-    @none_if_backend_detached
     @classmethod
     def patch_build_configuration(
             cls,
@@ -864,17 +813,14 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
     _stop_heart_beat: bool = False
     _executor: Optional[object] = None
 
-    @none_if_backend_detached
     @classmethod
     def get(cls, *args, **kwargs):
         return super().get(*args, **kwargs)
 
-    @none_if_backend_detached
     @classmethod
     def filter(cls, payload: Union[dict, None]):
         return super().filter(payload)
 
-    @none_if_backend_detached
     @classmethod
     def get_scheduler_for_ts(cls, hash_id: str):
 
@@ -1890,7 +1836,6 @@ class DynamicTableHelpers:
         all_metadatas = {m["hash_id"]: m for m in r.json()}
         return all_metadatas
 
-    @none_if_backend_detached
     @classmethod
     def _handle_source_table_configuration(cls,
                                            metadata: DynamicTableMetaData,
@@ -2059,7 +2004,6 @@ class DynamicTableHelpers:
     def set_policy_for_descendants(self, hash_id, policy, pol_type, exclude_ids, extend_to_classes):
         r = TimeSerieNode.set_policy_for_descendants(hash_id, policy, pol_type, exclude_ids, extend_to_classes)
 
-    @none_if_backend_detached
     def patch(self, metadata, timeout=None, *args, **kwargs):
         base_url = self.root_url
 

@@ -25,7 +25,7 @@ from mainsequence.tdag.config import (
 import structlog.contextvars as cvars
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager
-from mainsequence.client.models_tdag import (none_if_backend_detached, DataSource, LocalTimeSeriesHistoricalUpdate,
+from mainsequence.client.models_tdag import ( DataSource, LocalTimeSeriesHistoricalUpdate,
                                              DataUpdates, UniqueIdentifierRangeMap
                                              )
 from pandas.api.types import is_datetime64_any_dtype
@@ -738,7 +738,6 @@ class GraphNodeMethods(ABC):
 
 class TimeSerieRebuildMethods(ABC):
 
-    @none_if_backend_detached
     def verify_backend_git_hash_with_pickle(self):
         if self.local_persist_manager.metadata is not None:
             load_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
@@ -894,7 +893,6 @@ class TimeSerieRebuildMethods(ABC):
         path = f"{pp}/{self.local_hash_id}.pickle"
         return path
 
-    @none_if_backend_detached
     def _update_git_and_code_in_backend(self):
         self.local_persist_manager.update_source_informmation(
             git_hash_id=self.get_time_serie_source_code_git_hash(self.__class__),
@@ -1651,6 +1649,8 @@ class APITimeSerie(CommonMethodsMixin):
             persisted = True
         return persisted
 
+class TimeSerieInitMeta(BaseModel):
+    ...
 
 class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):
     """
@@ -1668,7 +1668,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
     def __init__(
             self,
-            init_meta=None,
+            init_meta:Optional[TimeSerieInitMeta]=None,
             build_meta_data: Union[dict, None] = None,
             local_kwargs_to_ignore: Union[List[str], None] = None,
             *args,
@@ -1905,10 +1905,10 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         """
 
         if "init_meta" in kwargs.keys():
-            init_meta = kwargs["init_meta"] if kwargs["init_meta"] is not None else {}
+            init_meta = kwargs["init_meta"] if kwargs["init_meta"] is not None else TimeSerieInitMeta()
             kwargs.pop("init_meta", None)
         else:
-            init_meta = {}
+            init_meta = TimeSerieInitMeta()
         return kwargs, init_meta
 
 
@@ -2026,11 +2026,11 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
     @property
     def local_persist_manager(self):
-
         if hasattr(self, "_local_persist_manager") == False:
             self.logger.debug(f"Setting local persist manager for {self.hash_id}")
             self._set_local_persist_manager(local_hash_id=self.local_hash_id,
-                                            remote_table_hashed_name=self.remote_table_hashed_name
+                                            remote_table_hashed_name=self.remote_table_hashed_name,
+
                                             )
         return self._local_persist_manager
 
@@ -2056,10 +2056,9 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             local_hash_id=local_hash_id,
             class_name=self.__class__.__name__,
             local_metadata=local_metadata,
-            data_source=self.data_source,
+            data_source=self.data_source
         )
 
-    @none_if_backend_detached
     def _verify_and_build_remote_objects(self):
 
         time_serie_source_code_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
@@ -2080,7 +2079,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         if os.path.isfile(self.pickle_path):
             os.remove(self.pickle_path)
 
-    @none_if_backend_detached
     def patch_build_configuration(self):
         """
         This method comes in handy when there is a change in VAM models extra configuration. This method will properly
