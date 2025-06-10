@@ -41,4 +41,11 @@ if os.getenv("PROJECT_LIBRARY_NAME") is None:
 
 register_default_strategies()
 
-get_pod_configuration()
+def runs_in_main_process() -> bool:
+    import multiprocessing
+
+    print(f"Process name: {multiprocessing.current_process().name}")
+    return multiprocessing.current_process().name == "MainProcess"
+
+if runs_in_main_process():
+    get_pod_configuration()
