@@ -1340,17 +1340,13 @@ class DataPersistanceMethods(ABC):
         last_observation = self.get_last_observation()
         return last_observation
 
-    def delete_time_series(self, delete_only_time_series: bool = False, ):
+    def delete_table(self,):
 
-        self.local_persist_manager.delete_time_series(delete_only_time_series=delete_only_time_series)
+        self.local_persist_manager.metadata.delete()
 
-    def flush_local_persisted(self, flush_only_time_series=True, session: Union[object, None] = None):
-        """
-        deletes  persisted data
-        :param flush_sub_folders:
-        :return:
-        """
-        self.local_persist_manager.flush_local_persisted(flush_only_time_series=flush_only_time_series)
+
+        a=5
+
 
     @tracer.start_as_current_span("TS: Persist Data")
     def persist_updated_data(self, temp_df, update_tracker, overwrite=False) -> bool:
