@@ -2148,13 +2148,18 @@ class PodDataSource:
 
         physical_ds = self.data_source.related_resource
         banner = (
-            f"\n{'-'*80}\n"
+            f"\n{'-' * 80}\n"
             f"LOCAL data source SET: {physical_ds.display_name}  (engine={physical_ds.class_type})\n"
-            f"{'-'*80}\n"
+            f"\nTo launch the GUI, run these commands in your Python environment:\n"
+            f"  import duckdb\n"
+            f"  conn = duckdb.connect('{db_interface.db_path}')\n"
+            f"  conn.execute(\"LOAD ui;\")         # Loads the UI extension\n"
+            f"  conn.execute(\"CALL start_ui();\")  # Starts the server and opens the browser\n"
+            f"{'-' * 80}\n"
         )
         logger.info(banner)
 
-   
+
 
 
     def __repr__(self):
