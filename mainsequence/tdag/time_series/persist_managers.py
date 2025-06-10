@@ -10,7 +10,7 @@ from mainsequence.client import (LocalTimeSerie, UniqueIdentifierRangeMap,
                                  DynamicTableDoesNotExist, DynamicTableDataSource, TDAG_CONSTANTS as CONSTANTS, DynamicTableMetaData,
                                  DataUpdates, DoesNotExist)
 
-from mainsequence.client.models_tdag import  none_if_backend_detached, DynamicTableHelpers
+from mainsequence.client.models_tdag import   DynamicTableHelpers
 import json
 import threading
 from concurrent.futures import Future
@@ -114,7 +114,6 @@ class PersistManager:
     def __init__(self,
                  data_source,
                  local_hash_id: int,
-                 detach_from_backend:bool,
                  description: Union[str, None] = None,
                  class_name: Union[str, None] = None,
                  metadata: Union[dict, None] = None,
@@ -123,7 +122,6 @@ class PersistManager:
                  ):
         self.data_source = data_source
         self.local_hash_id = local_hash_id
-
         if local_metadata is not None and metadata is None:
             # query remote hash_id
             metadata = local_metadata.remote_table
@@ -145,6 +143,7 @@ class PersistManager:
             self.synchronize_metadata(local_metadata=local_metadata)
 
     def synchronize_metadata(self, local_metadata: Union[None, LocalTimeSerie]):
+
         if local_metadata is not None:
             self.set_local_metadata(local_metadata)
         else:
@@ -331,7 +330,6 @@ class PersistManager:
         if "sourcetableconfiguration" in self.metadata.keys():
             return self.metadata['sourcetableconfiguration']
         return None
-    @none_if_backend_detached
     def update_source_informmation(self, git_hash_id: str, source_code: str):
         self.local_metadata.remote_table = self.metadata.patch(
             time_serie_source_code_git_hash=git_hash_id,
