@@ -265,7 +265,7 @@ def parse_object_signature_raw(elem, parent_description=None, attr_name=None, at
 
     elif isinstance(elem, type) and issubclass(elem, Enum):
         element_info["allowed_values"] = [e.value for e in elem]
-        if element_info["default"] is None:
+        if element_info["default"] is None and element_info["allowed_values"]:
             element_info["default"] = element_info["allowed_values"][0]
 
     elif hasattr(elem, '__origin__') and elem.__origin__ is list:
