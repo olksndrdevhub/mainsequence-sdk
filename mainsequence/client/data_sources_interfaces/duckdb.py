@@ -64,8 +64,8 @@ class DuckDBInterface:
         url = f"http://{host}:{port}"
         if not ui_is_running(host, port, timeout):
             # (first‐time only) install and load the UI extension
-            conn.execute("INSTALL ui;")
-            conn.execute("LOAD ui;")
+            # conn.execute("INSTALL ui;")
+            # conn.execute("LOAD ui;")
             # spin up the HTTP server and open your browser
             conn.execute("CALL start_ui();")
             print(f"DuckDB Explorer launched at {url}")
