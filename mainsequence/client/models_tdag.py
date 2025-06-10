@@ -2121,7 +2121,7 @@ class PodDataSource:
         self.data_source = POD_PROJECT.data_source
         logger.info(f"Set remote data source to {self.data_source.related_resource}")
 
-    def set_local_db(self,start_duck_gui=False):
+    def set_local_db(self):
         host_uid = bios_uuid()
         data_source = DataSource.get_or_create_duck_db(
             display_name=f"DuckDB_{host_uid}",
@@ -2154,8 +2154,7 @@ class PodDataSource:
         )
         logger.info(banner)
 
-        if start_duck_gui == True:
-            db_interface.launch_gui()
+   
 
 
     def __repr__(self):
