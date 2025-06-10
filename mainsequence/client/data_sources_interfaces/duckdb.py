@@ -43,6 +43,34 @@ class DuckDBInterface:
         self.con.execute("PRAGMA threads = 4")  # tweak to your cores
         self.con.execute("PRAGMA enable_object_cache = true")
 
+    def launch_gui(self, host='localhost', port=4213, timeout=0.5):
+        import duckdb
+        import socket
+
+        def ui_is_running(host, port, timeout):
+            """Returns True if something is listening on host:port."""
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(timeout)
+                try:
+                    s.connect((host, port))
+                    return True
+                except (ConnectionRefusedError, socket.timeout):
+                    return False
+
+        # 1. Connect to your database
+        conn = duckdb.connect(self.db_path)
+
+        # 2. Decide whether to start the UI
+        url = f"http://{host}:{port}"
+        if not ui_is_running(host, port, timeout):
+            # (first‐time only) install and load the UI extension
+            conn.execute("INSTALL ui;")
+            conn.execute("LOAD ui;")
+            # spin up the HTTP server and open your browser
+            conn.execute("CALL start_ui();")
+            print(f"DuckDB Explorer launched at {url}")
+        else:
+            print(f"DuckDB Explorer is already running at {url}")
 
     # ──────────────────────────────────────────────────────────────────────────────
     # Public API

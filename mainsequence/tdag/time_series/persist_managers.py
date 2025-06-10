@@ -95,7 +95,9 @@ class APIPersistManager:
         #fix types
 
         stc = self.local_metadata.remote_table.sourcetableconfiguration
-        filtered_data[stc.time_index_name] = pd.to_datetime(filtered_data[stc.time_index_name])
+        filtered_data[stc.time_index_name] = pd.to_datetime(filtered_data[stc.time_index_name],
+                                                            utc=True
+                                                            )
         for c, c_type in stc.column_dtypes_map.items():
             if c!=stc.time_index_name:
                 if c_type=="object":

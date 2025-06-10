@@ -2121,7 +2121,7 @@ class PodDataSource:
         self.data_source = POD_PROJECT.data_source
         logger.info(f"Set remote data source to {self.data_source.related_resource}")
 
-    def set_local_db(self):
+    def set_local_db(self,start_duck_gui=False):
         host_uid = bios_uuid()
         data_source = DataSource.get_or_create_duck_db(
             display_name=f"DuckDB_{host_uid}",
@@ -2136,12 +2136,13 @@ class PodDataSource:
         remote_tables = DynamicTableMetaData.filter(data_source__id=duckdb_dynamic_data_source.id, list_tables=True)
         remote_table_names = [t.table_name for t in remote_tables]
         from mainsequence.client.data_sources_interfaces.duckdb import DuckDBInterface
-        local_table_names = DuckDBInterface().list_tables()
+        db_interface=DuckDBInterface()
+        local_table_names = db_interface.list_tables()
 
         tables_to_delete = set(local_table_names) - set(remote_table_names)
         for table_name in tables_to_delete:
             logger.debug(f"Deleting table in local duck db {table_name}")
-            DuckDBInterface().drop_table(table_name)
+            db_interface.drop_table(table_name)
 
         self.data_source = duckdb_dynamic_data_source
 
@@ -2152,6 +2153,9 @@ class PodDataSource:
             f"{'-'*80}\n"
         )
         logger.info(banner)
+
+        if start_duck_gui == True:
+            db_interface.launch_gui()
 
 
     def __repr__(self):
