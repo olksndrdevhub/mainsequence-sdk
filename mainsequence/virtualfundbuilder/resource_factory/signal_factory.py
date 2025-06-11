@@ -35,6 +35,8 @@ class WeightsBase(BaseResource):
 
         super().__init__()
 
+
+
     def get_explanation(self):
         info = f"""
         <p>{self.__class__.__name__}: Signal weights class.</p>

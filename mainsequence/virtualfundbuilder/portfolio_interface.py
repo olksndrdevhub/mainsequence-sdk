@@ -194,6 +194,12 @@ class PortfolioInterface():
         self.logger.info(f"Configuration stored under {config_file}")
         return config_file
 
+
+    @classmethod
+    def load_configuration(cls, configuration_name)->PortfolioConfiguration:
+        config_file = os.path.join(cls.configuration_folder_path, f"{configuration_name}.yaml")
+        portfolio_config = PortfolioConfiguration.read_portfolio_configuration_from_yaml(config_file)
+        return PortfolioConfiguration(**portfolio_config)
     @classmethod
     def load_from_configuration(cls, configuration_name, config_file:Union[str,None]=None):
         if config_file is None:

@@ -1341,11 +1341,13 @@ class DataPersistanceMethods(ABC):
         return last_observation
 
     def delete_table(self,):
+        if self.local_persist_manager.data_source.related_resource.class_type=="duck_db":
+            from mainsequence.client.data_sources_interfaces.duckdb import DuckDBInterface
+            db_interface = DuckDBInterface()
+            db_interface.drop_table(self.local_persist_manager.metadata.hash_id)
 
         self.local_persist_manager.metadata.delete()
 
-
-        a=5
 
 
     @tracer.start_as_current_span("TS: Persist Data")
