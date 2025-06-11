@@ -284,7 +284,7 @@ def interpolate_daily_bars(
     restricted_schedule = calendar_instance.schedule(bars_df.index.min(),
                                                      bars_df.index.max())  # This needs to be faster
     restricted_schedule = restricted_schedule.reset_index()
-    market_type = "market_open"  # as bars observation date is at max a close we need to restrick the  scheduler to be at max open
+    market_type = "market_close"
 
     restricted_schedule = restricted_schedule.set_index(market_type)
     full_index = bars_df.index.union(restricted_schedule.index)
@@ -306,7 +306,7 @@ def interpolate_daily_bars(
     if len(bars_df) == 0:
         return pd.DataFrame()
 
-    bars_df = bars_df[bars_df.index.isin(full_index)]
+    bars_df = bars_df[bars_df.index.isin(restricted_schedule.index)]
 
     null_index = bars_df[bars_df["open_time"].isnull()].index
     if len(null_index) > 0:
