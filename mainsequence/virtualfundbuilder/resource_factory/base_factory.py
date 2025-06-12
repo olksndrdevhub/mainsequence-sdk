@@ -203,7 +203,7 @@ def send_resource_to_backend(resource_class, attributes: Optional[dict]=None):
     )
 
     # get the init signature form class and parent class, might need to be generalized to all parents
-    exclude_args = ["is_live", "build_meta_data", "local_kwargs_to_ignore"]
+    exclude_args = ["init_meta", "is_live", "build_meta_data", "local_kwargs_to_ignore"]
     for parent_class in resource_class.__mro__[1:]:
         init_method_parent = _get_wrapped_or_init(parent_class)
 
