@@ -15,6 +15,7 @@ import ast
 
 logger = get_vfb_logger()
 from mainsequence.virtualfundbuilder.enums import ResourceType
+from mainsequence.virtualfundbuilder.utils import runs_in_main_process
 
 class BaseResource():
     @classmethod
@@ -125,7 +126,7 @@ def insert_in_registry(registry, cls, register_in_agent, name=None, attributes: 
     registry[key] = cls
     logger.debug(f"Registered {cls.TYPE} class '{key}': {cls}")
 
-    if register_in_agent and not SKIP_REGISTRATION:
+    if register_in_agent and not SKIP_REGISTRATION and runs_in_main_process():
         # send_resource_to_backend(cls, attributes)
         Thread(
             target=send_resource_to_backend,

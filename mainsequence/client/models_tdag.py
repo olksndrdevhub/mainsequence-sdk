@@ -795,6 +795,17 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
         if r.status_code != 200:
             raise Exception(r.text)
 
+    def delete_table(self):
+        data_source = PodDataSource._get_duck_db()
+        duckdb_dynamic_data_source = DynamicTableDataSource.get_or_create_duck_db(
+            related_resource=data_source.id,
+        )
+        if (isinstance(self.data_source, int) and self.data_source.id == duckdb_dynamic_data_source.id) or \
+                (not isinstance(self.data_source, int) and self.data_source.related_resource.class_type == "duck_db"):
+            db_interface = DuckDBInterface()
+            db_interface.drop_table(self.table_name)
+
+        self.delete()
 
 class Scheduler(BasePydanticModel, BaseObjectOrm):
     uid: str
@@ -2065,12 +2076,17 @@ class PodDataSource:
         self.data_source = POD_PROJECT.data_source
         logger.info(f"Set remote data source to {self.data_source.related_resource}")
 
-    def set_local_db(self):
+    @staticmethod
+    def _get_duck_db():
         host_uid = bios_uuid()
         data_source = DataSource.get_or_create_duck_db(
             display_name=f"DuckDB_{host_uid}",
             host_mac_address=host_uid
         )
+        return data_source
+
+    def set_local_db(self):
+        data_source = self._get_duck_db()
 
         duckdb_dynamic_data_source = DynamicTableDataSource.get_or_create_duck_db(
             related_resource=data_source.id,

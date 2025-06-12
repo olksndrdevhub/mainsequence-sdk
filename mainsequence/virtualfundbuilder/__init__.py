@@ -25,7 +25,8 @@ from mainsequence.virtualfundbuilder.utils import (
     convert_to_binance_frequency,
     get_last_query_times_per_asset,
     build_rolling_regression_from_df,
-    filter_assets
+    filter_assets,
+    runs_in_main_process
 )
 
 # no more default strategies, everything should be for user
@@ -40,12 +41,6 @@ if os.getenv("PROJECT_LIBRARY_NAME") is None:
     os.environ["PROJECT_LIBRARY_NAME"] = Path(os.environ.get("VFB_PROJECT_PATH")).name
 
 register_default_strategies()
-
-def runs_in_main_process() -> bool:
-    import multiprocessing
-
-    print(f"Process name: {multiprocessing.current_process().name}")
-    return multiprocessing.current_process().name == "MainProcess"
 
 if runs_in_main_process():
     get_pod_configuration()
