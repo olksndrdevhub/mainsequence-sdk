@@ -218,7 +218,10 @@ def send_resource_to_backend(resource_class, attributes: Optional[dict]=None):
             elements_to_exclude=exclude_args
         )
         markdown_documentation += parent_markdown_documentation
-        object_signature.update(parent_object_signature)
+
+        for k, v in parent_object_signature.items():
+            # child values have precedence over parent values
+            if k not in object_signature: object_signature[k] = parent_object_signature[k]
 
     default_yaml = object_signature_to_yaml(object_signature)
 
