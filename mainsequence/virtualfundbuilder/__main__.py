@@ -68,7 +68,7 @@ def run_app(app_name, configuration):
         results = app_instance.run()
     except Exception as e:
         logger.error("Error running app", exc_info=True)
-        return
+        raise
     logger.info(f"Finished App {app_name} run with results: {results}")
 
 def run_notebook(notebook_name):
