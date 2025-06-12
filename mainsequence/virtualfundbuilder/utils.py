@@ -50,12 +50,8 @@ GECKO_SYMBOL_MAPPING = {
 # Small time delta for precision operations
 TIMEDELTA = pd.Timedelta("5ms")
 
-
-
 def runs_in_main_process() -> bool:
     import multiprocessing
-
-    print(f"Process name: {multiprocessing.current_process().name}")
     return multiprocessing.current_process().name == "MainProcess"
 
 def reindex_df(df: pd.DataFrame, start_time: datetime, end_time: datetime, freq: str) -> pd.DataFrame:
