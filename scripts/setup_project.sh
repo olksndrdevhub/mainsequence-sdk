@@ -99,6 +99,7 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
 
   echo "Adding/Updating .gitignore..."
   echo ".ipynb_checkpoints" > "$ROOT_PROJECT_PATH/.gitignore"
+  echo ".env" >> "$ROOT_PROJECT_PATH/.gitignore"
 
   chown -R 1000:100 "$HOME_DIR" 2>/dev/null || true
 
