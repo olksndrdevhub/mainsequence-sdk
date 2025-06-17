@@ -489,13 +489,13 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
     def get_data_between_dates_from_api(
             self,
-            start_date: datetime.datetime,
-            end_date: datetime.datetime,
-            great_or_equal: bool,
-            less_or_equal: bool,
-            unique_identifier_list: list,
-            columns: list,
-            unique_identifier_range_map: Union[None, UniqueIdentifierRangeMap]
+            start_date: datetime.datetime=None,
+            end_date: datetime.datetime=None,
+            great_or_equal: bool=None,
+            less_or_equal: bool=None,
+            unique_identifier_list: list=None,
+            columns: list=None,
+            unique_identifier_range_map: Union[None, UniqueIdentifierRangeMap]=None
         ):
         """ Helper function to make a single batch request (or multiple paged requests if next_offset). """
         def fetch_one_batch(chunk_range_map):
