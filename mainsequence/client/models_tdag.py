@@ -1121,7 +1121,12 @@ class DataUpdates(BaseModel):
             return []
         return self.update_statistics.items()
 
-    def filter_df_by_latest_value(self, df):
+    def filter_df_by_latest_value(self, df:pd.DataFrame):
+        """
+
+        :param df:
+        :return:
+        """
         if df.shape[0] == 0:
             return df
         if not self.is_empty():
