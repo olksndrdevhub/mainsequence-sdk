@@ -738,7 +738,7 @@ class AccountMixin(BasePydanticModel):
     cash_asset: Asset
     is_paper: bool
     account_target_portfolio: AccountTargetPortfolio
-    latest_holdings: Union["AccountHistoricalHoldings",None]=None
+    latest_holdings: Union["AccountLatestHoldings",None]=None
 
     @property
     def account_target_portfolio(self):
@@ -916,7 +916,6 @@ class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
 
 
 
-
 class AccountPositionDetail(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = None
     asset:Union[Asset,int] = None
@@ -926,18 +925,31 @@ class AccountPositionDetail(BaseObjectOrm,BasePydanticModel):
     parents_holdings: Optional[int]=None
     extra_details:Optional[dict]=None
 
-class AccountHistoricalHoldings(BaseObjectOrm,BasePydanticModel):
+class AccountHistoricalHoldingsMixin:
     id: Optional[int] = Field(None, primary_key=True)
     holdings_date: datetime.datetime
     comments: Optional[str] = Field(None, max_length=150)
     nav: Optional[float] = None
 
-    related_account: Union[int,"Account"]
     is_trade_snapshot: bool = Field(default=False)
     target_trade_time: Optional[datetime.datetime] = None
     related_expected_asset_exposure_df: Optional[Dict[str, Any]] = None
 
     holdings: List[AccountPositionDetail]
+
+class AccountLatestHoldings(AccountHistoricalHoldingsMixin,BaseObjectOrm,BasePydanticModel):
+    """
+    Same as Account HistoricalHoldings but Does not include related account
+
+    """
+    ...
+
+
+
+class AccountHistoricalHoldings(AccountHistoricalHoldingsMixin,BaseObjectOrm,BasePydanticModel):
+
+
+    related_account: Union[int,"Account"]
 
     @classmethod
     def destroy_holdings_before_date(cls,target_date:datetime.datetime,
