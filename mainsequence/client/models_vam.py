@@ -738,7 +738,7 @@ class AccountMixin(BasePydanticModel):
     cash_asset: Asset
     is_paper: bool
     account_target_portfolio: AccountTargetPortfolio
-    latest_holdings: Union["AccountLatestHoldingsSerializer",None]=None
+    latest_holdings: Union["AccountHistoricalHoldings",None]=None
 
     @property
     def account_target_portfolio(self):
@@ -915,17 +915,6 @@ class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
         )
 
 
-class AccountLatestHoldingsSerializer(BaseObjectOrm,BasePydanticModel):
-    id: Optional[int] = Field(None, primary_key=True)
-    holdings_date: datetime.datetime
-    comments: Optional[str] = Field(None, max_length=150)
-    nav: Optional[float] = None
-
-    is_trade_snapshot: bool = Field(default=False)
-    target_trade_time: Optional[datetime.datetime] = None
-    related_expected_asset_exposure_df: Optional[Dict[str, Any]] = None
-
-    holdings: list
 
 
 class AccountPositionDetail(BaseObjectOrm,BasePydanticModel):
