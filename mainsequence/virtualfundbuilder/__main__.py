@@ -40,11 +40,11 @@ def update_job_status(status_message):
         return None
 
 def run_configuration(configuration_name):
-    # TODO replace with new RunNamedPortfolio app
     from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
-    print("Run Timeseries Configuration")
+    from mainsequence.virtualfundbuilder.utils import get_vfb_logger
+    logger = get_vfb_logger()
+    logger.info(f"Run Timeseries Configuration {configuration_name}")
     portfolio = PortfolioInterface.load_from_configuration(configuration_name)
-
     res = portfolio.run()
     print(res.head())
 
@@ -53,7 +53,7 @@ def run_app(app_name, configuration):
     from mainsequence.virtualfundbuilder.resource_factory.app_factory import APP_REGISTRY
     from mainsequence.virtualfundbuilder.utils import get_vfb_logger
     logger = get_vfb_logger()
-    logger.info(f"Start App {app_name}")
+    logger.info(f"Start App {app_name} with configuration\n{configuration}")
     try:
         app_cls = APP_REGISTRY[app_name]
 
@@ -68,18 +68,22 @@ def run_app(app_name, configuration):
         results = app_instance.run()
     except Exception as e:
         logger.error("Error running app", exc_info=True)
-        return
+        raise
     logger.info(f"Finished App {app_name} run with results: {results}")
 
 def run_notebook(notebook_name):
     from mainsequence.virtualfundbuilder.notebook_handling import convert_notebook_to_python_file
-    print("Run Notebook")
+    from mainsequence.virtualfundbuilder.utils import get_vfb_logger
+    logger = get_vfb_logger()
+    logger.info(f"Run Notebook {notebook_name}")
     notebook_file_path = os.path.join(os.getenv("VFB_PROJECT_PATH"), "notebooks", f"{notebook_name}.ipynb")
     python_notebook_file = convert_notebook_to_python_file(notebook_file_path)
     runpy.run_path(python_notebook_file, run_name="__main__")
 
 def run_script(script_name):
-    print("Run script")
+    from mainsequence.virtualfundbuilder.utils import get_vfb_logger
+    logger = get_vfb_logger()
+    logger.info(f"Run script {script_name}")
     python_file_path = os.path.join(os.getenv("VFB_PROJECT_PATH"), "scripts", f"{script_name}.py")
     runpy.run_path(python_file_path, run_name="__main__")
 
@@ -176,13 +180,13 @@ class VirtualFundLauncher:
                 run_app(app_name=os.getenv("APP_NAME"), configuration=os.getenv("APP_CONFIGURATION"))
             elif execution_type == "standby":
                 sleep_seconds = int(os.getenv("STANDBY_DURATION_SECONDS"))
-                print(f"Sleep for {sleep_seconds} seconds")
+                self.logger.info(f"Sleep for {sleep_seconds} seconds")
                 time.sleep(sleep_seconds)
             else:
                 raise NotImplementedError(f"Unknown execution type {execution_type}")
 
         except Exception as e:
-            print(f"Exception during job run occured {e}")
+            self.logger.exception(f"Exception during job run occured {e}")
             import traceback
             traceback.print_exc()
             error_on_run = True

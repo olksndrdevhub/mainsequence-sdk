@@ -15,6 +15,7 @@ import ast
 
 logger = get_vfb_logger()
 from mainsequence.virtualfundbuilder.enums import ResourceType
+from mainsequence.virtualfundbuilder.utils import runs_in_main_process
 
 class BaseResource():
     @classmethod
@@ -125,7 +126,7 @@ def insert_in_registry(registry, cls, register_in_agent, name=None, attributes: 
     registry[key] = cls
     logger.debug(f"Registered {cls.TYPE} class '{key}': {cls}")
 
-    if register_in_agent and not SKIP_REGISTRATION:
+    if register_in_agent and not SKIP_REGISTRATION and runs_in_main_process():
         # send_resource_to_backend(cls, attributes)
         Thread(
             target=send_resource_to_backend,
@@ -202,7 +203,7 @@ def send_resource_to_backend(resource_class, attributes: Optional[dict]=None):
     )
 
     # get the init signature form class and parent class, might need to be generalized to all parents
-    exclude_args = ["is_live", "build_meta_data", "local_kwargs_to_ignore"]
+    exclude_args = ["init_meta", "is_live", "build_meta_data", "local_kwargs_to_ignore"]
     for parent_class in resource_class.__mro__[1:]:
         init_method_parent = _get_wrapped_or_init(parent_class)
 
@@ -217,7 +218,10 @@ def send_resource_to_backend(resource_class, attributes: Optional[dict]=None):
             elements_to_exclude=exclude_args
         )
         markdown_documentation += parent_markdown_documentation
-        object_signature.update(parent_object_signature)
+
+        for k, v in parent_object_signature.items():
+            # child values have precedence over parent values
+            if k not in object_signature: object_signature[k] = parent_object_signature[k]
 
     default_yaml = object_signature_to_yaml(object_signature)
 

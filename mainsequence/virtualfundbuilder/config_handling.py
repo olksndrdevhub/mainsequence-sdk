@@ -27,7 +27,7 @@ def replace_none_and_empty_dict_with_python_none(config):
                 elif isinstance(value, list):
                     for i, item in enumerate(value):
                         recursive_replace(item, f"{current_path}[{i}]")
-                elif value == 'None':
+                elif isinstance(value, str) and value.lower() in ['none', 'null']:
                     d[key] = None
                     logger.info(f"Replaced 'None' in configuration with None at {current_path}")
 

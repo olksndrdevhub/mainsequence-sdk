@@ -1135,13 +1135,13 @@ class TargetPortfolioMixin:
     portfolio_name: str = Field(..., max_length=255)
     portfolio_ticker: str = Field(..., max_length=150)
     latest_rebalance: Optional[datetime.datetime] = None
-    calendar: Calendar
+    calendar: Optional[Calendar]
 
     is_asset_only: bool = False
     build_purpose: str
     is_active: bool = False
-    local_time_serie: LocalTimeSerie
-    signal_local_time_serie: LocalTimeSerie
+    local_time_serie: Optional[LocalTimeSerie]
+    signal_local_time_serie: Optional[LocalTimeSerie]
 
     builds_from_predictions: bool = False
     builds_from_target_positions: bool = False

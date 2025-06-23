@@ -85,8 +85,10 @@ def build_application_logger(
         for key, value in json_response["additional_environment"].items():
             os.environ[key] = value
 
-
-    logger_file = os.getenv("LOGGER_FILE_PATH", "/var/log/tdag/tdag.log")
+    # Get logger path in home directory if no path is set in environemnt
+    tdag_base_path = Path(os.getenv("TDAG_ROOT_PATH", Path.home() / ".tdag"))
+    default_log_path = tdag_base_path / "logs" / "tdag.log"
+    logger_file = os.getenv("LOGGER_FILE_PATH", str(default_log_path))
 
     logger_name = "tdag"
 
