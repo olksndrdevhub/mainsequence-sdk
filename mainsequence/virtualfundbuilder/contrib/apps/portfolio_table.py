@@ -26,7 +26,7 @@ PortfolioNameEnum = Enum(
 
 class PortfolioTableConfiguration(BaseModel):
     report_title: str = "Portfolio Table"
-    portfolio_ticker: List[PortfolioNameEnum] = [list(PortfolioNameEnum)[0].value]
+    portfolio_tickers: List[PortfolioNameEnum] = [list(PortfolioNameEnum)[0].value]
     report_days: int = 365 * 5
 
 @register_app()
@@ -49,7 +49,7 @@ class PortfolioTable(HtmlApp):
         ) - datetime.timedelta(days=self.configuration.report_days)
 
         rows = []
-        for ticker in self.configuration.portfolio_ticker[:5]:  # 5 rows max
+        for ticker in self.configuration.portfolio_tickers:
             try:
                 portfolio = TargetPortfolio.get(portfolio_ticker=ticker)
                 df = portfolio.local_time_serie.get_data_between_dates_from_api()
