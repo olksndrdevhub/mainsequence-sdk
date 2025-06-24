@@ -59,7 +59,6 @@ class HtmlApp(BaseApp):
             if job_id:
                 html_artifact = None
                 try:
-                    filename = f""
                     html_artifact = Artifact.upload_file(
                         filepath=output_name,
                         name=output_name,

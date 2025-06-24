@@ -23,7 +23,7 @@ PortfolioNameEnum = Enum(
 class PortfolioReportConfiguration(BaseModel):
     report_title: str = "Portfolio Report"
     portfolio_ticker: List[PortfolioNameEnum]
-    report_days: int = 365
+    report_days: int = 365 * 5
 
 @register_app()
 class PortfolioReport(HtmlApp):
@@ -86,9 +86,16 @@ class PortfolioReport(HtmlApp):
 
         # Update y-axes to show 'Close Price' title
         fig.update_yaxes(title_text="Close Price")
+
+        # Add transparency
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            template=None
+        )
         return fig.to_html(
-            include_plotlyjs=True,
-            full_html=False,
+            include_plotlyjs="cdn",
+            full_html=True,
             config={'responsive': True, 'displayModeBar': False}
         )
 
