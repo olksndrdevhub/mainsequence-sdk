@@ -17,7 +17,7 @@ logger = get_vfb_logger()
 
 PortfolioNameEnum = Enum(
     "PortfolioEnum",
-    {portfolio.portfolio_name: portfolio.portfolio_ticker for portfolio in TargetPortfolio.filter(is_asset_only=False)},
+    {portfolio.portfolio_name: portfolio.portfolio_ticker for portfolio in TargetPortfolio.filter(is_asset_only=False, local_time_serie__isnull=False)},
     type=str,
 )
 class PortfolioReportConfiguration(BaseModel):
@@ -57,11 +57,7 @@ class PortfolioReport(HtmlApp):
             try:
 
                 portfolio = TargetPortfolio.get(portfolio_ticker=ticker)
-                # data = portfolio.local_time_serie.get_data_between_dates_from_api()
-                data = pd.DataFrame({
-                    'time_index': pd.date_range(end=datetime.datetime.now(datetime.timezone.utc), periods=self.configuration.report_days + 30, freq='D'),
-                    'close': 100 + np.random.uniform(-30, 30) + np.random.randn(self.configuration.report_days + 30).cumsum()
-                })
+                data = portfolio.local_time_serie.get_data_between_dates_from_api()
                 logger.info(f"Successfully fetched data for portfolio: {ticker}")
 
                 data['time_index'] = pd.to_datetime(data['time_index'])
@@ -98,6 +94,6 @@ class PortfolioReport(HtmlApp):
 
 if __name__ == "__main__":
     configuration = PortfolioReportConfiguration(
-        portfolio_ticker=[list(PortfolioNameEnum)[0].value]
+        portfolio_ticker=[list(PortfolioNameEnum)[0].value] # test with a sample portfolio
     )
     PortfolioReport(configuration).run()
