@@ -22,7 +22,7 @@ PortfolioNameEnum = Enum(
 )
 class PortfolioReportConfiguration(BaseModel):
     report_title: str = "Portfolio Report"
-    portfolio_ticker: List[PortfolioNameEnum]
+    portfolio_ticker: List[PortfolioNameEnum] = [list(PortfolioNameEnum)[0].value]
     report_days: int = 365 * 5
 
 @register_app()
@@ -100,7 +100,5 @@ class PortfolioReport(HtmlApp):
         )
 
 if __name__ == "__main__":
-    configuration = PortfolioReportConfiguration(
-        portfolio_ticker=[list(PortfolioNameEnum)[0].value] # test with a sample portfolio
-    )
+    configuration = PortfolioReportConfiguration()
     PortfolioReport(configuration).run()
