@@ -1,3 +1,5 @@
+import hashlib
+import json
 import os
 from abc import abstractmethod
 
@@ -28,6 +30,14 @@ class HtmlApp(BaseApp):
     """
     TYPE = ResourceType.HTML_APP
 
+    def _get_hash_from_configuration(self):
+        try:
+            return hashlib.sha256(
+                json.dumps(self.configuration.__dict__, sort_keys=True, default=str).encode()
+            ).hexdigest()[:8]
+        except Exception as e:
+            logger.warning(f"[{self.__name__}] Could not hash configuration: {e}")
+
     def __init_subclass__(cls, **kwargs):
         """
         Wraps the subclass's `run` method to add validation and saving logic.
@@ -36,17 +46,15 @@ class HtmlApp(BaseApp):
         original_run = cls.run
 
         def run_wrapper(self, *args, **kwargs) -> str:
-            # 1. Execute the user-defined run method from the subclass
+            # Execute the user-defined run method from the subclass
             html_content = original_run(self, *args, **kwargs)
 
-            # 2. Check that the output is a string
             if not isinstance(html_content, str):
                 raise TypeError(f"The 'run' method of {cls.__name__} must return a string of HTML content.")
 
-            # 3. Store the output on disk or to a bucket
-            job_id = os.getenv("JOB_ID", None)
-            output_name = self.__class__.__name__
-            output_name = output_name + ".html"
+            # Store the output
+            unique_hash = self._get_hash_from_configuration()
+            output_name = f"{cls.__name__}_{unique_hash}.html"
             try:
                 with open(output_name, "w", encoding="utf-8") as f:
                     f.write(html_content)
@@ -56,6 +64,7 @@ class HtmlApp(BaseApp):
                 logger.error(f"[{cls.__name__}] Error saving file: {e}")
                 raise
 
+            job_id = os.getenv("JOB_ID", None)
             if job_id:
                 html_artifact = None
                 try:
