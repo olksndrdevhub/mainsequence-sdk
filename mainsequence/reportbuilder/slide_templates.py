@@ -36,7 +36,7 @@ def generic_plotly_table(
         plot_bgcolor: str = 'rgba(0,0,0,0)',
         responsive: bool = True,
         display_mode_bar: bool = False,
-        include_plotlyjs: bool = False,
+        include_plotlyjs: str = False,
         full_html: bool = False,
         column_formats: Optional[List[str]] = None,
         theme_mode: ThemeMode = ThemeMode.light
@@ -130,7 +130,7 @@ def generic_plotly_pie_chart(
         sort_traces: bool = False,
         responsive: bool = True,
         display_mode_bar: bool = False,
-        include_plotlyjs: bool = False,
+        include_plotlyjs: str = False,
         full_html: bool = False,
         theme_mode: ThemeMode = ThemeMode.light
 ) -> str:
