@@ -101,12 +101,14 @@ def generic_plotly_table(
         layout_args["width"] = fig_width
 
     fig.update_layout(**layout_args)
-
-    return fig.to_html(
+    html = fig.to_html(
         include_plotlyjs=include_plotlyjs,
         full_html=full_html,
         config={'responsive': responsive, 'displayModeBar': display_mode_bar}
     )
+    html = html.replace('style="height:100%; width:100%;"',
+                        'style="width:100%;"')  # drop 100 % height
+    return html
 
 
 def generic_plotly_pie_chart(
