@@ -1,17 +1,18 @@
 import datetime
 from enum import Enum
-from typing import List
+from typing import List, Union
 
 import numpy as np
 import pandas as pd
 from mainsequence.client import TargetPortfolio
+from mainsequence.reportbuilder.model import StyleSettings, ThemeMode
+from mainsequence.reportbuilder.slide_templates import generic_plotly_table
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 from pydantic import BaseModel
 from mainsequence.virtualfundbuilder.resource_factory.app_factory import (
     HtmlApp,
     register_app,
 )
-import plotly.graph_objects as go
 
 logger = get_vfb_logger()
 
@@ -38,86 +39,41 @@ class PortfolioTable(HtmlApp):
         self.configuration = configuration
 
     def run(self) -> str:
-        """
-        Build **one** Plotly table for all requested portfolios
-        and return it as a single HTML document.
-        Rows   : one per portfolio (max-5 shown)
-        Columns: Close | 1-Day % | 7-Day SMA | 30-Day Volatility
-        """
-        start_date = datetime.datetime.now(
-            datetime.timezone.utc
-        ) - datetime.timedelta(days=self.configuration.report_days)
+        style = StyleSettings(mode=ThemeMode.light)
 
-        rows = []
-        for ticker in self.configuration.portfolio_tickers:
-            try:
-                portfolio = TargetPortfolio.get(portfolio_ticker=ticker)
-                df = portfolio.local_time_serie.get_data_between_dates_from_api()
-                df["time_index"] = pd.to_datetime(df["time_index"])
-                df = df[df["time_index"] >= start_date].copy()
-                df.sort_values("time_index", inplace=True)
-
-                if df.empty:
-                    logger.warning(f"No data for {ticker}")
-                    continue
-
-                # Indicators
-                df["pct_change"] = df["close"].pct_change()
-                df["sma_7"] = df["close"].rolling(7, min_periods=1).mean()
-
-                latest = df.iloc[-1]
-                rows.append(
-                    {
-                        "Portfolio": f"{portfolio.portfolio_name} ({portfolio.portfolio_ticker})",
-                        "Close": latest["close"],
-                        "1-Day %": latest["pct_change"],
-                        "SMA-7": latest["sma_7"],
-                    }
-                )
-                logger.info(f"Processed metrics for {ticker}")
-            except Exception as exc:
-                logger.error(f"Failed for {ticker}: {exc}")
-
-        if not rows:
-            return "<h3>No data available for requested portfolios.</h3>"
-
-        metrics_df = pd.DataFrame(rows).set_index("Portfolio")
-
-        # Conditional colours for the 1-Day % column
-        pct_color = [
-            ["#d7f5d2" if v > 0 else "#fbd1d1" for v in metrics_df["1-Day %"]]
+        fixed_income_local_headers = ["INSTRUMENT", "UNITS", "PRICE", "AMOUNT", "% TOTAL", "DURATION", "YIELD", "DxV"]
+        fixed_income_local_rows = [
+            ["Alpha Bond 2025", "350,000", "$99.50", "$34,825,000.00", "7.50%", "0.25", "9.05%", "90"],
+            ["Beta Note 2026", "160,000", "$99.80", "$15,968,000.00", "3.60%", "1.30", "9.15%", "530"],
+            ["Gamma Security 2026", "250,000", "$99.90", "$24,975,000.00", "5.60%", "1.50", "9.20%", "600"],
+            ["Delta Issue 2027", "245,000", "$100.10", "$24,524,500.00", "5.40%", "1.60", "9.25%", "630"],
+            ["Epsilon Paper 2026", "200,000", "$98.50", "$19,700,000.00", "4.40%", "0.80", "8.30%", "300"],
+            ["Zeta Bond 2029", "170,000", "$102.50", "$17,425,000.00", "3.90%", "3.30", "8.60%", "1,500"],
+            ["Eta Security 2030", "180,000", "$100.00", "$18,000,000.00", "4.00%", "3.80", "8.80%", "1,700"],
+            ["Theta Note 2034", "110,000", "$93.00", "$10,230,000.00", "2.30%", "6.30", "9.30%", "3,500"],
+            ["Iota UDI 2028", "40,000", "$98.00", "$33,600,000.00", "7.90%", "3.20", "4.90%", "1,300"],
+            ["Kappa C-Bill 2026A", "2,500,000", "$9.20", "$23,000,000.00", "5.10%", "0.85", "8.40%", "340"],
+            ["Lambda C-Bill 2026B", "3,300,000", "$8.80", "$29,040,000.00", "6.70%", "1.25", "8.50%", "520"],
+            ["TOTAL", "", "", "$251,287,500.00", "56.70%", "1.60", "8.55%", "480"]
         ]
 
-        fig = go.Figure(
-            data=[
-                go.Table(
-                    header=dict(
-                        values=list(metrics_df.columns),
-                        fill_color="lightgrey",
-                        font=dict(size=12, family="Roboto Condensed"),
-                        align="center",
-                    ),
-                    cells=dict(
-                        values=[metrics_df[c] for c in metrics_df.columns],
-                        format=[".2f", ".2%", ".2f", ".2%"],
-                        align="center",
-                        fill_color=["white"] * 3 + pct_color,
-                    ),
-                )
-            ]
+        shared_column_widths = [1.8, 1, 1, 1.5, 0.7, 0.8, 0.8, 0.7]
+        shared_cell_align: Union[str, List[str]] = ['left', 'right', 'right', 'right', 'right', 'right', 'right', 'right']
+        table_figure_width = 900
+
+        # Use paragraph font family for charts from the theme
+        chart_font_family = style.font_family_paragraphs
+        chart_label_font_size = style.chart_label_font_size
+
+        fi_local_html = generic_plotly_table(
+            headers=fixed_income_local_headers, rows=fixed_income_local_rows,
+            column_widths=shared_column_widths, cell_align=shared_cell_align, fig_width=table_figure_width,
+            header_font_dict=dict(color=style.background_color, size=10, family=chart_font_family),
+            cell_font_dict=dict(size=chart_label_font_size, family=chart_font_family, color=style.paragraph_color),
+            theme_mode=style.mode, full_html=False, include_plotlyjs="cdn"
         )
 
-        fig.update_layout(
-            title=self.configuration.report_title,
-            margin=dict(l=0, r=0, t=60, b=0),
-            paper_bgcolor="rgba(0,0,0,0)",
-        )
-
-        return fig.to_html(
-            include_plotlyjs="cdn",
-            full_html=True,
-            config={"responsive": True, "displayModeBar": False},
-        )
+        return fi_local_html
 
 
 if __name__ == "__main__":
