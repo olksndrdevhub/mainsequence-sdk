@@ -361,3 +361,80 @@ def generic_plotly_grouped_bar_chart(
         full_html=full_html,
         config={'responsive': responsive, 'displayModeBar': display_mode_bar}
     )
+
+
+def generic_plotly_line_chart(
+        x_values: List,
+        series_data: List[Dict[str, Any]],
+        # height and width are now optional for autosizing
+        height: Optional[int] = None,
+        width: Optional[int] = None,
+        chart_title: str = "",
+        y_axis_title: str = "",
+        y_axis_tick_format: Optional[str] = ".2f",
+        legend_dict: Optional[Dict[str, Any]] = None,
+        margin_dict: Optional[Dict[str, int]] = None,
+        theme_mode: ThemeMode = ThemeMode.light,
+        include_plotlyjs: str = "cdn",
+        full_html: bool = True,
+        display_mode_bar: bool = False,
+        responsive: bool = True
+) -> str:
+    """
+    Creates a responsive, multi-series line chart using Plotly, adhering to a style theme.
+    If height/width are not provided, the chart will be autosized to its container.
+    """
+    fig = go.Figure()
+    styles = get_theme_settings(theme_mode)
+
+    for i, series in enumerate(series_data):
+        # ... (trace creation logic remains the same) ...
+        trace = go.Scatter(
+            name=series.get('name', f'Series {i + 1}'),
+            x=x_values,
+            y=series['y_values'],
+            mode='lines',
+            line=dict(
+                color=series.get('color', styles.chart_palette_categorical[i % len(styles.chart_palette_categorical)]),
+                width=2
+            ),
+            hoverinfo='x+y+name'
+        )
+        fig.add_trace(trace)
+
+    default_legend_config = dict(
+        font=dict(size=styles.chart_label_font_size, family=styles.font_family_paragraphs),
+        orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+        bgcolor='rgba(0,0,0,0)'
+    )
+    if legend_dict:
+        default_legend_config.update(legend_dict)
+
+    final_margin_dict = margin_dict if margin_dict is not None else dict(l=60, r=40, t=60 if chart_title else 20, b=50)
+
+    # Create layout dictionary and only add height/width if they are specified
+    layout_args = {
+        "title_text": chart_title,
+        "title_font": dict(size=styles.font_size_h4, family=styles.font_family_headings, color=styles.heading_color),
+        "title_x": 0.5,
+        "legend": default_legend_config,
+        "margin": final_margin_dict,
+        "paper_bgcolor": 'rgba(0,0,0,0)',
+        "plot_bgcolor": 'rgba(0,0,0,0)',
+        "font": dict(family=styles.font_family_paragraphs, color=styles.paragraph_color),
+        "xaxis": dict(showgrid=True, gridcolor=styles.light_paragraph_color if theme_mode == ThemeMode.light else "#444", gridwidth=0.5, zeroline=False),
+        "yaxis": dict(title=y_axis_title, tickformat=y_axis_tick_format, showgrid=True,
+                      gridcolor=styles.light_paragraph_color if theme_mode == ThemeMode.light else "#444", gridwidth=0.5, zeroline=False)
+    }
+    if height:
+        layout_args["height"] = height
+    if width:
+        layout_args["width"] = width
+
+    fig.update_layout(**layout_args)
+
+    return fig.to_html(
+        include_plotlyjs=include_plotlyjs,
+        full_html=full_html,
+        config={'responsive': responsive, 'displayModeBar': display_mode_bar}
+    )

@@ -6,6 +6,8 @@ from typing import List
 import numpy as np
 import pandas as pd
 from mainsequence.client import TargetPortfolio
+from mainsequence.reportbuilder.model import StyleSettings, ThemeMode
+from mainsequence.reportbuilder.slide_templates import generic_plotly_line_chart
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 from plotly.subplots import make_subplots
 
@@ -22,7 +24,7 @@ PortfolioNameEnum = Enum(
 )
 class PortfolioReportConfiguration(BaseModel):
     report_title: str = "Portfolio Report"
-    portfolio_ticker: List[PortfolioNameEnum] = [list(PortfolioNameEnum)[0].value]
+    portfolio_tickers: List[PortfolioNameEnum] = [list(PortfolioNameEnum)[0].value]
     report_days: int = 365 * 5
 
 @register_app()
@@ -33,71 +35,62 @@ class PortfolioReport(HtmlApp):
         logger.info(f"Create portfolio report {configuration}")
         self.configuration = configuration
 
-    def run(self) -> None:
-        """
-        Generates and saves the portfolio report.
-
-        This method fetches data for each portfolio specified in the configuration,
-        plots their closing prices over time using Plotly, and saves the
-        resulting figure as a PNG image.
-        """
-        num_portfolios = len(self.configuration.portfolio_ticker)
-
-        # Create subplots, one for each portfolio
-        fig = make_subplots(
-            rows=num_portfolios,
-            cols=1,
-            subplot_titles=[f"Performance for {ticker}" for ticker in self.configuration.portfolio_ticker]
-        )
-
-        # Define the start date for the report
+    def run(self) -> str:
+        styles = StyleSettings(mode=ThemeMode.light)
         start_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=self.configuration.report_days)
 
-        for i, ticker in enumerate(self.configuration.portfolio_ticker):
-            try:
+        series_data = []
+        all_dates = pd.Index([])
 
+        portfolio_data_map = {}
+        for ticker in self.configuration.portfolio_tickers:
+            try:
                 portfolio = TargetPortfolio.get(portfolio_ticker=ticker)
                 data = portfolio.local_time_serie.get_data_between_dates_from_api()
-                logger.info(f"Successfully fetched data for portfolio: {ticker}")
-
                 data['time_index'] = pd.to_datetime(data['time_index'])
-                report_data = data[data['time_index'] >= start_date].copy()
+                report_data = data[data['time_index'] >= start_date].copy().sort_values('time_index')
 
-                # Add a scatter plot for the portfolio's close price
-                fig.add_trace(
-                    go.Scatter(
-                        x=report_data['time_index'],
-                        y=report_data['close'],
-                        mode='lines',
-                        name=f"{portfolio.portfolio_name} ({portfolio.portfolio_ticker})"
-                    ),
-                    row=i + 1,
-                    col=1
-                )
+                if not report_data.empty:
+                    portfolio_data_map[ticker] = report_data
+                    all_dates = all_dates.union(report_data['time_index'])
 
             except Exception as e:
                 logger.error(f"Could not process portfolio {ticker}. Error: {e}")
 
-        fig.update_layout(
-            title_text=self.configuration.report_title,
-            height=300 * num_portfolios,
-            showlegend=False
-        )
+        # Second loop: process and normalize data
+        for ticker in self.configuration.portfolio_tickers:
+            if ticker in portfolio_data_map:
+                report_data = portfolio_data_map[ticker]
+                portfolio = TargetPortfolio.get(portfolio_ticker=ticker)
 
-        # Update y-axes to show 'Close Price' title
-        fig.update_yaxes(title_text="Close Price")
+                # Reindex to common date range and forward-fill missing values
+                processed_data = report_data.set_index('time_index').reindex(all_dates).ffill().reset_index()
 
-        # Add transparency
-        fig.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            template=None
+                # Normalize to 100 at the start of the common date range
+                first_price = processed_data['close'].iloc[0]
+                normalized_close = (processed_data['close'] / first_price) * 100
+
+                series_data.append({
+                    "name": portfolio.portfolio_name,
+                    "y_values": normalized_close,
+                    "color": styles.chart_palette_categorical[len(series_data) % len(styles.chart_palette_categorical)]
+                })
+
+        # Final check if any data was processed
+        if not series_data:
+            return "<html><body><h1>No data available for the selected portfolios and date range.</h1></body></html>"
+
+        # Call the generic function
+        html_chart = generic_plotly_line_chart(
+            x_values=list(all_dates),
+            series_data=series_data,
+            chart_title=self.configuration.report_title,
+            y_axis_title="Indexed Performance (Start = 100)",
+            theme_mode=styles.mode,
+            full_html=False,
+            include_plotlyjs = "cdn"
         )
-        return fig.to_html(
-            include_plotlyjs="cdn",
-            full_html=True,
-            config={'responsive': True, 'displayModeBar': False}
-        )
+        return html_chart
 
 if __name__ == "__main__":
     configuration = PortfolioReportConfiguration()
