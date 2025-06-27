@@ -1028,12 +1028,36 @@ class DataUpdates(BaseModel):
 
     asset_list:Optional[List]=None
 
+
     class Config:
         arbitrary_types_allowed = True
 
     @classmethod
     def return_empty(cls):
         return cls()
+
+    def pretty_print(self):
+        print(f"{self.__class__.__name__} summary:")
+
+        # asset_list
+        if self.asset_list is None:
+            print("  asset_list: None")
+        else:
+            print(f"  asset_list: {len(self.asset_list)} assets")
+
+
+        # DataFrame
+        if self.last_observation is None or self.last_observation.empty:
+            print("  last_observation: empty DataFrame")
+        else:
+            rows, cols = self.last_observation.shape
+            print(f"  last_observation: DataFrame with {rows} rows × {cols} columns")
+
+        # Other attributes
+        print(f"  max_time_index_value: {self.max_time_index_value}")
+        print(f"  _max_time_in_update_statistics: {self._max_time_in_update_statistics}")
+
+
 
     def is_empty(self):
         return self.update_statistics is None and self.max_time_index_value is None
@@ -1045,11 +1069,17 @@ class DataUpdates(BaseModel):
 
     def get_max_latest_value(self, init_fallback_date: datetime = None):
         if not self.update_statistics:
+            if self.max_time_index_value:
+                return self.max_time_index_value #its a 1 colum index
             return init_fallback_date
         return max(self.update_statistics.values())
 
     def asset_identifier(self):
         return list(self.update_statistics.keys())
+
+    def get_update_range_map_great_or_equal(self):
+        range_map={k:DateInfo({"end_date_operand":">=","start_date":4}) for k,v in self.update_statistics.items()}
+        return range_map
 
     def update_assets(
             self,

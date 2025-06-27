@@ -2438,6 +2438,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
                 try:
                     temp_df = self.update(update_statistics)
+                    temp_df=update_statistics.filter_df_by_latest_value(temp_df)
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
