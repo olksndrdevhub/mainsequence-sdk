@@ -1,0 +1,1 @@
+::: mainsequence.virtualfundbuilder.contrib.apps.portfolio_report_app

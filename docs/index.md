@@ -6,6 +6,14 @@ The **Main Sequence Python SDK** is a powerful set of client libraries designed 
 2. **Client:** The Main Sequence client for interacting with the Main Sequence API.
 3. **VirtualFundBuilder:** A collection of classes and methods to quickly build portfolios and interact with our AI agents.
 4. **Examples:** A comprehensive collection of examples demonstrating how to build portfolios and interact with our AI agents.
+5. [**LLM Instructions for Time Series**](./llm-instructions-time-series.md): A set of instructions available to embed into AI workflows
+
+
+
+
+
+
+
 
 
 **We strongly** encourage you to go through our examples. We have built the examples as individual Jupyter notebooks that explain the SDK through use cases. Since most platform usage involves a combination of operations, this is the most intuitive way to learn about Main Sequence.

@@ -747,13 +747,6 @@ class AccountMixin(BasePydanticModel):
 
 
 
-    def get_nav(self):
-        base_url = self.get_object_url()
-        url = f"{base_url}/{self.id}/get_nav/"
-        r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="GET", url=url)
-        if r.status_code != 200:
-            raise Exception(f"Error Getting NAV in account {r.text}")
-        return r.json()
 
     def build_rebalance(
             self,
@@ -936,6 +929,17 @@ class AccountHistoricalHoldingsMixin:
     related_expected_asset_exposure_df: Optional[Dict[str, Any]] = None
 
     holdings: List[AccountPositionDetail]
+
+
+    def get_nav(self):
+        base_url = self.get_object_url()
+        url = f"{base_url}/{self.id}/get_nav/"
+        r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="GET", url=url)
+        if r.status_code != 200:
+            raise Exception(f"Error Getting NAV in account {r.text}")
+        return r.json()
+
+
 
 class AccountLatestHoldings(AccountHistoricalHoldingsMixin,BaseObjectOrm,BasePydanticModel):
     """

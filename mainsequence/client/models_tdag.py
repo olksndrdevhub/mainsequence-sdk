@@ -149,6 +149,33 @@ class LocalTimeSerieNode(BasePydanticModel, BaseObjectOrm):
     data_source_id: int
     updates_to: TimeSerieNode
 
+
+class ColumnMetaData(BasePydanticModel,BaseObjectOrm):
+    source_config_id: int = Field(
+        ...,
+        alias="source_config",
+        description="Primary key of the related SourceTableConfiguration"
+    )
+    column_name: str = Field(
+        ...,
+        max_length=63,
+        description="Name of the column (must match column_dtypes_map key)"
+    )
+    dtype: str = Field(
+        ...,
+        max_length=100,
+        description="Data type (will be synced from the configuration’s dtype map)"
+    )
+    label: str = Field(
+        ...,
+        max_length=250,
+        description="Human‐readable label"
+    )
+    description: str = Field(
+        ...,
+        description="Longer description of the column"
+    )
+
 class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     id: Optional[int] = Field(None, description="Primary key, auto-incremented ID")
     related_table: Union[int, "DynamicTableMetaData"]
@@ -162,6 +189,7 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     table_partition: Dict[str, Any] = Field(..., description="Table partition settings")
     last_observation: Optional[Dict]
     open_for_everyone: bool = Field(default=False, description="Whether the table configuration is open for everyone")
+    columns_metadata:Optional[List[ColumnMetaData]]=None
 
     def get_data_updates(self):
         max_per_asset = None
@@ -185,20 +213,20 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
             raise Exception(r.text)
         return r.json()
 
-    def patch_column_metadata(self,column_metadata:dict):
+    def set_or_update_columns_metadata(self,columns_metadata:List[ColumnMetaData],
+                                       timeout=None) -> None:
         """
         """
-        if column_metadata is not None:
-            for key, value in column_metadata.items():
-                if key not in self.column_dtypes_map:
-                    logger.warning(f"Column metadata key '{key}' not found in columns")
-                    continue
-                assert {"label", "description"}.issubset(
-                    value.keys()), f"Metadata for column '{key}' must include both 'label' and 'description'"
 
-        url = self.get_object_url() + f"/{self.related_table}/patch_column_metadata/"
+        columns_metadata = [
+            c.model_dump(exclude={'orm_class'})
+            for c in columns_metadata
+        ]
+        url = self.get_object_url() + f"/{self.related_table}/set_or_update_columns_metadata/"
         s = self.build_session()
-        r = make_request(s=s, loaders=self.LOADERS, r_type="POST", url=url,payload={"json": {"column_metadata":column_metadata}} )
+        r = make_request(s=s, loaders=self.LOADERS, r_type="POST",
+                         time_out=timeout,
+                         url=url,payload={"json": {"columns_metadata":columns_metadata}} )
         if r.status_code != 200:
             raise Exception(r.text)
         return r.json()
@@ -1019,7 +1047,7 @@ class LocalTimeSerieUpdateDetails(BasePydanticModel, BaseObjectOrm):
 
 class DataUpdates(BaseModel):
     """
-    TODO WIP Helper function to work with the table updates
+    This class contains the  update details of the table in the main sequence engine
     """
     update_statistics: Optional[Dict[str, Union[datetime.datetime, None]]] = None
     max_time_index_value: Optional[datetime.datetime] = None  # does not include fitler
@@ -1028,12 +1056,36 @@ class DataUpdates(BaseModel):
 
     asset_list:Optional[List]=None
 
+
     class Config:
         arbitrary_types_allowed = True
 
     @classmethod
     def return_empty(cls):
         return cls()
+
+    def pretty_print(self):
+        print(f"{self.__class__.__name__} summary:")
+
+        # asset_list
+        if self.asset_list is None:
+            print("  asset_list: None")
+        else:
+            print(f"  asset_list: {len(self.asset_list)} assets")
+
+
+        # DataFrame
+        if self.last_observation is None or self.last_observation.empty:
+            print("  last_observation: empty DataFrame")
+        else:
+            rows, cols = self.last_observation.shape
+            print(f"  last_observation: DataFrame with {rows} rows × {cols} columns")
+
+        # Other attributes
+        print(f"  max_time_index_value: {self.max_time_index_value}")
+        print(f"  _max_time_in_update_statistics: {self._max_time_in_update_statistics}")
+
+
 
     def is_empty(self):
         return self.update_statistics is None and self.max_time_index_value is None
@@ -1045,11 +1097,17 @@ class DataUpdates(BaseModel):
 
     def get_max_latest_value(self, init_fallback_date: datetime = None):
         if not self.update_statistics:
+            if self.max_time_index_value:
+                return self.max_time_index_value #its a 1 colum index
             return init_fallback_date
         return max(self.update_statistics.values())
 
     def asset_identifier(self):
         return list(self.update_statistics.keys())
+
+    def get_update_range_map_great_or_equal(self):
+        range_map={k:DateInfo({"start_date_operand":">=","start_date":v}) for k,v in self.update_statistics.items()}
+        return range_map
 
     def update_assets(
             self,

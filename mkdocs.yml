@@ -10,7 +10,7 @@ nav:
   - Reference: reference/
 
 
-
+dev_addr: 127.0.0.1:8003
 repo_url: https://github.com/mainsequence-sdk/mainsequence-sdk
 edit_uri: edit/main/docs/
 

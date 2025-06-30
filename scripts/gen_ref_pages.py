@@ -19,7 +19,9 @@ for path in sorted(src.rglob("*.py")):
     full_doc_path = Path(f"{docs_folder}/reference", doc_path)
 
     parts = tuple(module_path.parts)
-
+    # ───►  ignore every module under mainsequence.reportbuilder.*
+    if "reportbuilder" in parts:
+        continue
     if parts[-1] == "__init__":
         parts = parts[:-1]
         continue

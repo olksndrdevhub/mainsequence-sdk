@@ -45,6 +45,7 @@ class PricesFromApi(TimeSerie):
         )
         super().__init__(*args, **kwargs)
 
+
     def update(self, update_statistics: DataUpdates)->pd.DataFrame:
         data = self.prices_ts.get_df_between_dates(unique_identifier_list=[a.unique_identifier for a in self.asset_list])
         return data

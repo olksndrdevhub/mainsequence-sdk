@@ -102,6 +102,7 @@ class BaseObjectOrm:
         "Trade": "assets/trade",
         "VirtualFundHistoricalHoldings": "assets/historical_holdings",
         "AccountHistoricalHoldings": "assets/account_historical_holdings",
+        "AccountLatestHoldings": "assets/account_historical_holdings",
         "AccountRiskFactors": "assets/account_risk_factors",
         "AccountPortfolioScheduledRebalance": "assets/account_portfolio_scheduled_rebalance",
         "AccountPortfolioHistoricalPositions": "assets/account_portfolio_historical_positions",
