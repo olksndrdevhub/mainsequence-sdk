@@ -1,34 +1,60 @@
-# Instructions to create TimeSeries
+from mainsequence.tdag import APITimeSerie
 
-This instructions specifies the basic configurations and best practices for extendint the `TimeSerie` class
-in the main sequence platform
+## TimeSerie Implementation Guidelines  
+*Main Sequence Platform*
 
-* When possible always introspect the latest version docstrings of the method otherwise use the one bellow
+These guidelines cover the essential configuration and best-practice patterns for extending the `TimeSerie` class on the Main Sequence platform.
+
+> **Tip — docstrings first**  
+> Always check the most recent `TimeSerie` source for updated docstrings.  
+> If they differ from this document, treat the source code as the single source of truth.
 
 
-## 1. When asked about creation a `TimeSeries` the following methods are obligatory
+> **Tip — docstrings first**  
+> import mainsequence.client as ms_client for cleare readability 
 
-### __init__
 
-#### best practices
+---
 
-* Always decoreate the method with @TimeSerie._post_init_routines
-* Only use allowed types in the signature.
-* When you can to build a TimeSerie dependecy to another TimeSerie you must initialize is inside of this method for example.
-* It is best practice when a TimeSerie task makes a calculation on assets and one of the argument is of type ModelList like asset_list to include asset_list in local_kwargs_to_ignore
+### 1&nbsp;&nbsp;Required methods
+
+#### **`__init__`**
+
+**Best practices**
+
+* Decorate the constructor with `@TimeSerie._post_init_routines`.
+* Accept only these argument types: `str`, `int`, `list`, Pydantic model, or a list of Pydantic models.
+* Instantiate any dependent `TimeSerie` objects inside the constructor.
+* If the series receives a `ModelList` argument such as `asset_list`, add its name to `local_kwargs_to_ignore`.
+* `TimeSeries` can have direct dependencies which are initialized directly in the construction with its imported class or `APITimeSeries` which should be also initialized in the construction but are initialized only with `local_hash_id` and `data_source_id`
+* You may override the class constant `OFFSET_START` to set the earliest
+   permitted timestamp.
+
+##### Example of A `TimeSerie` direct dependency
 ```python
-class TimeSerie1:
-    def __init__(self,arg1:str,*args,**kwargs):
-        
-        self.arg1=arg1
-        super().__init__(*args,**kwargs)
-class TimeSerie2:
-    def __init__(self,arg1:str,*args,**kwargs):
-        
-        self.time_serie1=TimeSerie1(arg1=arg1,*args,**kwargs)
-        super().__init__(*args,**kwargs)
+from mainsequence.tdag import TimeSerie
+class PriceSerie(TimeSerie):
+    @TimeSerie._post_init_routines
+    def __init__(self, arg1: str, *args, **kwargs):
+        self.arg1 = arg1
+        super().__init__(*args, **kwargs)
 
+class ReturnSerie(TimeSerie):
+    @TimeSerie._post_init_routines
+    def __init__(self, arg1: str, *args, **kwargs):
+        self.price_serie = PriceSerie(arg1=arg1, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 ```
+##### Example of A `APITimeSerie` direct dependency
+```python
+from mainsequence.tdag import APITimeSerie
+class ReturnSerie(TimeSerie):
+    @TimeSerie._post_init_routines
+    def __init__(self, arg1: str, *args, **kwargs):
+        self.price_serie = APITimeSerie(data_source_id=1,local_hash_id="local_hash_id_ghjkdf8347y5342")
+        super().__init__(*args, **kwargs)
+```
+
 
 #### code reference
 
@@ -77,18 +103,29 @@ def __init__(
 
 ### update
 
-#### best practices
+**Best practices**
 
-* Always check that the update method covers the cases when the time serie is updated and when it is not. in the case of tables with two indices time_index, unique_identifier
-update_statistics.update_statistics will have an overriden value corresponding to `OFFSET_START` so there is no need to use two cases
-only in the special case that the `TimeSerie` requires the last observation value for example with `O(1)` In this case you should use the
-method `.self.get_df_between_dates` 
 
-* The method `TimeSerie.get_df_between_dates` should be the only method used to get data from another time series in cases
-when working with double index time_serie,unique_indetifier is recommended to use `unique_identifier_range_map`
+* Support both first-time ingestions and incremental updates.
+* Dual-index tables ( `time_index`, `unique_identifier` ) do **not** require two
+  separate code paths as `update_statistics.unique_identifier` already references
+  `OFFSET_START`. for single-index get the last update from `update_statistics.get_max_latest_value`
+* Use `self.get_df_between_dates(…)` to read from other time series;  
+  for dual-index reads, prefer `unique_identifier_range_map`.
+* Return a DataFrame and nothing else.
+* The engine never calls `update()` directly, but every subclass must implement it.
 
-* Be sure to return only dataframes as specified in the docstrings
-* This method should never be called for any process is part of the general mainsequence engine just need to be implemented
+
+**Functional contract (summary)**
+
+* For single-index series: fetch rows where `time_index` is greater than the
+  stored `max_time`.
+* For dual-index series: fetch rows where `time_index` is greater than the
+  per-identifier checkpoint in `max_time_per_id`.
+* All ingested `time_index` values must be UTC-aware `datetime`.
+* Column names must be lowercase; value columns must not contain raw
+  `datetime` objects (store integers such as Unix epochs instead).
+
 
 
 
@@ -208,9 +245,11 @@ class TimeSerie:
 
 
 
-### _get_column_metadata
+### `_get_column_metadata() → list[ColumnMetaData]`  *(recommended)*
 
-While this method is not obligatory is also a best practice to have as it helps the Main Sequence Data Engine
+While this method is not obligatory is also a best practice to have as it helps the Main Sequence Data Engine.
+*Return a list that documents each column’s name, data type, label, and description.*  
+This enriches downstream applications and is strongly encouraged for every new series.
 
 ```python
     def _get_column_metadata(self)->list[ColumnMetaData]:
@@ -249,15 +288,22 @@ While this method is not obligatory is also a best practice to have as it helps 
 
 
 
-## 2. When asked about creation a `TimeSeries` sometimes the following method is necessary
+## 2  Conditionally Required Methods
 
-### _get_get_asset_list
+### `_get_asset_list() → Optional[List[Asset]]`
 
-#### Best Practices
-* When a time_serie has a double index : time_index, unique_identifier and asset_list is not set in the constructor
-this method is oblogatory. One example of this case is when we are building an update given an asset_category.unique_identifier
-* Having asset categoies in the constructor rathern than asset list is also a best practice as it keep clean the constructor confitguration
-* this method should always return a list of  mainsequence.client.Asset
+Implement this method **only** when both conditions hold:
+
+1. The series uses the dual index `(time_index, unique_identifier)`.
+2. No `asset_list` was provided in the constructor.
+
+
+**Guidelines**
+
+* Prefer passing an asset *category* in `__init__`; compute the concrete list here.
+* If `self.asset_list` exists, simply return it; otherwise assemble the list
+  dynamically (for example, from an `AssetCategory`).
+
 
 #### Code Reference
 
@@ -288,6 +334,78 @@ this method is oblogatory. One example of this case is when we are building an u
         return None
 ```
 
-## 3. When asked about creation a `TimeSeries` The following method should be implemented if we want to make it a MarketTimeSerie
+## 3  Creating a `MarketTimeSerie`
 
-When this method is implemeted a secondary object called `MarketTimeSerie` is created
+A **`MarketTimeSerie`** is a registry entry that exposes a `TimeSerie` in the
+Markets catalogue with a clean, user-friendly identifier.  
+Create (or update) one whenever **either** of the following is true:
+
+* The `TimeSerie` has an `asset_list` and should be easy to discover in the
+  Markets UI / API.
+* The series is macro-level (factor, index, benchmark, etc.) and benefits from a
+  human-readable name.
+
+The preferred implementation site is the hook  
+`_run_post_update_routines(self, error_on_last_update: bool, update_statistics: DataUpdates)`,  
+which executes immediately after each successful `update()`.
+
+### Generic pattern
+
+```python
+import mainsequence.client as ms_client
+from mainsequence.tdag import TimeSerie
+class YourTimeSerie(TimeSerie):
+    ...
+
+    def _run_post_update_routines(
+        self,
+        error_on_last_update: bool,
+        update_statistics: DataUpdates,
+    ) -> None:
+        """
+        Register—or refresh—a MarketsTimeSeriesDetails record so this
+        TimeSerie is discoverable in the Markets platform.
+        """
+        if error_on_last_update:      # Skip registration if the update failed
+            return
+
+        UNIQUE_ID    = "<your_unique_snake_case_id>"          # e.g. "sp500_total_return"
+        FREQUENCY_ID = ms_client.DataFrequency.one_d          # pick the correct enum
+        DESCRIPTION  = (
+            "Plain-English description of what the data represents and "
+            "its provenance (source, methodology, units)."
+        )
+
+        try:
+            mts = ms_client.MarketsTimeSeriesDetails.get(unique_identifier=UNIQUE_ID)
+
+            # Re-link if this TimeSerie was rebuilt and now has a new LocalTimeSerie
+            if mts.related_local_time_serie.id != self.local_time_serie.id:
+                mts.patch(related_local_time_serie__id=self.local_time_serie.id)
+
+        except ms_client.DoesNotExist:
+            ms_client.MarketsTimeSeriesDetails.update_or_create(
+                unique_identifier            = UNIQUE_ID,
+                related_local_time_serie__id = self.local_time_serie.id,
+                data_frequency_id            = FREQUENCY_ID,
+                description                  = DESCRIPTION,
+            )
+```
+
+
+## 4  Data Retrieval Helper
+
+Always use `get_df_between_dates(…)` for inter-series reads.  
+For dual-index filters, supply `unique_identifier_range_map` to achieve
+per-identifier date windows.
+
+## 5  General Conventions
+
+* Column names: **lowercase only**.  
+* `time_index`: timezone-aware `datetime` in UTC.  
+* Value-column datetimes: store as integers (e.g. Unix epoch).  
+* Keep constructors minimal; move complex wiring into separate factories.  
+* Provide thorough unit tests for constructor logic, `update`, and any
+  transformation utilities.
+
+---
