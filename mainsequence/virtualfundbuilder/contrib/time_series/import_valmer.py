@@ -76,7 +76,7 @@ class ImportValmer(TimeSerie):
         self.source_data = source_data.drop(columns=asset_columns)
         return assets
     
-    def _set_column_metadata(self):
+    def _get_column_metadata(self):
         from mainsequence.client.models_tdag import ColumnMetaData
         columns_metadata = [ColumnMetaData(column_name="instrumento",
                                           dtype="str",
@@ -91,7 +91,7 @@ class ImportValmer(TimeSerie):
                                            dtype="str",
                                            label="Moneda",
                                            description=(
-                                               "Correspondes to Valmen code for curries be aware this may not match Figi Currency assets"
+                                               "Correspondes to Valmer code for curries be aware this may not match Figi Currency assets"
                                            )
                                            ),
                             

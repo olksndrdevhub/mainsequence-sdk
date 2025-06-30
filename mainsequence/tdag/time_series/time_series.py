@@ -25,8 +25,8 @@ from mainsequence.tdag.config import (
 import structlog.contextvars as cvars
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager
-from mainsequence.client.models_tdag import ( DataSource, LocalTimeSeriesHistoricalUpdate,
-                                             DataUpdates, UniqueIdentifierRangeMap
+from mainsequence.client.models_tdag import (DataSource, LocalTimeSeriesHistoricalUpdate,
+                                             DataUpdates, UniqueIdentifierRangeMap, ColumnMetaData
                                              )
 from pandas.api.types import is_datetime64_any_dtype
 
@@ -1115,6 +1115,9 @@ class TimeSerieRebuildMethods(ABC):
                                            )
 
 
+            self._set_column_metadata()
+
+
 
         return error_on_last_update
 
@@ -1250,12 +1253,67 @@ class DataPersistanceMethods(ABC):
         df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map)
         return df
 
-    def get_df_between_dates(self, start_date: Union[datetime.datetime, None] = None,
-                             end_date: Union[datetime.datetime, None] = None,
-                             unique_identifier_list: Union[None, list] = None,
-                              great_or_equal=True, less_or_equal=True,
-                             unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
-                             ):
+    def get_df_between_dates(
+            self,
+            start_date: Union[datetime.datetime, None] = None,
+            end_date: Union[datetime.datetime, None] = None,
+            unique_identifier_list: Union[None, list] = None,
+            great_or_equal: bool = True,
+            less_or_equal: bool = True,
+            unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
+    ) -> pd.DataFrame:
+        """
+        Retrieve rows from this TimeSerie whose `time_index` (and optional `unique_identifier`) fall within the specified date ranges.
+
+        **Note:** If `unique_identifier_range_map` is provided, **all** other filters
+        (`start_date`, `end_date`, `unique_identifier_list`, `great_or_equal`, `less_or_equal`)
+        are ignored, and only the per-identifier ranges in `unique_identifier_range_map` apply.
+
+        Filtering logic (when `unique_identifier_range_map` is None):
+          - If `start_date` is provided, include rows where
+            `time_index > start_date` (if `great_or_equal=False`)
+            or `time_index >= start_date` (if `great_or_equal=True`).
+          - If `end_date` is provided, include rows where
+            `time_index < end_date` (if `less_or_equal=False`)
+            or `time_index <= end_date` (if `less_or_equal=True`).
+          - If `unique_identifier_list` is provided, only include rows whose
+            `unique_identifier` is in that list.
+
+        Filtering logic (when `unique_identifier_range_map` is provided):
+          - For each `unique_identifier`, apply its own `start_date`/`end_date`
+            filters using the specified operands (`">"`, `">="`, `"<"`, `"<="`):
+            {
+              <uid>: {
+                "start_date": datetime,
+                "start_date_operand": ">=" or ">",
+                "end_date": datetime,
+                "end_date_operand": "<=" or "<"
+              },
+              ...
+            }
+
+        Parameters
+        ----------
+        start_date : datetime.datetime or None
+            Global lower bound for `time_index`. Ignored if `unique_identifier_range_map` is provided.
+        end_date : datetime.datetime or None
+            Global upper bound for `time_index`. Ignored if `unique_identifier_range_map` is provided.
+        unique_identifier_list : list or None
+            If provided, only include rows matching these IDs. Ignored if `unique_identifier_range_map` is provided.
+        great_or_equal : bool, default True
+            If True, use `>=` when filtering by `start_date`; otherwise use `>`. Ignored if `unique_identifier_range_map` is provided.
+        less_or_equal : bool, default True
+            If True, use `<=` when filtering by `end_date`; otherwise use `<`. Ignored if `unique_identifier_range_map` is provided.
+        unique_identifier_range_map : UniqueIdentifierRangeMap or None
+            Mapping of specific `unique_identifier` keys to their own sub-filters. When provided, this is the sole filter applied.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing rows that satisfy the combined time and identifier filters.
+        """
+
+
         func = self.local_persist_manager.get_df_between_dates
         sig = inspect.signature(func)
         kwargs = dict(
@@ -1652,14 +1710,9 @@ class TimeSerieInitMeta(BaseModel):
 
 class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):
     """
-    Pipeline
+    Base TimeSerie class
 
 
-        -__init__
-        - _create_config
-
-        - _init_db_properties_config
-        - set_graph node
 
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
@@ -1672,12 +1725,26 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             *args,
             **kwargs):
         """
-        Initializes the TimeSerie object with the provided metadata and configurations.
+        Initializes the TimeSerie object with the provided metadata and configurations. For extension of the method
+        the method should always be decorated by TimeSerie._post_init_routines
 
         This method sets up the time series object, loading the necessary configurations
-        and metadata. If `is_local_relation_tree_set` is True, it avoids recalculating the
-        relationship tree in schedulers, optimizing the process if the tree is already
-        calculated during initialization.
+        and metadata.
+
+        Each TimeSerie instance will create a table in the Main Sequence Data Engine by uniquely hashing
+        the arguments with exception of:
+
+        - init_meta
+        - build_meta_data
+        - local_kwargs_to_ignore
+
+        Each TimeSerie instance will create a local_hash_id and a LocalTimeSerie instance in the Data Engine by uniquely hashing
+        the same arguments as the table but excluding the arguments inside local_kwargs_to_ignore
+
+
+        allowed type of arguments can only be str,list, int or  Pydantic objects inlcuding lists of Pydantic Objects.
+
+        The OFFSET_START property can be overridend and markts the minimum date value where the table will insert data
 
         Parameters
         ----------
@@ -2480,9 +2547,70 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
     def _run_post_update_routines(self, error_on_last_update: bool,update_statistics:DataUpdates,  ):
         pass
 
+    def _get_column_metadata(self)->list[ColumnMetaData]:
+        """
+        This Method should return a list for ColumnMetaData to add extra context to each time series
+        Examples:
+            from mainsequence.client.models_tdag import ColumnMetaData
+        columns_metadata = [ColumnMetaData(column_name="instrument",
+                                          dtype="str",
+                                          label="Instrument",
+                                          description=(
+                                              "Unique identifier provided by Valmer; it’s a composition of the "
+                                              "columns `tv_emisora_serie`, and is also used as a ticker for custom "
+                                              "assets in Valmer."
+                                          )
+                                          ),
+                            ColumnMetaData(column_name="currency",
+                                           dtype="str",
+                                           label="Currency",
+                                           description=(
+                                               "Corresponds to  code for curries be aware this may not match Figi Currency assets"
+                                           )
+                                           ),
+
+                            ]
 
 
-    def _get_asset_list(self)->Union[None, list]:
+        Returns:
+
+        """
+        return None
+
+    def _set_column_metadata(self):
+
+        if self.metadata:
+            if self.metadata.sourcetableconfiguration != None:
+                if self.metadata.sourcetableconfiguration.columns_metadata is not None:
+                    columns_metadata=self._get_column_metadata()
+                    if columns_metadata is None:
+                        self.logger.info(f"_get_column_metadata method not implemented")
+                        return
+
+                    self.metadata.sourcetableconfiguration.set_or_update_columns_metadata(columns_metadata=columns_metadata)
+
+
+
+    def _get_asset_list(self) -> Optional[List["Asset"]]:
+
+        """
+        Provide the list of assets that this TimeSerie should include when updating.
+
+        By default, this method returns `self.asset_list` if defined.
+        Subclasses _must_ override this method when no `asset_list` attribute was set
+        during initialization, to supply a dynamic list of assets for update_statistics.
+
+        Use Case:
+          - For category-based series, return all Asset unique_identifiers in a given category
+            (e.g., `AssetCategory(unique_identifier="investable_assets")`), so that only those
+            assets are updated in this TimeSerie.
+
+        Returns
+        -------
+        list or None
+            - A list of asset unique_identifiers to include in the update.
+            - `None` if no filtering by asset is required (update all assets by default).
+        """
         if hasattr(self, "asset_list"):
             return self.asset_list
 
@@ -2505,11 +2633,39 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         )
         return update_statistics
 
-    def update(self, update_statistics: DataUpdates, ) -> pd.DataFrame:
+    def update(self, update_statistics: DataUpdates) -> pd.DataFrame:
         """
+        Fetch and ingest only the new rows for this TimeSerie based on prior update checkpoints.
 
+        DataUpdates provides the last-ingested positions:
+          - For a single-index series (time_index only), `update_statistics.max_time` is either:
+              - None: no prior data—fetch all available rows.
+              - a datetime: fetch rows where `time_index > max_time`.
+          - For a dual-index series (time_index, unique_identifier), `update_statistics.max_time_per_id` is either:
+              - None: single-index behavior applies.
+              - dict[str, datetime]: for each `unique_identifier` (matching `Asset.unique_identifier`), fetch rows where
+                `time_index > max_time_per_id[unique_identifier]`.
+
+        Requirements:
+          - `time_index` **must** be a `datetime.datetime` instance with UTC timezone.
+          - Column names **must** be all lowercase.
+          - No column values may be Python `datetime` objects; if date/time storage is needed, convert to integer
+            timestamps (e.g., UNIX epoch in seconds or milliseconds).
+
+        After retrieving the incremental rows, this method inserts or upserts them into the Main Sequence Data Engine.
+
+        Parameters
+        ----------
+        update_statistics : DataUpdates
+            Object capturing the previous update state. Must expose:
+              - `max_time` (datetime | None)
+              - `max_time_per_id` (dict[str, datetime] | None)
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing only the newly added or updated records.
         """
-
         raise NotImplementedError
 
 

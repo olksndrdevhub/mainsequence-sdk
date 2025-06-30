@@ -124,6 +124,23 @@ class SimulatedPrices(TimeSerie):
         data = data.set_index("unique_identifier", append=True)
         return data
 
+
+
+    def _get_column_metadata(self):
+        from mainsequence.client.models_tdag import ColumnMetaData
+        columns_metadata = [ColumnMetaData(column_name="feature_1",
+                                           dtype="float",
+                                           label="Feature 1",
+                                           description=(
+                                               "Feature calculated like XXX "
+                                           )
+                                           ),
+
+
+                            ]
+        return columns_metadata
+
+
 # Mocking DataUpdates and Running the Test
 def test_simple_crypto_feature():
     from mainsequence.client import Asset
@@ -323,7 +340,7 @@ def test_ta_feature_simulated_crypto_prices():
 
     ts.run(debug_mode=True,
            update_tree=True,
-           force_update=False,
+           force_update=True,
            update_only_tree=False,
     )
     print("Two asset time serie updated", ts.local_hash_id)
