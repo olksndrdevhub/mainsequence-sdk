@@ -1,0 +1,1427 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<link href="../img/favico.ico" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.5.44" name="generator"/>
+<title>Llm instructions time series - Main Sequence SDK</title>
+<link href="../assets/stylesheets/main.0253249f.min.css" rel="stylesheet"/>
+<link href="../assets/stylesheets/palette.06af60db.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../assets/_mkdocstrings.css" rel="stylesheet"/>
+<link href="../stylesheets/custom.css" rel="stylesheet"/>
+<script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="indigo" data-md-color-primary="indigo" data-md-color-scheme="slate" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#timeserie-implementation-guidelines">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="Main Sequence SDK" class="md-header__button md-logo" data-md-component="logo" href=".." title="Main Sequence SDK">
+<img alt="logo" src="../img/logo.png"/>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            Main Sequence SDK
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Llm instructions time series
+            
+          </span>
+</div>
+</div>
+</div>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/mainsequence-sdk/mainsequence-sdk" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="..">
+        
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../examples/">
+        
+  
+    
+  
+  Examples
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../tdag/getting_started/">
+          
+  
+    
+  
+  TDAG
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../about/">
+        
+  
+    
+  
+  About
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../reference/client/ai/">
+          
+  
+    
+  
+  Reference
+
+        </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="Main Sequence SDK" class="md-nav__button md-logo" data-md-component="logo" href=".." title="Main Sequence SDK">
+<img alt="logo" src="../img/logo.png"/>
+</a>
+    Main Sequence SDK
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/mainsequence-sdk/mainsequence-sdk" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="..">
+<span class="md-ellipsis">
+    Home
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../examples/">
+<span class="md-ellipsis">
+    Examples
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    TDAG
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            TDAG
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../tdag/getting_started/">
+<span class="md-ellipsis">
+    Getting Started
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../tdag/time_series_fundamentals/">
+<span class="md-ellipsis">
+    Time Series Data Pipelines Fundamentals
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../tdag/orchestration_and_monitoring/">
+<span class="md-ellipsis">
+    Orchestration &amp; Monitoring
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../about/">
+<span class="md-ellipsis">
+    About
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    Reference
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            Reference
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+<span class="md-ellipsis">
+    client
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_1">
+<span class="md-nav__icon md-icon"></span>
+            client
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/client/ai/">
+<span class="md-ellipsis">
+    ai
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/client/base/">
+<span class="md-ellipsis">
+    base
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_1_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_1_3" id="__nav_5_1_3_label" tabindex="0">
+<span class="md-ellipsis">
+    data_sources_interfaces
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_1_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_5_1_3">
+<span class="md-nav__icon md-icon"></span>
+            data_sources_interfaces
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/client/data_sources_interfaces/duckdb/">
+<span class="md-ellipsis">
+    duckdb
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/client/data_sources_interfaces/timescale/">
+<span class="md-ellipsis">
+    timescale
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/client/models_helpers/">
+<span class="md-ellipsis">
+    models_helpers
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/client/models_tdag/">
+<span class="md-ellipsis">
+    models_tdag
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/client/models_vam/">
+<span class="md-ellipsis">
+    models_vam
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/client/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+<span class="md-ellipsis">
+    instrumentation
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_2">
+<span class="md-nav__icon md-icon"></span>
+            instrumentation
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/instrumentation/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/logconf/">
+<span class="md-ellipsis">
+    logconf
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+<span class="md-ellipsis">
+    tdag
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_4">
+<span class="md-nav__icon md-icon"></span>
+            tdag
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/config/">
+<span class="md-ellipsis">
+    config
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_4_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_4_2" id="__nav_5_4_2_label" tabindex="0">
+<span class="md-ellipsis">
+    distributed
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_4_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_5_4_2">
+<span class="md-nav__icon md-icon"></span>
+            distributed
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/distributed/time_series/">
+<span class="md-ellipsis">
+    time_series
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/distributed/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/future_registry/">
+<span class="md-ellipsis">
+    future_registry
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_4_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_4_4" id="__nav_5_4_4_label" tabindex="0">
+<span class="md-ellipsis">
+    time_series
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_4_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_5_4_4">
+<span class="md-nav__icon md-icon"></span>
+            time_series
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/time_series/persist_managers/">
+<span class="md-ellipsis">
+    persist_managers
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/time_series/time_series/">
+<span class="md-ellipsis">
+    time_series
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_4_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_4_4_3" id="__nav_5_4_4_3_label" tabindex="0">
+<span class="md-ellipsis">
+    update
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_4_4_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_5_4_4_3">
+<span class="md-nav__icon md-icon"></span>
+            update
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/time_series/update/api/">
+<span class="md-ellipsis">
+    api
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/time_series/update/ray_manager/">
+<span class="md-ellipsis">
+    ray_manager
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/time_series/update/scheduler/">
+<span class="md-ellipsis">
+    scheduler
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/time_series/update/update_methods/">
+<span class="md-ellipsis">
+    update_methods
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/time_series/update/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/time_series/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/tdag/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+<span class="md-ellipsis">
+    virtualfundbuilder
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_5_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_5_5">
+<span class="md-nav__icon md-icon"></span>
+            virtualfundbuilder
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/agent_interface/">
+<span class="md-ellipsis">
+    agent_interface
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/config_handling/">
+<span class="md-ellipsis">
+    config_handling
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_5_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_5_3" id="__nav_5_5_3_label" tabindex="0">
+<span class="md-ellipsis">
+    contrib
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_5_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_5_5_3">
+<span class="md-nav__icon md-icon"></span>
+            contrib
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_5_3_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_5_3_1" id="__nav_5_5_3_1_label" tabindex="0">
+<span class="md-ellipsis">
+    apps
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_5_3_1_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_5_5_3_1">
+<span class="md-nav__icon md-icon"></span>
+            apps
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/apps/generate_report/">
+<span class="md-ellipsis">
+    generate_report
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/apps/load_external_portfolio/">
+<span class="md-ellipsis">
+    load_external_portfolio
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/apps/news_app/">
+<span class="md-ellipsis">
+    news_app
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/apps/portfolio_report_app/">
+<span class="md-ellipsis">
+    portfolio_report_app
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/apps/portfolio_table/">
+<span class="md-ellipsis">
+    portfolio_table
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/apps/run_named_portfolio/">
+<span class="md-ellipsis">
+    run_named_portfolio
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/apps/run_portfolio/">
+<span class="md-ellipsis">
+    run_portfolio
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_5_3_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_5_3_2" id="__nav_5_5_3_2_label" tabindex="0">
+<span class="md-ellipsis">
+    prices
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_5_3_2_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_5_5_3_2">
+<span class="md-nav__icon md-icon"></span>
+            prices
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/prices/time_series/">
+<span class="md-ellipsis">
+    time_series
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/prices/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_5_3_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_5_3_3" id="__nav_5_5_3_3_label" tabindex="0">
+<span class="md-ellipsis">
+    rebalance_strategies
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_5_3_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_5_5_3_3">
+<span class="md-nav__icon md-icon"></span>
+            rebalance_strategies
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/rebalance_strategies/rebalance_strategies/">
+<span class="md-ellipsis">
+    rebalance_strategies
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_5_3_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_5_3_4" id="__nav_5_5_3_4_label" tabindex="0">
+<span class="md-ellipsis">
+    time_series
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_5_3_4_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_5_5_3_4">
+<span class="md-nav__icon md-icon"></span>
+            time_series
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/time_series/external_weights/">
+<span class="md-ellipsis">
+    external_weights
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/time_series/import_valmer/">
+<span class="md-ellipsis">
+    import_valmer
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/time_series/intraday_trend/">
+<span class="md-ellipsis">
+    intraday_trend
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/time_series/market_cap/">
+<span class="md-ellipsis">
+    market_cap
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/time_series/mock_signal/">
+<span class="md-ellipsis">
+    mock_signal
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/time_series/portfolio_replicator/">
+<span class="md-ellipsis">
+    portfolio_replicator
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/contrib/time_series/sentiment_signal/">
+<span class="md-ellipsis">
+    sentiment_signal
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/enums/">
+<span class="md-ellipsis">
+    enums
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/models/">
+<span class="md-ellipsis">
+    models
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/notebook_handling/">
+<span class="md-ellipsis">
+    notebook_handling
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/portfolio_interface/">
+<span class="md-ellipsis">
+    portfolio_interface
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_5_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_5_8" id="__nav_5_5_8_label" tabindex="0">
+<span class="md-ellipsis">
+    portfolio_templates
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_5_8_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_5_5_8">
+<span class="md-nav__icon md-icon"></span>
+            portfolio_templates
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/portfolio_templates/crypto_index_template/">
+<span class="md-ellipsis">
+    crypto_index_template
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/portfolio_templates/momentum_portfolio/">
+<span class="md-ellipsis">
+    momentum_portfolio
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_5_5_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5_5_9" id="__nav_5_5_9_label" tabindex="0">
+<span class="md-ellipsis">
+    resource_factory
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_5_9_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_5_5_9">
+<span class="md-nav__icon md-icon"></span>
+            resource_factory
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/resource_factory/app_factory/">
+<span class="md-ellipsis">
+    app_factory
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/resource_factory/base_factory/">
+<span class="md-ellipsis">
+    base_factory
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/resource_factory/rebalance_factory/">
+<span class="md-ellipsis">
+    rebalance_factory
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/resource_factory/signal_factory/">
+<span class="md-ellipsis">
+    signal_factory
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/time_series/">
+<span class="md-ellipsis">
+    time_series
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../reference/virtualfundbuilder/utils/">
+<span class="md-ellipsis">
+    utils
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#timeserie-implementation-guidelines">
+<span class="md-ellipsis">
+      TimeSerie Implementation Guidelines
+    </span>
+</a>
+<nav aria-label="TimeSerie Implementation Guidelines" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-required-methods">
+<span class="md-ellipsis">
+      1  Required methods
+    </span>
+</a>
+<nav aria-label="1  Required methods" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#__init__">
+<span class="md-ellipsis">
+      __init__
+    </span>
+</a>
+<nav aria-label="__init__" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#example-of-a-timeserie-direct-dependency">
+<span class="md-ellipsis">
+      Example of A TimeSerie direct dependency
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#example-of-a-apitimeserie-direct-dependency">
+<span class="md-ellipsis">
+      Example of A APITimeSerie direct dependency
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#code-reference">
+<span class="md-ellipsis">
+      code reference
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#update">
+<span class="md-ellipsis">
+      update
+    </span>
+</a>
+<nav aria-label="update" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#code-reference_1">
+<span class="md-ellipsis">
+      code reference
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#_get_column_metadata-listcolumnmetadata-recommended">
+<span class="md-ellipsis">
+      _get_column_metadata() → list[ColumnMetaData] (recommended)
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-conditionally-required-methods">
+<span class="md-ellipsis">
+      2 Conditionally Required Methods
+    </span>
+</a>
+<nav aria-label="2 Conditionally Required Methods" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#_get_asset_list-optionallistasset">
+<span class="md-ellipsis">
+      _get_asset_list() → Optional[List[Asset]]
+    </span>
+</a>
+<nav aria-label="_get_asset_list() → Optional[List[Asset]]" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#code-reference_2">
+<span class="md-ellipsis">
+      Code Reference
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#3-creating-a-markettimeserie">
+<span class="md-ellipsis">
+      3 Creating a MarketTimeSerie
+    </span>
+</a>
+<nav aria-label="3 Creating a MarketTimeSerie" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#generic-pattern">
+<span class="md-ellipsis">
+      Generic pattern
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#4-data-retrieval-helper">
+<span class="md-ellipsis">
+      4 Data Retrieval Helper
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#5-general-conventions">
+<span class="md-ellipsis">
+      5 General Conventions
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1>Llm instructions time series</h1>
+<p>from mainsequence.tdag import APITimeSerie</p>
+<h2 id="timeserie-implementation-guidelines">TimeSerie Implementation Guidelines</h2>
+<p><em>Main Sequence Platform</em></p>
+<p>These guidelines cover the essential configuration and best-practice patterns for extending the <code>TimeSerie</code> class on the Main Sequence platform.</p>
+<blockquote>
+<p><strong>Tip — docstrings first</strong><br/>
+Always check the most recent <code>TimeSerie</code> source for updated docstrings.<br/>
+If they differ from this document, treat the source code as the single source of truth.</p>
+<p><strong>Tip — docstrings first</strong><br/>
+import mainsequence.client as ms_client for cleare readability </p>
+</blockquote>
+<hr/>
+<h3 id="1-required-methods">1  Required methods</h3>
+<h4 id="__init__"><strong><code>__init__</code></strong></h4>
+<p><strong>Best practices</strong></p>
+<ul>
+<li>Decorate the constructor with <code>@TimeSerie._post_init_routines</code>.</li>
+<li>Accept only these argument types: <code>str</code>, <code>int</code>, <code>list</code>, Pydantic model, or a list of Pydantic models.</li>
+<li>Instantiate any dependent <code>TimeSerie</code> objects inside the constructor.</li>
+<li>If the series receives a <code>ModelList</code> argument such as <code>asset_list</code>, add its name to <code>local_kwargs_to_ignore</code>.</li>
+<li><code>TimeSeries</code> can have direct dependencies which are initialized directly in the construction with its imported class or <code>APITimeSeries</code> which should be also initialized in the construction but are initialized only with <code>local_hash_id</code> and <code>data_source_id</code></li>
+<li>You may override the class constant <code>OFFSET_START</code> to set the earliest
+   permitted timestamp.</li>
+</ul>
+<h5 id="example-of-a-timeserie-direct-dependency">Example of A <code>TimeSerie</code> direct dependency</h5>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">mainsequence.tdag</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeSerie</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PriceSerie</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
+    <span class="nd">@TimeSerie</span><span class="o">.</span><span class="n">_post_init_routines</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg1</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arg1</span> <span class="o">=</span> <span class="n">arg1</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ReturnSerie</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
+    <span class="nd">@TimeSerie</span><span class="o">.</span><span class="n">_post_init_routines</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg1</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">price_serie</span> <span class="o">=</span> <span class="n">PriceSerie</span><span class="p">(</span><span class="n">arg1</span><span class="o">=</span><span class="n">arg1</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</code></pre></div>
+<h5 id="example-of-a-apitimeserie-direct-dependency">Example of A <code>APITimeSerie</code> direct dependency</h5>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">mainsequence.tdag</span><span class="w"> </span><span class="kn">import</span> <span class="n">APITimeSerie</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ReturnSerie</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
+    <span class="nd">@TimeSerie</span><span class="o">.</span><span class="n">_post_init_routines</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg1</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">price_serie</span> <span class="o">=</span> <span class="n">APITimeSerie</span><span class="p">(</span><span class="n">data_source_id</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">local_hash_id</span><span class="o">=</span><span class="s2">"local_hash_id_ghjkdf8347y5342"</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="code-reference">code reference</h4>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">init_meta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TimeSerieInitMeta</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">build_meta_data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">local_kwargs_to_ignore</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Create a TimeSerie instance and provision its storage in the Main Sequence Data Engine.</span>
+
+<span class="sd">    This initializer prepares all metadata and configuration for a new time series, then:</span>
+<span class="sd">      1. Computes a unique table identifier by hashing all arguments **except**</span>
+<span class="sd">         `init_meta`, `build_meta_data`, and `local_kwargs_to_ignore`.</span>
+<span class="sd">      2. Computes a separate `local_hash_id` (and corresponding LocalTimeSerie) by</span>
+<span class="sd">         hashing the same inputs, but omitting any keys listed in `local_kwargs_to_ignore`.</span>
+<span class="sd">      3. Applies any `@TimeSerie._post_init_routines` decorators after setup.</span>
+
+<span class="sd">    Argument types must be one of:</span>
+<span class="sd">      - `str`, `int`, `list`,</span>
+<span class="sd">      - Pydantic model instances or lists thereof.</span>
+
+<span class="sd">    You may override the class constant `OFFSET_START` to define the earliest</span>
+<span class="sd">    timestamp into which new data will be inserted.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    init_meta : TimeSerieInitMeta, optional</span>
+<span class="sd">        Initial metadata for this time series (e.g. name, description).</span>
+<span class="sd">    build_meta_data : dict, optional</span>
+<span class="sd">        Metadata recorded during the build process (e.g. version, source tags).</span>
+<span class="sd">    local_kwargs_to_ignore : list of str, optional</span>
+<span class="sd">        Names of keyword args that should be excluded when computing `local_hash_id`.</span>
+<span class="sd">    *args</span>
+<span class="sd">        Positional arguments used to further parameterize the series.</span>
+<span class="sd">    **kwargs</span>
+<span class="sd">        Keyword arguments used to further parameterize the series.</span>
+<span class="sd">    """</span>
+</code></pre></div>
+<h3 id="update">update</h3>
+<p><strong>Best practices</strong></p>
+<ul>
+<li>Support both first-time ingestions and incremental updates.</li>
+<li>Dual-index tables ( <code>time_index</code>, <code>unique_identifier</code> ) do <strong>not</strong> require two
+  separate code paths as <code>update_statistics.unique_identifier</code> already references
+  <code>OFFSET_START</code>. for single-index get the last update from <code>update_statistics.get_max_latest_value</code></li>
+<li>Use <code>self.get_df_between_dates(…)</code> to read from other time series;<br/>
+  for dual-index reads, prefer <code>unique_identifier_range_map</code>.</li>
+<li>Return a DataFrame and nothing else.</li>
+<li>The engine never calls <code>update()</code> directly, but every subclass must implement it.</li>
+</ul>
+<p><strong>Functional contract (summary)</strong></p>
+<ul>
+<li>For single-index series: fetch rows where <code>time_index</code> is greater than the
+  stored <code>max_time</code>.</li>
+<li>For dual-index series: fetch rows where <code>time_index</code> is greater than the
+  per-identifier checkpoint in <code>max_time_per_id</code>.</li>
+<li>All ingested <code>time_index</code> values must be UTC-aware <code>datetime</code>.</li>
+<li>Column names must be lowercase; value columns must not contain raw
+  <code>datetime</code> objects (store integers such as Unix epochs instead).</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DateInfo</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="n">start_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">]</span>
+    <span class="n">start_date_operand</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">end_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">]</span>
+    <span class="n">end_date_operand</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+
+<span class="n">UniqueIdentifierRangeMap</span> <span class="o">=</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DateInfo</span><span class="p">]</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">TimeSerie</span><span class="p">:</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">get_df_between_dates</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">start_date</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">end_date</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">unique_identifier_list</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">great_or_equal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="n">less_or_equal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="n">unique_identifier_range_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">UniqueIdentifierRangeMap</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Retrieve rows from this TimeSerie whose `time_index` (and optional `unique_identifier`) fall within the specified date ranges.</span>
+
+<span class="sd">        **Note:** If `unique_identifier_range_map` is provided, **all** other filters</span>
+<span class="sd">        (`start_date`, `end_date`, `unique_identifier_list`, `great_or_equal`, `less_or_equal`)</span>
+<span class="sd">        are ignored, and only the per-identifier ranges in `unique_identifier_range_map` apply.</span>
+
+<span class="sd">        Filtering logic (when `unique_identifier_range_map` is None):</span>
+<span class="sd">          - If `start_date` is provided, include rows where</span>
+<span class="sd">            `time_index &gt; start_date` (if `great_or_equal=False`)</span>
+<span class="sd">            or `time_index &gt;= start_date` (if `great_or_equal=True`).</span>
+<span class="sd">          - If `end_date` is provided, include rows where</span>
+<span class="sd">            `time_index &lt; end_date` (if `less_or_equal=False`)</span>
+<span class="sd">            or `time_index &lt;= end_date` (if `less_or_equal=True`).</span>
+<span class="sd">          - If `unique_identifier_list` is provided, only include rows whose</span>
+<span class="sd">            `unique_identifier` is in that list.</span>
+
+<span class="sd">        Filtering logic (when `unique_identifier_range_map` is provided):</span>
+<span class="sd">          - For each `unique_identifier`, apply its own `start_date`/`end_date`</span>
+<span class="sd">            filters using the specified operands (`"&gt;"`, `"&gt;="`, `"&lt;"`, `"&lt;="`):</span>
+<span class="sd">            {</span>
+<span class="sd">              &lt;uid&gt;: {</span>
+<span class="sd">                "start_date": datetime,</span>
+<span class="sd">                "start_date_operand": "&gt;=" or "&gt;",</span>
+<span class="sd">                "end_date": datetime,</span>
+<span class="sd">                "end_date_operand": "&lt;=" or "&lt;"</span>
+<span class="sd">              },</span>
+<span class="sd">              ...</span>
+<span class="sd">            }</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        start_date : datetime.datetime or None</span>
+<span class="sd">            Global lower bound for `time_index`. Ignored if `unique_identifier_range_map` is provided.</span>
+<span class="sd">        end_date : datetime.datetime or None</span>
+<span class="sd">            Global upper bound for `time_index`. Ignored if `unique_identifier_range_map` is provided.</span>
+<span class="sd">        unique_identifier_list : list or None</span>
+<span class="sd">            If provided, only include rows matching these IDs. Ignored if `unique_identifier_range_map` is provided.</span>
+<span class="sd">        great_or_equal : bool, default True</span>
+<span class="sd">            If True, use `&gt;=` when filtering by `start_date`; otherwise use `&gt;`. Ignored if `unique_identifier_range_map` is provided.</span>
+<span class="sd">        less_or_equal : bool, default True</span>
+<span class="sd">            If True, use `&lt;=` when filtering by `end_date`; otherwise use `&lt;`. Ignored if `unique_identifier_range_map` is provided.</span>
+<span class="sd">        unique_identifier_range_map : UniqueIdentifierRangeMap or None</span>
+<span class="sd">            Mapping of specific `unique_identifier` keys to their own sub-filters. When provided, this is the sole filter applied.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pd.DataFrame</span>
+<span class="sd">            A DataFrame containing rows that satisfy the combined time and identifier filters.</span>
+<span class="sd">        """</span>
+</code></pre></div>
+<h4 id="code-reference_1">code reference</h4>
+<div class="highlight"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">update_statistics</span><span class="p">:</span> <span class="n">DataUpdates</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Fetch and ingest only the new rows for this TimeSerie based on prior update checkpoints.</span>
+
+<span class="sd">        DataUpdates provides the last-ingested positions:</span>
+<span class="sd">          - For a single-index series (time_index only), `update_statistics.max_time` is either:</span>
+<span class="sd">              - None: no prior data—fetch all available rows.</span>
+<span class="sd">              - a datetime: fetch rows where `time_index &gt; max_time`.</span>
+<span class="sd">          - For a dual-index series (time_index, unique_identifier), `update_statistics.max_time_per_id` is either:</span>
+<span class="sd">              - None: single-index behavior applies.</span>
+<span class="sd">              - dict[str, datetime]: for each `unique_identifier` (matching `Asset.unique_identifier`), fetch rows where </span>
+<span class="sd">                `time_index &gt; max_time_per_id[unique_identifier]`.</span>
+
+<span class="sd">        Requirements:</span>
+<span class="sd">          - `time_index` **must** be a `datetime.datetime` instance with UTC timezone.</span>
+<span class="sd">          - Column names **must** be all lowercase.</span>
+<span class="sd">          - No column values may be Python `datetime` objects; if date/time storage is needed, convert to integer</span>
+<span class="sd">            timestamps (e.g., UNIX epoch in seconds or milliseconds).</span>
+
+<span class="sd">        After retrieving the incremental rows, this method inserts or upserts them into the Main Sequence Data Engine.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        update_statistics : DataUpdates</span>
+<span class="sd">            Object capturing the previous update state. Must expose:</span>
+<span class="sd">              - `max_time` (datetime | None)</span>
+<span class="sd">              - `max_time_per_id` (dict[str, datetime] | None)</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pd.DataFrame</span>
+<span class="sd">            A DataFrame containing only the newly added or updated records.</span>
+<span class="sd">        """</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+</code></pre></div>
+<h3 id="_get_column_metadata-listcolumnmetadata-recommended"><code>_get_column_metadata() → list[ColumnMetaData]</code> <em>(recommended)</em></h3>
+<p>While this method is not obligatory is also a best practice to have as it helps the Main Sequence Data Engine.
+<em>Return a list that documents each column’s name, data type, label, and description.</em><br/>
+This enriches downstream applications and is strongly encouraged for every new series.</p>
+<div class="highlight"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">_get_column_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">-&gt;</span><span class="nb">list</span><span class="p">[</span><span class="n">ColumnMetaData</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        This Method should return a list for ColumnMetaData to add extra context to each time series</span>
+<span class="sd">        Examples:</span>
+<span class="sd">            from mainsequence.client.models_tdag import ColumnMetaData</span>
+<span class="sd">        columns_metadata = [ColumnMetaData(column_name="instrument",</span>
+<span class="sd">                                          dtype="str",</span>
+<span class="sd">                                          label="Instrument",</span>
+<span class="sd">                                          description=(</span>
+<span class="sd">                                              "Unique identifier provided by Valmer; it’s a composition of the "</span>
+<span class="sd">                                              "columns `tv_emisora_serie`, and is also used as a ticker for custom "</span>
+<span class="sd">                                              "assets in Valmer."</span>
+<span class="sd">                                          )</span>
+<span class="sd">                                          ),</span>
+<span class="sd">                            ColumnMetaData(column_name="currency",</span>
+<span class="sd">                                           dtype="str",</span>
+<span class="sd">                                           label="Currency",</span>
+<span class="sd">                                           description=(</span>
+<span class="sd">                                               "Corresponds to  code for curries be aware this may not match Figi Currency assets"</span>
+<span class="sd">                                           )</span>
+<span class="sd">                                           ),</span>
+
+<span class="sd">                            ]</span>
+
+
+<span class="sd">        Returns:</span>
+
+<span class="sd">        """</span>
+</code></pre></div>
+<h2 id="2-conditionally-required-methods">2  Conditionally Required Methods</h2>
+<h3 id="_get_asset_list-optionallistasset"><code>_get_asset_list() → Optional[List[Asset]]</code></h3>
+<p>Implement this method <strong>only</strong> when both conditions hold:</p>
+<ol>
+<li>The series uses the dual index <code>(time_index, unique_identifier)</code>.</li>
+<li>No <code>asset_list</code> was provided in the constructor.</li>
+</ol>
+<p><strong>Guidelines</strong></p>
+<ul>
+<li>Prefer passing an asset <em>category</em> in <code>__init__</code>; compute the concrete list here.</li>
+<li>If <code>self.asset_list</code> exists, simply return it; otherwise assemble the list
+  dynamically (for example, from an <code>AssetCategory</code>).</li>
+</ul>
+<h4 id="code-reference_2">Code Reference</h4>
+<div class="highlight"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">_get_asset_list</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="s2">"Asset"</span><span class="p">]]:</span>
+
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Provide the list of assets that this TimeSerie should include when updating.</span>
+
+<span class="sd">        By default, this method returns `self.asset_list` if defined.</span>
+<span class="sd">        Subclasses _must_ override this method when no `asset_list` attribute was set</span>
+<span class="sd">        during initialization, to supply a dynamic list of assets for update_statistics.</span>
+
+<span class="sd">        Use Case:</span>
+<span class="sd">          - For category-based series, return all Asset unique_identifiers in a given category</span>
+<span class="sd">            (e.g., `AssetCategory(unique_identifier="investable_assets")`), so that only those</span>
+<span class="sd">            assets are updated in this TimeSerie.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list or None</span>
+<span class="sd">            - A list of asset unique_identifiers to include in the update.</span>
+<span class="sd">            - `None` if no filtering by asset is required (update all assets by default).</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"asset_list"</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">asset_list</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+</code></pre></div>
+<h2 id="3-creating-a-markettimeserie">3  Creating a <code>MarketTimeSerie</code></h2>
+<p>A <strong><code>MarketTimeSerie</code></strong> is a registry entry that exposes a <code>TimeSerie</code> in the
+Markets catalogue with a clean, user-friendly identifier.<br/>
+Create (or update) one whenever <strong>either</strong> of the following is true:</p>
+<ul>
+<li>The <code>TimeSerie</code> has an <code>asset_list</code> and should be easy to discover in the
+  Markets UI / API.</li>
+<li>The series is macro-level (factor, index, benchmark, etc.) and benefits from a
+  human-readable name.</li>
+</ul>
+<p>The preferred implementation site is the hook<br/>
+<code>_run_post_update_routines(self, error_on_last_update: bool, update_statistics: DataUpdates)</code>,<br/>
+which executes immediately after each successful <code>update()</code>.</p>
+<h3 id="generic-pattern">Generic pattern</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">mainsequence.client</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ms_client</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mainsequence.tdag</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeSerie</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">YourTimeSerie</span><span class="p">(</span><span class="n">TimeSerie</span><span class="p">):</span>
+    <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_post_update_routines</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">error_on_last_update</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">update_statistics</span><span class="p">:</span> <span class="n">DataUpdates</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Register—or refresh—a MarketsTimeSeriesDetails record so this</span>
+<span class="sd">        TimeSerie is discoverable in the Markets platform.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="n">error_on_last_update</span><span class="p">:</span>      <span class="c1"># Skip registration if the update failed</span>
+            <span class="k">return</span>
+
+        <span class="n">UNIQUE_ID</span>    <span class="o">=</span> <span class="s2">"&lt;your_unique_snake_case_id&gt;"</span>          <span class="c1"># e.g. "sp500_total_return"</span>
+        <span class="n">FREQUENCY_ID</span> <span class="o">=</span> <span class="n">ms_client</span><span class="o">.</span><span class="n">DataFrequency</span><span class="o">.</span><span class="n">one_d</span>          <span class="c1"># pick the correct enum</span>
+        <span class="n">DESCRIPTION</span>  <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"Plain-English description of what the data represents and "</span>
+            <span class="s2">"its provenance (source, methodology, units)."</span>
+        <span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mts</span> <span class="o">=</span> <span class="n">ms_client</span><span class="o">.</span><span class="n">MarketsTimeSeriesDetails</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">unique_identifier</span><span class="o">=</span><span class="n">UNIQUE_ID</span><span class="p">)</span>
+
+            <span class="c1"># Re-link if this TimeSerie was rebuilt and now has a new LocalTimeSerie</span>
+            <span class="k">if</span> <span class="n">mts</span><span class="o">.</span><span class="n">related_local_time_serie</span><span class="o">.</span><span class="n">id</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">local_time_serie</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+                <span class="n">mts</span><span class="o">.</span><span class="n">patch</span><span class="p">(</span><span class="n">related_local_time_serie__id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">local_time_serie</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="n">ms_client</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="n">ms_client</span><span class="o">.</span><span class="n">MarketsTimeSeriesDetails</span><span class="o">.</span><span class="n">update_or_create</span><span class="p">(</span>
+                <span class="n">unique_identifier</span>            <span class="o">=</span> <span class="n">UNIQUE_ID</span><span class="p">,</span>
+                <span class="n">related_local_time_serie__id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">local_time_serie</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="n">data_frequency_id</span>            <span class="o">=</span> <span class="n">FREQUENCY_ID</span><span class="p">,</span>
+                <span class="n">description</span>                  <span class="o">=</span> <span class="n">DESCRIPTION</span><span class="p">,</span>
+            <span class="p">)</span>
+</code></pre></div>
+<h2 id="4-data-retrieval-helper">4  Data Retrieval Helper</h2>
+<p>Always use <code>get_df_between_dates(…)</code> for inter-series reads.<br/>
+For dual-index filters, supply <code>unique_identifier_range_map</code> to achieve
+per-identifier date windows.</p>
+<h2 id="5-general-conventions">5  General Conventions</h2>
+<ul>
+<li>Column names: <strong>lowercase only</strong>.  </li>
+<li><code>time_index</code>: timezone-aware <code>datetime</code> in UTC.  </li>
+<li>Value-column datetimes: store as integers (e.g. Unix epoch).  </li>
+<li>Keep constructors minimal; move complex wiring into separate factories.  </li>
+<li>Provide thorough unit tests for constructor logic, <code>update</code>, and any
+  transformation utilities.</li>
+</ul>
+<hr/>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"base": "..", "features": ["navigation.tabs", "navigation.footer", "navigation.indexes"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+<script src="../assets/javascripts/bundle.83f73b43.min.js"></script>
+<script src="https://unpkg.com/mermaid@10.9.0/dist/mermaid.min.js"></script>
+</body>
+</html>
