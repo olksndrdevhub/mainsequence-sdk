@@ -84,7 +84,6 @@ class PortfolioReport(HtmlApp):
         html_chart = generic_plotly_line_chart(
             x_values=list(all_dates),
             series_data=series_data,
-            chart_title=self.configuration.report_title,
             y_axis_title="Indexed Performance (Start = 100)",
             theme_mode=styles.mode,
             full_html=False,
