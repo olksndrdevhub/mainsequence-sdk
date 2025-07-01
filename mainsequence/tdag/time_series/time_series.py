@@ -1252,7 +1252,10 @@ class DataPersistanceMethods(ABC):
         """
         df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map)
         return df
-
+    
+    def get_ranged_data(self,range_descriptor: Optional[UniqueIdentifierRangeMap] ):
+        return self.get_df_between_dates(unique_identifier_range_map=range_descriptor)
+    
     def get_df_between_dates(
             self,
             start_date: Union[datetime.datetime, None] = None,
@@ -2506,6 +2509,9 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 try:
                     temp_df = self.update(update_statistics)
                     temp_df=update_statistics.filter_df_by_latest_value(temp_df)
+                    temp_df.replace({np.nan: None}, inplace=True)
+
+
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
@@ -2707,7 +2713,11 @@ class WrapperTimeSerie(TimeSerie):
                     market_time_serie_unique_identifier=rule.markets_time_serie_unique_identifier)
 
         self.translation_table = translation_table
-
+    
+    
+    def get_ranged_data(self,range_descriptor: Optional[UniqueIdentifierRangeMap] ):
+        return self.get_df_between_dates(unique_identifier_range_map=range_descriptor)
+    
     def get_df_between_dates(
             self,
             start_date: Union[datetime.datetime, None] = None,
