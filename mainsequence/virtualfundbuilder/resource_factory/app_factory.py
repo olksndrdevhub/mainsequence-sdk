@@ -30,6 +30,9 @@ class HtmlApp(BaseApp):
     """
     TYPE = ResourceType.HTML_APP
 
+    def __init__(self, *args, **kwargs):
+        self.created_artifacts = []
+
     def _get_hash_from_configuration(self):
         try:
             return hashlib.sha256(
@@ -37,6 +40,48 @@ class HtmlApp(BaseApp):
             ).hexdigest()[:8]
         except Exception as e:
             logger.warning(f"[{self.__name__}] Could not hash configuration: {e}")
+
+    def store_artifact(self, html_content, output_name=None):
+        """
+        Saves the given HTML content to a file, uploads it as an artifact,
+        and stores the artifact reference.
+        If output_name is not provided, a sequential name (e.g., ClassName_1.html) is generated.
+        """
+        if not isinstance(html_content, str):
+            raise TypeError(f"The 'store_artifact' method of {self.__class__.__name__} must be called with a string of HTML content.")
+
+        if output_name is None:
+            output_name = len(self.created_artifacts)
+
+        output_name = f"{self.__class__.__name__}_{output_name}.html"
+
+        try:
+            with open(output_name, "w", encoding="utf-8") as f:
+                f.write(html_content)
+
+            logger.info(f"[{self.__class__.__name__}] Successfully saved HTML to: {output_name}")
+        except IOError as e:
+            logger.error(f"[{self.__class__.__name__}] Error saving file: {e}")
+            raise
+
+        job_id = os.getenv("JOB_ID", None)
+        if job_id:
+            html_artifact = None
+            try:
+                html_artifact = Artifact.upload_file(
+                    filepath=output_name,
+                    name=output_name,
+                    created_by_resource_name=self.__class__.__name__,
+                    bucket_name="HTMLOutput"
+                )
+                if html_artifact:
+                    self.created_artifacts.append(html_artifact)
+                    logger.info(f"Artifact uploaded successfully: {html_artifact.id}")
+                else:
+                    logger.info("Artifact upload failed")
+            except Exception as e:
+                logger.info(f"Error uploading artifact: {e}")
+
 
     def __init_subclass__(cls, **kwargs):
         """
@@ -46,39 +91,11 @@ class HtmlApp(BaseApp):
         original_run = cls.run
 
         def run_wrapper(self, *args, **kwargs) -> str:
-            # Execute the user-defined run method from the subclass
             html_content = original_run(self, *args, **kwargs)
 
-            if not isinstance(html_content, str):
-                raise TypeError(f"The 'run' method of {cls.__name__} must return a string of HTML content.")
+            if html_content:
+                self.store_artifact(html_content)
 
-            # Store the output
-            unique_hash = self._get_hash_from_configuration()
-            output_name = f"{cls.__name__}_{unique_hash}.html"
-            try:
-                with open(output_name, "w", encoding="utf-8") as f:
-                    f.write(html_content)
-
-                logger.info(f"[{cls.__name__}] Successfully saved HTML to: {output_name}")
-            except IOError as e:
-                logger.error(f"[{cls.__name__}] Error saving file: {e}")
-                raise
-
-            job_id = os.getenv("JOB_ID", None)
-            if job_id:
-                html_artifact = None
-                try:
-                    html_artifact = Artifact.upload_file(
-                        filepath=output_name,
-                        name=output_name,
-                        created_by_resource_name=self.__class__.__name__,
-                        bucket_name="HTMLOutput"
-                    )
-                    logger.info(f"Artifact uploaded successfully: {html_artifact.id if html_artifact else 'Failed'}")
-                except Exception as e:
-                    logger.info(f"Error uploading artifact: {e}")
-
-        # Replace the subclass's run method with our enhanced wrapper
         cls.run = run_wrapper
 
     @abstractmethod
