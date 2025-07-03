@@ -2354,7 +2354,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
                             except Exception as e:
                                 self.logger.exception(
-                                    f"Error updating dependency {ts.local_hash_id} when loading pickle")
+                                    f"Error updating dependency {ts_row['local_hash_id']} when loading pickle")
                                 raise e
 
                         try:

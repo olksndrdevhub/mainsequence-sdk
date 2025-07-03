@@ -177,10 +177,13 @@ class PersistManager:
             # Define a callback that will launch set_local_metadata_lazy after the remote update is complete.
     @property
     def metadata(self):
-        if self.local_metadata.remote_table.sourcetableconfiguration is not None:
-            if self.local_metadata.remote_table.build_meta_data.get("initialize_with_default_partitions",True) == False:
-                if self.local_metadata.remote_table.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
-                    self.logger.warning("Default Partitions will not be initialized ")
+        if self.local_metadata is None:
+            return None
+        if self.local_metadata.remote_table is not None:
+            if self.local_metadata.remote_table.sourcetableconfiguration is not None:
+                if self.local_metadata.remote_table.build_meta_data.get("initialize_with_default_partitions",True) == False:
+                    if self.local_metadata.remote_table.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+                        self.logger.warning("Default Partitions will not be initialized ")
 
         return self.local_metadata.remote_table
 
