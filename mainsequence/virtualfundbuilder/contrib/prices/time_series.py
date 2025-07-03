@@ -652,9 +652,10 @@ class InterpolatedPrices(TimeSerie):
         Creates mappings from symbols to IDs
         """
         if self.constructor_asset_list is not None:
-            return self.constructor_asset_list
-        asset_category = AssetCategory.get(unique_identifier=self.asset_category_unique_id)
-        asset_list = Asset.filter(id__in=asset_category.assets)
+            asset_list= self.constructor_asset_list
+        else:
+            asset_category = AssetCategory.get(unique_identifier=self.asset_category_unique_id)
+            asset_list = Asset.filter(id__in=asset_category.assets)
         self.asset_calendar_map = {a.unique_identifier: a.get_calendar() for a in asset_list}
         return asset_list
 
