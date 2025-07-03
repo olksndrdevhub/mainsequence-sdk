@@ -4,7 +4,7 @@ from venv import logger
 
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple, Callable
 import json
 import time
 import traceback
@@ -46,7 +46,16 @@ from mainsequence.tdag.config import bcolors
 from mainsequence.logconf import logger
 
 
-def serialize_model_list(value):
+def serialize_model_list(value: Optional[List[Any]]) -> Optional[Dict[str, Any]]:
+    """
+    Serializes a list of model objects into a dictionary.
+
+    Args:
+        value: A list of model objects or None.
+
+    Returns:
+        A dictionary representation of the model list, or None if the input is None.
+    """
     if value is None:
         return None
     value.sort(key=lambda x: x.unique_identifier, reverse=False)
@@ -56,7 +65,20 @@ def serialize_model_list(value):
     return value
 
 
-def rebuild_with_type(value, rebuild_function):
+def rebuild_with_type(value: Dict[str, Any], rebuild_function: Callable) -> Union[tuple, Any]:
+    """
+    Rebuilds a tuple from a serialized dictionary representation.
+
+    Args:
+        value: A dictionary with a '__type__' key.
+        rebuild_function: A function to apply to each item in the tuple.
+
+    Returns:
+        A rebuilt tuple.
+
+    Raises:
+        NotImplementedError: If the type is not 'tuple'.
+    """
     if value["__type__"] == "tuple":
         return tuple([rebuild_function(c) for c in value["items"]])
     else:
@@ -69,6 +91,15 @@ build_model = lambda model_data: get_model_class(model_data["orm_class"])(**mode
 
 
 def parse_dictionary_before_hashing(dictionary: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Parses a dictionary before hashing, handling nested structures and special types.
+
+    Args:
+        dictionary: The dictionary to parse.
+
+    Returns:
+        A new dictionary ready for hashing.
+    """
     local_ts_dict_to_hash = {}
     for key, value in dictionary.items():
         if key != "build_meta_data":
@@ -106,11 +137,15 @@ def parse_dictionary_before_hashing(dictionary: Dict[str, Any]) -> Dict[str, Any
     return local_ts_dict_to_hash
 
 
-def hash_signature(dictionary: Dict[str, Any]) -> str:
+def hash_signature(dictionary: Dict[str, Any]) -> Tuple[str, str]:
     """
-    MD5 hash of a dictionary used to hash the local annd remote configuration of tables
-    :param dictionary:
-    :return:
+    Computes MD5 hashes for local and remote configurations of a dictionary.
+
+    Args:
+        dictionary: The dictionary to hash.
+
+    Returns:
+        A tuple containing the local hash and the remote hash.
     """
     import hashlib
     dhash_local = hashlib.md5()
@@ -139,20 +174,23 @@ def hash_signature(dictionary: Dict[str, Any]) -> str:
 
 
 class ConfigSerializer:
+    """Handles serialization and deserialization of configurations."""
 
     @staticmethod
-    def _serialize_model(model):
+    def _serialize_model(model: Any) -> Dict[str, Any]:
         columns = {"model": model.__class__.__name__, "id": model.unique_identifier}
-
         return columns
 
     @classmethod
-    def rebuild_serialized_wrapper_dict(cls, time_series_dict_config: dict):
+    def rebuild_serialized_wrapper_dict(cls, time_series_dict_config: dict) -> Dict[str, Any]:
         """
-        rebuilds configuration from time_series Wrapper
-        :param time_series_dict_config:
+        Rebuilds a dictionary of TimeSerie objects from a serialized wrapper configuration.
 
-        :return:
+        Args:
+            time_series_dict_config: The serialized wrapper dictionary.
+
+        Returns:
+            A dictionary of TimeSerie objects.
         """
         time_series_dict = {}
         for key, value in time_series_dict_config.items():
@@ -162,15 +200,16 @@ class ConfigSerializer:
         return time_series_dict
 
     @classmethod
-    def rebuild_pydantic_model(cls, details, state_kwargs: Union[None, dict] = None):
+    def rebuild_pydantic_model(cls, details: Dict[str, Any], state_kwargs: Optional[dict] = None) -> Any:
         """
-        If there is an state rebuild the configuration then the method to rebuild related objects is from state
+        Rebuilds a Pydantic model from its serialized representation.
+
         Args:
-            details: 
-            state_kwargs: 
+            details: The serialized model details.
+            state_kwargs: Optional state arguments for deserialization.
 
         Returns:
-
+            An instance of the rebuilt Pydantic model.
         """
         rebuild_function = lambda x, state_kwargs: cls._rebuild_configuration_argument(x, ignore_pydantic=False)
         if state_kwargs is not None:
@@ -217,15 +256,17 @@ class ConfigSerializer:
         return value
 
     @classmethod
-    def rebuild_serialized_config(cls, config, time_serie_class_name):
+    def rebuild_serialized_config(cls, config: Dict[str, Any], time_serie_class_name: str) -> Dict[str, Any]:
         """
-        rebulds configuration from config file, particularly Assets
-        :param config:
+        Rebuilds a configuration dictionary from a serialized config.
 
-        :param time_serie_class_name:
-        :return:
+        Args:
+            config: The configuration dictionary.
+            time_serie_class_name: The name of the TimeSerie class.
+
+        Returns:
+            The rebuilt configuration dictionary.
         """
-
         config = cls.rebuild_config(config=config)
         if time_serie_class_name == "WrapperTimeSerie":
             config["time_series_dict"] = cls.rebuild_serialized_wrapper_dict(
@@ -235,17 +276,17 @@ class ConfigSerializer:
         return config
 
     @classmethod
-    def _rebuild_configuration_argument(cls, value, ignore_pydantic):
+    def _rebuild_configuration_argument(cls, value: Any, ignore_pydantic: bool) -> Any:
         """
-        To be able to mix pydantic with VAM ORM models we need to add the posibility to recusevely ignore pydantic
+        Recursively rebuilds a configuration argument from its serialized form.
+
         Args:
-            value: 
-            ignore_pydantic: 
+            value: The configuration value to rebuild.
+            ignore_pydantic: Whether to ignore Pydantic model rebuilding.
 
         Returns:
-
+            The rebuilt configuration value.
         """
-
         if isinstance(value, dict):
 
             if "is_time_series_config" in value.keys():
@@ -275,21 +316,32 @@ class ConfigSerializer:
         return value
 
     @classmethod
-    def rebuild_config(cls, config, ignore_pydantic=False):
+    def rebuild_config(cls, config: Dict[str, Any], ignore_pydantic: bool = False) -> Dict[str, Any]:
         """
+        Rebuilds a configuration dictionary.
 
-        :param config:
-        :return:
+        Args:
+            config: The configuration dictionary to rebuild.
+            ignore_pydantic: If True, Pydantic models will not be rebuilt.
+
+        Returns:
+            The rebuilt configuration dictionary.
         """
-
         for key, value in config.items():
             config[key] = cls._rebuild_configuration_argument(value, ignore_pydantic)
 
         return config
 
-    def _serialize_signature_argument(self, value, pickle_ts: bool):
+    def _serialize_signature_argument(self, value: Any, pickle_ts: bool) -> Any:
         """
-        Serializes signature argument
+        Serializes a single argument from a function signature.
+
+        Args:
+            value: The argument value to serialize.
+            pickle_ts: Whether to pickle TimeSerie objects.
+
+        Returns:
+            The serialized argument.
         """
         from types import SimpleNamespace
         from mainsequence.client import BaseObjectOrm
@@ -399,8 +451,18 @@ class ConfigSerializer:
             value = new_value
         return value
 
-    def _serialize_configuration_dict(self, kwargs, pickle_ts=False, ordered_dict=True):
+    def _serialize_configuration_dict(self, kwargs: Dict[str, Any], pickle_ts: bool = False, ordered_dict: bool = True) -> Dict[str, Any]:
+        """
+        Serializes a configuration dictionary.
 
+        Args:
+            kwargs: The dictionary to serialize.
+            pickle_ts: Whether to pickle TimeSerie objects.
+            ordered_dict: Whether to return an ordered dictionary.
+
+        Returns:
+            The serialized dictionary.
+        """
         import collections
         new_kwargs = {}
 
@@ -424,24 +486,42 @@ class ConfigSerializer:
             ordered_kwargs = new_kwargs
         return ordered_kwargs
 
-    def serialize_to_pickle(self, properties):
+    def serialize_to_pickle(self, properties: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Serializes properties to a pickle-friendly dictionary.
+        """
         serialized_properties = self._serialize_configuration_dict(kwargs=properties, pickle_ts=True)
         return serialized_properties
 
-    def serialize_init_kwargs(self, kwargs):
+    def serialize_init_kwargs(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """
-          serializes  TimeSeries init_kwargs to be able to  persist in local configuration
-          :param kwargs:
-          :return:
-          """
+        Serializes __init__ keyword arguments for a TimeSerie.
+        """
         ordered_kwargs = self._serialize_configuration_dict(kwargs=kwargs)
         return ordered_kwargs
 
     @classmethod
-    def deserialize_pickle_value(cls, value, include_vam_client_objects: bool,
+    def deserialize_pickle_value(cls,
+                                 value: Any,
+                                 include_vam_client_objects: bool,
                                  graph_depth_limit: int,
                                  graph_depth: int,
-                                 ignore_pydantic=False, data_source_id: Union[DynamicTableDataSource, None] = None, ):
+                                 ignore_pydantic: bool = False,
+                                 data_source_id: Optional[int] = None) -> Any:
+        """
+        Deserializes a single value from a pickled state.
+
+        Args:
+            value: The value to deserialize.
+            include_vam_client_objects: Whether to include VAM client objects.
+            graph_depth_limit: The depth limit for graph traversal.
+            graph_depth: The current depth in the graph.
+            ignore_pydantic: Whether to ignore Pydantic model deserialization.
+            data_source_id: The ID of the data source.
+
+        Returns:
+            The deserialized value.
+        """
         import cloudpickle
 
         new_value = value
@@ -518,22 +598,21 @@ class ConfigSerializer:
         return new_value
 
     @classmethod
-    def deserialize_pickle_state(cls, state, include_vam_client_objects: bool, data_source_id: int,
+    def deserialize_pickle_state(cls, state: Any, include_vam_client_objects: bool, data_source_id: int,
                                  graph_depth_limit: int,
-                                 graph_depth: int,
-                                 ):
+                                 graph_depth: int) -> Any:
         """
-        
-        Parameters
-        ----------
-        state
+        Deserializes the state of an object from a pickle.
 
+        Args:
+            state: The state to deserialize.
+            include_vam_client_objects: Whether to include VAM client objects.
+            data_source_id: The ID of the data source.
+            graph_depth_limit: The depth limit for graph traversal.
+            graph_depth: The current depth in the graph.
 
-        deserialize_pickle_state
-
-        Returns
-        -------
-
+        Returns:
+            The deserialized state.
         """
         if isinstance(state, dict):
             for key, value in state.items():
@@ -554,7 +633,17 @@ class ConfigSerializer:
         return state
 
 
-def get_time_serie_relation_tree(time_serie, as_object=False):
+def get_time_serie_relation_tree(time_serie: "TimeSerie", as_object: bool = False) -> Dict[str, Any]:
+    """
+    Gets the relation tree of a TimeSerie object.
+
+    Args:
+        time_serie: The TimeSerie object.
+        as_object: If True, returns the TimeSerie object itself in the tree.
+
+    Returns:
+        A dictionary representing the relation tree.
+    """
     import inspect
     members = inspect.getmembers(time_serie, lambda a: not (inspect.isroutine(a)))
     # get dicto of members
@@ -591,7 +680,13 @@ class DependencyUpdateError(Exception):
 
 class GraphNodeMethods(ABC):
 
-    def get_mermaid_dependency_diagram(self):
+    def get_mermaid_dependency_diagram(self) -> str:
+        """
+        Displays a Mermaid.js dependency diagram in a Jupyter environment.
+
+        Returns:
+            The Mermaid diagram string.
+        """
         from IPython.display import display, HTML
 
         mermaid_diagram = self.local_persist_manager.display_mermaid_dependency_diagram()
@@ -633,24 +728,30 @@ class GraphNodeMethods(ABC):
         # Optionally return the raw diagram code for further use
         return mermaid_diagram
 
-    def get_all_local_dependencies(self, ):
+    def get_all_local_dependencies(self) -> pd.DataFrame:
         """
-        get relation tree by ids in the graph
-        :return:
-        """
+        Gets a DataFrame of all local dependencies in the graph.
 
+        Returns:
+            A pandas DataFrame with dependency information.
+        """
         dependencies_df = self.local_persist_manager.get_all_local_dependencies()
         return dependencies_df
 
     @property
-    def is_local_relation_tree_set(self):
+    def is_local_relation_tree_set(self) -> bool:
         return self.local_persist_manager.local_metadata.ogm_dependencies_linked
 
-    def get_update_map(self, dependecy_map: Union[dict, None] = None):
+    def get_update_map(self, dependecy_map: Optional[Dict] = None) -> Dict[Tuple[str, int], Dict[str, Any]]:
         """
         Obtain all local time_series in the dependency graph by introspecting the code class members.
         Dicts are allowed to have timeseries.
-        :return:
+
+        Args:
+            dependecy_map: An optional dictionary to store the dependency map.
+
+        Returns:
+            A dictionary mapping (local_hash_id, data_source_id) to TimeSerie info.
         """
         members = self.__dict__
         dependecy_map = {} if dependecy_map is None else dependecy_map
@@ -688,10 +789,7 @@ class GraphNodeMethods(ABC):
         return dependecy_map
 
     def set_relation_tree(self):
-        """
-        Sets node relationship in the backend
-        :return:
-        """
+        """Sets the node relationships in the backend."""
         def process_ts_value(value):
             if isinstance(value, TimeSerie):
                 value.local_persist_manager
@@ -738,7 +836,8 @@ class GraphNodeMethods(ABC):
 
 class TimeSerieRebuildMethods(ABC):
 
-    def verify_backend_git_hash_with_pickle(self):
+    def verify_backend_git_hash_with_pickle(self) -> None:
+        """Verifies if the git hash in the backend matches the one from the pickled object."""
         if self.local_persist_manager.metadata is not None:
             load_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
 
@@ -758,22 +857,32 @@ class TimeSerieRebuildMethods(ABC):
 
     @classmethod
     @tracer.start_as_current_span("TS: load_from_pickle")
-    def load_from_pickle(cls, pickle_path):
+    def load_from_pickle(cls, pickle_path: str) -> "TimeSerie":
         time_serie = load_from_pickle(pickle_path)
-
         return time_serie
 
     @classmethod
-    def load_data_source_from_pickle(self, pickle_path):
+    def load_data_source_from_pickle(self, pickle_path: str) -> Any:
         data_path = Path(pickle_path).parent / "data_source.pickle"
         with open(data_path, 'rb') as handle:
             data_source = cloudpickle.load(handle)
         return data_source
 
     @classmethod
-    def rebuild_and_set_from_local_hash_id(cls, local_hash_id:int, data_source_id:int, set_dependencies_df: bool = False,
-                                           graph_depth_limit=1,
-                                           ):
+    def rebuild_and_set_from_local_hash_id(cls, local_hash_id: int, data_source_id: int, set_dependencies_df: bool = False,
+                                           graph_depth_limit: int = 1) -> Tuple["TimeSerie", str]:
+        """
+        Rebuilds a TimeSerie from its local hash ID and pickles it if it doesn't exist.
+
+        Args:
+            local_hash_id: The local hash ID of the TimeSerie.
+            data_source_id: The data source ID.
+            set_dependencies_df: Whether to set the dependencies DataFrame.
+            graph_depth_limit: The depth limit for graph traversal.
+
+        Returns:
+            A tuple containing the TimeSerie object and the path to its pickle file.
+        """
         pickle_path = TimeSerie.get_pickle_path(local_hash_id=local_hash_id,
                                                 data_source_id=data_source_id,
                                                 )
@@ -796,14 +905,28 @@ class TimeSerieRebuildMethods(ABC):
         ts.logger.debug(f"ts {local_hash_id} loaded from pickle ")
         return ts, pickle_path
 
-    def set_data_source_from_pickle_path(self, pikle_path):
+    def set_data_source_from_pickle_path(self, pikle_path: str) -> None:
+        """
+        Sets the data source for the TimeSerie from a pickle path.
+
+        Args:
+            pikle_path: The path to the pickle file.
+        """
         data_source = self.load_data_source_from_pickle(pikle_path)
         self.set_data_source(data_source=data_source)
 
     @classmethod
-    def load_and_set_from_pickle(cls, pickle_path, graph_depth_limit=1,
-                                 ):
+    def load_and_set_from_pickle(cls, pickle_path: str, graph_depth_limit: int = 1) -> "TimeSerie":
+        """
+        Loads a TimeSerie from a pickle file and sets its state.
 
+        Args:
+            pickle_path: The path to the pickle file.
+            graph_depth_limit: The depth limit for setting the state.
+
+        Returns:
+            The loaded and configured TimeSerie object.
+        """
         ts = cls.load_from_pickle(pickle_path)
         ts.set_state_with_sessions(
             graph_depth=0,
@@ -813,17 +936,18 @@ class TimeSerieRebuildMethods(ABC):
 
     @classmethod
     @tracer.start_as_current_span("TS: Rebuild From Configuration")
-    def rebuild_from_configuration(cls, local_hash_id:str,
-                                   data_source: Union[int, object],
-
-                                   ):
+    def rebuild_from_configuration(cls, local_hash_id: str,
+                                   data_source: Union[int, object]) -> "TimeSerie":
         """
+        Rebuilds a TimeSerie instance from its configuration.
 
-        :param serie_data_folder:
+        Args:
+            local_hash_id: The local hash ID of the TimeSerie.
+            data_source: The data source ID or object.
 
-        :return: TimeSerie
+        Returns:
+            The rebuilt TimeSerie instance.
         """
-
         import importlib
         from mainsequence.tdag.time_series.persist_managers import PersistManager
 
@@ -863,11 +987,11 @@ class TimeSerieRebuildMethods(ABC):
 
         return re_build_ts
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: Dict[str, Any]) -> None:
         # Restore instance attributes (i.e., filename and lineno).
         self.__dict__.update(state)
 
-    def __getstate__(self):
+    def __getstate__(self) -> Dict[str, Any]:
         # Copy the object's state from self.__dict__ which contains
         # all our instance attributes. Always use the dict.copy()
         # method to avoid modifying the original state.
@@ -877,33 +1001,37 @@ class TimeSerieRebuildMethods(ABC):
         return state
 
     @classmethod
-    def get_pickle_path(cls, local_hash_id: str,data_source_id: int):
+    def get_pickle_path(cls, local_hash_id: str, data_source_id: int) -> str:
         return os.path.join(ogm.pickle_storage_path, str(data_source_id), f"{local_hash_id}.pickle")
 
     @classmethod
-    def load_and_set_from_hash_id(cls,  local_hash_id: int,data_source_id: int):
+    def load_and_set_from_hash_id(cls, local_hash_id: int, data_source_id: int) -> "TimeSerie":
         path = cls.get_pickle_path(local_hash_id=local_hash_id,data_source_id=data_source_id)
         ts = cls.load_and_set_from_pickle(pickle_path=path)
         return ts
 
     @property
-    def pickle_path(self):
+    def pickle_path(self) -> str:
         pp = data_source_dir_path(self.data_source.id)
-
         path = f"{pp}/{self.local_hash_id}.pickle"
         return path
 
-    def _update_git_and_code_in_backend(self):
+    def _update_git_and_code_in_backend(self) -> None:
+        """Updates the source code and git hash information in the backend."""
         self.local_persist_manager.update_source_informmation(
             git_hash_id=self.get_time_serie_source_code_git_hash(self.__class__),
             source_code=self.get_time_serie_source_code(self.__class__),
         )
 
-    def persist_to_pickle(self, overwrite=False):
+    def persist_to_pickle(self, overwrite: bool = False) -> Tuple[str, str]:
         """
+        Persists the TimeSerie object to a pickle file.
 
-        :return:
-        :rtype:
+        Args:
+            overwrite: If True, overwrites the existing pickle file.
+
+        Returns:
+            A tuple containing the full path and the relative path of the pickle file.
         """
         import cloudpickle
         path = self.pickle_path
@@ -925,25 +1053,19 @@ class TimeSerieRebuildMethods(ABC):
         return path, path.replace(ogm.pickle_storage_path + "/", "")
 
     @tracer.start_as_current_span("TS: set_state_with_sessions")
-    def set_state_with_sessions(self, include_vam_client_objects=True,
-                                graph_depth_limit=1000,
-                                graph_depth=0):
+    def set_state_with_sessions(self, include_vam_client_objects: bool = True,
+                                graph_depth_limit: int = 1000,
+                                graph_depth: int = 0) -> None:
         """
-         Method to set state after it was loaded from pickle.
-        Parameters
-        ----------
-        include_vam_client_objects :
-        graph_depth_limit :
-        metadatas : pre-requestd dictionary of metadatas to speed calculation of rebuild of state
-        graph_depth :
+        Sets the state of the TimeSerie after loading from pickle, including sessions.
 
-        Returns
-        -------
-
+        Args:
+            include_vam_client_objects: Whether to include VAM client objects.
+            graph_depth_limit: The depth limit for graph traversal.
+            graph_depth: The current depth in the graph.
         """
         if graph_depth_limit == -1:
             graph_depth_limit = 1e6
-
 
         minimum_required_depth_for_update = self.get_minimum_required_depth_for_update()
 
@@ -974,16 +1096,22 @@ class TimeSerieRebuildMethods(ABC):
 
         self.local_persist_manager.synchronize_metadata(local_metadata=None)
 
-    def get_minimum_required_depth_for_update(self):
+    def get_minimum_required_depth_for_update(self) -> int:
         """
-        Controls the minimum depth that needs to be rebuil
-        Returns
-        -------
-
+        Controls the minimum depth that needs to be rebuilt.
         """
         return 0
 
-    def _prepare_state_for_pickle(self, state):
+    def _prepare_state_for_pickle(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Prepares the object's state for pickling by serializing and removing unpicklable entries.
+
+        Args:
+            state: The object's __dict__.
+
+        Returns:
+            A pickle-safe dictionary representing the object's state.
+        """
         import cloudpickle
         properties = state
         serializer = ConfigSerializer()
@@ -1013,24 +1141,22 @@ class TimeSerieRebuildMethods(ABC):
 
         return properties
 
-    def run_in_debug_scheduler(self, break_after_one_update=True, run_head_in_main_process=True,
-                               wait_for_update=True, force_update=True, debug=True, update_tree=True,
-                               raise_exception_on_error=True
-                               ):
+    def run_in_debug_scheduler(self, break_after_one_update: bool = True, run_head_in_main_process: bool = True,
+                               wait_for_update: bool = True, force_update: bool = True, debug: bool = True,
+                               update_tree: bool = True,
+                               raise_exception_on_error: bool = True) -> None:
         """
+        Runs the TimeSerie update in a debug scheduler.
 
         Args:
-            break_after_one_update:
-            run_head_in_main_process:
-            wait_for_update:
-            force_update:
-            debug:
-            update_tree:
-
-        Returns:
-
+            break_after_one_update: If True, stops after one update cycle.
+            run_head_in_main_process: If True, runs the head node in the main process.
+            wait_for_update: If True, waits for the update to complete.
+            force_update: If True, forces an update.
+            debug: If True, runs in debug mode.
+            update_tree: If True, updates the entire dependency tree.
+            raise_exception_on_error: If True, raises exceptions on errors.
         """
-
         from .update.scheduler import SchedulerUpdater
         SchedulerUpdater.debug_schedule_ts(
             time_serie_hash_id=self.local_hash_id,
@@ -1046,19 +1172,24 @@ class TimeSerieRebuildMethods(ABC):
 
     @tracer.start_as_current_span("TS: Update")
     def start_time_serie_update(self, update_tracker: object, debug_mode: bool,
-               raise_exceptions=True, update_tree=False,
-               local_time_series_map: Union[Dict[str,LocalTimeSerie], None] = None, update_only_tree=False, force_update=False,
-               use_state_for_update=False
-               ):
+                                raise_exceptions: bool = True, update_tree: bool = False,
+                                local_time_series_map: Optional[Dict[str, "LocalTimeSerie"]] = None, update_only_tree: bool = False, force_update: bool = False,
+                                use_state_for_update: bool = False) -> bool:
         """
-        Main update method for time series that interacts with Graph node. Time series should be updated through this
-        method only
-        :param update_tree_kwargs:
-        :param raise_exceptions:
-        :param update_tree:
-        :param scheduler: models.Scheduler
-        :param metadatas: pre-requested metadatas to speed initiation of ts
-        :return:
+        Main update method for a TimeSerie that interacts with the graph node.
+
+        Args:
+            update_tracker: The update tracker object.
+            debug_mode: Whether to run in debug mode.
+            raise_exceptions: Whether to raise exceptions on errors.
+            update_tree: Whether to update the entire dependency tree.
+            local_time_series_map: A map of local time series.
+            update_only_tree: If True, only updates the dependency tree structure.
+            force_update: If True, forces an update.
+            use_state_for_update: If True, uses the current state for the update.
+
+        Returns:
+            True if there was an error on the last update, False otherwise.
         """
         try:
             local_time_serie_historical_update =self.local_persist_manager.local_metadata.set_start_of_execution(
@@ -1099,11 +1230,9 @@ class TimeSerieRebuildMethods(ABC):
                 self.logger.info("Already updated, waiting until next update time")
 
         except Exception as e:
-
             error_on_last_update = True
             raise e
         finally:
-
             self.local_persist_manager.local_metadata.set_end_of_execution(
                 historical_update_id=local_time_serie_historical_update.id,
                 error_on_update=error_on_last_update)
@@ -1114,10 +1243,7 @@ class TimeSerieRebuildMethods(ABC):
                                            update_statistics=update_statistics
                                            )
 
-
             self._set_column_metadata()
-
-
 
         return error_on_last_update
 
@@ -1125,23 +1251,24 @@ class TimeSerieRebuildMethods(ABC):
 class DataPersistanceMethods(ABC):
 
     # sets
-    def get_metadatas_and_set_updates(self, *args, **kwargs):
+    def get_metadatas_and_set_updates(self, *args, **kwargs) -> Any:
         from mainsequence.client import LocalTimeSerie
         return LocalTimeSerie.get_metadatas_and_set_updates(*args, **kwargs)
 
-    def patch_update_details(self, local_hash_id=None, *args, **kwargs):
+    def patch_update_details(self, local_hash_id: Optional[str] = None, *args, **kwargs) -> Any:
         return self.local_persist_manager.patch_update_details(local_hash_id=local_hash_id, **kwargs)
 
-    def reset_dependencies_states(self, hash_id_list: list):
+    def reset_dependencies_states(self, hash_id_list: list) -> Any:
         return self.local_persist_manager.reset_dependencies_states(hash_id_list=hash_id_list)
 
-    def update_details_in_dependecy_tree(self, set_relation_tree=True, include_head=False, *args, **kwargs):
+    def update_details_in_dependecy_tree(self, set_relation_tree: bool = True, include_head: bool = False, *args, **kwargs) -> None:
         """
-        updates schedule from all tree related time series
-        :param schedule:
-        :return:
-        """
+        Updates the schedule for all time series in the dependency tree.
 
+        Args:
+            set_relation_tree: Whether to set the relation tree first.
+            include_head: Whether to include the head node in the update.
+        """
         if set_relation_tree == True:
             self.set_relation_tree()
         dependants_df = self.get_all_local_dependencies()
@@ -1160,31 +1287,31 @@ class DataPersistanceMethods(ABC):
 
     # direct contact
     @property
-    def update_details(self):
+    def update_details(self) -> Any:
         return self.local_persist_manager.update_details
 
     @property
-    def run_configuration(self):
+    def run_configuration(self) -> Any:
         return self.local_persist_manager.run_configuration
 
     @property
-    def metadata(self):
+    def metadata(self) -> Any:
         return self.local_persist_manager.metadata
 
     @property
-    def local_metadata(self):
+    def local_metadata(self) -> Any:
         return self.local_persist_manager.local_metadata
 
     @property
-    def source_table_configuration(self):
+    def source_table_configuration(self) -> Any:
         return self.local_persist_manager.source_table_configuration
 
-    def set_policy(self, interval: str, comp_type: str, overwrite=False, ):
-
+    def set_policy(self, interval: str, comp_type: str, overwrite: bool = False) -> None:
+        """Sets a policy (e.g., retention) for the time series."""
         self.local_persist_manager.set_policy(interval, overwrite=overwrite, comp_type=comp_type)
 
-    def verify_tree_compression_policy_is_set(self):
-
+    def verify_tree_compression_policy_is_set(self) -> None:
+        """Verifies that the compression policy is set for the entire dependency tree."""
         deps = self.dependencies_df
         for _, ts_row in deps.iterrows():
             try:
@@ -1194,30 +1321,33 @@ class DataPersistanceMethods(ABC):
             except Exception as e:
                 self.logger.exception(f"{ts_row['hash_id']} compression policy not set")
 
-    def upsert_data(self, data_df: pd.DataFrame):
+    def upsert_data(self, data_df: pd.DataFrame) -> None:
         """
-        Updates and Insert data into DB
-        :param data_df:
-        :return:
+        Updates and inserts data into the database.
+
+        Args:
+            data_df: The DataFrame to upsert.
         """
         self.local_persist_manager.upsert_data(data_df=data_df)
 
     @property
-    def persist_size(self):
-
+    def persist_size(self) -> int:
         return self.local_persist_manager.persist_size
 
-    def get_update_statistics(self, unique_identifier_list: Optional[list[str]] = None,
-                              ) ->DataUpdates:
+    def get_update_statistics(self, unique_identifier_list: Optional[List[str]] = None) -> DataUpdates:
         """
-        gets latest value directly from querying the DB,
-        args and kwargs are nedeed for datalake
+        Gets the latest update statistics from the database.
+
+        Args:
+            unique_identifier_list: An optional list of unique identifiers to filter by.
+
+        Returns:
+            A DataUpdates object with the latest statistics.
         """
         if isinstance(self.metadata,int):
             self.local_persist_manager.set_local_metadata_lazy(force_registry=True,include_relations_detail=True)
 
         if self.metadata.sourcetableconfiguration is None:
-
             return DataUpdates()
 
         update_stats = self.metadata.sourcetableconfiguration.get_data_updates()
@@ -1228,32 +1358,40 @@ class DataPersistanceMethods(ABC):
         return earliest_value
 
     @property
-    def local_parquet_file(self):
+    def local_parquet_file(self) -> str:
         try:
             return self.data_folder + "/time_series_data.parquet"
         except Exception as e:
             raise
 
-    def is_persisted(self, session: Union[None, object] = None):
-
+    def is_persisted(self, session: Optional[object] = None) -> bool:
+        """ Checks if the time series is persisted """
         ip = self.local_persist_manager.time_serie_exist()
         return ip
 
-    def filter_by_assets_ranges(self, asset_ranges_map: dict):
+    def filter_by_assets_ranges(self, asset_ranges_map: dict) -> pd.DataFrame:
         """
+        Filters data by asset ranges.
 
-        Parameters
-        ----------
-        asset_ranges
+        Args:
+            asset_ranges_map: A dictionary mapping assets to their date ranges.
 
-        Returns
-        -------
-
+        Returns:
+            A DataFrame with the filtered data.
         """
         df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map)
         return df
     
-    def get_ranged_data(self,range_descriptor: Optional[UniqueIdentifierRangeMap] ):
+    def get_ranged_data(self, range_descriptor: Optional[UniqueIdentifierRangeMap]) -> pd.DataFrame:
+        """
+        Gets data based on a range descriptor.
+
+        Args:
+            range_descriptor: A UniqueIdentifierRangeMap object.
+
+        Returns:
+            A DataFrame with the ranged data.
+        """
         return self.get_df_between_dates(unique_identifier_range_map=range_descriptor)
     
     def get_df_between_dates(
@@ -1315,8 +1453,6 @@ class DataPersistanceMethods(ABC):
         pd.DataFrame
             A DataFrame containing rows that satisfy the combined time and identifier filters.
         """
-
-
         func = self.local_persist_manager.get_df_between_dates
         sig = inspect.signature(func)
         kwargs = dict(
@@ -1333,7 +1469,13 @@ class DataPersistanceMethods(ABC):
         filtered_data = self.local_persist_manager.get_df_between_dates(**kwargs)
         return filtered_data
 
-    def get_persisted_ts(self):
+    def get_persisted_ts(self) -> pd.DataFrame:
+        """
+        Gets the full persisted time series data.
+
+        Returns:
+            A DataFrame with the persisted data.
+        """
         try:
             persisted_df = self.local_persist_manager.get_persisted_ts()
         except Exception as e:
@@ -1344,7 +1486,16 @@ class DataPersistanceMethods(ABC):
 
         return persisted_df
 
-    def load_ts_df(self, session: Union[None, object] = None, *args, **kwargs):
+    def load_ts_df(self, session: Optional[object] = None, *args, **kwargs) -> pd.DataFrame:
+        """
+        Loads the time series DataFrame, updating it if it's not persisted.
+
+        Args:
+            session: An optional session object.
+
+        Returns:
+            A DataFrame with the time series data.
+        """
         if self.is_persisted:
             pandas_df = self.get_persisted_ts(session=session)
         else:
@@ -1353,11 +1504,16 @@ class DataPersistanceMethods(ABC):
 
         return pandas_df
 
-    def get_latest_update_by_assets_filter(self, asset_symbols: Union[list, None], last_update_per_asset: dict):
+    def get_latest_update_by_assets_filter(self, asset_symbols: Optional[list], last_update_per_asset: dict) -> datetime.datetime:
         """
-        Gets the latest update from a symbol list
-        :param asset_symbols:
-        :return:
+        Gets the latest update timestamp for a list of asset symbols.
+
+        Args:
+            asset_symbols: A list of asset symbols.
+            last_update_per_asset: A dictionary mapping assets to their last update time.
+
+        Returns:
+            The latest update timestamp.
         """
         if asset_symbols is not None:
             last_update_in_table = np.max([timestamp for unique_identifier, timestamp in last_update_per_asset.items()
@@ -1367,8 +1523,18 @@ class DataPersistanceMethods(ABC):
             last_update_in_table = np.max(last_update_per_asset.values)
         return last_update_in_table
 
-    def last_update_per_unique_identifier(self, unique_identifier_list: Union[list],
-                                          last_update_per_asset: dict):
+    def last_update_per_unique_identifier(self, unique_identifier_list: Optional[list],
+                                          last_update_per_asset: dict) -> datetime.datetime:
+        """
+        Gets the earliest last update time for a list of unique identifiers.
+
+        Args:
+            unique_identifier_list: A list of unique identifiers.
+            last_update_per_asset: A dictionary mapping assets to their last update times.
+
+        Returns:
+            The earliest last update timestamp.
+        """
         if unique_identifier_list is not None:
             last_update_in_table = min(
                 [t for a in last_update_per_asset.values() for t in a.values() if a in unique_identifier_list])
@@ -1376,10 +1542,15 @@ class DataPersistanceMethods(ABC):
             last_update_in_table = min([t for a in last_update_per_asset.values() for t in a.values()])
         return last_update_in_table
 
-    def get_last_observation(self, unique_identifier_list: Optional[list] = None) -> pd.DataFrame():
+    def get_last_observation(self, unique_identifier_list: Optional[list] = None) -> Optional[pd.DataFrame]:
         """
-        (1) Requests last observatiion from local persist manager
-        (3) evaluates if last observation is consistent
+        Gets the last observation from the time series.
+
+        Args:
+            unique_identifier_list: An optional list of unique identifiers to filter by.
+
+        Returns:
+            A DataFrame with the last observation, or None if not found.
         """
         update_statistics = self.get_update_statistics(unique_identifier_list=unique_identifier_list)
         if update_statistics.is_empty():
@@ -1397,11 +1568,11 @@ class DataPersistanceMethods(ABC):
         return last_observation
 
     @property
-    def last_observation(self):
+    def last_observation(self) -> Optional[pd.DataFrame]:
         last_observation = self.get_last_observation()
         return last_observation
 
-    def delete_table(self,):
+    def delete_table(self) -> None:
         if self.local_persist_manager.data_source.related_resource.class_type=="duck_db":
             from mainsequence.client.data_sources_interfaces.duckdb import DuckDBInterface
             db_interface = DuckDBInterface()
@@ -1409,10 +1580,19 @@ class DataPersistanceMethods(ABC):
 
         self.local_persist_manager.metadata.delete()
 
-
-
     @tracer.start_as_current_span("TS: Persist Data")
-    def persist_updated_data(self, temp_df, update_tracker, overwrite=False) -> bool:
+    def persist_updated_data(self, temp_df: pd.DataFrame, update_tracker: object, overwrite: bool = False) -> bool:
+        """
+        Persists the updated data to the database.
+
+        Args:
+            temp_df: The DataFrame with updated data.
+            update_tracker: The update tracker object.
+            overwrite: If True, overwrites existing data.
+
+        Returns:
+            True if data was persisted, False otherwise.
+        """
         persisted = False
         if temp_df.shape[0] > 0:
             if overwrite == True:
@@ -1439,17 +1619,24 @@ class ModelList(list):
     pass
 
 
-def data_source_dir_path(data_source_id):
+def data_source_dir_path(data_source_id: int) -> str:
     path = ogm.pickle_storage_path
     return f"{path}/{data_source_id}"
 
-
-def data_source_pickle_path(data_source_id):
+def data_source_pickle_path(data_source_id: int) -> str:
     return f"{data_source_dir_path(data_source_id)}/data_source.pickle"
 
-
 @tracer.start_as_current_span("TS: load_from_pickle")
-def load_from_pickle(pickle_path):
+def load_from_pickle(pickle_path: str) -> "TimeSerie":
+    """
+    Loads a TimeSerie object from a pickle file, handling both standard and API types.
+
+    Args:
+        pickle_path: The path to the pickle file.
+
+    Returns:
+        The loaded TimeSerie object.
+    """
     import cloudpickle
     from pathlib import Path
 
@@ -1480,13 +1667,14 @@ def load_from_pickle(pickle_path):
 
 class CommonMethodsMixin:
 
-    def get_logger_context_variables(self):
+    def get_logger_context_variables(self) -> Dict[str, Any]:
         return dict(local_hash_id=self.local_hash_id,
-                                   local_hash_id_data_source=self.data_source_id,
-                                   api_time_series=self.__class__.__name__=="APITimeSerie")
+                    local_hash_id_data_source=self.data_source_id,
+                    api_time_series=self.__class__.__name__ == "APITimeSerie")
 
     @property
-    def logger(self):
+    def logger(self) -> logging.Logger:
+        """Gets a logger instance with bound context variables."""
         # import structlog.contextvars as cvars
         # cvars.bind_contextvars(local_hash_id=self.local_hash_id,
         #                      local_hash_id_data_source=self.data_source_id,
@@ -1494,11 +1682,11 @@ class CommonMethodsMixin:
         global logger
         if hasattr(self, "_logger") == False:
             cvars.bind_contextvars(**self.get_logger_context_variables() )
-
             self._logger = logger
 
         return self._logger
-    def unbind_context_variables_from_logger(self):
+
+    def unbind_context_variables_from_logger(self) -> None:
         cvars.unbind_contextvars(*self.get_logger_context_variables().keys())
 
 
@@ -1506,13 +1694,13 @@ class APITimeSerie(CommonMethodsMixin):
     PICKLE_PREFIFX = "api-"
 
     @classmethod
-    def build_from_local_time_serie(cls, local_time_serie: "LocalTimeSerie"):
+    def build_from_local_time_serie(cls, local_time_serie: "LocalTimeSerie") -> "APITimeSerie":
         return cls(data_source_id=local_time_serie.remote_table.data_source.id,
                    local_hash_id=local_time_serie.local_hash_id
                    )
 
     @classmethod
-    def build_from_unique_identifier(cls, unique_identifier: str):
+    def build_from_unique_identifier(cls, unique_identifier: str) -> "APITimeSerie":
         from mainsequence.client import MarketsTimeSeriesDetails
         tdag_api_data_source = MarketsTimeSeriesDetails.get(unique_identifier=unique_identifier)
         ts = cls(
@@ -1523,11 +1711,14 @@ class APITimeSerie(CommonMethodsMixin):
 
     def __init__(self,
                  data_source_id: int, local_hash_id: str,
-                 data_source_local_lake: Union[None, DataSource] = None):
+                 data_source_local_lake: Optional[DataSource] = None):
         """
-        A time serie is uniquely identified in tdag by  data_source_id and table_name
-        :param data_source_id:
-        :param table_name:
+        Initializes an APITimeSerie.
+
+        Args:
+            data_source_id: The ID of the data source.
+            local_hash_id: The local hash ID of the time series.
+            data_source_local_lake: Optional local data source for the lake.
         """
         if data_source_local_lake is not None:
             assert data_source_local_lake.data_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE, "data_source_local_lake should be of type CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE"
@@ -1537,7 +1728,8 @@ class APITimeSerie(CommonMethodsMixin):
         self.data_source = data_source_local_lake
         self.local_persist_manager
 
-    def __getstate__(self):
+    def __getstate__(self) -> Dict[str, Any]:
+        """Prepares the state for pickling."""
         state = self.__dict__.copy()
         # Remove unpicklable/transient state specific to APITimeSerie
         names_to_remove = [
@@ -1547,16 +1739,18 @@ class APITimeSerie(CommonMethodsMixin):
         return cleaned_state
 
     @property
-    def local_persist_manager(self):
+    def local_persist_manager(self) -> Any:
+        """Gets the local persistence manager, initializing it if necessary."""
         if hasattr(self, "_local_persist_manager") == False:
             self._set_local_persist_manager()
             self.logger.debug(f"Setting local persist manager for {self.local_hash_id}")
         return self._local_persist_manager
 
-    def set_relation_tree(self):
+    def set_relation_tree(self) -> None:
         pass  # do nothing  for API Time Series
 
-    def _verify_local_data_source(self):
+    def _verify_local_data_source(self) -> None:
+        """Verifies and sets the local data source from environment variables if available."""
         pod_source = os.environ.get("POD_DEFAULT_DATA_SOURCE", None)
         if pod_source != None:
             from mainsequence.client import models as models
@@ -1567,12 +1761,21 @@ class APITimeSerie(CommonMethodsMixin):
             pod_source = ModelClass(**pod_source)
             self.data_source = pod_source
 
-    def build_data_source_from_configuration(self, data_config):
+    def build_data_source_from_configuration(self, data_config: Dict[str, Any]) -> DataSource:
+        """
+        Builds a data source object from a configuration dictionary.
+
+        Args:
+            data_config: The data source configuration.
+
+        Returns:
+            A DataSource object.
+        """
         ModelClass = DynamicTableDataSource.get_class(data_config['data_type'])
         pod_source = ModelClass.get(data_config["id"])
         return pod_source
 
-    def _set_local_persist_manager(self):
+    def _set_local_persist_manager(self) -> None:
         from mainsequence.tdag.time_series.persist_managers import APIPersistManager
 
         self._verify_local_data_source()
@@ -1586,9 +1789,21 @@ class APITimeSerie(CommonMethodsMixin):
     def get_df_between_dates(self, start_date: Optional[datetime.datetime] = None,
                              end_date: Optional[datetime.datetime] = None,
                              unique_identifier_list: Optional[list] = None,unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
-                              great_or_equal=True, less_or_equal=True,
-                             ):
+                             great_or_equal: bool = True, less_or_equal: bool = True) -> pd.DataFrame:
+        """
+        Retrieves a DataFrame of time series data between specified dates.
 
+        Args:
+            start_date: The start date of the data range.
+            end_date: The end date of the data range.
+            unique_identifier_list: An optional list of unique identifiers to filter by.
+            unique_identifier_range_map: An optional map of ranges for unique identifiers.
+            great_or_equal: Whether to include the start date.
+            less_or_equal: Whether to include the end date.
+
+        Returns:
+            A pandas DataFrame with the requested data.
+        """
         filtered_data = self.local_persist_manager.get_df_between_dates(start_date=start_date,
                                                                         end_date=end_date,
                                                                         unique_identifier_list=unique_identifier_list,
@@ -1599,31 +1814,30 @@ class APITimeSerie(CommonMethodsMixin):
 
         return filtered_data
 
-    def filter_by_assets_ranges(self, unique_identifier_range_map: UniqueIdentifierRangeMap):
+    def filter_by_assets_ranges(self, unique_identifier_range_map: UniqueIdentifierRangeMap) -> pd.DataFrame:
         """
+        Filters data by asset ranges.
 
-        Parameters
-        ----------
-        asset_ranges
+        Args:
+            unique_identifier_range_map: A map of unique identifiers to their date ranges.
 
-        Returns
-        -------
-
+        Returns:
+            A pandas DataFrame with the filtered data.
         """
         df = self.local_persist_manager.filter_by_assets_ranges(unique_identifier_range_map, time_serie=self)
         return df
 
     @property
-    def pickle_path(self):
+    def pickle_path(self) -> str:
         pp = data_source_dir_path(self.data_source_id)
         path = f"{pp}/{self.PICKLE_PREFIFX}{self.local_hash_id}.pickle"
         return path
 
     @classmethod
-    def get_pickle_path(cls, local_hash_id, data_source_id: int):
+    def get_pickle_path(cls, local_hash_id: str, data_source_id: int) -> str:
         return f"{ogm.pickle_storage_path}/{data_source_id}/{cls.PICKLE_PREFIFX}{local_hash_id}.pickle"
 
-    def persist_to_pickle(self, overwrite=False):
+    def persist_to_pickle(self, overwrite: bool = False) -> Tuple[str, str]:
         path = self.pickle_path
         # after persisting pickle , build_hash and source code need to be patched
         self.logger.debug(f"Persisting pickle")
@@ -1637,28 +1851,33 @@ class APITimeSerie(CommonMethodsMixin):
                 cloudpickle.dump(self, handle)
         return path, path.replace(ogm.pickle_storage_path + "/", "")
 
-    def get_update_statistics(self, asset_symbols: Union[list, None] = None,
-                              ) -> datetime.datetime:
+    def get_update_statistics(self, asset_symbols: Optional[list] = None) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
         """
-        getts latest value directly from querying the DB,
-        args and kwargs are nedeed for datalake
-        Parameters
-        ----------
-        args :
-        kwargs :
+        Gets update statistics from the database.
 
-        Returns
-        -------
+        Args:
+            asset_symbols: An optional list of asset symbols to filter by.
 
+        Returns:
+            A tuple containing the last update time for the table and a dictionary of last update times per asset.
         """
-
         last_update_in_table, last_update_per_asset = self.local_persist_manager.get_update_statistics(
             remote_table_hash_id=self.remote_table_hashed_name,
             asset_symbols=asset_symbols, time_serie=self)
         return last_update_in_table, last_update_per_asset
 
-    def get_earliest_updated_asset_filter(self, unique_identifier_list: Union[list],
-                                          last_update_per_asset: dict):
+    def get_earliest_updated_asset_filter(self, unique_identifier_list: list,
+                                          last_update_per_asset: dict) -> datetime.datetime:
+        """
+        Gets the earliest last update time for a list of unique identifiers.
+
+        Args:
+            unique_identifier_list: A list of unique identifiers.
+            last_update_per_asset: A dictionary mapping assets to their last update times.
+
+        Returns:
+            The earliest last update timestamp.
+        """
         if unique_identifier_list is not None:
             last_update_in_table = min(
                 [t for a in last_update_per_asset.values() for t in a.values() if a in unique_identifier_list])
@@ -1670,16 +1889,20 @@ class APITimeSerie(CommonMethodsMixin):
         self.logger.info("Not updating series")
         pass
 
-    def persist_data_to_local_lake(self, temp_df, update_tracker,
-                                   latest_value: Union[None, datetime.datetime],
-                                   overwrite=False) -> bool:
+    def persist_data_to_local_lake(self, temp_df: pd.DataFrame, update_tracker: object,
+                                   latest_value: Optional[datetime.datetime],
+                                   overwrite: bool = False) -> bool:
         """
-        Helper series to  persist data to a local lake for reading purposes
-        :param temp_df:
-        :param update_tracker:
-        :param latest_value:
-        :param overwrite:
-        :return:
+        Persists data to a local data lake for reading purposes.
+
+        Args:
+            temp_df: The DataFrame to persist.
+            update_tracker: The update tracker object.
+            latest_value: The latest value timestamp.
+            overwrite: If True, overwrites existing data.
+
+        Returns:
+            True if data was persisted, False otherwise.
         """
         persisted = False
         if temp_df.shape[0] > 0:
@@ -1714,15 +1937,12 @@ class TimeSerieInitMeta(BaseModel):
 class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):
     """
     Base TimeSerie class
-
-
-
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
 
     def __init__(
             self,
-            init_meta:Optional[TimeSerieInitMeta]=None,
+            init_meta:Optional[TimeSerieInitMeta] = None,
             build_meta_data: Union[dict, None] = None,
             local_kwargs_to_ignore: Union[List[str], None] = None,
             *args,
@@ -1776,13 +1996,28 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         # create logger
 
     @staticmethod
-    def set_context_in_logger(logger_context:dict):
+    def set_context_in_logger(logger_context: Dict[str, Any]) -> None:
+        """
+        Binds context variables to the global logger.
+
+        Args:
+            logger_context: A dictionary of context variables.
+        """
         global logger
         for key,value in logger_context.items():
             logger.bind(**dict(key=value))
 
     @staticmethod
-    def get_time_serie_source_code(TimeSerieClass: "TimeSerie"):
+    def get_time_serie_source_code(TimeSerieClass: "TimeSerie") -> str:
+        """
+        Gets the source code of a TimeSerie class.
+
+        Args:
+            TimeSerieClass: The class to get the source code for.
+
+        Returns:
+            The source code as a string.
+        """
         global logger
         try:
             # First try the standard approach.
@@ -1804,12 +2039,15 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         return "Source code unavailable."
 
     @staticmethod
-    def get_time_serie_source_code_git_hash(TimeSerieClass: "TimeSerie"):
+    def get_time_serie_source_code_git_hash(TimeSerieClass: "TimeSerie") -> str:
         """
-        Hashes a time serie source code
-        Returns
-        -------
+        Hashes the source code of a TimeSerie class using SHA-1 (Git style).
 
+        Args:
+            TimeSerieClass: The class to hash.
+
+        Returns:
+            The Git-style hash of the source code.
         """
         time_serie_class_source_code = TimeSerieClass.get_time_serie_source_code(TimeSerieClass)
         # Prepare the content for Git-style hashing
@@ -1820,7 +2058,11 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         git_hash = hash_object.hexdigest()
         return git_hash
 
-    def _post_init_routines():
+    def _post_init_routines() -> Callable:
+        """
+        A decorator to run routines after the __init__ method of a TimeSerie.
+        It handles argument processing, configuration creation, and other setup tasks.
+        """
         def wrap(init_method):
             @wraps(init_method)
             def run_init(*args, **kwargs):
@@ -1859,7 +2101,10 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         return wrap
 
     @staticmethod
-    def sanitize_default_build_metadata(build_meta_data: Union[dict, None] = None):
+    def sanitize_default_build_metadata(build_meta_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Sanitizes the build metadata, providing default values if necessary.
+        """
         if build_meta_data is None:
             build_meta_data = {"initialize_with_default_partitions": True}
 
@@ -1867,74 +2112,65 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             build_meta_data["initialize_with_default_partitions"] = True
         return build_meta_data
 
-
-
-    def get_html_description(self) -> Union[str, None]:
+    def get_html_description(self) -> Optional[str]:
         """
-        must return a descript on html tags so it can be readable and rendedered
-        Returns:
+        Returns an HTML description of the TimeSerie instance.
 
+        Returns:
+            An HTML string with the description.
         """
         description = f"""<p>Time Serie Instance of {self.__class__.__name__} updating table {self.remote_table_hashed_name}</p>"""
         return description
 
-
-
     @property
-    def hash_id(self):
-        """
-
-        Returns:
-
-        """
+    def hash_id(self) -> str:
+        """The remote table hash name."""
         return self.remote_table_hashed_name
 
     @property
-    def data_source_id(self):
+    def data_source_id(self) -> int:
         return self.data_source.id
 
     @property
-    def local_hash_id(self):
+    def local_hash_id(self) -> str:
         return self.hashed_name
 
-    def _run_pre_load_routines(self):
+    def _run_pre_load_routines(self) -> None:
         """
-        Override this method to execute after load and before dependencies are updated
-        Returns
-        -------
-
+        Override this method to execute code after loading and before dependencies are updated.
         """
         self.pre_load_routines_run = True
 
-    def get_data_source_from_orm(self):
+    def get_data_source_from_orm(self) -> Any:
         from mainsequence.client import SessionDataSource
-
         if SessionDataSource.data_source.related_resource is None:
             raise Exception("This Pod does not have a default data source")
         return SessionDataSource.data_source
 
 
     @property
-    def data_source(self):
+    def data_source(self) -> Any:
         if hasattr(self, "_data_source"):
             return self._data_source
         else:
             raise Exception("Data source has not been set")
 
-    def set_data_source(self, data_source: Union[object, None] = None):
+    def set_data_source(self, data_source: Optional[object] = None) -> None:
         """
+        Sets the data source for the time series.
 
-        :return:
+        Args:
+            data_source: The data source object. If None, the default is fetched from the ORM.
         """
         if data_source is None:
             self._data_source = self.get_data_source_from_orm()
         else:
             self._data_source = data_source
 
-    def run_after_post_init_routines(self):
+    def run_after_post_init_routines(self) -> None:
         pass
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         try:
             local_id = self.local_metadata.id
         except:
@@ -1942,36 +2178,40 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         repr = self.__class__.__name__ + f" {os.environ['TDAG_ENDPOINT']}/local-time-series/details/?local_time_serie_id={local_id}"
         return repr
 
-    def _get_target_time_index(self, idx):
+    def _get_target_time_index(self, idx: Any) -> Any:
         raise NotImplementedError
 
     @property
-    def local_time_serie(self):
+    def local_time_serie(self) -> Any:
+        """The local time series metadata object."""
         return self.local_persist_manager.local_metadata
 
-
-
     @property
-    def update_uses_parallel(self):
+    def update_uses_parallel(self) -> bool:
+        """Checks if the update process uses parallel execution."""
         meta_data = self.meta_data
         if "update_uses_parallel" in meta_data:
             return meta_data["update_uses_parallel"]
         else:
             return False
 
-    def plot_relation_tree(self):
+    def plot_relation_tree(self) -> Any:
         # from fdaccess.time_seriesV2.drawing import build_data_for_tree
         # tree = self.get_relation_tree(as_object=True)
         # data = build_data_for_tree(tree=tree)
         # return data
         raise NotImplementedError
 
-    def _sanitize_init_meta(self, kwargs) -> dict:
+    def _sanitize_init_meta(self, kwargs: Dict[str, Any]) -> Tuple[Dict[str, Any], "TimeSerieInitMeta"]:
         """
-        Handles Initial Configuration in preconfig process
-        :return:
-        """
+        Handles initial configuration in the pre-configuration process.
 
+        Args:
+            kwargs: The keyword arguments dictionary.
+
+        Returns:
+            A tuple containing the sanitized kwargs and the init_meta object.
+        """
         if "init_meta" in kwargs.keys():
             init_meta = kwargs["init_meta"] if kwargs["init_meta"] is not None else TimeSerieInitMeta()
             kwargs.pop("init_meta", None)
@@ -1979,9 +2219,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             init_meta = TimeSerieInitMeta()
         return kwargs, init_meta
 
-
-
-    def run_local_update(self, tdag_detached=True):
+    def run_local_update(self, tdag_detached: bool = True) -> Any:
         raise NotImplementedError("Legacy")
         self.local_persist_manager
         return self.get_df_between_dates()
@@ -2093,7 +2331,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             raise error_to_raise
 
     @property
-    def local_persist_manager(self):
+    def local_persist_manager(self) -> PersistManager:
         if hasattr(self, "_local_persist_manager") == False:
             self.logger.debug(f"Setting local persist manager for {self.hash_id}")
             self._set_local_persist_manager(local_hash_id=self.local_hash_id,
@@ -2127,8 +2365,8 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             data_source=self.data_source
         )
 
-    def _verify_and_build_remote_objects(self):
-
+    def _verify_and_build_remote_objects(self) -> None:
+        """Verifies and builds remote objects if they don't exist."""
         time_serie_source_code_git_hash = self.get_time_serie_source_code_git_hash(self.__class__)
         time_serie_source_code = self.get_time_serie_source_code(self.__class__)
         self._local_persist_manager.local_persist_exist_set_config(
@@ -2143,17 +2381,14 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         ) #this method always creates
 
 
-    def flush_pickle(self):
+    def flush_pickle(self) -> None:
+        """Deletes the pickle file for this time series."""
         if os.path.isfile(self.pickle_path):
             os.remove(self.pickle_path)
 
-    def patch_build_configuration(self):
+    def patch_build_configuration(self) -> None:
         """
-        This method comes in handy when there is a change in VAM models extra configuration. This method will properly
-        update the models on all the tree
-        Returns
-        -------
-
+        Patches the build configuration for the time series and its dependencies.
         """
         patch_build = os.environ.get("PATCH_BUILD_CONFIGURATION", False) in ["true", "True", 1]
         if patch_build == True:
@@ -2167,13 +2402,13 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                                                                  remote_build_metadata=self.remote_build_metadata,
                                                                  )
 
-
-
-    def _create_config(self, kwargs, post_init_log_messages: list):
+    def _create_config(self, kwargs: Dict[str, Any], post_init_log_messages: list) -> None:
         """
-        This methods executes  after serialization
-        :param kwargs:
-        :return:
+        Creates the configuration and hashes for the TimeSerie instance.
+
+        Args:
+            kwargs: The keyword arguments from __init__.
+            post_init_log_messages: A list of log messages to be displayed.
         """
         global logger
         kwargs, init_meta = self._sanitize_init_meta(kwargs=kwargs)
@@ -2211,15 +2446,14 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
         logger.debug(f"local/remote {self.hashed_name}/{self.remote_table_hashed_name}")
 
-    def set_update_uses_parallel(self, value):
+    def set_update_uses_parallel(self, value: bool) -> None:
+        """
+        Sets the 'update_uses_parallel' metadata flag.
+        """
         self.local_persist_manager.set_meta("update_uses_parallel", value)
 
-    def set_dependencies_df(self):
-        """
-
-        :return:
-        """
-
+    def set_dependencies_df(self) -> None:
+        """Sets the dependencies DataFrame for the time series."""
         self.logger.debug("Initializing update priority ... ")
         depth_df = self.local_persist_manager.get_all_dependencies_update_priority()
         self.depth_df = depth_df
@@ -2229,16 +2463,21 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         if depth_df.shape[0] > 0:
             self.dependencies_df = self.depth_df[self.depth_df["local_time_serie_id"] != self.local_persist_manager.local_metadata.id].copy()
 
-    def pre_update_setting_routines(self, scheduler, set_time_serie_queue_status: bool, update_tree: True,
-                                    metadata: Union[dict, None] = None, local_metadata: Union[dict, None] = None
-                                    ):
+    def pre_update_setting_routines(self, scheduler: "Scheduler", set_time_serie_queue_status: bool, update_tree: bool,
+                                    metadata: Optional[dict] = None, local_metadata: Optional[dict] = None) -> Tuple[Dict, Any]:
         """
-        Routines to execute previous to an update
-        Returns
-        -------
+        Routines to execute before an update.
 
+        Args:
+            scheduler: The scheduler object.
+            set_time_serie_queue_status: Whether to set the queue status.
+            update_tree: Whether to update the tree.
+            metadata: Optional remote metadata.
+            local_metadata: Optional local metadata.
+
+        Returns:
+            A tuple containing the local metadata map and state data.
         """
-
         # reset metadata
         self.local_persist_manager.synchronize_metadata(local_metadata=local_metadata)
         self.set_relation_tree()
@@ -2288,13 +2527,17 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
     @tracer.start_as_current_span("Verify time series tree update")
     def _verify_tree_is_updated(
             self,
-            local_time_series_map: Dict[int, LocalTimeSerie],
+            local_time_series_map: Dict[int, "LocalTimeSerie"],
             debug_mode: bool,
             use_state_for_update: bool = False
-    ):
+    ) -> None:
         """
+        Verifies that the dependency tree is updated.
+
         Args:
-            use_state_for_update: timeseries will be collected from code introspection
+            local_time_series_map: A map of local time series objects.
+            debug_mode: Whether to run in debug mode.
+            use_state_for_update: If True, uses the current state for the update.
         """
         # build tree
         if self.is_local_relation_tree_set == False:
@@ -2372,14 +2615,25 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                     updated_uids.extend(tmp_ts.index.to_list())
         self.logger.debug(f'Dependency Tree evaluated for  {self}')
 
-    def set_actor_manager(self, actor_manager: object):
+    def set_actor_manager(self, actor_manager: object) -> None:
+        """
+        Sets the actor manager for distributed updates.
+
+        Args:
+            actor_manager: The actor manager object.
+        """
         self.update_actor_manager = actor_manager
 
     @tracer.start_as_current_span("Execute distributed parallel update")
     def _execute_parallel_distributed_update(self, tmp_ts: pd.DataFrame,
-                                             local_time_series_map:Dict[int,LocalTimeSerie]
-                                             ):
+                                             local_time_series_map: Dict[int, "LocalTimeSerie"]) -> None:
+        """
+        Executes a parallel distributed update of dependencies.
 
+        Args:
+            tmp_ts: A DataFrame of time series to update.
+            local_time_series_map: A map of local time series objects.
+        """
         telemetry_carrier = tracer_instrumentator.get_telemetry_carrier()
 
         pre_loaded_ts = [t.hash_id for t in self.scheduler.pre_loads_in_tree]
@@ -2452,13 +2706,28 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             raise DependencyUpdateError(f"Update Stop from error in children \n {ts_with_errors}")
 
     @tracer.start_as_current_span("TimeSerie.update_local")
-    def update_local(self, update_tree, update_tracker: object, debug_mode: bool,
+    def update_local(self, update_tree: bool, update_tracker: object, debug_mode: bool,
                      update_statistics: DataUpdates,
-                     local_time_series_map: Union[None, dict] = None,
-                     overwrite_latest_value: Union[datetime.datetime, None] = None, update_only_tree: bool = False,
+                     local_time_series_map: Optional[dict] = None,
+                     overwrite_latest_value: Optional[datetime.datetime] = None, update_only_tree: bool = False,
                      use_state_for_update: bool = False,
                      *args, **kwargs) -> bool:
+        """
+        Performs a local update of the time series data.
 
+        Args:
+            update_tree: Whether to update the dependency tree.
+            update_tracker: The update tracker object.
+            debug_mode: Whether to run in debug mode.
+            update_statistics: The data update statistics.
+            local_time_series_map: A map of local time series objects.
+            overwrite_latest_value: An optional timestamp to overwrite the latest value.
+            update_only_tree: If True, only updates the dependency tree structure.
+            use_state_for_update: If True, uses the current state for the update.
+
+        Returns:
+            True if data was persisted, False otherwise.
+        """
         from mainsequence.instrumentation.utils import Status, StatusCode
         persisted = False
         if update_tree == True:
@@ -2480,7 +2749,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         #     if len(r)>0:
         #         #there is data but not source table configuration overwrite
         #         overwrite_latest_value=datetime.datetime(2023,6,23).replace(tzinfo=pytz.utc)
-
 
         with tracer.start_as_current_span("Update Calculation") as update_span:
 
@@ -2552,10 +2820,11 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
             return persisted
 
-    def _run_post_update_routines(self, error_on_last_update: bool,update_statistics:DataUpdates,  ):
+    def _run_post_update_routines(self, error_on_last_update: bool, update_statistics: DataUpdates) -> None:
+        """ Should be overwritten by subclass """
         pass
 
-    def _get_column_metadata(self)->list[ColumnMetaData]:
+    def _get_column_metadata(self) -> Optional[List[ColumnMetaData]]:
         """
         This Method should return a list for ColumnMetaData to add extra context to each time series
         Examples:
@@ -2578,15 +2847,12 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                                            ),
 
                             ]
-
-
         Returns:
-
+            A list of ColumnMetaData objects, or None.
         """
         return None
 
-    def _set_column_metadata(self):
-
+    def _set_column_metadata(self) -> None:
         if self.metadata:
             if self.metadata.sourcetableconfiguration != None:
                 if self.metadata.sourcetableconfiguration.columns_metadata is not None:
@@ -2600,7 +2866,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
 
     def _get_asset_list(self) -> Optional[List["Asset"]]:
-
         """
         Provide the list of assets that this TimeSerie should include when updating.
 
@@ -2624,7 +2889,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
         return None
 
-    def set_update_statistics(self, update_statistics: DataUpdates):
+    def set_update_statistics(self, update_statistics: DataUpdates) -> DataUpdates:
         """
         Default method to narrow down update statistics un local time series,
         the method will filter using asset_list if the attribute exists as well as the init fallback date
@@ -2717,19 +2982,41 @@ class WrapperTimeSerie(TimeSerie):
         self.translation_table = translation_table
     
     
-    def get_ranged_data(self,range_descriptor: Optional[UniqueIdentifierRangeMap] ):
+    def get_ranged_data(self, range_descriptor: Optional[UniqueIdentifierRangeMap]) -> pd.DataFrame:
+        """
+        Gets data based on a range descriptor.
+
+        Args:
+            range_descriptor: A UniqueIdentifierRangeMap object.
+
+        Returns:
+            A DataFrame with the ranged data.
+        """
         return self.get_df_between_dates(unique_identifier_range_map=range_descriptor)
     
     def get_df_between_dates(
             self,
-            start_date: Union[datetime.datetime, None] = None,
-            end_date: Union[datetime.datetime, None] = None,
-            unique_identifier_list: Union[None, list] = None,
-            great_or_equal=True,
-            less_or_equal=True,
+            start_date: Optional[datetime.datetime] = None,
+            end_date: Optional[datetime.datetime] = None,
+            unique_identifier_list: Optional[list] = None,
+            great_or_equal: bool = True,
+            less_or_equal: bool = True,
             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
-    ):
+    ) -> pd.DataFrame:
+        """
+        Retrieves a DataFrame of time series data between specified dates, handling asset translation.
 
+        Args:
+            start_date: The start date of the data range.
+            end_date: The end date of the data range.
+            unique_identifier_list: An optional list of unique identifiers to filter by.
+            great_or_equal: Whether to include the start date.
+            less_or_equal: Whether to include the end date.
+            unique_identifier_range_map: An optional map of ranges for unique identifiers.
+
+        Returns:
+            A pandas DataFrame with the requested data.
+        """
         if (unique_identifier_list is None) == (unique_identifier_range_map is None):
             raise ValueError(
                 "Pass **either** unique_identifier_list **or** unique_identifier_range_map, but not both."
@@ -2844,206 +3131,6 @@ class WrapperTimeSerie(TimeSerie):
         data_df = pd.concat(data_df, axis=0)
         return data_df
 
-    def set_data_source_from_pickle_path(self, pikle_path):
-        data_source = self.load_data_source_from_pickle(pikle_path)
-        self.set_data_source(data_source=data_source)
-
-    @tracer.start_as_current_span("Wrapper.concat_between_dates")
-    def pandas_df_concat_on_rows_by_key_between_dates(self, start_date: Optional[datetime.datetime]=None,
-                                                      great_or_equal: Optional[bool]=None,
-                                                      end_date: Optional[datetime.datetime]=None,
-                                                      less_or_equal: Optional[bool]=None,
-                                                      thread: bool = False,
-                                                      unique_identifier_list: Optional[list] = None,
-                                                      return_as_list=False, key_date_filter: Optional[dict] = None,
-                                                      unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
-                                                      ) -> pd.DataFrame:
-        """
-         Concatenate DataFrames from all wrapped TimeSeries between given dates.
-
-         Args:
-             start_date: The start date for the data range.
-             great_or_equal: Whether to include the start date (True) or not (False).
-             end_date: The end date for the data range.
-             less_or_equal: Whether to include the end date (True) or not (False).
-             thread: Whether to use threading for parallel processing.
-             unique_identifier_list: asset_symbol filter
-             return_as_list: If True, return a dictionary of DataFrames instead of concatenating.
-            key_date_filter: Concatenate DataFrames only for key date filter.
-         Returns:
-             A concatenated DataFrame or a dictionary of DataFrames if return_as_list is True.
-         """
-        all_dfs = []
-        all_dfs_thread = {}
-        thread = False
-
-        def add_ts(ts, key, thread, unique_identifier_list, key_date_filter,unique_identifier_range_map):
-            data_start_date = start_date
-            if isinstance(start_date, dict):
-                data_start_date = start_date[key]
-            if key_date_filter is not None:
-                data_start_date = key_date_filter.get(key, data_start_date)
-
-            tmp_df = ts.get_df_between_dates(start_date=data_start_date, great_or_equal=great_or_equal,
-                                             end_date=end_date, less_or_equal=less_or_equal,
-                                             unique_identifier_list=unique_identifier_list,
-                                             unique_identifier_range_map=unique_identifier_range_map
-                                             )
-            tmp_df["key"] = key
-            all_dfs_thread[key] = tmp_df
-
-        if thread == False:
-            for key, ts in self.related_time_series.items():
-                add_ts(ts, key, thread, unique_identifier_list, key_date_filter,unique_identifier_range_map)
-        else:
-
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                future_list = []
-                for key, ts in self.related_time_series.items():
-                    future = executor.submit(add_ts, ts, key, thread, unique_identifier_list, key_date_filter,
-                                             unique_identifier_range_map
-                                             )
-                    future_list.append(future)
-
-                for future in as_completed(future_list):
-                    # You can optionally handle exceptions here if any
-                    try:
-                        result = future.result()  # This will block until the future is done
-                    except Exception as e:
-                        self.logger.exception("Error in thread")
-                        raise e
-
-        if return_as_list == False:
-            all_dfs = pd.concat(all_dfs_thread.values(), axis=0)
-        else:
-            all_dfs = all_dfs_thread
-
-        return all_dfs
-
-    @tracer.start_as_current_span("Wrapper.concat_greater_than")
-    def pandas_df_concat_on_rows_by_key_greater_than(self, target_value: datetime.datetime, great_or_equal: bool,
-                                                     thread: bool = False, return_as_list=False,
-                                                     columns: Union[None, list] = None, *args,
-                                                     **kwargs) -> pd.DataFrame:
-        """
-         Concatenate DataFrames from all wrapped TimeSeries greater than a target value.
-
-         Args:
-             target_value: The latest datetime value to compare against.
-             great_or_equal: Whether to include the target value (True) or not (False).
-             thread: Whether to use threading for parallel processing.
-             return_as_list: If True, return a dictionary of DataFrames instead of concatenating.
-             columns: Optional list of columns to include.
-
-         Returns:
-             A concatenated DataFrame or a dictionary of DataFrames if return_as_list is True.
-
-         """
-        all_dfs = []
-        all_dfs_thread = {}
-
-        def add_ts(ts, key, thread, columns):
-            tmp_df = ts.get_df_between_dates(start_date=target_value,
-                                             great_or_equal=great_or_equal,
-                                             columns=columns,
-                                             *args, **kwargs
-                                             )
-            tmp_df["key"] = key
-            if thread == False:
-                return tmp_df
-            all_dfs_thread[key] = tmp_df
-            if return_as_list == False:
-                all_dfs = pd.concat(all_dfs, axis=0)
-
-        if thread == False:
-
-            for key, ts in self.related_time_series.items():
-                tmp_df = add_ts(ts, key, thread, columns)
-                all_dfs.append(tmp_df)
-
-            all_dfs = pd.concat(all_dfs, axis=0)
-        else:
-            thread_list = []
-            for key, ts in self.related_time_series.items():
-                t = threading.Thread(target=add_ts, args=(ts, key, thread, columns))
-                t.start()
-                thread_list.append(t)
-            for t in thread_list:
-                t.join()
-            all_dfs = pd.concat(all_dfs_thread.values(), axis=0)
-
-        return all_dfs
-
-    def get_pandas_df_list_data_greater_than(self, target_value: datetime.datetime, great_or_equal: bool,
-                                             thread=True) -> list:
-        """
-        Get DataFrames from all wrapped TimeSeries greater than a target value.
-
-        Args:
-            target_value: The target datetime value to compare against.
-            great_or_equal: Whether to include the target value (True) or not (False).
-            thread: Whether to use threading for parallel processing.
-
-        Returns:
-            A dictionary with TimeSerie keys and their corresponding DataFrames or error messages.
-        """
-        thread_list = []
-
-        def get_df(all_dfs, key, ts, target_value, great_or_equal):
-            try:
-                tmp_df = ts.get_df_between_dates(start_date=target_value, great_or_equal=great_or_equal)
-                all_dfs[key] = tmp_df
-            except Exception as e:
-                all_dfs[key] = "Error"
-
-        all_dfs = {}
-        for key, ts in self.related_time_series.items():
-
-            if thread == False:
-                get_df(all_dfs, key, ts, target_value, great_or_equal, )
-            else:
-                t = threading.Thread(target=get_df, args=(all_dfs, key, ts, target_value, great_or_equal,))
-                t.start()
-                thread_list.append(t)
-
-        for t in thread_list:
-            t.join()
-
-        return all_dfs
-
     def update(self, update_statistics):
-
-        """ Implemented in the wrapped nodes"""
+        """ WrapperTimeSeries does not update """
         pass
-
-    def __getitem__(self, item):
-        return self.related_time_series[item]
-
-    def children_is_updating(self) -> bool:
-        """ Check if any wrapped TimeSerie is currently updating. """
-
-        return any([i.active_update for i in self.get_wrapped()])
-
-    def items(self):
-        """Get items of wrapped TimeSeries. """
-        return self.related_time_series.items()
-
-    def values(self):
-        """ Get values of wrapped TimeSeries. """
-        return self.related_time_series.values()
-
-    def get_wrapped(self) -> List[TimeSerie]:
-        """
-        Get all wrapped TimeSeries, including nested ones.
-
-        Returns:
-            A list of all wrapped TimeSerie objects, including those nested in other WrapperTimeSeries.
-        """
-        wrapped = []
-        for ts in self.related_time_series.values():
-            if isinstance(ts, WrapperTimeSerie):
-                tmp_w = ts.get_wrapped()
-                wrapped.extend(tmp_w)
-            else:
-                wrapped.append(ts)
-        return wrapped
