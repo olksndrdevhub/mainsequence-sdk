@@ -32,7 +32,7 @@ class ReportType(Enum):
 class PortfolioTableConfiguration(BaseModel):
     report_title: str = "Portfolio Table"
     report_type: ReportType = ReportType.FIXED_INCOME
-    portfolio_tickers: List[PortfolioNameEnum] = [list(PortfolioNameEnum)[0].value]
+    portfolio_tickers: List[PortfolioNameEnum]
     report_days: int = 365 * 5
 
 @register_app()

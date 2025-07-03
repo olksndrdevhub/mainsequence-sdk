@@ -24,7 +24,7 @@ PortfolioNameEnum = Enum(
 )
 class PortfolioReportConfiguration(BaseModel):
     report_title: str = "Portfolio Report"
-    portfolio_tickers: List[PortfolioNameEnum] = [list(PortfolioNameEnum)[0].value]
+    portfolio_tickers: List[PortfolioNameEnum]
     report_days: int = 365 * 5
 
 @register_app()
