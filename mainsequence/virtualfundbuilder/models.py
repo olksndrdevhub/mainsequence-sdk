@@ -333,28 +333,26 @@ class ProjectTemplate(BaseModel):
         The root model for the entire project configuration.
         name: "Data Processing Pipeline"
         jobs:
-          ingestion:
-            name: "Data Ingestion"
-            resources:
-              - script:
-                  path: "/scripts/ingest_data.py"
-            schedule:
-              type: "crontab"
-              start_time: "2025-08-01T00:00:00Z"
-              expression: "0 2 * * *"
-          monitoring:
-            name: "Heartbeat Monitor"
-            resources:
-              - app:
-                  name: "HealthChecker"
-                  configuration:
-                    endpoint: "/health"
-                    retries: 3
-            schedule:
-              type: "interval"
-              start_time: "2025-08-01T01:00:00Z"
-              every: 5
-              period: "minutes"
+            - name: "Data Ingestion"
+              resources:
+                - script:
+                    path: "/scripts/ingest_data.py"
+              schedule:
+                type: "crontab"
+                start_time: "2025-08-01T00:00:00Z"
+                expression: "0 2 * * *"
+            - name: "Heartbeat Monitor"
+              resources:
+                - app:
+                    name: "HealthChecker"
+                    configuration:
+                      endpoint: "/health"
+                      retries: 3
+              schedule:
+                type: "interval"
+                start_time: "2025-08-01T01:00:00Z"
+                every: 5
+                period: "minutes"
     """
     name: str = Field(..., min_length=1, description="The name of the project.")
     jobs: List[Job]
