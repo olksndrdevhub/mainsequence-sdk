@@ -1,6 +1,6 @@
 import pandas as pd
 import datetime
-from typing import Union, List,Dict,Optional
+from typing import Union, List, Dict, Optional, Tuple
 import os
 from mainsequence.logconf import logger
 
@@ -10,19 +10,29 @@ from mainsequence.client import (LocalTimeSerie, UniqueIdentifierRangeMap,
                                  DynamicTableDoesNotExist, DynamicTableDataSource, TDAG_CONSTANTS as CONSTANTS, DynamicTableMetaData,
                                  DataUpdates, DoesNotExist)
 
-from mainsequence.client.models_tdag import   DynamicTableHelpers
+from mainsequence.client.models_tdag import DynamicTableHelpers, LocalTimeSerieUpdateDetails
 import json
 import threading
 from concurrent.futures import Future
-from .. import  future_registry  # import your global future registry module
-
+from .. import  future_registry
 
 
 class APIPersistManager:
+    """
+    Manages persistence for time series data accessed via an API.
+    It handles asynchronous fetching of metadata to avoid blocking operations.
+    """
 
-    def __init__(self,data_source_id:int,local_hash_id:str):
-        self.data_source_id = data_source_id
-        self.local_hash_id = local_hash_id
+    def __init__(self, data_source_id: int, local_hash_id: str):
+        """
+        Initializes the APIPersistManager.
+
+        Args:
+            data_source_id: The ID of the data source.
+            local_hash_id: The local hash identifier for the time series.
+        """
+        self.data_source_id: int = data_source_id
+        self.local_hash_id: str = local_hash_id
 
         logger.debug(f"Initializing Time Serie {self.local_hash_id}  as APITimeSerie")
 
@@ -37,9 +47,8 @@ class APIPersistManager:
         thread.start()
 
 
-
     @property
-    def local_metadata(self):
+    def local_metadata(self) -> LocalTimeSerie:
         """Lazily block and cache the result if needed."""
         if not hasattr(self, '_local_metadata_cached'):
             # This call blocks until the future is resolved.
@@ -47,18 +56,20 @@ class APIPersistManager:
         return self._local_metadata_cached
 
     @property
-    def metadata(self):
+    def metadata(self) -> DynamicTableMetaData:
+        """Returns the remote table metadata associated with the local time series."""
         return self.local_metadata.remote_table
 
 
-    def _init_local_metadata(self):
-        """Perform the REST request asynchronously."""
+    def _init_local_metadata(self) -> None:
+        """
+        Performs the REST request to fetch local metadata asynchronously.
+        Sets the result or exception on the future object.
+        """
         try:
-
-
             result = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
                                                 remote_table__data_source__id=self.data_source_id,
-                                                    include_relations_detail=True
+                                                include_relations_detail=True
             )
             self._local_metadata_future.set_result(result)
         except Exception as exc:
@@ -67,11 +78,30 @@ class APIPersistManager:
             # Remove the future from the global registry once done.
             future_registry.remove_future(self._local_metadata_future)
 
-    def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
-                             less_or_equal=True,
-                             unique_identifier_list: Union[list, None] = None,
-                             columns: Union[list, None] = None,
-                             unique_identifier_range_map: Union[UniqueIdentifierRangeMap, None] = None,):
+    def get_df_between_dates(self,
+                             start_date: Optional[datetime.datetime],
+                             end_date: Optional[datetime.datetime],
+                             great_or_equal: bool = True,
+                             less_or_equal: bool = True,
+                             unique_identifier_list: Optional[List[str]] = None,
+                             columns: Optional[List[str]] = None,
+                             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None
+                             ) -> pd.DataFrame:
+        """
+        Retrieves a DataFrame from the API between specified dates.
+
+        Args:
+            start_date: The start date for the data range.
+            end_date: The end date for the data range.
+            great_or_equal: Whether the start date is inclusive.
+            less_or_equal: Whether the end date is inclusive.
+            unique_identifier_list: A list of unique identifiers to filter by.
+            columns: A list of columns to retrieve.
+            unique_identifier_range_map: A map of unique identifiers to their specific date ranges.
+
+        Returns:
+            A pandas DataFrame with the requested data.
+        """
         filtered_data = self.local_metadata.get_data_between_dates_from_api(
                                                         start_date=start_date,
                                                         end_date=end_date, great_or_equal=great_or_equal,
@@ -106,64 +136,96 @@ class APIPersistManager:
         filtered_data=filtered_data.set_index(stc.index_names)
         return filtered_data
 
-    def filter_by_assets_ranges(self, unique_identifier_range_map: UniqueIdentifierRangeMap,time_serie:"TimeSerie"):
+    def filter_by_assets_ranges(self, unique_identifier_range_map: UniqueIdentifierRangeMap,
+                                time_serie: "TimeSerie") -> pd.DataFrame:
+        """
+        Filters data by asset ranges.
+
+        Args:
+            unique_identifier_range_map: A map of assets to their date ranges.
+            time_serie: The parent TimeSerie object.
+
+        Returns:
+            A pandas DataFrame containing the filtered data.
+        """
         df = self.get_df_between_dates(start_date=None, end_date=None, unique_identifier_range_map=unique_identifier_range_map)
         return df
 
 class PersistManager:
     def __init__(self,
-                 data_source,
-                 local_hash_id: int,
-                 description: Union[str, None] = None,
-                 class_name: Union[str, None] = None,
-                 metadata: Union[dict, None] = None,
-                 local_metadata: Union[dict, None] = None
-
+                 data_source: DynamicTableDataSource,
+                 local_hash_id: str,
+                 description: Optional[str] = None,
+                 class_name: Optional[str] = None,
+                 metadata: Optional[Dict] = None,
+                 local_metadata: Optional[LocalTimeSerie] = None
                  ):
-        self.data_source = data_source
-        self.local_hash_id = local_hash_id
+        """
+        Initializes the PersistManager.
+
+        Args:
+            data_source: The data source for the time series.
+            local_hash_id: The local hash identifier for the time series.
+            description: An optional description for the time series.
+            class_name: The name of the TimeSerie class.
+            metadata: Optional remote metadata dictionary.
+            local_metadata: Optional local metadata object.
+        """
+        self.data_source: DynamicTableDataSource = data_source
+        self.local_hash_id: str = local_hash_id
         if local_metadata is not None and metadata is None:
             # query remote hash_id
             metadata = local_metadata.remote_table
-        self.description=description
+        self.description: Optional[str] = description
         self.logger = logger
 
-
-        self.table_model_loaded = False
-
-        self.class_name = class_name
+        self.table_model_loaded: bool = False
+        self.class_name: Optional[str] = class_name
 
         # Private members for managing lazy asynchronous retrieval.
-        self._local_metadata_future = None
-        self._local_metadata_cached = None  # Cached result after first lookup
+        self._local_metadata_future: Optional[Future] = None
+        self._local_metadata_cached: Optional[LocalTimeSerie] = None
         self._local_metadata_lock = threading.Lock()
-        self._metadata_cached=None
+        self._metadata_cached: Optional[DynamicTableMetaData] = None
 
         if self.local_hash_id is not None:
             self.synchronize_metadata(local_metadata=local_metadata)
 
-    def synchronize_metadata(self, local_metadata: Union[None, LocalTimeSerie]):
-
+    def synchronize_metadata(self, local_metadata: Optional[LocalTimeSerie]) -> None:
         if local_metadata is not None:
             self.set_local_metadata(local_metadata)
         else:
             self.set_local_metadata_lazy(force_registry=True, include_relations_detail=True)
 
     @classmethod
-    def get_from_data_type(self,data_source:DynamicTableDataSource,*args, **kwargs):
+    def get_from_data_type(cls, data_source: DynamicTableDataSource, *args, **kwargs) -> 'PersistManager':
+        """
+        Factory method to get the correct PersistManager based on data source type.
+
+        Args:
+            data_source: The data source object.
+
+        Returns:
+            An instance of a PersistManager subclass.
+        """
         data_type = data_source.related_resource_class_type
         if data_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
             return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
         else:
             return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
 
+    def set_local_metadata(self, local_metadata: LocalTimeSerie) -> None:
+        """
+        Caches the local metadata object for lazy queries
 
-    ## method for doing lazy queries
-    def set_local_metadata(self, local_metadata: LocalTimeSerie):
+        Args:
+            local_metadata: The LocalTimeSerie object to cache.
+        """
         self._local_metadata_cached = local_metadata
 
     @property
-    def local_metadata(self):
+    def local_metadata(self) -> LocalTimeSerie:
+        """Lazily block and retrieve the local metadata, caching the result."""
         with self._local_metadata_lock:
             if self._local_metadata_cached is None:
                 if self._local_metadata_future is None:
@@ -176,7 +238,10 @@ class PersistManager:
 
             # Define a callback that will launch set_local_metadata_lazy after the remote update is complete.
     @property
-    def metadata(self):
+    def metadata(self) -> Optional[DynamicTableMetaData]:
+        """
+        Lazily retrieves and returns the remote metadata.
+        """
         if self.local_metadata is None:
             return None
         if self.local_metadata.remote_table is not None:
@@ -188,14 +253,17 @@ class PersistManager:
         return self.local_metadata.remote_table
 
     @property
-    def local_build_configuration(self):
+    def local_build_configuration(self) -> Dict:
         return self.local_metadata.build_configuration
 
     @property
-    def local_build_metadata(self):
+    def local_build_metadata(self) -> Dict:
         return self.local_metadata.build_meta_data
 
-    def set_local_metadata_lazy_callback(self,fut:Future):
+    def set_local_metadata_lazy_callback(self, fut: Future) -> None:
+        """
+        Callback to handle the result of an asynchronous task and trigger a metadata refresh.
+        """
         try:
             # This will re-raise any exception that occurred in _update_task.
             fut.result()
@@ -206,8 +274,14 @@ class PersistManager:
         # Launch the local metadata update regardless of the outcome.
         self.set_local_metadata_lazy(force_registry=True)
 
-    def set_local_metadata_lazy(self, force_registry=True, include_relations_detail=True):
+    def set_local_metadata_lazy(self, force_registry: bool = True, include_relations_detail: bool = True) -> None:
+        """
+        Initiates a lazy, asynchronous fetch of the local metadata.
 
+        Args:
+            force_registry: If True, forces a refresh even if cached data exists.
+            include_relations_detail: If True, includes relationship details in the fetch.
+        """
         with self._local_metadata_lock:
             if force_registry:
                 self._local_metadata_cached = None
@@ -241,13 +315,14 @@ class PersistManager:
 
 
 
-    def depends_on_connect(self, new_ts:"TimeSerie", is_api:bool):
+    def depends_on_connect(self, new_ts: "TimeSerie", is_api: bool) -> None:
         """
-        Connects a time Serie as relationship in the DB
-        Parameters
-        ----------
-        """
+        Connects a time series as a relationship in the DB.
 
+        Args:
+            new_ts: The target TimeSerie to connect to.
+            is_api: True if the target is an APITimeSerie.
+        """
         if not is_api:
             self.local_metadata.depends_on_connect(
                                         source_local_hash_id=self.local_metadata.local_hash_id,
@@ -269,7 +344,13 @@ class PersistManager:
                 raise exc
 
 
-    def display_mermaid_dependency_diagram(self):
+    def display_mermaid_dependency_diagram(self) -> str:
+        """
+        Generates and returns an HTML string for a Mermaid dependency diagram.
+
+        Returns:
+            An HTML string containing the Mermaid diagram and supporting Javascript.
+        """
         from IPython.core.display import display, HTML, Javascript
 
         response = TimeSerieLocalUpdate.get_mermaid_dependency_diagram(local_hash_id=self.local_hash_id,
@@ -311,37 +392,56 @@ class PersistManager:
 
         return mermaid_chart
 
-    def get_all_dependencies_update_priority(self):
+    def get_all_dependencies_update_priority(self) -> pd.DataFrame:
+        """
+        Retrieves a DataFrame of all dependencies with their update priority.
+
+        Returns:
+            A pandas DataFrame with dependency and priority information.
+        """
         depth_df = self.local_metadata.get_all_dependencies_update_priority()
         return depth_df
 
-    def set_ogm_dependencies_linked(self):
-
+    def set_ogm_dependencies_linked(self) -> None:
         self.local_metadata.set_ogm_dependencies_linked()
 
     @property
-    def update_details(self):
-
+    def update_details(self) -> Optional[LocalTimeSerieUpdateDetails]:
+        """Returns the update details associated with the local time series."""
         return self.local_metadata.localtimeserieupdatedetails
 
     @property
-    def run_configuration(self):
+    def run_configuration(self) -> Optional[Dict]:
+        """Returns the run configuration from the local metadata."""
         return self.local_metadata.run_configuration
 
     @property
-    def source_table_configuration(self):
+    def source_table_configuration(self) -> Optional[Dict]:
+        """Returns the source table configuration from the remote metadata."""
         if "sourcetableconfiguration" in self.metadata.keys():
             return self.metadata['sourcetableconfiguration']
         return None
-    def update_source_informmation(self, git_hash_id: str, source_code: str):
+
+    def update_source_informmation(self, git_hash_id: str, source_code: str) -> None:
+        """
+        Updates the source code and git hash for the remote table.
+        """
         self.local_metadata.remote_table = self.metadata.patch(
             time_serie_source_code_git_hash=git_hash_id,
             time_serie_source_code=source_code,
         )
 
     @staticmethod
-    def batch_data_persisted(hash_id_list: list):
+    def batch_data_persisted(hash_id_list: List[str]) -> Dict[str, bool]:
+        """
+        Checks for the existence of multiple time series in the database.
 
+        Args:
+            hash_id_list: A list of remote table hash IDs.
+
+        Returns:
+            A dictionary mapping each hash ID to a boolean indicating its existence.
+        """
         exist = {}
         dth = DynamicTableHelpers()
         in_db, _ = dth.exist(hash_id__in=hash_id_list)
@@ -355,8 +455,8 @@ class PersistManager:
 
         return exist
 
-
-    def add_tags(self, tags: list):
+    def add_tags(self, tags: List[str]) -> None:
+        """Adds tags to the local time series metadata if they don't already exist."""
         if any([t not in self.local_metadata.tags for t in tags]) == True:
             self.local_metadata.add_tags(tags=tags)
 
@@ -364,31 +464,29 @@ class PersistManager:
         self.dth.destroy(metadata=self.metadata, delete_only_table=delete_only_table)
 
     @property
-    def persist_size(self):
+    def persist_size(self) -> int:
+        """Returns the size of the persisted table, or 0 if not available."""
         try:
             return self.metadata['table_size']
         except KeyError:
             return 0
 
-    def time_serie_exist(self):
-        if hasattr(self,"metadata"):
+    def time_serie_exist(self) -> bool:
+        """Checks if the remote metadata for the time series exists."""
+        if hasattr(self, "metadata"):
             return True
         return False
 
-
-
-    def patch_build_configuration(self,local_configuration:dict,remote_configuration:dict,
-                                  remote_build_metadata:dict):
+    def patch_build_configuration(self, local_configuration: dict, remote_configuration: dict,
+                                  remote_build_metadata: dict) -> None:
         """
-        This method can be threaded because it runs at the end of an init method
+        Asynchronously patches the build configuration for the remote and local tables.
+
         Args:
-            local_configuration:
-            remote_configuration:
-
-        Returns:
-
+            local_configuration: The build configuration for the local time series.
+            remote_configuration: The build configuration for the remote table.
+            remote_build_metadata: The build metadata for the remote table.
         """
-
         # This ensures that later accesses to local_metadata will block for the new value.
         with self._local_metadata_lock:
             self._local_metadata_future = Future()
@@ -423,9 +521,6 @@ class PersistManager:
                 # Once the operation is complete (or errors out), remove the future from the global registry.
                 future_registry.remove_future(result)
 
-
-
-
         thread = threading.Thread(
             target=_patch_build_configuration,
             name=f"PatchBuildConfigThread-{self.local_hash_id}",
@@ -436,25 +531,20 @@ class PersistManager:
         patch_future.add_done_callback(self.set_local_metadata_lazy_callback)
 
 
-
     def local_persist_exist_set_config(
             self,
-            remote_table_hashed_name:str,
-            local_configuration:dict,
-            remote_configuration:dict,
-            data_source:dict,
-            time_serie_source_code_git_hash:str,
-            time_serie_source_code:str,
-            remote_build_metadata:dict,
-    ):
+            remote_table_hashed_name: str,
+            local_configuration: dict,
+            remote_configuration: dict,
+            data_source: DynamicTableDataSource,
+            time_serie_source_code_git_hash: str,
+            time_serie_source_code: str,
+            remote_build_metadata: dict,
+    ) -> None:
         """
-        This method runs on initialization of the TimeSerie class. We also use it to retrieve the table if
-        is already persisted
-        :param config:
-
-        :return:
+        Ensures local and remote persistence objects exist and sets their configurations.
+        This runs on TimeSerie initialization.
         """
-
         remote_build_configuration = None
         if hasattr(self, "remote_build_configuration"):
             remote_build_configuration = self.remote_build_configuration
@@ -488,10 +578,10 @@ class PersistManager:
         local_table_exist = self._verify_local_ts_exists(remote_table_hash_id=remote_table_hash_id, local_configuration=local_configuration)
 
 
-
-    def _verify_local_ts_exists(self, remote_table_hash_id: str, local_configuration: Union[dict, None]=None):
+    def _verify_local_ts_exists(self, remote_table_hash_id: str,
+                                local_configuration: Optional[Dict] = None) -> None:
         """
-        Verifies that the local time serie exist in ORM
+        Verifies that the local time series exists in the ORM, creating it if necessary.
         """
         local_build_configuration = None
         if self.local_metadata is not None:
@@ -522,30 +612,17 @@ class PersistManager:
             self.set_local_metadata(local_metadata=local_metadata)
 
 
-
-    def _verify_insertion_format(self,temp_df):
+    def _verify_insertion_format(self, temp_df: pd.DataFrame) -> None:
         """
-        verifies that data frame is properly configured
-        Parameters
-        ----------
-        temp_df :
-
-        Returns
-        -------
-
+        Verifies that a DataFrame is properly configured for insertion.
         """
-
         if isinstance(temp_df.index,pd.MultiIndex)==True:
             assert temp_df.index.names==["time_index", "asset_symbol"] or  temp_df.index.names==["time_index", "asset_symbol", "execution_venue_symbol"]
 
-    def build_update_details(self,source_class_name):
+    def build_update_details(self, source_class_name: str) -> None:
         """
-
-        Returns
-        -------
-
+        Asynchronously builds or updates the update details for the time series.
         """
-
         update_kwargs=dict(source_class_name=source_class_name,
                            local_metadata=json.loads(self.local_metadata.model_dump_json())
                            )
@@ -553,8 +630,6 @@ class PersistManager:
         with self._local_metadata_lock:
             self._local_metadata_future = Future()
             future_registry.add_future(self._local_metadata_future)
-
-
 
         # Create a future for the remote update task and register it.
         future = Future()
@@ -578,19 +653,19 @@ class PersistManager:
         )
         thread.start()
 
-
-
-            # Attach the callback to the future.
-
+        # Attach the callback to the future.
         future.add_done_callback(self.set_local_metadata_lazy_callback)
 
-    def patch_table(self,**kwargs):
+    def patch_table(self, **kwargs) -> None:
+        """Patches the remote metadata table with the given keyword arguments."""
         self.metadata.patch( **kwargs)
 
-    def protect_from_deletion(self,protect_from_deletion=True):
+    def protect_from_deletion(self, protect_from_deletion: bool = True) -> None:
+        """Sets the 'protect_from_deletion' flag on the remote metadata."""
         self.metadata.patch( protect_from_deletion=protect_from_deletion)
 
-    def open_for_everyone(self, open_for_everyone=True):
+    def open_for_everyone(self, open_for_everyone: bool = True) -> None:
+        """Sets the 'open_for_everyone' flag on local, remote, and source table configurations."""
         if not self.local_metadata.open_for_everyone:
             self.local_metadata.patch(open_for_everyone=open_for_everyone)
 
@@ -602,18 +677,24 @@ class PersistManager:
 
     def set_start_of_execution(self,**kwargs):
         return self.dth.set_start_of_execution(metadata=self.metadata,**kwargs)
+
     def set_end_of_execution(self,**kwargs):
         return self.dth.set_end_of_execution(metadata=self.metadata, **kwargs)
+
     def reset_dependencies_states(self,hash_id_list):
         return self.dth.reset_dependencies_states(metadata=self.metadata, hash_id_list=hash_id_list)
 
-    #table dependes
 
-    def get_update_statistics(self, asset_symbols:list,
-                              remote_table_hash_id,time_serie,
-                              ) -> [datetime.datetime,Dict[str, datetime.datetime]]:
+    def get_update_statistics(self, asset_symbols: List[str],
+                              remote_table_hash_id: str, time_serie: "TimeSerie"
+                              ) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
+        """
+        Gets update statistics for the time series.
 
-
+        Returns:
+            A tuple containing the last update timestamp for the table and a dictionary of
+            last update timestamps per asset.
+        """
         metadata = self.local_metadata.remote_table
 
         last_update_in_table, last_update_per_asset = None, None
@@ -632,14 +713,17 @@ class PersistManager:
 
         return last_update_in_table, last_update_per_asset
 
-    def _add_to_data_source(self,data_df,overwrite:bool):
-        raise NotImplementedError
-
-    def persist_updated_data(self, temp_df: pd.DataFrame,historical_update_id:Union[int,None],
-                             update_tracker: Union[object, None] = None,
-                             overwrite=False):
+    def persist_updated_data(self, temp_df: pd.DataFrame, historical_update_id: Optional[int],
+                             update_tracker: Optional[object] = None,
+                             overwrite: bool = False) -> None:
         """
-        Main update time series function, it is called from TimeSeries class
+        Main update time series function, called from the TimeSerie class.
+
+        Args:
+            temp_df: DataFrame with the data to persist.
+            historical_update_id: ID of the historical update record.
+            update_tracker: The update tracker object.
+            overwrite: Whether to overwrite existing data.
         """
         self._local_metadata_cached = DynamicTableHelpers.upsert_data_into_table(
             local_metadata=self.local_metadata,
@@ -657,27 +741,41 @@ class PersistManager:
         persisted_df = self.dth.get_data_by_time_index(metadata=self.metadata)
         return persisted_df
 
-    def filter_by_assets_ranges(self, asset_ranges_map: dict,time_serie):
+    def filter_by_assets_ranges(self, asset_ranges_map: dict, time_serie: "TimeSerie") -> pd.DataFrame:
+        """
+        Filters data by asset ranges using the DynamicTableHelpers.
 
+        Args:
+            asset_ranges_map: A dictionary mapping assets to their date ranges.
+            time_serie: The parent TimeSerie object.
 
+        Returns:
+            A pandas DataFrame with the filtered data.
+        """
         if isinstance(self, DataLakePersistManager):
             self.verify_if_already_run(time_serie)
         df = self.dth.filter_by_assets_ranges(metadata=self.metadata, asset_ranges_map=asset_ranges_map,
                                               data_source=self.data_source, local_hash_id=time_serie.local_hash_id)
 
-
         return df
 
-    def get_earliest_value(self,remote_table_hash_id) -> datetime.datetime:
+    def get_earliest_value(self, remote_table_hash_id: str) -> Optional[datetime.datetime]:
+        """Gets the earliest timestamp value from the table."""
         earliest_value = self.dth.get_earliest_value(hash_id=remote_table_hash_id)
         return earliest_value
 
-    def get_df_between_dates(self, start_date, end_date, great_or_equal=True,
-                             less_or_equal=True,
-                             unique_identifier_list: Union[list, None] = None,
-                             columns: Union[list, None] = None,
-                             unique_identifier_range_map:Optional[UniqueIdentifierRangeMap]=None):
-
+    def get_df_between_dates(self,
+                             start_date: Optional[datetime.datetime],
+                             end_date: Optional[datetime.datetime],
+                             great_or_equal: bool = True,
+                             less_or_equal: bool = True,
+                             unique_identifier_list: Optional[List[str]] = None,
+                             columns: Optional[List[str]] = None,
+                             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None
+                             ) -> pd.DataFrame:
+        """
+        Retrieves a DataFrame from the data source between specified dates.
+        """
         filtered_data = self.data_source.get_data_by_time_index(local_metadata=self.local_metadata,
                                                         start_date=start_date,
                                                         end_date=end_date,
@@ -695,7 +793,6 @@ class TimeScaleLocalPersistManager(PersistManager):
     """
     Main Controler to interacti with TimeSerie ORM
     """
-
 
     def get_full_source_data(self,remote_table_hash_id, engine="pandas"):
         """
@@ -734,7 +831,15 @@ class TimeScaleLocalPersistManager(PersistManager):
         return dfs
 
 
-    def set_policy(self, interval: str,overwrite:bool,comp_type:str):
+    def set_policy(self, interval: str, overwrite: bool, comp_type: str) -> None:
+        """
+        Sets a retention or compression policy on the time series table.
+
+        Args:
+            interval: The interval for the policy (e.g., '7 days').
+            overwrite: If True, overwrites an existing policy.
+            comp_type: The type of policy ('retention' or 'compression').
+        """
         if self.metadata is not None:
             retention_policy_config = self.metadata["retention_policy_config"]
             compression_policy_config=self.metadata["compression_policy_config"]
@@ -746,12 +851,11 @@ class TimeScaleLocalPersistManager(PersistManager):
                     status = self.dth.set_compression_policy(interval=interval, metadata=self.metadata)
         else:
             self.logger.warning("Retention policy couldnt be set as TS is not yet persisted")
+
     def set_policy_for_descendants(self,remote_table_hash_id:str,
                                    policy,comp_type:str,exclude_ids:Union[list,None]=None,extend_to_classes=False):
         self.dth.set_policy_for_descendants(hash_id=remote_table_hash_id,pol_type=comp_type,policy=policy,
                                             exclude_ids=exclude_ids,extend_to_classes=extend_to_classes)
-
-
 
     def delete_after_date(self, after_date: str):
         self.dth.delete_after_date(metadata=self.metadata, after_date=after_date)
