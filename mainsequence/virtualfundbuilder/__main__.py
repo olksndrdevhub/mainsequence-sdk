@@ -144,6 +144,22 @@ def get_pod_configuration():
         f.write(TMP_SCRIPT)
     runpy.run_path(str(python_file_path), run_name="__main__")
 
+
+def import_project_configuration():
+    # load project configuration if exists
+    config_file = Path(os.getenv("VFB_PROJECT_PATH")) / "project_configuration.yaml"
+
+    if not config_file.exists():
+        return
+
+    project_configuration = yaml.load(config_file)
+
+    # parse_configuration_file()
+
+    # for job_config in project_configuration["project"]
+
+
+
 def prerun_routines():
     data = update_job_status("RUNNING")
     env_update = data.get("environment_update", {})
@@ -163,7 +179,6 @@ class VirtualFundLauncher:
         self.logger = get_vfb_logger()
 
     def run_resource(self, execution_type, execution_object=None):
-        # get_pod_configuration() # to make sure all resources are available
         error_on_run = False
 
         try:
@@ -175,7 +190,9 @@ class VirtualFundLauncher:
             elif execution_type == "notebook":
                 run_notebook(execution_object)
             elif execution_type == "system_job":
-                pass # placeholder, get_pod_configuration already called above
+                import_project_configuration()
+                # get_pod_configuration already called from import to publish resource in backend
+                pass
             elif execution_type == "app":
                 run_app(app_name=os.getenv("APP_NAME"), configuration=os.getenv("APP_CONFIGURATION"))
             elif execution_type == "standby":
