@@ -106,7 +106,7 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   echo "Create initial commit"
   cd "$ROOT_PROJECT_PATH"
   git add "$ROOT_PROJECT_PATH"
-  git commit -am "initial commit"
+  git commit -am "initial commit for $TDAG_ENDPOINT"
   git push
 else
   echo "Folder $VFB_PROJECT_PATH already exists. Updating repo..."

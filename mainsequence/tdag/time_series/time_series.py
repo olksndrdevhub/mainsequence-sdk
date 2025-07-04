@@ -24,7 +24,7 @@ from mainsequence.tdag.config import (
 )
 import structlog.contextvars as cvars
 
-from mainsequence.tdag.time_series.persist_managers import PersistManager
+from mainsequence.tdag.time_series.persist_managers import PersistManager, APIPersistManager
 from mainsequence.client.models_tdag import (DataSource, LocalTimeSeriesHistoricalUpdate,
                                              DataUpdates, UniqueIdentifierRangeMap, ColumnMetaData
                                              )
@@ -631,48 +631,6 @@ class ConfigSerializer:
             raise NotImplementedError
 
         return state
-
-
-def get_time_serie_relation_tree(time_serie: "TimeSerie", as_object: bool = False) -> Dict[str, Any]:
-    """
-    Gets the relation tree of a TimeSerie object.
-
-    Args:
-        time_serie: The TimeSerie object.
-        as_object: If True, returns the TimeSerie object itself in the tree.
-
-    Returns:
-        A dictionary representing the relation tree.
-    """
-    import inspect
-    members = inspect.getmembers(time_serie, lambda a: not (inspect.isroutine(a)))
-    # get dicto of members
-    members = [a[1] for a in members if a[0] == "__dict__"][0]
-
-    def ts_data(ts):
-        if as_object is True:
-            return time_serie
-        else:
-            return (time_serie.data_folder, time_serie.__class__.__name__)
-
-    tree = {"father": ts_data(time_serie), "children": []}
-    for key, value in members.items():
-        if "related_time_series" in key:
-            # add to tree
-            if isinstance(value, list):
-                raise NotImplementedError
-            elif isinstance(value, dict):
-                for tm_ts in value.values():
-                    children = get_time_serie_relation_tree(tm_ts, as_object=as_object)
-
-                    tree["children"].append(children)
-        if isinstance(value, TimeSerie):
-            children = get_time_serie_relation_tree(value, as_object=as_object)
-
-            tree["children"].append(children)
-
-    return tree
-
 
 class DependencyUpdateError(Exception):
     pass
@@ -1723,10 +1681,10 @@ class APITimeSerie(CommonMethodsMixin):
         if data_source_local_lake is not None:
             assert data_source_local_lake.data_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE, "data_source_local_lake should be of type CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE"
 
-        self.data_source_id=data_source_id
-        self.local_hash_id=local_hash_id
+        self.data_source_id = data_source_id
+        self.local_hash_id = local_hash_id
         self.data_source = data_source_local_lake
-        self.local_persist_manager
+        self._local_persist_manager: APIPersistManager = None
 
     def __getstate__(self) -> Dict[str, Any]:
         """Prepares the state for pickling."""
@@ -1741,7 +1699,7 @@ class APITimeSerie(CommonMethodsMixin):
     @property
     def local_persist_manager(self) -> Any:
         """Gets the local persistence manager, initializing it if necessary."""
-        if hasattr(self, "_local_persist_manager") == False:
+        if self._local_persist_manager is None:
             self._set_local_persist_manager()
             self.logger.debug(f"Setting local persist manager for {self.local_hash_id}")
         return self._local_persist_manager
@@ -1776,11 +1734,8 @@ class APITimeSerie(CommonMethodsMixin):
         return pod_source
 
     def _set_local_persist_manager(self) -> None:
-        from mainsequence.tdag.time_series.persist_managers import APIPersistManager
-
         self._verify_local_data_source()
-
-        self._local_persist_manager = APIPersistManager(local_hash_id=self.local_hash_id,data_source_id=self.data_source_id)
+        self._local_persist_manager = APIPersistManager(local_hash_id=self.local_hash_id, data_source_id=self.data_source_id)
         local_metadata = self._local_persist_manager.local_metadata
 
         assert local_metadata is not None, f"Verify that {self.local_hash_id} exists if you are not the author reach to the author"
@@ -1811,7 +1766,26 @@ class APITimeSerie(CommonMethodsMixin):
                                                                         less_or_equal=less_or_equal,
                                                                         unique_identifier_range_map=unique_identifier_range_map,
                                                                         )
+        if len(filtered_data) == 0:
+            logger.info(f"Data from {self.local_hash_id} is empty in request ")
+            logger.debug(
+                f"Calling get_data_between_dates_from_api with arguments: "
+                f"start_date={start_date}, end_date={end_date}, "
+                f"great_or_equal={great_or_equal}, less_or_equal={less_or_equal}, "
+                f"unique_identifier_list={unique_identifier_list}, "
+                f"unique_identifier_range_map={unique_identifier_range_map}"
+            )
+            return filtered_data
 
+        # fix types
+        stc = self.local_persist_manager.local_metadata.remote_table.sourcetableconfiguration
+        filtered_data[stc.time_index_name] = pd.to_datetime(filtered_data[stc.time_index_name], utc=True)
+        for c, c_type in stc.column_dtypes_map.items():
+            if c != stc.time_index_name:
+                if c_type == "object":
+                    c_type = "str"
+                filtered_data[c] = filtered_data[c].astype(c_type)
+        filtered_data = filtered_data.set_index(stc.index_names)
         return filtered_data
 
     def filter_by_assets_ranges(self, unique_identifier_range_map: UniqueIdentifierRangeMap) -> pd.DataFrame:
@@ -1889,52 +1863,10 @@ class APITimeSerie(CommonMethodsMixin):
         self.logger.info("Not updating series")
         pass
 
-    def persist_data_to_local_lake(self, temp_df: pd.DataFrame, update_tracker: object,
-                                   latest_value: Optional[datetime.datetime],
-                                   overwrite: bool = False) -> bool:
-        """
-        Persists data to a local data lake for reading purposes.
-
-        Args:
-            temp_df: The DataFrame to persist.
-            update_tracker: The update tracker object.
-            latest_value: The latest value timestamp.
-            overwrite: If True, overwrites existing data.
-
-        Returns:
-            True if data was persisted, False otherwise.
-        """
-        persisted = False
-        if temp_df.shape[0] > 0:
-            if overwrite == True:
-                self.logger.warning(f"Values will be overwritten assuming latest value of  {latest_value}")
-
-            if isinstance(self.local_persist_manager, DataLakePersistManager) == False:
-                local_metadata = TimeSerieLocalUpdate.get(local_hash_id=self.local_hash_id)
-                local_persist_manager = DataLakePersistManager(local_hash_id=self.local_hash_id,
-
-                                                               class_name=local_metadata["build_configuration"][
-                                                                   "time_series_class_import_path"]["qualname"],
-                                                               logger=self.logger,
-                                                               local_metadata=local_metadata,
-                                                               description=f"Local API Lake for {self.local_hash_id}",
-                                                               data_source=self.data_source)
-                local_persist_manager.persist_updated_data(temp_df=temp_df,
-                                                           update_tracker=update_tracker,
-                                                           historical_update_id=None,
-                                                           overwrite=overwrite)
-            else:
-                self.local_persist_manager.persist_updated_data(temp_df=temp_df,
-                                                                update_tracker=update_tracker,
-                                                                historical_update_id=None,
-                                                                overwrite=overwrite)
-            persisted = True
-        return persisted
-
 class TimeSerieInitMeta(BaseModel):
     ...
 
-class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):
+class TimeSerie(CommonMethodsMixin, DataPersistanceMethods, GraphNodeMethods, TimeSerieRebuildMethods):
     """
     Base TimeSerie class
     """
@@ -1988,12 +1920,13 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         self.local_kwargs_to_ignore = local_kwargs_to_ignore
 
         self.pre_load_routines_run = False
+        self._data_source: Optional[DynamicTableDataSource] = None # is set later
+        self._local_persist_manager: Optional[PersistManager] = None
 
         # asser that method is decorated
         if not len(self.__init__.__closure__) == 1:
             logger.error("init method is not decorated with @TimeSerie._post_init_routines()")
             raise Exception
-        # create logger
 
     @staticmethod
     def set_context_in_logger(logger_context: Dict[str, Any]) -> None:
@@ -2004,7 +1937,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
             logger_context: A dictionary of context variables.
         """
         global logger
-        for key,value in logger_context.items():
+        for key, value in logger_context.items():
             logger.bind(**dict(key=value))
 
     @staticmethod
@@ -2150,7 +2083,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
     @property
     def data_source(self) -> Any:
-        if hasattr(self, "_data_source"):
+        if self._data_source is not None:
             return self._data_source
         else:
             raise Exception("Data source has not been set")
@@ -2186,22 +2119,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         """The local time series metadata object."""
         return self.local_persist_manager.local_metadata
 
-    @property
-    def update_uses_parallel(self) -> bool:
-        """Checks if the update process uses parallel execution."""
-        meta_data = self.meta_data
-        if "update_uses_parallel" in meta_data:
-            return meta_data["update_uses_parallel"]
-        else:
-            return False
-
-    def plot_relation_tree(self) -> Any:
-        # from fdaccess.time_seriesV2.drawing import build_data_for_tree
-        # tree = self.get_relation_tree(as_object=True)
-        # data = build_data_for_tree(tree=tree)
-        # return data
-        raise NotImplementedError
-
     def _sanitize_init_meta(self, kwargs: Dict[str, Any]) -> Tuple[Dict[str, Any], "TimeSerieInitMeta"]:
         """
         Handles initial configuration in the pre-configuration process.
@@ -2218,11 +2135,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
         else:
             init_meta = TimeSerieInitMeta()
         return kwargs, init_meta
-
-    def run_local_update(self, tdag_detached: bool = True) -> Any:
-        raise NotImplementedError("Legacy")
-        self.local_persist_manager
-        return self.get_df_between_dates()
 
     def run(
             self,
@@ -2332,7 +2244,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
 
     @property
     def local_persist_manager(self) -> PersistManager:
-        if hasattr(self, "_local_persist_manager") == False:
+        if self._local_persist_manager is None:
             self.logger.debug(f"Setting local persist manager for {self.hash_id}")
             self._set_local_persist_manager(local_hash_id=self.local_hash_id,
                                             remote_table_hashed_name=self.remote_table_hashed_name,
@@ -2711,7 +2623,7 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                      local_time_series_map: Optional[dict] = None,
                      overwrite_latest_value: Optional[datetime.datetime] = None, update_only_tree: bool = False,
                      use_state_for_update: bool = False,
-                     *args, **kwargs) -> bool:
+                     *args, **kwargs) -> Optional[bool]:
         """
         Performs a local update of the time series data.
 
@@ -2736,9 +2648,8 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                                          local_time_series_map=local_time_series_map,
                                          use_state_for_update=use_state_for_update,
                                          )
-            update_only_tree == True
             if update_only_tree == True:
-                self.logger.info(f'Local Time Series  {self}   only tree updated')
+                self.logger.info(f'Local Time Series  {self} only tree updated')
                 return None
 
         # hardcore check to fix missing values
@@ -2784,7 +2695,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
-
                     raise e
 
                 if not temp_df.empty:
@@ -2861,8 +2771,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                         return
 
                     self.metadata.sourcetableconfiguration.set_or_update_columns_metadata(columns_metadata=columns_metadata)
-
-
 
     def _get_asset_list(self) -> Optional[List["Asset"]]:
         """

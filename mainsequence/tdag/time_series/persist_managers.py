@@ -78,78 +78,16 @@ class APIPersistManager:
             # Remove the future from the global registry once done.
             future_registry.remove_future(self._local_metadata_future)
 
-    def get_df_between_dates(self,
-                             start_date: Optional[datetime.datetime],
-                             end_date: Optional[datetime.datetime],
-                             great_or_equal: bool = True,
-                             less_or_equal: bool = True,
-                             unique_identifier_list: Optional[List[str]] = None,
-                             columns: Optional[List[str]] = None,
-                             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None
-                             ) -> pd.DataFrame:
+    def get_df_between_dates(self, *args, **kwargs) -> pd.DataFrame:
         """
         Retrieves a DataFrame from the API between specified dates.
-
-        Args:
-            start_date: The start date for the data range.
-            end_date: The end date for the data range.
-            great_or_equal: Whether the start date is inclusive.
-            less_or_equal: Whether the end date is inclusive.
-            unique_identifier_list: A list of unique identifiers to filter by.
-            columns: A list of columns to retrieve.
-            unique_identifier_range_map: A map of unique identifiers to their specific date ranges.
 
         Returns:
             A pandas DataFrame with the requested data.
         """
-        filtered_data = self.local_metadata.get_data_between_dates_from_api(
-                                                        start_date=start_date,
-                                                        end_date=end_date, great_or_equal=great_or_equal,
-                                                        less_or_equal=less_or_equal,
-                                                        unique_identifier_list=unique_identifier_list,
-                                                        columns=columns,
-                                                        unique_identifier_range_map=unique_identifier_range_map
-        )
-
-        if len(filtered_data) == 0:
-            logger.info(f"Data from {self.local_hash_id} is empty in request ")
-            logger.debug(
-                f"Calling get_data_between_dates_from_api with arguments: "
-                f"start_date={start_date}, end_date={end_date}, "
-                f"great_or_equal={great_or_equal}, less_or_equal={less_or_equal}, "
-                f"unique_identifier_list={unique_identifier_list}, columns={columns}, "
-                f"unique_identifier_range_map={unique_identifier_range_map}"
-            )
-            return filtered_data
-
-        #fix types
-
-        stc = self.local_metadata.remote_table.sourcetableconfiguration
-        filtered_data[stc.time_index_name] = pd.to_datetime(filtered_data[stc.time_index_name],
-                                                            utc=True
-                                                            )
-        for c, c_type in stc.column_dtypes_map.items():
-            if c!=stc.time_index_name:
-                if c_type=="object":
-                    c_type="str"
-                filtered_data[c]=filtered_data[c].astype(c_type)
-        filtered_data=filtered_data.set_index(stc.index_names)
+        filtered_data = self.local_metadata.get_data_between_dates_from_api(*args, **kwargs)
         return filtered_data
 
-    def filter_by_assets_ranges(self, unique_identifier_range_map: UniqueIdentifierRangeMap,
-                                time_serie: "TimeSerie") -> pd.DataFrame:
-        """
-        Filters data by asset ranges.
-
-        Args:
-            unique_identifier_range_map: A map of assets to their date ranges.
-            time_serie: The parent TimeSerie object.
-
-        Returns:
-            A pandas DataFrame containing the filtered data.
-        """
-        df = self.get_df_between_dates(start_date=None, end_date=None, unique_identifier_range_map=unique_identifier_range_map)
-        return df
 
 class PersistManager:
     def __init__(self,
@@ -460,9 +398,6 @@ class PersistManager:
         if any([t not in self.local_metadata.tags for t in tags]) == True:
             self.local_metadata.add_tags(tags=tags)
 
-    def destroy(self, delete_only_table: bool):
-        self.dth.destroy(metadata=self.metadata, delete_only_table=delete_only_table)
-
     @property
     def persist_size(self) -> int:
         """Returns the size of the persisted table, or 0 if not available."""
@@ -675,16 +610,6 @@ class PersistManager:
         if not self.metadata.sourcetableconfiguration.open_for_everyone:
             self.metadata.sourcetableconfiguration.patch(open_for_everyone=open_for_everyone)
 
-    def set_start_of_execution(self,**kwargs):
-        return self.dth.set_start_of_execution(metadata=self.metadata,**kwargs)
-
-    def set_end_of_execution(self,**kwargs):
-        return self.dth.set_end_of_execution(metadata=self.metadata, **kwargs)
-
-    def reset_dependencies_states(self,hash_id_list):
-        return self.dth.reset_dependencies_states(metadata=self.metadata, hash_id_list=hash_id_list)
-
-
     def get_update_statistics(self, asset_symbols: List[str],
                               remote_table_hash_id: str, time_serie: "TimeSerie"
                               ) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
@@ -732,60 +657,14 @@ class PersistManager:
 
         )
 
-    def get_persisted_ts(self):
-        """
-        full Request of the persisted data should always default to DB
-        :return:
-        """
-
-        persisted_df = self.dth.get_data_by_time_index(metadata=self.metadata)
-        return persisted_df
-
-    def filter_by_assets_ranges(self, asset_ranges_map: dict, time_serie: "TimeSerie") -> pd.DataFrame:
-        """
-        Filters data by asset ranges using the DynamicTableHelpers.
-
-        Args:
-            asset_ranges_map: A dictionary mapping assets to their date ranges.
-            time_serie: The parent TimeSerie object.
-
-        Returns:
-            A pandas DataFrame with the filtered data.
-        """
-        if isinstance(self, DataLakePersistManager):
-            self.verify_if_already_run(time_serie)
-        df = self.dth.filter_by_assets_ranges(metadata=self.metadata, asset_ranges_map=asset_ranges_map,
-                                              data_source=self.data_source, local_hash_id=time_serie.local_hash_id)
-
-        return df
-
-    def get_earliest_value(self, remote_table_hash_id: str) -> Optional[datetime.datetime]:
-        """Gets the earliest timestamp value from the table."""
-        earliest_value = self.dth.get_earliest_value(hash_id=remote_table_hash_id)
-        return earliest_value
-
-    def get_df_between_dates(self,
-                             start_date: Optional[datetime.datetime],
-                             end_date: Optional[datetime.datetime],
-                             great_or_equal: bool = True,
-                             less_or_equal: bool = True,
-                             unique_identifier_list: Optional[List[str]] = None,
-                             columns: Optional[List[str]] = None,
-                             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None
-                             ) -> pd.DataFrame:
+    def get_df_between_dates(self, *args, **kwargs) -> pd.DataFrame:
         """
         Retrieves a DataFrame from the data source between specified dates.
         """
-        filtered_data = self.data_source.get_data_by_time_index(local_metadata=self.local_metadata,
-                                                        start_date=start_date,
-                                                        end_date=end_date,
-                                                        great_or_equal=great_or_equal,
-                                                        less_or_equal=less_or_equal,
-                                                        unique_identifier_list=unique_identifier_list,
-                                                        columns=columns,
-                                                        unique_identifier_range_map=unique_identifier_range_map
-                                                        )
-
+        filtered_data = self.data_source.get_data_by_time_index(
+            local_metadata=self.local_metadata,
+            *args, **kwargs
+        )
         return filtered_data
 
 
@@ -793,73 +672,6 @@ class TimeScaleLocalPersistManager(PersistManager):
     """
     Main Controler to interacti with TimeSerie ORM
     """
-
-    def get_full_source_data(self,remote_table_hash_id, engine="pandas"):
-        """
-        Returns full stored data, uses multiprocessing to achieve several queries by rows and speed
-        :return:
-        """
-
-        from joblib import Parallel, delayed
-        from tqdm import tqdm
-
-        metadata = self.dth.get_configuration(hash_id=remote_table_hash_id)
-        earliest_obs = metadata["sourcetableconfiguration"]["last_time_index_value"]
-        latest_value = metadata["sourcetableconfiguration"]["earliest_index_value"]
-
-        ranges = list(pd.date_range(earliest_obs, latest_value, freq="1 m"))
-
-        if earliest_obs not in ranges:
-            ranges = [earliest_obs] + ranges
-
-        if latest_value not in ranges:
-            ranges.append(latest_value)
-
-        def get_data(ranges, i, metadata, dth):
-
-            s, e = ranges[i], ranges[i + 1]
-            tmp_data = dth.get_data_by_time_index(start_date=s, end_date=e, metadata=self.metadata,
-                                                  great_or_equal=True, less_or_equal=False)
-
-            tmp_data = tmp_data.reset_index()
-            return tmp_data
-
-        dfs = Parallel(n_jobs=10)(
-            delayed(get_data)(ranges, i, remote_table_hash_id, engine) for i in tqdm(range(len(ranges) - 1)))
-        dfs = pd.concat(dfs, axis=0)
-        dfs = dfs.set_index(self.metadata["table_config"]["index_names"])
-        return dfs
-
-
-    def set_policy(self, interval: str, overwrite: bool, comp_type: str) -> None:
-        """
-        Sets a retention or compression policy on the time series table.
-
-        Args:
-            interval: The interval for the policy (e.g., '7 days').
-            overwrite: If True, overwrites an existing policy.
-            comp_type: The type of policy ('retention' or 'compression').
-        """
-        if self.metadata is not None:
-            retention_policy_config = self.metadata["retention_policy_config"]
-            compression_policy_config=self.metadata["compression_policy_config"]
-            if comp_type =="retention":
-                if retention_policy_config is None or overwrite == True:
-                    status = self.dth.set_retention_policy(interval=interval, metadata=self.metadata)
-            if comp_type=="compression":
-                if compression_policy_config is None or overwrite == True:
-                    status = self.dth.set_compression_policy(interval=interval, metadata=self.metadata)
-        else:
-            self.logger.warning("Retention policy couldnt be set as TS is not yet persisted")
-
-    def set_policy_for_descendants(self,remote_table_hash_id:str,
-                                   policy,comp_type:str,exclude_ids:Union[list,None]=None,extend_to_classes=False):
-        self.dth.set_policy_for_descendants(hash_id=remote_table_hash_id,pol_type=comp_type,policy=policy,
-                                            exclude_ids=exclude_ids,extend_to_classes=extend_to_classes)
-
-    def delete_after_date(self, after_date: str):
-        self.dth.delete_after_date(metadata=self.metadata, after_date=after_date)
-
     def get_table_schema(self,table_name):
         return self.metadata["sourcetableconfiguration"]["column_dtypes_map"]
 
