@@ -477,7 +477,7 @@ class InterpolatedPrices(TimeSerie):
             intraday_bar_interpolation_rule: str,
             asset_category_unique_id: Optional[str] = None,
             upsample_frequency_id: Optional[str] = None,
-            asset_list:ModelList = None,
+            asset_list:ModelList = None,#todo change for asset_filter when asset filter has all the characteristics
             local_kwargs_to_ignore: List[str] = ["asset_category_unique_id","asset_list"],
             *args,
             **kwargs

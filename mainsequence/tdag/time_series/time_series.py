@@ -2779,7 +2779,6 @@ class TimeSerie(CommonMethodsMixin,DataPersistanceMethods, GraphNodeMethods, Tim
                     temp_df=update_statistics.filter_df_by_latest_value(temp_df)
                     temp_df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
-                    temp_df.replace({np.nan: None}, inplace=True)
 
 
                 except Exception as e:
