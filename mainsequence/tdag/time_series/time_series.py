@@ -1340,7 +1340,23 @@ class DataPersistanceMethods(ABC):
         df = self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map)
         return df
     
-    def get_ranged_data(self, range_descriptor: Optional[UniqueIdentifierRangeMap]) -> pd.DataFrame:
+    def get_ranged_data_per_asset(self, range_descriptor: Optional[UniqueIdentifierRangeMap]) -> pd.DataFrame:
+        """
+        Gets data based on a range descriptor.
+
+        Args:
+            range_descriptor: A UniqueIdentifierRangeMap object.
+
+        Returns:
+            A DataFrame with the ranged data.
+        """
+        return self.get_df_between_dates(unique_identifier_range_map=range_descriptor)
+
+    def get_ranged_data(self, start_date: Union[datetime.datetime, None] = None,
+                        end_date: Union[datetime.datetime, None] = None,
+                        great_or_equal: bool = True,
+                        less_or_equal: bool = True,
+                        ) -> pd.DataFrame:
         """
         Gets data based on a range descriptor.
 
