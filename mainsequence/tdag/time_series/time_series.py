@@ -1668,9 +1668,9 @@ class APITimeSerie(CommonMethodsMixin):
     PICKLE_PREFIFX = "api-"
 
     @classmethod
-    def build_from_local_time_serie(cls, local_time_serie: "LocalTimeSerie") -> "APITimeSerie":
-        return cls(data_source_id=local_time_serie.remote_table.data_source.id,
-                   local_hash_id=local_time_serie.local_hash_id
+    def build_from_local_time_serie(cls, source_table: "LocalTimeSerie") -> "APITimeSerie":
+        return cls(data_source_id=source_table.data_source.id,
+                   source_table_hash_id=source_table.hash_id
                    )
 
     @classmethod
@@ -1678,13 +1678,13 @@ class APITimeSerie(CommonMethodsMixin):
         from mainsequence.client import MarketsTimeSeriesDetails
         tdag_api_data_source = MarketsTimeSeriesDetails.get(unique_identifier=unique_identifier)
         ts = cls(
-            data_source_id=tdag_api_data_source.related_local_time_serie.remote_table.data_source,
-            local_hash_id=tdag_api_data_source.related_local_time_serie.local_hash_id
+            data_source_id=tdag_api_data_source.source_table.data_source,
+            source_table_hash_id=tdag_api_data_source.source_table.hash_id
         )
         return ts
 
     def __init__(self,
-                 data_source_id: int, local_hash_id: str,
+                 data_source_id: int, source_table_hash_id: str,
                  data_source_local_lake: Optional[DataSource] = None):
         """
         Initializes an APITimeSerie.
@@ -1698,9 +1698,16 @@ class APITimeSerie(CommonMethodsMixin):
             assert data_source_local_lake.data_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE, "data_source_local_lake should be of type CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE"
 
         self.data_source_id = data_source_id
-        self.local_hash_id = local_hash_id
+        self.source_table_hash_id = source_table_hash_id
         self.data_source = data_source_local_lake
         self._local_persist_manager: APIPersistManager = None
+
+    @staticmethod
+    def _get_local_hash_id(hash_id):
+        return "API_"+f"{hash_id}"
+    @property
+    def local_hash_id(self):
+        return  self._get_local_hash_id(hash_id=self.source_table_hash_id)
 
     def __getstate__(self) -> Dict[str, Any]:
         """Prepares the state for pickling."""
@@ -1717,7 +1724,7 @@ class APITimeSerie(CommonMethodsMixin):
         """Gets the local persistence manager, initializing it if necessary."""
         if self._local_persist_manager is None:
             self._set_local_persist_manager()
-            self.logger.debug(f"Setting local persist manager for {self.local_hash_id}")
+            self.logger.debug(f"Setting local persist manager for {self.source_table_hash_id}")
         return self._local_persist_manager
 
     def set_relation_tree(self) -> None:
@@ -1751,10 +1758,10 @@ class APITimeSerie(CommonMethodsMixin):
 
     def _set_local_persist_manager(self) -> None:
         self._verify_local_data_source()
-        self._local_persist_manager = APIPersistManager(local_hash_id=self.local_hash_id, data_source_id=self.data_source_id)
-        local_metadata = self._local_persist_manager.local_metadata
+        self._local_persist_manager = APIPersistManager(source_table_hash_id=self.source_table_hash_id, data_source_id=self.data_source_id)
+        metadata = self._local_persist_manager.metadata
 
-        assert local_metadata is not None, f"Verify that {self.local_hash_id} exists if you are not the author reach to the author"
+        assert metadata is not None, f"Verify that the table {self.source_table_hash_id} exists "
 
 
     def get_df_between_dates(self, start_date: Optional[datetime.datetime] = None,
@@ -1783,7 +1790,7 @@ class APITimeSerie(CommonMethodsMixin):
                                                                         unique_identifier_range_map=unique_identifier_range_map,
                                                                         )
         if len(filtered_data) == 0:
-            logger.info(f"Data from {self.local_hash_id} is empty in request ")
+            logger.info(f"Data from {self.source_table_hash_id} is empty in request ")
             logger.debug(
                 f"Calling get_data_between_dates_from_api with arguments: "
                 f"start_date={start_date}, end_date={end_date}, "
@@ -1824,8 +1831,8 @@ class APITimeSerie(CommonMethodsMixin):
         return path
 
     @classmethod
-    def get_pickle_path(cls, local_hash_id: str, data_source_id: int) -> str:
-        return f"{ogm.pickle_storage_path}/{data_source_id}/{cls.PICKLE_PREFIFX}{local_hash_id}.pickle"
+    def get_pickle_path(cls, source_table_hash_id: str, data_source_id: int) -> str:
+        return f"{ogm.pickle_storage_path}/{data_source_id}/{cls.PICKLE_PREFIFX}{cls._get_local_hash_id()}.pickle"
 
     def persist_to_pickle(self, overwrite: bool = False) -> Tuple[str, str]:
         path = self.pickle_path
@@ -2889,8 +2896,8 @@ class WrapperTimeSerie(TimeSerie):
                 logger.exception(f"HistoricalBarsSource does not exist for {market_time_serie_unique_identifier}")
                 raise e
             api_ts = APITimeSerie(
-                data_source_id=hbs.related_local_time_serie.data_source_id,
-                local_hash_id=hbs.related_local_time_serie.local_hash_id
+                data_source_id=hbs.source_table.data_source,
+                source_table_hash_id=hbs.source_table.hash_id
             )
             return api_ts
 

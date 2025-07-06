@@ -4,6 +4,7 @@ from .models_tdag import (request_to_datetime, LocalTimeSeriesDoesNotExist, Dyna
                           SourceTableConfigurationDoesNotExist, LocalTimeSerieUpdateDetails,
                           JSON_COMPRESSED_PREFIX, Scheduler, SchedulerDoesNotExist, LocalTimeSerie,
                           DynamicTableMetaData, DynamicTableDataSource, LocalTimeSerieNode,
+ColumnMetaData,
                           Project, UniqueIdentifierRangeMap, LocalTimeSeriesHistoricalUpdate,
                           DataUpdates, DataSource, PodDataSource, SessionDataSource)
 

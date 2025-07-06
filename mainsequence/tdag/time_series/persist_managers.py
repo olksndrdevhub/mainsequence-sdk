@@ -23,7 +23,7 @@ class APIPersistManager:
     It handles asynchronous fetching of metadata to avoid blocking operations.
     """
 
-    def __init__(self, data_source_id: int, local_hash_id: str):
+    def __init__(self, data_source_id: int, source_table_hash_id: str):
         """
         Initializes the APIPersistManager.
 
@@ -32,51 +32,51 @@ class APIPersistManager:
             local_hash_id: The local hash identifier for the time series.
         """
         self.data_source_id: int = data_source_id
-        self.local_hash_id: str = local_hash_id
+        self.source_table_hash_id: str = source_table_hash_id
 
-        logger.debug(f"Initializing Time Serie {self.local_hash_id}  as APITimeSerie")
+        logger.debug(f"Initializing Time Serie {self.source_table_hash_id}  as APITimeSerie")
 
         # Create a Future to hold the local metadata when ready.
-        self._local_metadata_future = Future()
+        self._metadata_future = Future()
         # Register the future globally.
-        future_registry.add_future(self._local_metadata_future)
+        future_registry.add_future(self._metadata_future)
         # Launch the REST request in a separate, non-daemon thread.
-        thread = threading.Thread(target=self._init_local_metadata,
-                                  name=f"LocalMetadataThread-{self.local_hash_id}",
+        thread = threading.Thread(target=self._init_metadata,
+                                  name=f"ApiMetaDataThread-{self.source_table_hash_id}",
                                   daemon=False)
         thread.start()
 
 
     @property
-    def local_metadata(self) -> LocalTimeSerie:
+    def metadata(self) -> LocalTimeSerie:
         """Lazily block and cache the result if needed."""
-        if not hasattr(self, '_local_metadata_cached'):
+        if not hasattr(self, '_metadata_cached'):
             # This call blocks until the future is resolved.
-            self._local_metadata_cached = self._local_metadata_future.result()
-        return self._local_metadata_cached
+            self._metadata_cached = self._metadata_future.result()
+        return self._metadata_cached
 
     @property
-    def metadata(self) -> DynamicTableMetaData:
+    def local_metadata(self) -> DynamicTableMetaData:
         """Returns the remote table metadata associated with the local time series."""
-        return self.local_metadata.remote_table
+        return None
 
 
-    def _init_local_metadata(self) -> None:
+    def _init_metadata(self) -> None:
         """
         Performs the REST request to fetch local metadata asynchronously.
         Sets the result or exception on the future object.
         """
         try:
-            result = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
-                                                remote_table__data_source__id=self.data_source_id,
+            result = DynamicTableMetaData.get_or_none(hash_id=self.source_table_hash_id,
+                                                data_source__id=self.data_source_id,
                                                 include_relations_detail=True
             )
-            self._local_metadata_future.set_result(result)
+            self._metadata_future.set_result(result)
         except Exception as exc:
-            self._local_metadata_future.set_exception(exc)
+            self._metadata_future.set_exception(exc)
         finally:
             # Remove the future from the global registry once done.
-            future_registry.remove_future(self._local_metadata_future)
+            future_registry.remove_future(self._metadata_future)
 
     def get_df_between_dates(self, *args, **kwargs) -> pd.DataFrame:
         """
@@ -85,7 +85,7 @@ class APIPersistManager:
         Returns:
             A pandas DataFrame with the requested data.
         """
-        filtered_data = self.local_metadata.get_data_between_dates_from_api(*args, **kwargs)
+        filtered_data = self.metadata.get_data_between_dates_from_api(*args, **kwargs)
         return filtered_data
 
 

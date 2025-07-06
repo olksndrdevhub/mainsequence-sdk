@@ -517,88 +517,11 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
     def get_data_between_dates_from_api(
             self,
-            start_date: datetime.datetime=None,
-            end_date: datetime.datetime=None,
-            great_or_equal: bool=None,
-            less_or_equal: bool=None,
-            unique_identifier_list: list=None,
-            columns: list=None,
-            unique_identifier_range_map: Union[None, UniqueIdentifierRangeMap]=None
-        ):
-        """ Helper function to make a single batch request (or multiple paged requests if next_offset). """
-        def fetch_one_batch(chunk_range_map):
-            all_results_chunk = []
-            offset = 0
-            while True:
-                payload = {
-                    "json": {
-                        "start_date": start_date.timestamp() if start_date else None,
-                        "end_date": end_date.timestamp() if end_date else None,
-                        "great_or_equal": great_or_equal,
-                        "less_or_equal": less_or_equal,
-                        "unique_identifier_list": unique_identifier_list,
-                        "columns": columns,
-                        "offset": offset,  # pagination offset
-                        "unique_identifier_range_map": chunk_range_map,
-                    }
-                }
+           *args,**kwargs
+    ):
 
-                # Perform the POST request
-                r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url)
-                if r.status_code != 200:
-                    logger.warning(f"Error in request: {r.text}")
-                    return []
+        return self.remote_table.get_data_between_dates_from_api(  *args,**kwargs)
 
-                response_data = r.json()
-                # Accumulate results
-                chunk = response_data.get("results", [])
-                all_results_chunk.extend(chunk)
-
-                # Retrieve next offset; if None, we've got all the data in this chunk
-                next_offset = response_data.get("next_offset")
-                if not next_offset:
-                    break
-
-                # Update offset for the next iteration
-                offset = next_offset
-
-            return all_results_chunk
-
-        s = self.build_session()
-        url = self.get_object_url() + f"/{self.id}/get_data_between_dates_from_remote/"
-
-        unique_identifier_range_map = copy.deepcopy(unique_identifier_range_map)
-        if unique_identifier_range_map is not None:
-            for unique_identifier, date_info in unique_identifier_range_map.items():
-                # Convert start_date if present
-                if 'start_date' in date_info and isinstance(date_info['start_date'], datetime.datetime):
-                    date_info['start_date'] = int(date_info['start_date'].timestamp())
-
-                # Convert end_date if present
-                if 'end_date' in date_info and isinstance(date_info['end_date'], datetime.datetime):
-                    date_info['end_date'] = int(date_info['end_date'].timestamp())
-
-        all_results = []
-        if unique_identifier_range_map:
-            keys = list(unique_identifier_range_map.keys())
-            chunk_size = 100
-            for start_idx in range(0, len(keys), chunk_size):
-                key_chunk = keys[start_idx: start_idx + chunk_size]
-
-                # Build sub-dictionary for this chunk
-                chunk_map = {
-                    k: unique_identifier_range_map[k] for k in key_chunk
-                }
-
-                # Fetch data (including any pagination via next_offset)
-                chunk_results = fetch_one_batch(chunk_map)
-                all_results.extend(chunk_results)
-        else:
-            # If unique_identifier_range_map is None, do a single batch with offset-based pagination.
-            chunk_results = fetch_one_batch(None)
-            all_results.extend(chunk_results)
-
-        return pd.DataFrame(all_results)
 
     @classmethod
     def post_data_frame_in_chunks(
@@ -834,6 +757,92 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             db_interface.drop_table(self.table_name)
 
         self.delete()
+
+    def get_data_between_dates_from_api(
+            self,
+            start_date: datetime.datetime=None,
+            end_date: datetime.datetime=None,
+            great_or_equal: bool=None,
+            less_or_equal: bool=None,
+            unique_identifier_list: list=None,
+            columns: list=None,
+            unique_identifier_range_map: Union[None, UniqueIdentifierRangeMap]=None
+        ):
+        """ Helper function to make a single batch request (or multiple paged requests if next_offset). """
+        def fetch_one_batch(chunk_range_map):
+            all_results_chunk = []
+            offset = 0
+            while True:
+                payload = {
+                    "json": {
+                        "start_date": start_date.timestamp() if start_date else None,
+                        "end_date": end_date.timestamp() if end_date else None,
+                        "great_or_equal": great_or_equal,
+                        "less_or_equal": less_or_equal,
+                        "unique_identifier_list": unique_identifier_list,
+                        "columns": columns,
+                        "offset": offset,  # pagination offset
+                        "unique_identifier_range_map": chunk_range_map,
+                    }
+                }
+
+                # Perform the POST request
+                r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url)
+                if r.status_code != 200:
+                    logger.warning(f"Error in request: {r.text}")
+                    return []
+
+                response_data = r.json()
+                # Accumulate results
+                chunk = response_data.get("results", [])
+                all_results_chunk.extend(chunk)
+
+                # Retrieve next offset; if None, we've got all the data in this chunk
+                next_offset = response_data.get("next_offset")
+                if not next_offset:
+                    break
+
+                # Update offset for the next iteration
+                offset = next_offset
+
+            return all_results_chunk
+
+        s = self.build_session()
+        url = self.get_object_url() + f"/{self.id}/get_data_between_dates_from_remote/"
+
+        unique_identifier_range_map = copy.deepcopy(unique_identifier_range_map)
+        if unique_identifier_range_map is not None:
+            for unique_identifier, date_info in unique_identifier_range_map.items():
+                # Convert start_date if present
+                if 'start_date' in date_info and isinstance(date_info['start_date'], datetime.datetime):
+                    date_info['start_date'] = int(date_info['start_date'].timestamp())
+
+                # Convert end_date if present
+                if 'end_date' in date_info and isinstance(date_info['end_date'], datetime.datetime):
+                    date_info['end_date'] = int(date_info['end_date'].timestamp())
+
+        all_results = []
+        if unique_identifier_range_map:
+            keys = list(unique_identifier_range_map.keys())
+            chunk_size = 100
+            for start_idx in range(0, len(keys), chunk_size):
+                key_chunk = keys[start_idx: start_idx + chunk_size]
+
+                # Build sub-dictionary for this chunk
+                chunk_map = {
+                    k: unique_identifier_range_map[k] for k in key_chunk
+                }
+
+                # Fetch data (including any pagination via next_offset)
+                chunk_results = fetch_one_batch(chunk_map)
+                all_results.extend(chunk_results)
+        else:
+            # If unique_identifier_range_map is None, do a single batch with offset-based pagination.
+            chunk_results = fetch_one_batch(None)
+            all_results.extend(chunk_results)
+
+        return pd.DataFrame(all_results)
+
 
 class Scheduler(BasePydanticModel, BaseObjectOrm):
     uid: str
