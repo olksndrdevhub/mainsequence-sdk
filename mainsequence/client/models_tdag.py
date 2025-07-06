@@ -227,7 +227,7 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
         r = make_request(s=s, loaders=self.LOADERS, r_type="POST",
                          time_out=timeout,
                          url=url,payload={"json": {"columns_metadata":columns_metadata}} )
-        if r.status_code != 200:
+        if r.status_code not in [ 200,201]:
             raise Exception(r.text)
         return r.json()
 
