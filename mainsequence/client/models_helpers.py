@@ -1,6 +1,6 @@
 from .models_vam import *
 from .base import MARKETS_CONSTANTS
-from .models_tdag import LocalTimeSerie
+from .models_tdag import DynamicTableMetaData, LocalTimeSerie
 import datetime
 
 from pydantic import BaseModel, Field, PositiveInt
@@ -17,7 +17,7 @@ def get_right_account_class(account: Account):
 class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
     id:Optional[int]=None
     unique_identifier: str
-    related_local_time_serie: Union[LocalTimeSerie,int]
+    source_table: Union[DynamicTableMetaData,int]
     description: Optional[str] = Field(None, description="Descriptions of the data source")
     data_frequency_id: Optional[DataFrequency] =None
     assets_in_data_source: Optional[List[int]]

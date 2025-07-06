@@ -103,46 +103,6 @@ class TimeSerieHeadUpdateActor:
 class TimeSerieHeadUpdateActorDist(TimeSerieHeadUpdateActor):
     ...
 
-
-@contextmanager
-def set_data_source(pod_source=None, tdag_detached=False, override_all: bool = False):
-    """
-
-    :param override_all:
-    :return:
-    """
-    raise NotImplementedError("Legacy function")
-    if pod_source is not None:
-
-        vars = ["POD_DEFAULT_DATA_SOURCE", "POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE", ]
-        original_values = {k: os.environ.get(k, None) for k in vars}
-
-        # Override the environment variables
-        os.environ["POD_DEFAULT_DATA_SOURCE"] = pod_source.model_dump_json()
-        os.environ["POD_DEFAULT_DATA_SOURCE_FORCE_OVERRIDE"] = str(override_all)
-
-
-        try:
-            yield pod_source
-        except Exception as e:
-
-            raise
-        finally:
-            # Restore the original environment variables
-            if pod_source is None: return
-            for key, value in original_values.items():
-                if value is None:  # Variable was not originally set
-                    del os.environ[key]
-                else:
-                    os.environ[key] = value
-    else:
-        # default data source for pod
-        try:
-            yield DynamicTableDataSource.get_default_data_source_for_token()
-        except Exception as e:
-            raise
-
-
 class SchedulerUpdater:
     ACTOR_WAIT_LIMIT = 80  # seconds to wait before sending task to get scheduled
 

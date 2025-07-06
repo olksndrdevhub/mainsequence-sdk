@@ -25,19 +25,24 @@ from joblib import Parallel, delayed
 
 from mainsequence.virtualfundbuilder.models import AssetsConfiguration
 from mainsequence.virtualfundbuilder.utils import logger, TIMEDELTA
-
+from typing import Optional
+from mainsequence.tdag.time_series import ModelList
 FULL_CALENDAR = "24/7"
 
 
-def get_interpolated_prices_timeseries(assets_configuration: AssetsConfiguration):
+def get_interpolated_prices_timeseries(assets_configuration: Optional[AssetsConfiguration]=None,
+                                     ):
     """
     Creates a Wrapper Timeseries for an asset configuration.
     """
-    prices_configuration = copy.deepcopy(assets_configuration).prices_configuration
 
+
+    prices_configuration = copy.deepcopy(assets_configuration).prices_configuration
     prices_configuration_kwargs = prices_configuration.model_dump()
     prices_configuration_kwargs.pop("is_live", None)
     prices_configuration_kwargs.pop("markets_time_series", None)
+
+
     return InterpolatedPrices(
         asset_category_unique_id=assets_configuration.assets_category_unique_id,
         **prices_configuration_kwargs
@@ -467,12 +472,13 @@ class InterpolatedPrices(TimeSerie):
     @TimeSerie._post_init_routines()
     def __init__(
             self,
-            asset_category_unique_id: str,
+
             bar_frequency_id: str,
             intraday_bar_interpolation_rule: str,
+            asset_category_unique_id: Optional[str] = None,
             upsample_frequency_id: Optional[str] = None,
-            asset_filter: Optional[dict] = None,
-            local_kwargs_to_ignore: List[str] = ["asset_category_unique_id"],
+            asset_list:ModelList = None,#todo change for asset_filter when asset filter has all the characteristics
+            local_kwargs_to_ignore: List[str] = ["asset_category_unique_id","asset_list"],
             *args,
             **kwargs
     ):
@@ -480,13 +486,17 @@ class InterpolatedPrices(TimeSerie):
         Initializes the InterpolatedPrices object.
         """
         assert "d" in bar_frequency_id or "m" in bar_frequency_id, f"bar_frequency_id={bar_frequency_id} should be 'd for days' or 'm for min'"
+
+        if asset_category_unique_id is None:
+            assert asset_list is not None, f"asset_category_unique_id={asset_category_unique_id} should not be None or asset_list should be defined"
+
         self.asset_category_unique_id = asset_category_unique_id
         self.interpolator = UpsampleAndInterpolation(
             bar_frequency_id=bar_frequency_id,
             upsample_frequency_id=upsample_frequency_id,
             intraday_bar_interpolation_rule=intraday_bar_interpolation_rule
         )
-
+        self.constructor_asset_list = asset_list
         bars_frequency_min = string_frequency_to_minutes(bar_frequency_id)
         self.maximum_forward_fill = datetime.timedelta(minutes=bars_frequency_min) - TIMEDELTA
 
@@ -503,7 +513,7 @@ class InterpolatedPrices(TimeSerie):
             self.logger.error(f"Translation table {translation_table} does not exist")
 
         self.bars_ts = WrapperTimeSerie(translation_table=translation_table)
-        super().__init__(*args, **kwargs)
+        super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
     def get_html_description(self) -> Union[str, None]:
         description = f"""<p>Time Serie Instance of {self.__class__.__name__} updating table {self.remote_table_hashed_name} for for <b>train</b> prices in <b>{self.execution_venue_symbol}</b> for backtesting</p>"""
@@ -641,8 +651,11 @@ class InterpolatedPrices(TimeSerie):
         """
         Creates mappings from symbols to IDs
         """
-        asset_category = AssetCategory.get(unique_identifier=self.asset_category_unique_id)
-        asset_list = Asset.filter(id__in=asset_category.assets)
+        if self.constructor_asset_list is not None:
+            asset_list= self.constructor_asset_list
+        else:
+            asset_category = AssetCategory.get(unique_identifier=self.asset_category_unique_id)
+            asset_list = Asset.filter(id__in=asset_category.assets)
         self.asset_calendar_map = {a.unique_identifier: a.get_calendar() for a in asset_list}
         return asset_list
 

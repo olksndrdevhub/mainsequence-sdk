@@ -61,6 +61,7 @@ mkdocs-autorefs = "*"
 mkdocstrings = {extras = ["python"], version = "*"}
 mkdocs-mermaid2-plugin = "*"
 pymdown-extensions = "*"
+pipdeptree = "*"
 
 [requires]
 python_version = "3.9"
