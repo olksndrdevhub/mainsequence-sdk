@@ -1082,7 +1082,6 @@ class DataUpdates(BaseModel):
         else:
             print(f"  asset_list: {len(self.asset_list)} assets")
 
-
         # DataFrame
         if self.last_observation is None or self.last_observation.empty:
             print("  last_observation: empty DataFrame")
@@ -1093,8 +1092,6 @@ class DataUpdates(BaseModel):
         # Other attributes
         print(f"  max_time_index_value: {self.max_time_index_value}")
         print(f"  _max_time_in_update_statistics: {self._max_time_in_update_statistics}")
-
-
 
     def is_empty(self):
         return self.update_statistics is None and self.max_time_index_value is None
@@ -1125,7 +1122,7 @@ class DataUpdates(BaseModel):
             init_fallback_date: datetime = None,
             unique_identifier_list: Union[list, None] = None
     ):
-        self.asset_list=asset_list
+        self.asset_list = asset_list
         new_update_statistics = self.update_statistics
         last_observation = self.last_observation
         if asset_list is not None or unique_identifier_list is not None:
@@ -1199,20 +1196,14 @@ class DataUpdates(BaseModel):
             return []
         return self.update_statistics.items()
 
-    def filter_df_by_latest_value(self, df:pd.DataFrame):
-        """
-
-        :param df:
-        :return:
-        """
+    def filter_df_by_latest_value(self, df: pd.DataFrame) -> pd.DataFrame:
         if df.shape[0] == 0:
             return df
+
         if not self.is_empty():
-
-            if self.update_statistics is None and self.max_time_index_value is not None:
-                #single index time serie
+            if (self.update_statistics is None or "unique_identifier" not in df.index.names) and self.max_time_index_value is not None:
+                # single index time serie
                 return df[df.index>=self.max_time_index_value]
-
 
             for unique_identifier, last_update in self.update_statistics.items():
                 df = df[
@@ -2199,9 +2190,6 @@ class PodDataSource:
             f"{'-' * 80}\n"
         )
         logger.info(banner)
-
-
-
 
     def __repr__(self):
         return f"{self.data_source.related_resource}"
