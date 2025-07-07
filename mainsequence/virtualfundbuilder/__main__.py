@@ -146,18 +146,23 @@ def get_pod_configuration():
 
 
 def import_project_configuration():
+    from mainsequence.client import ProjectConfiguration, Job
+    from mainsequence.virtualfundbuilder.utils import get_vfb_logger
+    logger = get_vfb_logger()
+
     # load project configuration if exists
     config_file = Path(os.getenv("VFB_PROJECT_PATH")) / "project_configuration.yaml"
 
     if not config_file.exists():
         return
 
-    project_configuration = yaml.load(config_file)
+    with open(config_file, "r") as f:
+        project_configuration_raw = yaml.safe_load(f)
+    project_configuration = ProjectConfiguration(**project_configuration_raw)
 
-    # parse_configuration_file()
-
-    # for job_config in project_configuration["project"]
-
+    logger.info(f"Create or update {project_configuration.jobs} jobs in backend")
+    for job in project_configuration.jobs:
+        Job.create_from_configuration(job_configuration=job.model_dump())
 
 
 def prerun_routines():
@@ -180,6 +185,8 @@ class VirtualFundLauncher:
 
     def run_resource(self, execution_type, execution_object=None):
         error_on_run = False
+        import_project_configuration()
+
 
         try:
             prerun_routines()
