@@ -1801,7 +1801,7 @@ class APITimeSerie(CommonMethodsMixin):
             return filtered_data
 
         # fix types
-        stc = self.local_persist_manager.local_metadata.remote_table.sourcetableconfiguration
+        stc = self.local_persist_manager.metadata.sourcetableconfiguration
         filtered_data[stc.time_index_name] = pd.to_datetime(filtered_data[stc.time_index_name], utc=True)
         for c, c_type in stc.column_dtypes_map.items():
             if c != stc.time_index_name:
