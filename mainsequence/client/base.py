@@ -132,6 +132,7 @@ class BaseObjectOrm:
         "SourceTableConfiguration": "ts_manager/source_table_config",
         "DynamicResource": "tdag-gpt/dynamic_resource",
         "Artifact": "pods/artifact",
+        "Job": "pods/job",
 
         #ReportBuilder
         "Presentation": "reports/presentations",
