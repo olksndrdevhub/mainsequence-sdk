@@ -21,7 +21,7 @@ fi
 # -------------------------------------------------------------
 # Decide whether to clone via SSH or API token
 # -------------------------------------------------------------
-if [ "${AUTHENTICATION_METHOD:-ssh}" = "api" ] && [ -n "${GIT_API_TOKEN:-}" ] && [ -n "${GIT_REPO_URL:-}" ]; then
+if [ "${AUTHENTICATION_METHOD:-ssh}" = "api" ]; then
   clone_via_api_token
 else
   clone_via_ssh_key

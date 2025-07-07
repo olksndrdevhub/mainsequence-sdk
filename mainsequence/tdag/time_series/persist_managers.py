@@ -48,18 +48,12 @@ class APIPersistManager:
 
 
     @property
-    def metadata(self) -> LocalTimeSerie:
+    def metadata(self) -> DynamicTableMetaData:
         """Lazily block and cache the result if needed."""
         if not hasattr(self, '_metadata_cached'):
             # This call blocks until the future is resolved.
             self._metadata_cached = self._metadata_future.result()
         return self._metadata_cached
-
-    @property
-    def local_metadata(self) -> DynamicTableMetaData:
-        """Returns the remote table metadata associated with the local time series."""
-        return None
-
 
     def _init_metadata(self) -> None:
         """

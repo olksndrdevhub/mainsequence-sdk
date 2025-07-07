@@ -33,22 +33,26 @@ setup_ssh_key() {
 }
 
 ########################################
-# Clone via API token
+# Clone via API token if provided, otherwise clone public repo.
 # Requires environment variables:
-#    GIT_API_TOKEN
+#    GIT_API_TOKEN (optional)
 #    GIT_REPO_URL
 #    REPO_PATH
 ########################################
 clone_via_api_token() {
-  echo "Using API token approach..."
   ensure_no_host_key_check
-
-  # Ensure we don't do SSH
   export GIT_SSH_COMMAND="echo skipping_ssh"
-
   rm -rf "$REPO_PATH"
-  REMOTE_URL=$(echo "$GIT_REPO_URL" | sed "s|https://|https://${GIT_API_TOKEN}@|")
-  git clone "$REMOTE_URL" "$REPO_PATH"
+
+  local remote_url="$GIT_REPO_URL"
+  if [ -n "${GIT_API_TOKEN:-}" ]; then
+    echo "Using API token for authentication..."
+    remote_url=$(echo "$GIT_REPO_URL" | sed "s|https://|https://${GIT_API_TOKEN}@|")
+  else
+    echo "No API token found. Cloning public repository anonymously..."
+  fi
+
+  git clone "$remote_url" "$REPO_PATH"
 }
 
 ########################################

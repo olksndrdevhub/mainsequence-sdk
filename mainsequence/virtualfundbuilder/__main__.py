@@ -144,6 +144,27 @@ def get_pod_configuration():
         f.write(TMP_SCRIPT)
     runpy.run_path(str(python_file_path), run_name="__main__")
 
+
+def import_project_configuration():
+    from mainsequence.client import ProjectConfiguration, Job
+    from mainsequence.virtualfundbuilder.utils import get_vfb_logger
+    logger = get_vfb_logger()
+
+    # load project configuration if exists
+    config_file = Path(os.getenv("VFB_PROJECT_PATH")) / "project_configuration.yaml"
+
+    if not config_file.exists():
+        return
+
+    with open(config_file, "r") as f:
+        project_configuration_raw = yaml.safe_load(f)
+    project_configuration = ProjectConfiguration(**project_configuration_raw)
+
+    logger.info(f"Create or update {project_configuration.jobs} jobs in backend")
+    for job in project_configuration.jobs:
+        Job.create_from_configuration(job_configuration=job.model_dump())
+
+
 def prerun_routines():
     data = update_job_status("RUNNING")
     env_update = data.get("environment_update", {})
@@ -163,8 +184,9 @@ class VirtualFundLauncher:
         self.logger = get_vfb_logger()
 
     def run_resource(self, execution_type, execution_object=None):
-        # get_pod_configuration() # to make sure all resources are available
         error_on_run = False
+        import_project_configuration()
+
 
         try:
             prerun_routines()
@@ -175,7 +197,9 @@ class VirtualFundLauncher:
             elif execution_type == "notebook":
                 run_notebook(execution_object)
             elif execution_type == "system_job":
-                pass # placeholder, get_pod_configuration already called above
+                import_project_configuration()
+                # get_pod_configuration already called from import to publish resource in backend
+                pass
             elif execution_type == "app":
                 run_app(app_name=os.getenv("APP_NAME"), configuration=os.getenv("APP_CONFIGURATION"))
             elif execution_type == "standby":

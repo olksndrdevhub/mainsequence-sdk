@@ -26,7 +26,7 @@ import structlog.contextvars as cvars
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager, APIPersistManager
 from mainsequence.client.models_tdag import (DataSource, LocalTimeSeriesHistoricalUpdate,
-                                             DataUpdates, UniqueIdentifierRangeMap, ColumnMetaData
+                                             DataUpdates, UniqueIdentifierRangeMap, ColumnMetaData, POD_PROJECT
                                              )
 from pandas.api.types import is_datetime64_any_dtype
 
@@ -152,8 +152,13 @@ def hash_signature(dictionary: Dict[str, Any]) -> Tuple[str, str]:
     dhash_remote = hashlib.md5()
 
     local_ts_dict_to_hash = parse_dictionary_before_hashing(dictionary)
-
     remote_ts_in_db_hash = copy.deepcopy(local_ts_dict_to_hash)
+
+    # local_hash are bound to project
+    if "project_id" in local_ts_dict_to_hash:
+        raise ValueError(f"project_id is set automatically for the local_hash to the current project.")
+    local_ts_dict_to_hash["project_id"] = POD_PROJECT.id
+
     if "local_kwargs_to_ignore" in local_ts_dict_to_hash.keys():
         keys_to_ignore = local_ts_dict_to_hash['local_kwargs_to_ignore']
         keys_to_ignore.sort()
@@ -2710,10 +2715,8 @@ class TimeSerie(CommonMethodsMixin, DataPersistanceMethods, GraphNodeMethods, Ti
                     self.logger.info(f'Updating Local Time Series for  {self}  for first time')
                 try:
                     temp_df = self.update(update_statistics)
-                    temp_df=update_statistics.filter_df_by_latest_value(temp_df)
+                    temp_df = update_statistics.filter_df_by_latest_value(temp_df)
                     temp_df.replace([np.inf, -np.inf], np.nan, inplace=True)
-
-
 
                 except Exception as e:
                     import traceback
