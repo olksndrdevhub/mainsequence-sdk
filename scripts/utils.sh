@@ -52,15 +52,23 @@ clone_via_api_token() {
 }
 
 ########################################
-# Clone via SSH
+# Clone via SSH.
+# If GIT_PRIVATE_KEY is provided, it will be used for authentication.
+# Otherwise, it will attempt an anonymous clone using the SSH URL.
 # Requires environment variables:
-#    GIT_PRIVATE_KEY
+#    GIT_PRIVATE_KEY (optional)
 #    GIT_SSH_URL
 #    REPO_PATH
 ########################################
 clone_via_ssh_key() {
-  echo "Using SSH key approach..."
-  setup_ssh_key
+  # If a private key is provided, set it up with the ssh-agent.
+  if [ -n "${GIT_PRIVATE_KEY:-}" ]; then
+    echo "Using SSH key approach..."
+    setup_ssh_key
+  else
+    echo "No SSH key provided. Attempting anonymous clone via SSH URL."
+  fi
+
   ensure_no_host_key_check
 
   export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
