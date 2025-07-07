@@ -15,11 +15,11 @@ def get_right_account_class(account: Account):
 
 
 class MarketsTimeSeriesDetails(BaseObjectOrm, BasePydanticModel):
-    id:Optional[int]=None
+    id: Optional[int] = None
     unique_identifier: str
-    source_table: Union[DynamicTableMetaData,int]
+    source_table: Union[DynamicTableMetaData, int]
     description: Optional[str] = Field(None, description="Descriptions of the data source")
-    data_frequency_id: Optional[DataFrequency] =None
+    data_frequency_id: Optional[DataFrequency] = None
     assets_in_data_source: Optional[List[int]]
     extra_properties: Optional[Dict]
 
