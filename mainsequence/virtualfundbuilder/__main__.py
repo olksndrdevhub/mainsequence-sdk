@@ -197,7 +197,7 @@ class VirtualFundLauncher:
             elif execution_type == "notebook":
                 run_notebook(execution_object)
             elif execution_type == "system_job":
-                self.logger("Update project resources and import project configuration")
+                self.logger.info("Update project resources and import project configuration")
                 import_project_configuration()
                 # get_pod_configuration already called from import
                 pass
