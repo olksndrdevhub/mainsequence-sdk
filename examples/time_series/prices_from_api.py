@@ -13,7 +13,6 @@ from mainsequence.client.models_helpers import MarketsTimeSeriesDetails
 from mainsequence.client import MARKETS_CONSTANTS
 
 
-
 class PricesFromApi(TimeSerie):
     """
     A basic time series example tracking BTC and ETH price updates.
@@ -25,7 +24,6 @@ class PricesFromApi(TimeSerie):
         yesterday at midnight (UTC).
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
-
 
     @TimeSerie._post_init_routines()
     def __init__(self, asset_list, *args, **kwargs):
@@ -40,13 +38,13 @@ class PricesFromApi(TimeSerie):
         self.asset_list = asset_list
         ts_details = MarketsTimeSeriesDetails.get(unique_identifier="alpaca_1d_bars")
         self.prices_ts = APITimeSerie(
-            data_source_id=ts_details.related_local_time_serie.remote_table.data_source,
-            local_hash_id=ts_details.related_local_time_serie.local_hash_id
+            data_source_id=ts_details.source_table.data_source,
+            source_table_hash_id=ts_details.source_table.hash_id
         )
         super().__init__(*args, **kwargs)
 
 
-    def update(self, update_statistics: DataUpdates)->pd.DataFrame:
+    def update(self, update_statistics: DataUpdates) -> pd.DataFrame:
         data = self.prices_ts.get_df_between_dates(unique_identifier_list=[a.unique_identifier for a in self.asset_list])
         return data
 

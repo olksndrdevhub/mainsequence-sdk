@@ -2,7 +2,6 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-
 from mainsequence.client import TargetPortfolio, Account, AccountPortfolioScheduledRebalance, RebalanceTargetPosition, OrderManager, OrderManagerTargetQuantity, \
     Asset, Order, MarketOrder, AccountHistoricalHoldings
 
@@ -12,7 +11,6 @@ from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterfa
 from mainsequence import MARKETS_CONSTANTS
 
 account = Account.get(account_name="Default MainSequence Portfolios Account")
-
 
 btc_asset = Asset.get(symbol="BTC", execution_venue__symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL)
 

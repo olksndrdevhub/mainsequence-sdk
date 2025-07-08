@@ -12,7 +12,6 @@ from mainsequence.tdag import TimeSerie
 from mainsequence.client import DataUpdates
 
 
-
 class FamaFrenchTimeSerie(TimeSerie):
     """
     This TimeSerie dynamically fetches a cross-section of U.S. stocks from the Polygon API, calculates

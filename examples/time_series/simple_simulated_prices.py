@@ -22,7 +22,6 @@ class SimulatedPrices(TimeSerie):
     """
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
 
-
     @TimeSerie._post_init_routines()
     def __init__(self, asset_list: ModelList, *args, **kwargs):
         """

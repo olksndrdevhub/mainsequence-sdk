@@ -10,8 +10,8 @@ dotenv.load_dotenv('../.env.dev')
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
 portfolio = PortfolioInterface.load_from_configuration("market_cap")
 
-SessionDataSource.set_local_db()
-res = portfolio.run()
+# SessionDataSource.set_local_db()
+res = portfolio.run(update_tree=False)
 print(res)
 # bars_ts = get_interpolated_prices_timeseries(portfolio.portfolio_build_configuration.assets_configuration)
 
