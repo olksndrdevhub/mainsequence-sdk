@@ -212,11 +212,6 @@ def build_rolling_regression_from_df(x: NDArray, y: NDArray, rolling_window: int
     reg_results.columns = reg_results.columns.swaplevel()
     return reg_results
 
-def filter_assets(df: pd.DataFrame, asset_list: ModelList) -> pd.DataFrame:
-    """ Filters a DataFrame to include only rows that have asset symbols contained in a given asset list. """
-    asset_ids = [a.unique_identifier for a in asset_list]
-    return df[df.index.get_level_values("asset_symbol").isin(asset_ids)]
-
 
 def parse_google_docstring(docstring):
     parsed = docstring_parser.parse(docstring)
@@ -463,30 +458,6 @@ def parse_raw_object_signature(object_signature, use_examples_for_default=None, 
     if parsed is None:
         parsed = {}
     return parsed
-
-
-def find_ts_recursively(root_ts, ts_names):
-    def _find_ts_recursively(parent_ts):
-        results = []
-        for attr_name, attr_value in parent_ts.__dict__.items():
-
-            # wrapped ts for prices
-            if attr_name == "related_time_series" and isinstance(attr_value, dict):
-                for value in attr_value.values():
-                    if isinstance(value, TimeSerie) and value.hash_id.split("_")[0] in ts_names:
-                        results.append(value)
-
-            if not isinstance(attr_value, TimeSerie):
-                continue
-
-            if attr_value.hash_id.split("_")[0] in ts_names:
-                results.append(attr_value)
-                continue
-
-            results += _find_ts_recursively(attr_value)
-
-        return results
-    return list(set(_find_ts_recursively(root_ts)))
 
 
 def default_config_to_dict(default_config):

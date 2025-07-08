@@ -10,7 +10,7 @@ from .time_series import PortfolioStrategy
 from mainsequence.client import Asset, AssetFutureUSDM, MARKETS_CONSTANTS as CONSTANTS, TargetPortfolio
 
 from .models import PortfolioConfiguration
-from .utils import find_ts_recursively, get_vfb_logger
+from .utils import get_vfb_logger
 
 
 class PortfolioInterface():
