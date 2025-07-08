@@ -3,9 +3,6 @@ from pathlib import Path
 from enum import Enum
 from .utils import read_key_from_yaml, write_yaml, read_yaml
 
-
-
-
 DEFAULT_RETENTION_POLICY = dict(scheduler_name="default", retention_policy_time="90 days")
 
 TIME_SERIES_SOURCE_TIMESCALE = "timescale"
@@ -17,10 +14,6 @@ TDAG_CONFIG_PATH = os.environ.get("TDAG_CONFIG_PATH", f"{TDAG_PATH}/config.yml")
 TDAG_DATA_PATH = f"{TDAG_PATH}/data"
 GT_TEMP_PATH = f"{TDAG_PATH}/temp"
 GT_RAY_FOLDER = f"{TDAG_PATH}/ray"
-
-
-
-
 
 TIME_SERIES_FOLDER = f"{TDAG_DATA_PATH}/time_series_data"
 os.makedirs(TIME_SERIES_FOLDER, exist_ok=True)

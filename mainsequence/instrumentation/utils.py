@@ -24,7 +24,7 @@ ConsoleSpanExporter
 from opentelemetry.trace.propagation.tracecontext import \
     TraceContextTextMapPropagator
 from typing import Union
-
+import structlog
 
 def is_port_in_use(port: int,agent_host:str) -> bool:
     import socket
@@ -33,27 +33,18 @@ def is_port_in_use(port: int,agent_host:str) -> bool:
 
 class TracerInstrumentator():
     __doc__ = f"""
-    Main instrumentator class controlls building and exporting of traces 
-    
-    
-       """
-
+        Main instrumentator class controlls building and exporting of traces 
+    """
 
     def build_tracer(self) -> TraceContextTextMapPropagator:
-        """
-        buidl_tracer("Time Series",__name__)
-        :return:
-        """
-
         from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
         from opentelemetry.sdk.resources import SERVICE_NAME, Resource
         resource = Resource(attributes={SERVICE_NAME: "tdag"})
         set_tracer_provider(TracerProvider(resource=resource))
 
-        end_point=os.environ.get("OTLP_ENDPOINT")
+        end_point = os.environ.get("OTLP_ENDPOINT")
 
         if end_point is not None:
-    
             otlp_exporter = OTLPSpanExporter(endpoint=end_point)
             if  is_port_in_use(4317,agent_host=self.agent_host)== True:
                 get_tracer_provider().add_span_processor(BatchSpanProcessor(otlp_exporter))
@@ -71,12 +62,10 @@ class TracerInstrumentator():
         telemetry_carrier = {}
         prop.inject(carrier=telemetry_carrier)
         return telemetry_carrier
+
     def append_attribute_to_current_span(self,attribute_key,attribute_value):
         current_span = get_current_span()
         current_span.set_attribute(attribute_key, attribute_value)
-
-import structlog
-
 
 def add_otel_trace_context(logger, method_name, event_dict):
     """
