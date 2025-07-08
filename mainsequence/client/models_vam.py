@@ -415,30 +415,6 @@ class AssetTranslationRule(BaseModel):
     def is_asset_in_rule(self, asset: "Asset") -> bool:
         return self.asset_filter.filter_triggered(asset)
 
-class AssetTranslationTable(BaseModel):
-    rules: List[AssetTranslationRule] = Field(default_factory=list)
-
-    def evaluate_asset(self, asset: "Asset") -> dict:
-        for rule in self.rules:
-            if rule.is_asset_in_rule(asset):
-                return {
-                    "markets_time_serie_unique_identifier": rule.markets_time_serie_unique_identifier,
-                    "execution_venue_symbol": rule.target_execution_venue_symbol,
-                    "exchange_code": rule.target_exchange_code,
-                }
-        raise TranslationError(f"No rules for asset {asset} found")
-
-    def evaluate_assets(self, assets: List["Asset"]) -> Dict[str, dict]:
-        """
-        Evaluate multiple assets at once, returning a dict:
-            { asset.unique_identifier: { 'markets_time_serie_unique_identifier':..., ...}, ...}
-        or raises TranslationError if an asset is unmatched.
-        """
-        results = {}
-        for asset in assets:
-            results[asset.unique_identifier] = self.evaluate_asset(asset)
-        return results
-
 class AssetTranslationTable(BaseObjectOrm, BasePydanticModel):
     """
     Mirrors the Django model 'AssetTranslationTableModel' in the backend.

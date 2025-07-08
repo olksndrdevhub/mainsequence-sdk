@@ -204,7 +204,7 @@ class Job(BaseObjectOrm, BasePydanticModel):
         s = cls.build_session()
         job_configuration["project_id"] = POD_PROJECT.id
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": job_configuration})
-        if r.status_code != 200:
+        if r.status_code not in [200, 201]:
             raise Exception(r.text)
         return r.json()
 
