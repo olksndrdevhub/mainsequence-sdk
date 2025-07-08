@@ -152,8 +152,10 @@ def import_project_configuration():
 
     # load project configuration if exists
     config_file = Path(os.getenv("VFB_PROJECT_PATH")) / "project_configuration.yaml"
+    logger.info(f"Try to import project configuration from {config_file}")
 
     if not config_file.exists():
+        logger.info("No project configuration found")
         return
 
     with open(config_file, "r") as f:
@@ -185,8 +187,6 @@ class VirtualFundLauncher:
 
     def run_resource(self, execution_type, execution_object=None):
         error_on_run = False
-        import_project_configuration()
-
 
         try:
             prerun_routines()
