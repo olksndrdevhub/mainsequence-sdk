@@ -71,12 +71,8 @@ class FixedWeights(WeightsBase, TimeSerie):
         return signals_weights
 
 
-
-
-
 class AssetMistMatch(Exception):
     ...
-
 
 class VolatilityControlConfiguration(BaseModel):
     target_volatility: float = 0.1
@@ -174,10 +170,6 @@ class MarketCap(WeightsBase, TimeSerie):
         asset_list = Asset.filter(id__in=asset_category.assets)
         return asset_list
 
-
-
-
-
     def update(self, update_statistics: "DataUpdates"):
         """
         Args:
@@ -207,15 +199,13 @@ class MarketCap(WeightsBase, TimeSerie):
                                                           update_statistics.asset_list])
 
         ms_asset_list={a.main_sequence_share_class:a for a in ms_asset_list}
-        asset_list_to_share_class={a.main_sequence_share_class:a for a in update_statistics.asset_list}
+        asset_list_to_share_class = {a.main_sequence_share_class:a for a in update_statistics.asset_list}
 
-
-
-        market_cap_uid_range_map={ms_asset.get_spot_reference_asset_unique_identifier():
+        market_cap_uid_range_map = {ms_asset.get_spot_reference_asset_unique_identifier():
                                       unique_identifier_range_market_cap_map[asset_list_to_share_class[ms_share_class].unique_identifier]
                                        for ms_share_class,ms_asset in ms_asset_list.items()}
 
-        market_cap_uid_to_asset_uid={ms_asset.get_spot_reference_asset_unique_identifier():
+        market_cap_uid_to_asset_uid = {ms_asset.get_spot_reference_asset_unique_identifier():
                                       asset_list_to_share_class[ms_share_class].unique_identifier
                                        for ms_share_class,ms_asset in ms_asset_list.items()}
 
@@ -225,8 +215,6 @@ class MarketCap(WeightsBase, TimeSerie):
             great_or_equal=False,
         )
         mc = mc[~mc.index.duplicated(keep='first')]
-
-
 
         if mc.shape[0] == 0:
             self.logger.info("No data in Market Cap historical market cap")

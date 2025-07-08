@@ -20,10 +20,8 @@ class TrackingStrategy(Enum):
     ELASTIC_NET = "elastic_net"
     LASSO = "lasso"
 
-
 class TrackingStrategyConfiguration(VFBConfigBaseModel):
     configuration: Dict = {"alpha": 0, "l1_ratio": 0}
-
 
 def rolling_pca_betas(X, window, n_components=5, *args, **kwargs):
     """

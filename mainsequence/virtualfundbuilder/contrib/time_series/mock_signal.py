@@ -10,7 +10,6 @@ class MockSignal(WeightsBase, TimeSerie):
     """
     Mock Signal to test strategies. Creates a signal with long/short of ETH and BTC in frequency.
     """
-
     @TimeSerie._post_init_routines()
     def __init__(self, source_frequency: str = "30min", *args, **kwargs):
         super().__init__(*args, **kwargs)

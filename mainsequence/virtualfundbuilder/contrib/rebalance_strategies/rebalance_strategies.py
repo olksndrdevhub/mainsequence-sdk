@@ -49,17 +49,6 @@ class VolumeParticipation(RebalanceStrategyBase):
             prices_df: pd.DataFrame,
             price_type: str,
     ) -> pd.DataFrame:
-        """
-
-        Parameters
-        ----------
-        signal_weights
-        rebalance_dates
-
-        Returns
-        -------
-
-        """
         raise NotImplementedError
         asset_list = list(signal_weights.columns)
         start_time, end_time = pd.Timestamp(self.rebalance_start).time(), pd.Timestamp(self.rebalance_end).time()

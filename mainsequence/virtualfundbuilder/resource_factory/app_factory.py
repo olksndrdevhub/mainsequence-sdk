@@ -23,7 +23,6 @@ def register_app(name=None, register_in_agent=True):
         return insert_in_registry(APP_REGISTRY, cls, register_in_agent, name)
     return decorator
 
-
 class HtmlApp(BaseApp):
     """
     A base class for apps that generate HTML output.

@@ -17,7 +17,6 @@ from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 logger = get_vfb_logger()
 
 
-
 class WeightsBase(BaseResource):
     TYPE = ResourceType.SIGNAL_WEIGHTS_STRATEGY
 
@@ -34,8 +33,6 @@ class WeightsBase(BaseResource):
         self.assets_configuration = signal_assets_configuration
 
         super().__init__()
-
-
 
     def get_explanation(self):
         info = f"""
