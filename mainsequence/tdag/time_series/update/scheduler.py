@@ -12,7 +12,7 @@ from mainsequence.client import (Scheduler, SourceTableConfigurationDoesNotExist
 from .utils import get_time_to_wait_from_hash_id
 from .ray_manager import RayUpdateManager
 from mainsequence.tdag.config import bcolors
-from typing import Union, List
+from typing import Union, List, Dict, Optional, Any, Tuple
 import ray
 import pandas as pd
 from mainsequence.tdag.time_series.time_series import DependencyUpdateError, TimeSerie
@@ -28,10 +28,9 @@ USE_PICKLE = USE_PICKLE in ["True", "true", True]
 class TimeSerieHeadUpdateActor:
     TRACE_ID = "NO_TRACE"
 
-    def __init__(self, local_hash_id: str, data_source_id: int, scheduler: Scheduler,  debug,
-                 update_tree, update_extra_kwargs, remote_table_hashed_name: str,
-
-                 ):
+    def __init__(self, local_hash_id: str, data_source_id: int, scheduler: Scheduler, debug: bool,
+                 update_tree: Union[bool, dict], update_extra_kwargs: Dict, remote_table_hashed_name: str,
+                 ) -> None:
         """
 
         Parameters
@@ -42,20 +41,19 @@ class TimeSerieHeadUpdateActor:
         update_tree :
         update_extra_kwargs :
         """
-        self.update_tree = update_tree
-        self.remote_table_hashed_name = remote_table_hashed_name
-        self.ts = self._load_time_serie(local_hash_id=local_hash_id, remote_table_hashed_name=remote_table_hashed_name,
-                                        data_source_id=data_source_id,
-                                        scheduler=scheduler)
-        self.scheduler = scheduler
-
-        self.update_extra_kwargs = update_extra_kwargs
-        self.local_hash_id = local_hash_id
-        self.debug = debug
+        self.update_tree: Union[bool, dict] = update_tree
+        self.remote_table_hashed_name: str = remote_table_hashed_name
+        self.ts: TimeSerie = self._load_time_serie(local_hash_id=local_hash_id, remote_table_hashed_name=remote_table_hashed_name,
+                                                   data_source_id=data_source_id,
+                                                   scheduler=scheduler)
+        self.scheduler: Scheduler = scheduler
+        self.update_extra_kwargs: Dict = update_extra_kwargs
+        self.local_hash_id: str = local_hash_id
+        self.debug: bool = debug
 
     def _load_time_serie(self, local_hash_id: str,
                          remote_table_hashed_name: str, data_source_id: int,
-                         scheduler) -> "TimeSerie":
+                         scheduler: Scheduler) -> "TimeSerie":
         from mainsequence.tdag.time_series import TimeSerie
 
         distributed_actor_manager = RayUpdateManager(scheduler_uid=scheduler.uid,
@@ -68,20 +66,21 @@ class TimeSerieHeadUpdateActor:
                                                       data_source=data_source_id,
                                                       )
         else:
-            ts, pickle_path=rebuild_and_set_from_local_hash_id(local_hash_id=local_hash_id,data_source_id=data_source_id,
+            ts, pickle_path = rebuild_and_set_from_local_hash_id(local_hash_id=local_hash_id,data_source_id=data_source_id,
                                                                graph_depth_limit=0)
 
         ts.set_actor_manager(actor_manager=distributed_actor_manager)
 
         return ts
 
-    def run_one_step_update(self, force_update=False,
-                            update_only_tree=False, ):
+    def run_one_step_update(self, force_update: bool = False,
+                            update_only_tree: bool = False) -> bool:
         """
         Main update Method for a time serie Head
         Returns
         -------
-
+        bool
+            True if an error occurred during the update, False otherwise.
         """
         from mainsequence.instrumentation import TracerInstrumentator
         from mainsequence.tdag.config import configuration
@@ -111,10 +110,11 @@ class SchedulerUpdater:
                           data_source_id: int,
                           debug: bool, update_tree: bool,
                           raise_exception_on_error: bool = True,
-                          break_after_one_update=True, force_update=False, run_head_in_main_process=False,
-                          update_extra_kwargs=None, update_only_tree=False, name_suffix=None,
-
-                          ):
+                          break_after_one_update: bool = True, force_update: bool = False,
+                          run_head_in_main_process: bool = False,
+                          update_extra_kwargs: Optional[dict] = None, update_only_tree: bool = False,
+                          name_suffix: Optional[str] = None,
+                          ) -> None:
 
         # get_remote_hash_id
         new_scheduler = Scheduler.initialize_debug_for_ts(local_hash_id=time_serie_hash_id,
@@ -144,31 +144,31 @@ class SchedulerUpdater:
             raise e
 
     @classmethod
-    def start_from_uid(cls, uid: str, *args, **kwargs):
+    def start_from_uid(cls, uid: str, *args, **kwargs) -> None:
         scheduler = Scheduler.get(uid=uid)
         scheduler_updater = cls(scheduler=scheduler)
         scheduler_updater.start(*args, **kwargs)
 
-    def __init__(self, scheduler: Scheduler):
-        from mainsequence.tdag.config import logging_folder
+    def __init__(self, scheduler: Scheduler) -> None:
         global logger
         self.node_scheduler = scheduler
         logger = logger.bind(scheduler_name=scheduler.name)
         self.logger = logger
 
-    def _clear_idle_scheduled_tree(self, *args, **kwargs):
+    def _clear_idle_scheduled_tree(self, *args, **kwargs) -> None:
         pass
 
-    def _node_scheduler_heart_beat(self):
+    def _node_scheduler_heart_beat(self) -> None:
         """
         Timestamps a heart-beat from scheduler
         """
         self.node_scheduler.last_heart_beat = datetime.datetime.now(pytz.utc)
         self.node_scheduler.save()
 
-    def _run_update_task(self, running_distributed_heads: bool, uid_to_wait: str, actors_map: dict,
-                         task_hex_to_uid: dict, force_update: bool, force_next_start_of_minute: bool,
-                         update_only_tree: bool) -> dict:
+    def _run_update_task(self, running_distributed_heads: bool, uid_to_wait: str,
+                         actors_map: Dict[str, Dict[str, Any]],
+                         task_hex_to_uid: Dict[str, str], force_update: bool, force_next_start_of_minute: bool,
+                         update_only_tree: bool) -> Dict[str, Dict[str, Any]]:
         actor_handle = actors_map[uid_to_wait]['actor_handle']
         if running_distributed_heads == True:
             task_handle = actor_handle.run_one_step_update.remote(force_next_start_of_minute=force_next_start_of_minute,
@@ -186,8 +186,10 @@ class SchedulerUpdater:
 
         return actors_map
 
-    def _build_actor_handle(self, running_distributed_heads: bool, update_init_kwargs: dict, actor_options: dict,
-                            local_time_serie_uid: str, actors_map: dict):
+    def _build_actor_handle(self, running_distributed_heads: bool, update_init_kwargs: Dict[str, Any],
+                            actor_options: Dict[str, Any],
+                            local_time_serie_uid: str, actors_map: Dict[str, Dict[str, Any]]
+    ) -> Dict[str, Dict[str, Any]]:
 
         if running_distributed_heads == True:
             actor_handle = TimeSerieHeadUpdateActorDist.options(**actor_options).remote(**update_init_kwargs)
@@ -203,10 +205,12 @@ class SchedulerUpdater:
 
         return actors_map
 
-    def _actor_launcher_manager(self, wait_list, sequential_update: bool,
-                                running_distributed_heads, actors_map,
-                                task_hex_to_uid, force_update=False, update_only_tree=False,
-                                launch_backoff_wait: Union[None, float] = None):
+    def _actor_launcher_manager(self, wait_list: Dict[str, Dict[str, Any]], sequential_update: bool,
+                                running_distributed_heads: bool, actors_map: Dict[str, Dict[str, Any]],
+                                task_hex_to_uid: Dict[str, str], force_update: bool = False,
+                                update_only_tree: bool = False,
+                                launch_backoff_wait: Optional[float] = None
+                                ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
         new_wait_list = {}
 
         time_to_wait, actor_launched = [], False
@@ -258,10 +262,11 @@ class SchedulerUpdater:
 
         return new_wait_list, actors_map
 
-    def _build_scheduler_actors_if_not_exist(self, actors_map: dict, wait_list: dict, update_tree: bool,
-                                             debug: bool, update_extra_kwargs: dict,
+    def _build_scheduler_actors_if_not_exist(self, actors_map: Dict[str, Dict[str, Any]],
+                                             wait_list: Dict[str, Dict[str, Any]], update_tree: bool,
+                                             debug: bool, update_extra_kwargs: Dict[str, Any],
                                              running_distributed_heads: bool, first_launch: bool,
-                                             ):
+        ) -> Tuple[Dict[str, Dict[str, Any]], List[LocalTimeSerie], Dict[str, Dict[str, Any]]]:
         """
         Queries ts_orm scheduler and build update actors if not exist
         """
@@ -336,16 +341,9 @@ class SchedulerUpdater:
                 f"Actor for head ts with local hash_id {head_ts} built and added to update loop")
         return actors_map, target_ts, wait_list
 
-    def _get_next_update_loop(self, local_hash_id: str,data_source_id:int):
+    def _get_next_update_loop(self, local_hash_id: str, data_source_id: int) -> Optional[datetime.datetime]:
         """
         loop until query succesfull to avoid breaking the  udpates
-        Parameters
-        ----------
-        hash_id
-
-        Returns
-        -------
-
         """
         error_in_request = True
         while error_in_request == True:
@@ -358,8 +356,7 @@ class SchedulerUpdater:
                 time.sleep(60)
         return next_update
 
-    def refresh_node_scheduler(self):
-
+    def refresh_node_scheduler(self) -> None:
         error_in_request = True
         while error_in_request == True:
             try:
@@ -374,12 +371,10 @@ class SchedulerUpdater:
                 self.logger.exception("Error getting refreshing scheduler")
                 time.sleep(60)
 
-    def _evaluate_read_task(self, ready: list, task_hex_to_uid: dict, wait_list: dict):
+    def _evaluate_read_task(self, ready: List[ray.ObjectRef], task_hex_to_uid: Dict[str, str],
+                            wait_list: Dict[str, Dict[str, Any]]) -> Tuple[Dict[str, str], Dict[str, Dict[str, Any]]]:
         """
         makes evaluation of task if its ready
-        Returns
-        -------
-
         """
         for ready_task in ready:
             task_hex = ready_task.task_id().hex()
@@ -410,8 +405,7 @@ class SchedulerUpdater:
               raise_exception_on_error=False,
               update_extra_kwargs: Union[None, dict] = None, run_head_in_main_process=False, force_update=False,
               sequential_update=False, update_only_tree=False, api_port: Union[int, None] = None,
-
-              ):
+              ) -> None:
         """
             Parameters
             ----------
