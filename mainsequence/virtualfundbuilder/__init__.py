@@ -6,7 +6,6 @@ import sys
 
 from mainsequence.virtualfundbuilder.__main__ import get_pod_configuration
 
-
 def load_env():
 
     assert os.environ.get("VFB_PROJECT_PATH", None) is not None, "VFB_PROJECT_PATH environment variable not set"

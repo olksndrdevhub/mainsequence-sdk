@@ -144,7 +144,6 @@ def get_pod_configuration():
         f.write(TMP_SCRIPT)
     runpy.run_path(str(python_file_path), run_name="__main__")
 
-
 def import_project_configuration():
     from mainsequence.client import ProjectConfiguration, Job
     from mainsequence.virtualfundbuilder.utils import get_vfb_logger

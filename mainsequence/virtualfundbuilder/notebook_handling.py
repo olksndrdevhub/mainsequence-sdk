@@ -40,11 +40,3 @@ def convert_notebook_to_python_file(notebook_path):
     return python_file_path
 
 
-
-
-# f_path = convert_notebook_to_python_file("/home/jose/code/MainSequenceClientSide/vfb-contrib/notebooks/Getting Started.ipynb")
-#
-# classes = import_classes_from_notebook(f_path)
-
-
-

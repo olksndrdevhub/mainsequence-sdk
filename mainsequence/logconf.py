@@ -12,16 +12,6 @@ from structlog.dev import ConsoleRenderer
 from .instrumentation import OTelJSONRenderer
 logger = None
 
-def extract_from_record(_, __, event_dict):
-    """
-    Extract thread and process names and add them to the event dict.
-    """
-    record = event_dict.get("_record")
-    if record is not None:
-        event_dict["thread_name"] = record.threadName
-        event_dict["process_name"] = record.processName
-    return event_dict
-
 def ensure_dir(file_path):
     directory = os.path.dirname(file_path)
     Path(directory).mkdir(parents=True, exist_ok=True)
@@ -151,7 +141,6 @@ def build_application_logger(
         },
     }
     try:
-    # Configure logging with dictConfig
         logging.config.dictConfig(logging_config)
     except Exception as e:
         raise e
@@ -171,8 +160,6 @@ def build_application_logger(
             timestamper,
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info, #suggested to remove for pretty exceptions
-
-
             add_structlog_event_to_record,  # Add this processor before wrap_for_formatter
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
 

@@ -91,36 +91,3 @@ def configuration_sanitizer(configuration: dict) -> PortfolioConfiguration:
         portfolio_build_configuration=portfolio_build_config,
         portfolio_markets_configuration=configuration['portfolio_markets_configuration'],
     )
-
-
-class TemplateFactory:
-    """
-    A factory for creating template-based objects, for example, market indices.
-    """
-
-    @staticmethod
-    def create_market_index(index_name):
-        """
-        Creates a market index portfolio object based on a predefined template configuration.
-
-        Args:
-            index_name (str): The name of the index to create, which corresponds to a specific template configuration.
-
-        Returns:
-            PortfolioStrategy: A PortfolioStrategy object configured according to the template.
-        """
-        from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
-        from .portfolio_templates.crypto_index_template import crypto_index_template_config
-
-        logger.info(f"Creating market index for {index_name}")
-
-        try:
-            base_config = crypto_index_template_config
-            if index_name == "CryptoTop5":
-                base_config["backtesting_weights_config"]["signal_weights_configuration"]["num_top_assets"] = 5
-
-            template_portfolio = PortfolioInterface(portfolio_config=base_config)
-            return template_portfolio.portfolio_strategy  # Return first node of the portfolio
-        except KeyError as e:
-            logger.error(f"Configuration for {index_name} is missing: {e}")
-            raise

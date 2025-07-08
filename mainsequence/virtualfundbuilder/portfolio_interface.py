@@ -72,9 +72,7 @@ class PortfolioInterface():
 
         portfolio_ts = self.portfolio_strategy_time_serie
 
-        def build_markets_portfolio(ts, build_purpose,portfolio_tags):
-
-
+        def build_markets_portfolio(ts, build_purpose, portfolio_tags):
             # when is live target portfolio
             signal_weights_ts = ts.signal_weights
 
@@ -119,10 +117,8 @@ class PortfolioInterface():
 
             return target_portfolio,index_asset
 
-        target_portfolio,index_asset = build_markets_portfolio(portfolio_ts, build_purpose=self.build_purpose,
+        target_portfolio, index_asset = build_markets_portfolio(portfolio_ts, build_purpose=self.build_purpose,
                                                                portfolio_tags=portfolio_tags)
-
-        # create index Asset
 
         self.index_asset = index_asset
         self.target_portfolio = target_portfolio
@@ -196,19 +192,19 @@ class PortfolioInterface():
 
 
     @classmethod
-    def load_configuration(cls, configuration_name)->PortfolioConfiguration:
+    def load_configuration(cls, configuration_name) -> PortfolioConfiguration:
         config_file = os.path.join(cls.configuration_folder_path, f"{configuration_name}.yaml")
         portfolio_config = PortfolioConfiguration.read_portfolio_configuration_from_yaml(config_file)
         return PortfolioConfiguration(**portfolio_config)
+
     @classmethod
-    def load_from_configuration(cls, configuration_name, config_file:Union[str,None]=None):
+    def load_from_configuration(cls, configuration_name, config_file: Optional[str] = None):
         if config_file is None:
             config_file = os.path.join(cls.configuration_folder_path, f"{configuration_name}.yaml")
         if not os.path.exists(config_file):
             raise FileNotFoundError(f"Configuration file '{config_file}' does not exist.")
 
         portfolio_config = PortfolioConfiguration.read_portfolio_configuration_from_yaml(config_file)
-
         portfolio = cls(portfolio_config_template=portfolio_config, configuration_name=configuration_name)
         return portfolio
 
@@ -236,12 +232,3 @@ class PortfolioInterface():
             raise FileNotFoundError(f"Configuration file '{config_file}' does not exist.")
         os.remove(config_file)
         self.logger.info(f"Deleted configuration file '{config_file}'.")
-
-
-    def delete_portfolio(self):
-        """
-        Deletes the portfolio from vam
-        :return:
-        """
-        #should delete
-        self.live_portfolio.delete()
