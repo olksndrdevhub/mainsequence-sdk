@@ -25,7 +25,6 @@ from mainsequence.virtualfundbuilder.utils import (
     convert_to_binance_frequency,
     get_last_query_times_per_asset,
     build_rolling_regression_from_df,
-    filter_assets,
     runs_in_main_process
 )
 
