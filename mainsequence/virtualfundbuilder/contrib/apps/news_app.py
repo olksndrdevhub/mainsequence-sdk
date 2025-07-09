@@ -402,7 +402,7 @@ class SentimentReport(BaseApp):
         except Exception as e:
             logger.info(f"Error uploading artifact: {e}")
 
-        # Return artifact or None
+        self.add_output(html_artifact)
         return html_artifact
 
 # --- Main Execution Guard ---
