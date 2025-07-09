@@ -394,3 +394,6 @@ class BaseObjectOrm:
 
     def delete(self, *args, **kwargs):
         return self.__class__.destroy_by_id(self.id)
+
+    def get_app_label(self):
+        return self.END_POINTS[self.orm_class].split("/")[0]

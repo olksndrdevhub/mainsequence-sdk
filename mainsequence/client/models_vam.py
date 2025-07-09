@@ -1192,7 +1192,8 @@ class TargetPortfolioMixin:
         r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
-class TargetPortfolio(TargetPortfolioMixin,BaseObjectOrm, BasePydanticModel):
+
+class TargetPortfolio(TargetPortfolioMixin, BaseObjectOrm, BasePydanticModel):
     pass
 
 class AssetOnlyPortfolio(TargetPortfolioMixin,BaseObjectOrm, BasePydanticModel):

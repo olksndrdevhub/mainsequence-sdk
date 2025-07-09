@@ -1651,6 +1651,40 @@ def query_agent(json_payload: dict, timeout=None):
     return r
 
 
+def add_created_object_to_jobrun(model_name: str, app_label: str, object_id: int, timeout: Optional[int] = None) -> dict:
+    """
+    Logs a new object that was created by this JobRun instance.
+
+    Args:
+        model_name: The string name of the created model (e.g., "Project").
+        app_label: The Django app label where the model is defined (e.g., "pod_manager").
+        object_id: The primary key of the created object instance.
+        timeout: Optional request timeout in seconds.
+
+    Returns:
+        A dictionary representing the created record.
+    """
+    url = TDAG_ENDPOINT + f"/orm/api/pods/job-run/{os.getenv('JOB_ID')}/add_created_object/"
+    s = requests.Session()
+    payload = {
+        "json": {
+            "app_label": app_label,
+            "model_name": model_name,
+            "object_id": object_id
+        }
+    }
+    r = make_request(
+        s=s,
+        loaders=loaders,
+        r_type="POST",
+        url=url,
+        payload=payload,
+        time_out=timeout
+    )
+    if r.status_code not in [200, 201]:
+        raise Exception(f"Failed to add created object: {r.status_code} - {r.text}")
+    return r.json()
+
 
 class Artifact(BasePydanticModel, BaseObjectOrm):
     id: Optional[int]

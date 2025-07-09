@@ -2,8 +2,9 @@ import hashlib
 import json
 import os
 from abc import abstractmethod
+from typing import Any
 
-from mainsequence.client.models_tdag import Artifact
+from mainsequence.client.models_tdag import Artifact, add_created_object_to_jobrun
 from mainsequence.virtualfundbuilder.enums import ResourceType
 from mainsequence.virtualfundbuilder.resource_factory.base_factory import insert_in_registry, BaseResource
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
@@ -12,6 +13,23 @@ logger = get_vfb_logger()
 
 class BaseApp(BaseResource):
     TYPE = ResourceType.APP
+
+    def add_output(self, output: Any):
+        """
+        Saves the given output in the backend.
+        """
+        logger.info(f"Add object {output} to job run output")
+        job_id = os.getenv("JOB_ID", None)
+
+        if job_id:
+            add_created_object_to_jobrun(
+                model_name=output.orm_class,
+                app_label=output.get_app_label(),
+                object_id=output.id
+            )
+            logger.info("Output added successfully")
+        else:
+            logger.info("This is not a Job Run - no output can be added")
 
 APP_REGISTRY = APP_REGISTRY if 'APP_REGISTRY' in globals() else {}
 def register_app(name=None, register_in_agent=True):

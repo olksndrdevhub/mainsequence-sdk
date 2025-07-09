@@ -24,10 +24,11 @@ class RunPortfolio(BaseApp):
     def __init__(self, configuration: RunPortfolioConfiguration):
         self.configuration = configuration
 
-    def run(self) -> Artifact:
+    def run(self) -> None:
         portfolio = PortfolioInterface(portfolio_config_template=self.configuration.portfolio_configuration.model_dump())
         res = portfolio.run(**self.configuration.portfolio_run_parameters.model_dump())
         logger.info(f"Portfolio Run successful with results {res.head()}")
+        self.add_output(output=portfolio.target_portfolio)
 
 
 if __name__ == "__main__":
