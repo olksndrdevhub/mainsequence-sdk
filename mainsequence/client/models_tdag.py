@@ -1664,7 +1664,7 @@ def add_created_object_to_jobrun(model_name: str, app_label: str, object_id: int
     Returns:
         A dictionary representing the created record.
     """
-    url = TDAG_ENDPOINT + f"/orm/api/pods/job-run/{os.getenv('JOB_ID')}/add_created_object/"
+    url = TDAG_ENDPOINT + f"/orm/api/pods/job-run/{os.getenv('JOB_RUN_ID')}/add_created_object/"
     s = requests.Session()
     payload = {
         "json": {

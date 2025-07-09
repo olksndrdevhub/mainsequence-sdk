@@ -19,7 +19,7 @@ class BaseApp(BaseResource):
         Saves the given output in the backend.
         """
         logger.info(f"Add object {output} to job run output")
-        job_id = os.getenv("JOB_ID", None)
+        job_id = os.getenv("JOB_RUN_ID", None)
 
         if job_id:
             add_created_object_to_jobrun(
