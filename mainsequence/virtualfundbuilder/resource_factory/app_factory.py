@@ -58,14 +58,14 @@ class HtmlApp(BaseApp):
         except Exception as e:
             logger.warning(f"[{self.__name__}] Could not hash configuration: {e}")
 
-    def store_artifact(self, html_content, output_name=None):
+    def add_html_output(self, html_content, output_name=None):
         """
         Saves the given HTML content to a file, uploads it as an artifact,
         and stores the artifact reference.
         If output_name is not provided, a sequential name (e.g., ClassName_1.html) is generated.
         """
         if not isinstance(html_content, str):
-            raise TypeError(f"The 'store_artifact' method of {self.__class__.__name__} must be called with a string of HTML content.")
+            raise TypeError(f"The 'add_html_output' method of {self.__class__.__name__} must be called with a string of HTML content.")
 
         if output_name is None:
             output_name = len(self.created_artifacts)
@@ -93,6 +93,7 @@ class HtmlApp(BaseApp):
                 )
                 if html_artifact:
                     self.created_artifacts.append(html_artifact)
+                    self.add_output(html_artifact)
                     logger.info(f"Artifact uploaded successfully: {html_artifact.id}")
                 else:
                     logger.info("Artifact upload failed")
@@ -111,7 +112,7 @@ class HtmlApp(BaseApp):
             html_content = original_run(self, *args, **kwargs)
 
             if html_content:
-                self.store_artifact(html_content)
+                self.add_html_output(html_content)
 
         cls.run = run_wrapper
 
