@@ -1769,10 +1769,14 @@ class APITimeSerie(CommonMethodsMixin):
         assert metadata is not None, f"Verify that the table {self.source_table_hash_id} exists "
 
 
-    def get_df_between_dates(self, start_date: Optional[datetime.datetime] = None,
+    def get_df_between_dates(self,
+                             start_date: Optional[datetime.datetime] = None,
                              end_date: Optional[datetime.datetime] = None,
-                             unique_identifier_list: Optional[list] = None,unique_identifier_range_map:Optional[UniqueIdentifierRangeMap] = None,
-                             great_or_equal: bool = True, less_or_equal: bool = True) -> pd.DataFrame:
+                             unique_identifier_list: Optional[list] = None,
+                             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
+                             great_or_equal: bool = True,
+                             less_or_equal: bool = True
+    ) -> pd.DataFrame:
         """
         Retrieves a DataFrame of time series data between specified dates.
 
@@ -2994,9 +2998,6 @@ class WrapperTimeSerie(TimeSerie):
 
             # get correct target assets based on the share classes
             main_sequence_share_classes = [a.main_sequence_share_class for a in assets]
-
-
-
             asset_query = dict(
                 execution_venue__symbol=target_execution_venue_symbol,
                 main_sequence_share_class__in=main_sequence_share_classes
@@ -3006,8 +3007,12 @@ class WrapperTimeSerie(TimeSerie):
 
             target_assets = Asset.filter(**asset_query)
 
-            if len(main_sequence_share_classes) != len( target_assets):
-                self.logger.warning(f"Not all assets were found in backend with translation information with query {asset_query}")
+            target_asset_unique_ids = [a.main_sequence_share_class for a in target_assets]
+            if len(main_sequence_share_classes) > len(target_asset_unique_ids):
+                self.logger.warning(f"Not all assets were found in backend for translation table: {set(main_sequence_share_classes) - set(target_asset_unique_ids)}")
+
+            if len(main_sequence_share_classes) < len(target_asset_unique_ids):
+                self.logger.warning(f"Too many assets were found in backend for translation table: {set(target_asset_unique_ids) - set(main_sequence_share_classes)}")
 
             # create the source-target mapping
             source_asset_share_class_map = {}
