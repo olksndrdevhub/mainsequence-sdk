@@ -85,7 +85,7 @@ class BaseObjectOrm:
         "User": "user",
 
         # VAM
-        "TargetPortfolio": 'assets/target_portfolio',
+        "Portfolio": 'assets/target_portfolio',
         "AssetOnlyPortfolio":'assets/asset_only_portfolio',
         "Asset": "assets/asset",
         "IndexAsset": "assets/index_asset",
@@ -110,7 +110,7 @@ class BaseObjectOrm:
         "ExecutionPositions": "assets/execution_positions",
         "AccountCoolDown": "assets/account_cooldown",
         "HistoricalWeights": "assets/portfolio_weights",
-        "TargetPortfolioIndexAsset": "assets/target_portfolio_index_asset",
+        "PortfolioIndexAsset": "assets/target_portfolio_index_asset",
         "HistoricalBarsSource": "data_sources/historical-bars-source",
         "MarketsTimeSeriesDetails": "data_sources/markets-time-series-details",
         "AssetCategory": "assets/asset-category",
@@ -136,6 +136,7 @@ class BaseObjectOrm:
 
         #ReportBuilder
         "Presentation": "reports/presentations",
+        "Folder":"reports/folder"
 
     }
     ROOT_URL = API_ENDPOINT

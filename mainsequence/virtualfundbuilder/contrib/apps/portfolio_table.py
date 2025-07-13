@@ -4,7 +4,7 @@ from typing import List, Union
 
 import numpy as np
 import pandas as pd
-from mainsequence.client import TargetPortfolio
+from mainsequence.client import Portfolio
 from mainsequence.reportbuilder.model import StyleSettings, ThemeMode
 from mainsequence.reportbuilder.slide_templates import generic_plotly_table
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
@@ -20,7 +20,7 @@ PortfolioNameEnum = Enum(
     "PortfolioEnum",
     {
         p.portfolio_name: p.portfolio_ticker
-        for p in TargetPortfolio.filter(is_asset_only=False, local_time_serie__isnull=False)
+        for p in Portfolio.filter(is_asset_only=False, local_time_serie__isnull=False)
     },
     type=str,
 )

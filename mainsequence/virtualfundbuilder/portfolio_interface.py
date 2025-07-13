@@ -7,7 +7,7 @@ import re
 
 from .config_handling import configuration_sanitizer
 from .time_series import PortfolioStrategy
-from mainsequence.client import Asset, AssetFutureUSDM, MARKETS_CONSTANTS as CONSTANTS, TargetPortfolio
+from mainsequence.client import Asset, AssetFutureUSDM, MARKETS_CONSTANTS as CONSTANTS, Portfolio
 
 from .models import PortfolioConfiguration
 from .utils import get_vfb_logger
@@ -60,13 +60,13 @@ class PortfolioInterface():
         os.environ["PATCH_BUILD_CONFIGURATION"] = patch
         self._is_initialized = True
 
-    def build_target_portfolio_in_backend(self, portfolio_tags=None) -> TargetPortfolio:
+    def build_target_portfolio_in_backend(self, portfolio_tags=None) -> Portfolio:
         """
         This method creates a portfolio in VAM with configm file settings.
 
         Returns:
         """
-        from mainsequence.client import TargetPortfolioIndexAsset
+        from mainsequence.client import PortfolioIndexAsset
         if not self._is_initialized:
             self._initialize_nodes()
 
@@ -106,14 +106,14 @@ class PortfolioInterface():
 
             standard_kwargs["backtest_table_price_column_name"] = "close"
 
-            target_portfolio = TargetPortfolio.get_or_none(local_time_serie__id=ts.local_metadata.id)
+            target_portfolio = Portfolio.get_or_none(local_time_serie__id=ts.local_metadata.id)
             if target_portfolio is None:
-                target_portfolio, index_asset = TargetPortfolio.create_from_time_series(**standard_kwargs)
+                target_portfolio, index_asset = Portfolio.create_from_time_series(**standard_kwargs)
             else:
                 # patch timeserie of portfolio to guaranteed recreation
                 target_portfolio.patch(**standard_kwargs)
                 self.logger.debug(f"Target portfolio {ts.local_metadata.id} already exists in Backend")
-                index_asset = TargetPortfolioIndexAsset.get(reference_portfolio__id=target_portfolio.id)
+                index_asset = PortfolioIndexAsset.get(reference_portfolio__id=target_portfolio.id)
 
             return target_portfolio,index_asset
 
