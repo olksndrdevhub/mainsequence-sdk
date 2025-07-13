@@ -400,9 +400,9 @@ class AssetFilter(BaseModel):
     def filter_triggered(self, asset: "Asset") -> bool:
         if asset.execution_venue_symbol != self.execution_venue_symbol:
             return False
-        if self.security_type is not None and asset.security_type != self.security_type:
+        if self.security_type and asset.security_type != self.security_type:
             return False
-        if self.security_market_sector is not None and asset.security_market_sector != self.security_market_sector:
+        if self.security_market_sector and asset.security_market_sector != self.security_market_sector:
             return False
         return True
 

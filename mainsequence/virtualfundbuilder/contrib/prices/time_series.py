@@ -475,7 +475,8 @@ class InterpolatedPrices(TimeSerie):
             intraday_bar_interpolation_rule: str,
             asset_category_unique_id: Optional[str] = None,
             upsample_frequency_id: Optional[str] = None,
-            asset_list:ModelList = None,#todo change for asset_filter when asset filter has all the characteristics
+            asset_list: ModelList = None, # todo change for asset_filter when asset filter has all the characteristics
+            translation_table_unique_id: Optional[str] = None,
             local_kwargs_to_ignore: List[str] = ["asset_category_unique_id","asset_list"],
             *args,
             **kwargs
@@ -487,6 +488,9 @@ class InterpolatedPrices(TimeSerie):
 
         if asset_category_unique_id is None:
             assert asset_list is not None, f"asset_category_unique_id={asset_category_unique_id} should not be None or asset_list should be defined"
+
+        if translation_table_unique_id is None:
+            raise Exception(f"Translation table needs to be set")
 
         self.asset_category_unique_id = asset_category_unique_id
         self.interpolator = UpsampleAndInterpolation(
@@ -503,12 +507,7 @@ class InterpolatedPrices(TimeSerie):
         self.upsample_frequency_id = upsample_frequency_id
 
         # get the translation rules
-        translation_table = f"prices_translation_table_{self.bar_frequency_id}"
-        try:
-            # 1) fetch from server
-            translation_table = AssetTranslationTable.get(unique_identifier=translation_table)
-        except DoesNotExist:
-            self.logger.error(f"Translation table {translation_table} does not exist")
+        translation_table = AssetTranslationTable.get(unique_identifier=translation_table_unique_id)
 
         self.bars_ts = WrapperTimeSerie(translation_table=translation_table)
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)

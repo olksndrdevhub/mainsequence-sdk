@@ -54,11 +54,13 @@ class PricesConfiguration(VFBConfigBaseModel):
         upsample_frequency_id (str): Frequency to upsample intraday data to.
         intraday_bar_interpolation_rule (str): Rule for interpolating missing intraday bars.
         is_live (bool): Boolean flag indicating if the price feed is live.
+        translation_table_unique_id (str): The unique identifier of the translation table used to identify the price source.
     """
     bar_frequency_id: str = "1d"
     upsample_frequency_id: str = "1d"  # "15m"
     intraday_bar_interpolation_rule: str = "ffill"
     is_live: bool = False
+    translation_table_unique_id: str = "databento_prices"
 
 @lru_cache(maxsize=1028)  # Cache up to 1028 different combinations
 def cached_asset_filter(*args,**kwargs):
