@@ -42,6 +42,7 @@ class PortfolioTable(HtmlApp):
     def __init__(self, configuration: PortfolioTableConfiguration):
         logger.info(f"Create portfolio table with configuration {configuration}")
         self.configuration = configuration
+        super().__init__()
 
     def run(self) -> str:
         style = StyleSettings(mode=ThemeMode.light)
