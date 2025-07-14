@@ -60,7 +60,7 @@ class PricesConfiguration(VFBConfigBaseModel):
     upsample_frequency_id: str = "1d"  # "15m"
     intraday_bar_interpolation_rule: str = "ffill"
     is_live: bool = False
-    translation_table_unique_id: str = "databento_prices"
+    translation_table_unique_id: str = "prices_translation_table_1d"
 
 @lru_cache(maxsize=1028)  # Cache up to 1028 different combinations
 def cached_asset_filter(*args,**kwargs):
