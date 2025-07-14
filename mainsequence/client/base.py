@@ -136,7 +136,8 @@ class BaseObjectOrm:
 
         #ReportBuilder
         "Presentation": "reports/presentations",
-        "Folder":"reports/folder"
+        "Folder":"reports/folder",
+        "Slide":"reports/slides",
 
     }
     ROOT_URL = API_ENDPOINT

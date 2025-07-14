@@ -3,8 +3,8 @@ from .base import BasePydanticModel, BaseObjectOrm, TDAG_ENDPOINT
 from .utils import (is_process_running, get_network_ip,
                     TDAG_CONSTANTS,
                     DATE_FORMAT, AuthLoaders, make_request, set_types_in_table, request_to_datetime, serialize_to_json, bios_uuid)
-from typing import Optional, List,Annotated, Union
-from pydantic import constr, Field,conint
+from typing import Optional, List,Annotated, Union, Literal
+from pydantic import constr, Field,conint, BaseModel
 import datetime
 
 
@@ -32,7 +32,7 @@ class Theme(BasePydanticModel,BaseObjectOrm):
     mode: constr(max_length=5) = Field(
         ..., description="‘light’ or ‘dark’"
     )
-    editor_background: Optional[int] = Field(
+    editor_background: Optional[dict] = Field(
         None, description="FK to Background.id"
     )
 
@@ -103,6 +103,51 @@ class Folder(BasePydanticModel, BaseObjectOrm):
         # Return a new instance of AssetCategory built from the response JSON.
         return cls(**r.json())
 
+class Slide(BasePydanticModel,BaseObjectOrm):
+    id:Optional[int]=None
+    number: int = Field(
+        ...,
+        ge=0,
+        description="Number of the slide in presentation order"
+    )
+    body: str = Field(
+        ...,
+        description=(
+            "Tiptap rich-text document for the main content, serialized as JSON. "
+            "Must follow the Tiptap ‘doc’ schema, e.g.: "
+            '{"type":"doc","content":[{"type":"paragraph","attrs":{"textAlign":null}}]}'
+        ),
+        example='{"type":"doc","content":[{"type":"paragraph","attrs":{"textAlign":null}}]}'
+    )
+    header: Optional[str] = Field(
+        None,
+        description=(
+            "Optional Tiptap rich-text document for the header, serialized as JSON. "
+            "If present, should follow the Tiptap ‘doc’ schema, e.g.: "
+            '{"type":"doc","content":[{"type":"paragraph","attrs":{"textAlign":null}}]}'
+        ),
+        example='{"type":"doc","content":[{"type":"paragraph","attrs":{"textAlign":null}}]}'
+    )
+    footer: Optional[str] = Field(
+        None,
+        description=(
+            "Optional Tiptap rich-text document for the footer, serialized as JSON. "
+            "If present, should follow the Tiptap ‘doc’ schema, e.g.: "
+            '{"type":"doc","content":[{"type":"paragraph","attrs":{"textAlign":null}}]}'
+        ),
+        example='{"type":"doc","content":[{"type":"paragraph","attrs":{"textAlign":null}}]}'
+    )
+    created_at: datetime.datetime = Field(
+        default_factory=datetime.datetime.utcnow,
+        description="Timestamp when the record was created"
+    )
+    updated_at: datetime.datetime = Field(
+        default_factory=datetime.datetime.utcnow,
+        description="Timestamp when the record was last updated"
+    )
+    custom_format: Optional[dict] = Field(description="Extra configuration for different type of slides")
+
+
 class Presentation(BasePydanticModel, BaseObjectOrm):
     id: int
     folder: int
@@ -111,6 +156,7 @@ class Presentation(BasePydanticModel, BaseObjectOrm):
     created_at: datetime.datetime
     updated_at:  datetime.datetime
     theme: Union[int,Theme]
+    slides:List[Slide]
 
     @classmethod
     def get_or_create_by_title(cls, *args, **kwargs):
@@ -127,3 +173,138 @@ class Presentation(BasePydanticModel, BaseObjectOrm):
             raise Exception(f"Error appending creating: {r.text}")
         # Return a new instance of AssetCategory built from the response JSON.
         return cls(**r.json())
+
+
+##########
+
+class TextNode(BaseModel):
+    type: Literal["text"] = Field(..., description="Inline text node")
+    text: str = Field(..., description="Text content")
+
+
+class TextParagraphAttrs(BaseModel):
+    textAlign: Optional[Literal["left", "right", "center", "justify"]] = Field(
+        None, description="Text alignment within the block"
+    )
+    level: Optional[int] = Field(
+        None, ge=1, le=6,
+        description="Heading level (1–6); only set when `type` == 'heading'"
+    )
+
+
+class TextParagraph(BaseModel):
+    """
+    Tiptap 'paragraph' or 'heading' block with inline text content.
+    """
+    type: Literal["paragraph", "heading"] = Field(
+        ..., description="Block type: 'paragraph' or 'heading'"
+    )
+    attrs: TextParagraphAttrs = Field(
+        default_factory=TextParagraphAttrs,
+        description="Block attributes (alignment and optional heading level)"
+    )
+    content: List[TextNode] = Field(
+        ..., description="Inline text nodes"
+    )
+
+    @classmethod
+    def paragraph(
+            cls,
+            text: str,
+            text_align: Optional[Literal["left", "right", "center", "justify"]] = None
+    ) -> "TextParagraph":
+        """
+        Build a simple paragraph block:
+
+            TextParagraph.paragraph("Hello world", text_align="center")
+        """
+        return cls(
+            type="paragraph",
+            attrs=TextParagraphAttrs(textAlign=text_align),
+            content=[TextNode(type="text", text=text)]
+        )
+
+    @classmethod
+    def heading(
+            cls,
+            text: str,
+            level: int = 1,
+            text_align: Optional[Literal["left", "right", "center", "justify"]] = None
+    ) -> "TextParagraph":
+        """
+        Build a heading block of the given level (1–6):
+
+            TextParagraph.heading("Title", level=2, text_align="center")
+        """
+        return cls(
+            type="heading",
+            attrs=TextParagraphAttrs(textAlign=text_align, level=level),
+            content=[TextNode(type="text", text=text)]
+        )
+
+    class Config:
+        json_schema_extra = {
+            "examples": {
+                "paragraph": {
+                    "summary": "Basic paragraph",
+                    "value": {
+                        "type": "paragraph",
+                        "attrs": {"textAlign": None},
+                        "content": [{"type": "text", "text": "This is a body paragraph."}]
+                    }
+                },
+                "heading": {
+                    "summary": "Centered H1 heading",
+                    "value": {
+                        "type": "heading",
+                        "attrs": {"textAlign": "center", "level": 1},
+                        "content": [{"type": "text", "text": "This is a heading"}]
+                    }
+                }
+            }
+        }
+
+### App Nodes
+class EndpointProps(BaseModel):
+    props: dict[int, int] = Field(
+        ...,
+        description="Dictionary of props to send to the endpoint, e.g. {'id': 33}",
+        example={"id": 33}
+    )
+    url: str = Field(
+        ...,
+        description="Relative or absolute URL for the API endpoint",
+        example="/orm/api/reports/run-function/"
+    )
+
+class AppNodeAttrs(BaseModel):
+    endpointProps: EndpointProps = Field(
+        ...,
+        description="Configuration for the endpoint call"
+    )
+
+class AppNode(BaseModel):
+    """
+    Represents a custom Tiptap node of type 'appNode' that invokes an API.
+    """
+    type: Literal["appNode"] = Field(
+        "appNode",
+        description="Node type identifier"
+    )
+    attrs: AppNodeAttrs = Field(
+        ...,
+        description="Node attributes"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "type": "appNode",
+                "attrs": {
+                    "endpointProps": {
+                        "props": {"id": 33},
+                        "url": "/orm/api/reports/run-function/"
+                    }
+                }
+            }
+        }
