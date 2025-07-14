@@ -1906,7 +1906,7 @@ class TimeSerie(CommonMethodsMixin, DataPersistanceMethods, GraphNodeMethods, Ti
 
     def __init__(
             self,
-            init_meta:Optional[TimeSerieInitMeta] = None,
+            init_meta: Optional[TimeSerieInitMeta] = None,
             build_meta_data: Union[dict, None] = None,
             local_kwargs_to_ignore: Union[List[str], None] = None,
             *args,
