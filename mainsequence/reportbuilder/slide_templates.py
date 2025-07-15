@@ -1,5 +1,7 @@
 from typing import List, Dict, Any, Optional, Union
 import plotly.graph_objects as go
+import plotly.express as px
+
 from mainsequence.reportbuilder.model import (
     Slide,
     GridLayout, GridCell,
@@ -7,7 +9,7 @@ from mainsequence.reportbuilder.model import (
     HorizontalAlign, VerticalAlign, FontWeight,
     Size, Position, ThemeMode,get_theme_settings
 )
-
+import pandas as pd
 
 def _transpose_for_plotly(data_rows: List[List[Any]], num_columns: int) -> List[List[Any]]:
     if not data_rows:
@@ -183,10 +185,12 @@ def generic_plotly_pie_chart(
     )
 
 
+
+
 def generic_plotly_bar_chart(
         y_values: List[Union[str, int, float]],
         x_values: List[Union[int, float]],
-        orientation: str,
+        orientation: str="h",
         height: int = 400,
         width: int = 450,
         title: Optional[str] = None,
@@ -209,40 +213,44 @@ def generic_plotly_bar_chart(
         theme_mode: ThemeMode = ThemeMode.light
 
 ) -> str:
-
-    settings=get_theme_settings(theme_mode)
+    # 1) theme & defaults
+    settings = get_theme_settings(theme_mode)
     if bar_color is None:
         bar_color = settings.chart_palette_categorical
     if textfont_dict is None:
         textfont_dict = dict(size=9)
     if margin_dict is None:
-        margin_dict = dict(l=80 if orientation == 'h' else 40, r=20, t=5, b=20)
+        # extra left margin for horizontal labels
+        margin_dict = dict(l=150 if orientation == 'h' else 40, r=20, t=5, b=20)
     if font_dict is None:
         font_dict = dict(family="Lato, Arial, Helvetica, sans-serif")
 
-    default_axis_config = dict(
+    # 2) axis defaults (no autorange reversal)
+    default_axis = dict(
         showgrid=False,
         zeroline=False,
         showline=False,
         tickfont=dict(size=9, color="#333333")
     )
-    if xaxis_dict is None:
-        xaxis_dict = default_axis_config.copy()
-    if yaxis_dict is None:
-        yaxis_dict = default_axis_config.copy()
-        if orientation == 'h':  # For horizontal bar charts, reverse y-axis category order
-            yaxis_dict['autorange'] = "reversed"
+    xaxis_cfg = xaxis_dict.copy() if xaxis_dict else default_axis.copy()
+    yaxis_cfg = yaxis_dict.copy() if yaxis_dict else default_axis.copy()
 
+    # 3) build data_params correctly
     if orientation == 'h':
-        data_params = dict(y=y_values, x=x_values)
-        if text_template is None: text_template = "%{x:.2f}"
+        # horizontal: numeric→x, categories→y
+        data_params = dict(x=x_values, y=y_values)
+        if text_template is None:
+            text_template = "%{x:.2f}"
     elif orientation == 'v':
+        # vertical: categories→x, numeric→y
         data_params = dict(x=y_values, y=x_values)
-        if text_template is None: text_template = "%{y:.2f}"
+        if text_template is None:
+            text_template = "%{y:.2f}"
     else:
         raise ValueError("Orientation must be 'h' or 'v'")
 
-    fig = go.Figure(data=[go.Bar(
+    # 4) build the figure
+    fig = go.Figure(go.Bar(
         **data_params,
         orientation=orientation,
         marker_color=bar_color,
@@ -250,7 +258,7 @@ def generic_plotly_bar_chart(
         textposition=textposition,
         textfont=textfont_dict,
         hoverinfo=hoverinfo
-    )])
+    ))
 
     fig.update_layout(
         title_text=title,
@@ -259,8 +267,8 @@ def generic_plotly_bar_chart(
         margin=margin_dict,
         paper_bgcolor=paper_bgcolor,
         plot_bgcolor=plot_bgcolor,
-        xaxis=xaxis_dict,
-        yaxis=yaxis_dict,
+        xaxis=xaxis_cfg,
+        yaxis=yaxis_cfg,
         bargap=bargap,
         font=font_dict
     )
@@ -269,6 +277,8 @@ def generic_plotly_bar_chart(
         full_html=full_html,
         config={'responsive': responsive, 'displayModeBar': display_mode_bar}
     )
+
+
 
 
 def generic_plotly_grouped_bar_chart(
@@ -363,74 +373,124 @@ def generic_plotly_grouped_bar_chart(
     )
 
 
-def generic_plotly_line_chart(
-        x_values: List,
-        series_data: List[Dict[str, Any]],
-        # height and width are now optional for autosizing
-        height: Optional[int] = None,
-        width: Optional[int] = None,
-        chart_title: str = "",
-        y_axis_title: str = "",
-        y_axis_tick_format: Optional[str] = ".2f",
-        legend_dict: Optional[Dict[str, Any]] = None,
-        margin_dict: Optional[Dict[str, int]] = None,
-        theme_mode: ThemeMode = ThemeMode.light,
-        include_plotlyjs: str = "cdn",
-        full_html: bool = True,
-        display_mode_bar: bool = False,
-        responsive: bool = True
-) -> str:
-    """
-    Creates a responsive, multi-series line chart using Plotly, adhering to a style theme.
-    If height/width are not provided, the chart will be autosized to its container.
-    """
-    fig = go.Figure()
-    styles = get_theme_settings(theme_mode)
-
+def _build_traces(
+    x_values: List,
+    series_data: List[Dict[str, Any]],
+    styles: Any
+) -> List[go.Scatter]:
+    traces = []
+    palette = styles.chart_palette_categorical
     for i, series in enumerate(series_data):
-        # ... (trace creation logic remains the same) ...
-        trace = go.Scatter(
+        traces.append(go.Scatter(
             name=series.get('name', f'Series {i + 1}'),
             x=x_values,
             y=series['y_values'],
             mode='lines',
             line=dict(
-                color=series.get('color', styles.chart_palette_categorical[i % len(styles.chart_palette_categorical)]),
+                color=series.get('color', palette[i % len(palette)]),
                 width=2
             ),
             hoverinfo='x+y+name'
-        )
-        fig.add_trace(trace)
+        ))
+    return traces
 
-    default_legend_config = dict(
+def _build_layout(
+    styles: Any,
+    chart_title: str,
+    y_axis_title: str,
+    y_axis_tick_format: Optional[str],
+    legend_dict: Optional[Dict[str, Any]],
+    margin_dict: Optional[Dict[str, int]],
+    theme_mode: Any,
+    height: Optional[int],
+    width: Optional[int],
+) -> Dict[str, Any]:
+    # legend
+    default_legend = dict(
         font=dict(size=styles.chart_label_font_size, family=styles.font_family_paragraphs),
         orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
         bgcolor='rgba(0,0,0,0)'
     )
     if legend_dict:
-        default_legend_config.update(legend_dict)
+        default_legend.update(legend_dict)
 
-    final_margin_dict = margin_dict if margin_dict is not None else dict(l=60, r=40, t=60 if chart_title else 20, b=50)
+    # margin
+    final_margin = margin_dict or dict(
+        l=60, r=40,
+        t=60 if chart_title else 20,
+        b=50
+    )
 
-    # Create layout dictionary and only add height/width if they are specified
-    layout_args = {
-        "title_text": chart_title,
-        "title_font": dict(size=styles.font_size_h4, family=styles.font_family_headings, color=styles.heading_color),
-        "title_x": 0.5,
-        "legend": default_legend_config,
-        "margin": final_margin_dict,
-        "paper_bgcolor": 'rgba(0,0,0,0)',
-        "plot_bgcolor": 'rgba(0,0,0,0)',
-        "font": dict(family=styles.font_family_paragraphs, color=styles.paragraph_color),
-        "xaxis": dict(showgrid=True, gridcolor=styles.light_paragraph_color if theme_mode == ThemeMode.light else "#444", gridwidth=0.5, zeroline=False),
-        "yaxis": dict(title=y_axis_title, tickformat=y_axis_tick_format, showgrid=True,
-                      gridcolor=styles.light_paragraph_color if theme_mode == ThemeMode.light else "#444", gridwidth=0.5, zeroline=False)
-    }
+    layout = dict(
+        title_text=chart_title,
+        title_font=dict(
+            size=styles.font_size_h4,
+            family=styles.font_family_headings,
+            color=styles.heading_color
+        ),
+        title_x=0.5,
+        legend=default_legend,
+        margin=final_margin,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(
+            family=styles.font_family_paragraphs,
+            color=styles.paragraph_color
+        ),
+        xaxis=dict(
+            showgrid=True,
+            gridcolor=styles.light_paragraph_color if theme_mode == ThemeMode.light else "#444",
+            gridwidth=0.5,
+            zeroline=False
+        ),
+        yaxis=dict(
+            title=y_axis_title,
+            tickformat=y_axis_tick_format,
+            showgrid=True,
+            gridcolor=styles.light_paragraph_color if theme_mode == ThemeMode.light else "#444",
+            gridwidth=0.5,
+            zeroline=False
+        )
+    )
     if height:
-        layout_args["height"] = height
+        layout["height"] = height
     if width:
-        layout_args["width"] = width
+        layout["width"] = width
 
+    return layout
+
+def generic_plotly_line_chart(
+    x_values: List,
+    series_data: List[Dict[str, Any]],
+    # height and width are now optional for autosizing
+    height: Optional[int] = None,
+    width: Optional[int] = None,
+    chart_title: str = "",
+    y_axis_title: str = "",
+    y_axis_tick_format: Optional[str] = ".2f",
+    legend_dict: Optional[Dict[str, Any]] = None,
+    margin_dict: Optional[Dict[str, int]] = None,
+    theme_mode: ThemeMode = ThemeMode.light,
+    include_plotlyjs: str = "cdn",
+    full_html: bool = True,
+    display_mode_bar: bool = False,
+    responsive: bool = True
+) -> str:
+    """
+    Responsive multi-series line chart.
+    """
+    styles = get_theme_settings(theme_mode)
+    fig = go.Figure()
+
+    # add traces
+    for trace in _build_traces(x_values, series_data, styles):
+        fig.add_trace(trace)
+
+    # apply layout
+    layout_args = _build_layout(
+        styles, chart_title, y_axis_title, y_axis_tick_format,
+        legend_dict, margin_dict, theme_mode, height, width
+    )
     fig.update_layout(**layout_args)
 
     return fig.to_html(
@@ -438,3 +498,35 @@ def generic_plotly_line_chart(
         full_html=full_html,
         config={'responsive': responsive, 'displayModeBar': display_mode_bar}
     )
+
+def plot_dataframe_line_chart(
+    df: pd.DataFrame,
+    x_column: Optional[str]=None,
+    columns: Optional[List[str]] = None,
+    **plot_kwargs
+) -> str:
+    """
+    Plot all specified columns from df against the x_column.
+    Any generic_plotly_line_chart kwargs can be passed through plot_kwargs.
+    """
+    index_name=df.index.name
+    df=df.reset_index()
+    x_column = x_column or index_name
+    columns=columns or [c for c in df.columns if c!=index_name]
+    series_data = [
+        {
+            'name': col,
+            'y_values': df[col].tolist(),
+            # optionally add 'color': ... here if you want fixed colors per column
+        }
+        for col in columns
+    ]
+    x_values = df[x_column].tolist()
+    # delegate to generic
+    return generic_plotly_line_chart(
+        x_values=x_values,
+        series_data=series_data,
+        **plot_kwargs
+    )
+
+

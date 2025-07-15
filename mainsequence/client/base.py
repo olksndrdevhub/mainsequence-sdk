@@ -138,6 +138,7 @@ class BaseObjectOrm:
         "Presentation": "reports/presentations",
         "Folder":"reports/folder",
         "Slide":"reports/slides",
+        "Theme": "reports/themes",
 
     }
     ROOT_URL = API_ENDPOINT

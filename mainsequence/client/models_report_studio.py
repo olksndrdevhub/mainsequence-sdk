@@ -80,6 +80,83 @@ class Theme(BasePydanticModel,BaseObjectOrm):
         description="List of 6 HEX colours for categorical palettes",
     )
 
+    def set_plotly_theme(self):
+        import plotly.io as pio
+        import plotly.graph_objects as go
+        try:
+            import plotly.express as px
+        except ImportError:
+            px = None
+
+        # --------------------- derive colours and fonts --------------------------
+        base_font = dict(
+            family=self.font_family_paragraphs or "Inter, Arial, sans-serif",
+            size=self.font_size_p,
+            color=self.paragraph_color,
+        )
+        title_font = dict(
+            family=self.font_family_headings or base_font["family"],
+            size=self.font_size_h4,
+            color=self.heading_color,
+        )
+
+        # categorical palette
+        colorway = (
+            self.chart_palette_categorical[:]
+            if len(self.chart_palette_categorical) >= 3
+            else [
+                self.primary_color,
+                self.secondary_color,
+                self.accent_color_1,
+                self.accent_color_2,
+                self.heading_color,
+                self.paragraph_color,
+            ]
+        )
+
+        sequential = (
+            self.chart_palette_sequential[:]
+            if len(self.chart_palette_sequential) >= 3
+            else colorway
+        )
+        diverging = (
+            self.chart_palette_diverging[:]
+            if len(self.chart_palette_diverging) >= 3
+            else colorway[::-1]
+        )
+
+        paper_bg = plot_bg = self.background_color
+        if self.mode.lower() == "dark" and paper_bg.lower() == "#ffffff":
+            paper_bg = plot_bg = "#111111"
+
+        # --------------------------- build template ------------------------------
+        template = go.layout.Template(
+            layout=dict(
+                font=base_font,
+                title_font=title_font,
+                paper_bgcolor=paper_bg,
+                plot_bgcolor=plot_bg,
+                colorway=colorway,
+                #  ↓↓↓  **correct spot for continuous scales**  ↓↓↓
+                colorscale=dict(
+                    sequential=sequential,
+                    diverging=diverging,
+                ),
+                xaxis=dict(showgrid=False, zeroline=False),
+                yaxis=dict(showgrid=True, zeroline=False),
+            )
+        )
+
+        # ---------------------- register & activate ------------------------------
+        tpl_name = f"theme_{self.id}_{self.name}"
+        pio.templates[tpl_name] = template
+        pio.templates.default = tpl_name
+        if px:
+            px.defaults.template = tpl_name
+            px.defaults.color_discrete_sequence = colorway
+            px.defaults.color_continuous_scale = sequential
+
+
 
 class Folder(BasePydanticModel, BaseObjectOrm):
     id:Optional[int]=None
@@ -158,6 +235,8 @@ class Presentation(BasePydanticModel, BaseObjectOrm):
     theme: Union[int,Theme]
     slides:List[Slide]
 
+
+
     @classmethod
     def get_or_create_by_title(cls, *args, **kwargs):
         url = f"{cls.get_object_url()}/get_or_create_by_title/"
@@ -173,6 +252,22 @@ class Presentation(BasePydanticModel, BaseObjectOrm):
             raise Exception(f"Error appending creating: {r.text}")
         # Return a new instance of AssetCategory built from the response JSON.
         return cls(**r.json())
+
+
+    def add_slide(self, *args, **kwargs)->Slide:
+        url = f"{self.get_object_url()}/{self.id}/add_slide/"
+
+
+        r = make_request(
+            s=self.build_session(),
+            loaders=self.LOADERS,
+            r_type="POST",
+            url=url,payload={"json":{}}
+        )
+        if r.status_code not in [ 201]:
+            raise Exception(f"Error appending creating: {r.text}")
+        # Return a new instance of AssetCategory built from the response JSON.
+        return Slide(**r.json())
 
 
 ##########
@@ -266,7 +361,7 @@ class TextParagraph(BaseModel):
 
 ### App Nodes
 class EndpointProps(BaseModel):
-    props: dict[int, int] = Field(
+    props: dict[str, int] = Field(
         ...,
         description="Dictionary of props to send to the endpoint, e.g. {'id': 33}",
         example={"id": 33}
@@ -308,3 +403,10 @@ class AppNode(BaseModel):
                 }
             }
         }
+    @classmethod
+    def make_app_node(cls,id: int, url: str = "/orm/api/reports/run-function/") -> "AppNode":
+        return cls(
+            attrs=AppNodeAttrs(
+                endpointProps=EndpointProps(props={"id": id}, url=url)
+            )
+        )
