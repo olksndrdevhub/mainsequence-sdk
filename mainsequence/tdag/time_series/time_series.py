@@ -785,6 +785,7 @@ def prepare_config_kwargs(kwargs: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[
         meta_kwargs["build_meta_data"] = {"initialize_with_default_partitions": True}
 
     return kwargs, meta_kwargs  # Returns (core_kwargs, meta_kwargs)
+
 class BuildManager:
 
     def __init__(self, owner: 'TimeSerie'):
