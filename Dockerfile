@@ -1,4 +1,4 @@
-FROM jupyter/base-notebook:python-3.9
+FROM jupyter/base-notebook:python-3.10
 
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
