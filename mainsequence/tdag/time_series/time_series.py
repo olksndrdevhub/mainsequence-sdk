@@ -731,7 +731,7 @@ class GraphManager:
                 value.local_persist_manager  # before connection call local persist manager to garantee ts is created
                 self.local_persist_manager.depends_on_connect(value, is_api=True)
 
-        members = self.__dict__
+        members = self.owner.__dict__
         if self.local_persist_manager.local_metadata is None:
             self.owner.build_manager.verify_and_build_remote_objects() #critical point to build the objects
 

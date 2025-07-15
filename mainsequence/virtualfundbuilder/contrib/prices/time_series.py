@@ -524,7 +524,7 @@ class InterpolatedPrices(TimeSerie):
         return required
 
     def _run_post_update_routines(self, error_on_last_update, update_statistics):
-        if not self.metadata.protect_from_deletion:
+        if not self.persistance.metadata.protect_from_deletion:
             self.local_persist_manager.protect_from_deletion()
 
     def _transform_raw_data_to_upsampled_df(
