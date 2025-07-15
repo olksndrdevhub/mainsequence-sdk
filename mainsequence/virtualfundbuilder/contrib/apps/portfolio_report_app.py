@@ -34,6 +34,7 @@ class PortfolioReport(HtmlApp):
     def __init__(self, configuration: PortfolioReportConfiguration):
         logger.info(f"Create portfolio report {configuration}")
         self.configuration = configuration
+        super().__init__()
 
     def run(self) -> str:
         styles = StyleSettings(mode=ThemeMode.light)

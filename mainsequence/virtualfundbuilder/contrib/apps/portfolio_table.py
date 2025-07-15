@@ -42,6 +42,7 @@ class PortfolioTable(HtmlApp):
     def __init__(self, configuration: PortfolioTableConfiguration):
         logger.info(f"Create portfolio table with configuration {configuration}")
         self.configuration = configuration
+        super().__init__()
 
     def run(self) -> str:
         style = StyleSettings(mode=ThemeMode.light)
@@ -84,8 +85,8 @@ class PortfolioTable(HtmlApp):
             liquidity_rows = [
                 ["Repo Agreement", "", "", "$55,000,000.00", "12.50%", "0.01", "9.50%", "5"],
                 ["Cash Equiv. (Local)", "", "", "$150.00", "0.00%", "", "", ""],
-                ["Cash Equiv. (USD)", "50,000", "", "$1,000,000.00", "0.20%", "", "", ""],
-                ["TOTAL", "", "", "$56,000,150.00", "12.70%", "", "", ""]
+                # ["Cash Equiv. (USD)", "50,000", "", "$1,000,000.00", "0.20%", "", "", ""],
+                # ["TOTAL", "", "", "$56,000,150.00", "12.70%", "", "", ""]
             ]
 
             html_table = generic_plotly_table(
