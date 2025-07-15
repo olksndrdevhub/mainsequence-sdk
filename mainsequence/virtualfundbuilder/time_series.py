@@ -67,7 +67,6 @@ class PortfolioStrategy(TimeSerie):
         "volume_at_last_rebalance": "volume_before"
     }
 
-    @TimeSerie._post_init_routines()
     def __init__(
             self,
             portfolio_build_configuration: PortfolioBuildConfiguration,

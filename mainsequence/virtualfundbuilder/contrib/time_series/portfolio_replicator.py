@@ -143,7 +143,6 @@ def rolling_elastic_net(y, X, window, alpha=1.0, l1_ratio=0.5):
 
 @register_signal_class(register_in_agent=True)
 class ETFReplicator(WeightsBase, TimeSerie):
-    @TimeSerie._post_init_routines()
     def __init__(
         self,
         symbol_to_replicate: str,

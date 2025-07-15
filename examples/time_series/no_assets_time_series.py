@@ -11,7 +11,6 @@ class SingleIndexSimulatedPrices(TimeSerie):
     OFFSET_START = datetime.datetime(1970, 1, 1, tzinfo=pytz.UTC)
 
 
-    @TimeSerie._post_init_routines()
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

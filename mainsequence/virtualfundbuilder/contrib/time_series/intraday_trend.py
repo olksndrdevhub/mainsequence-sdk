@@ -15,7 +15,6 @@ import pandas_market_calendars as mcal
 @register_signal_class(register_in_agent=True)
 class IntradayTrend(WeightsBase, TimeSerie):
 
-    @TimeSerie._post_init_routines()
     def __init__(
             self,
             calendar: str,

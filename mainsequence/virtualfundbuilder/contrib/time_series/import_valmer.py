@@ -16,7 +16,6 @@ import pandas.api.types as ptypes
 
 
 class ImportValmer(TimeSerie):
-    @TimeSerie._post_init_routines()
     def __init__(
             self,
             artifact_name: str,

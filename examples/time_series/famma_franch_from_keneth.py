@@ -43,7 +43,6 @@ class KennethFrenchTimeSerie(TimeSerie):
     CPUS = 1
     GPUS = 0
 
-    @TimeSerie._post_init_routines()
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

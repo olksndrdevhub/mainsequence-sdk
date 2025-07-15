@@ -29,7 +29,6 @@ class PricesFromApi(TimeSerie):
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
 
-    @TimeSerie._post_init_routines()
     def __init__(self, *args, **kwargs):
         """
         Initialize the SimpleCryptoFeature time series.
@@ -54,7 +53,6 @@ interpolated_prices = lambda x: x
 calculate_risk_measurement = lambda x: x
 
 class PricesInterpolation(TimeSerie):
-    @TimeSerie._post_init_routines()
     def __init__(self, *args, **kwargs):
 
         self.data_time_series=PricesFromApi(*args, **kwargs)
@@ -63,7 +61,6 @@ class PricesInterpolation(TimeSerie):
         return prices
 
 class RiskMeasurement(TimeSerie):
-    @TimeSerie._post_init_routines()
     def __init__(self, *args, **kwargs):
         self.prices_time_series = PricesInterpolation(*args, **kwargs)
 

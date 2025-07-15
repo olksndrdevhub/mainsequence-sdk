@@ -5,7 +5,6 @@ import pandas as pd
 import datetime
 
 class TestFeature2(TimeSerie):
-    @TimeSerie._post_init_routines()
     def __init__(self, asset_list: ModelList, other_config: str, *args, **kwargs):
         self.asset_list = asset_list
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
@@ -20,7 +19,6 @@ class TestFeature2(TimeSerie):
         return data
 
 class TestFeature(TimeSerie):
-    @TimeSerie._post_init_routines()
     def __init__(self, asset_list: ModelList,other_config:str, *args, **kwargs):
         self.asset_list = asset_list
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]

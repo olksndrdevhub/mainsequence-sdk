@@ -7,7 +7,7 @@ import numpy as np
 import datetime
 import pandas_market_calendars as mcal
 
-from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, ModelList, APITimeSerie, data_source_pickle_path
+from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, APITimeSerie, data_source_pickle_path
 from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
                                   DataUpdates, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
                                  )
@@ -26,7 +26,6 @@ from joblib import Parallel, delayed
 from mainsequence.virtualfundbuilder.models import AssetsConfiguration
 from mainsequence.virtualfundbuilder.utils import logger, TIMEDELTA
 from typing import Optional
-from mainsequence.tdag.time_series import ModelList
 FULL_CALENDAR = "24/7"
 
 
@@ -467,7 +466,6 @@ class InterpolatedPrices(TimeSerie):
     """
     OFFSET_START = datetime.datetime(2017, 7, 20).replace(tzinfo=pytz.utc)
 
-    @TimeSerie._post_init_routines()
     def __init__(
             self,
 
@@ -475,7 +473,7 @@ class InterpolatedPrices(TimeSerie):
             intraday_bar_interpolation_rule: str,
             asset_category_unique_id: Optional[str] = None,
             upsample_frequency_id: Optional[str] = None,
-            asset_list: ModelList = None, # todo change for asset_filter when asset filter has all the characteristics
+            asset_list: List = None, # todo change for asset_filter when asset filter has all the characteristics
             translation_table_unique_id: Optional[str] = None,
             local_kwargs_to_ignore: List[str] = ["asset_category_unique_id","asset_list"],
             *args,
@@ -512,9 +510,7 @@ class InterpolatedPrices(TimeSerie):
         self.bars_ts = WrapperTimeSerie(translation_table=translation_table)
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
-    def get_html_description(self) -> Union[str, None]:
-        description = f"""<p>Time Serie Instance of {self.__class__.__name__} updating table {self.remote_table_hashed_name} for for <b>train</b> prices in <b>{self.execution_venue_symbol}</b> for backtesting</p>"""
-        return description
+
 
     def _get_required_cores(self, last_observation_map) -> int:
         """
@@ -693,7 +689,6 @@ class InterpolatedPrices(TimeSerie):
 
 class ExternalPrices(TimeSerie):
 
-    @TimeSerie._post_init_routines()
     def __init__(
             self,
             artifact_name: str,

@@ -15,7 +15,6 @@ import pandas.api.types as ptypes
 
 @register_signal_class(register_in_agent=False)
 class ExternalWeights(WeightsBase, TimeSerie):
-    @TimeSerie._post_init_routines()
     def __init__(
             self,
             artifact_name: str,

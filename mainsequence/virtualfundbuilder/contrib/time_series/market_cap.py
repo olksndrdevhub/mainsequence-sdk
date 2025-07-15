@@ -24,7 +24,6 @@ class SymbolWeight(VFBConfigBaseModel):
 @register_signal_class(register_in_agent=True)
 class FixedWeights(WeightsBase, TimeSerie):
 
-    @TimeSerie._post_init_routines()
     def __init__(self, asset_symbol_weights: List[SymbolWeight], *args, **kwargs):
         """
         Args:
@@ -82,7 +81,6 @@ class VolatilityControlConfiguration(BaseModel):
 
 @register_signal_class(register_in_agent=True)
 class MarketCap(WeightsBase, TimeSerie):
-    @TimeSerie._post_init_routines()
     def __init__(self,
                  volatility_control_configuration: Optional[VolatilityControlConfiguration],
                  minimum_atvr_ratio: float = .1,

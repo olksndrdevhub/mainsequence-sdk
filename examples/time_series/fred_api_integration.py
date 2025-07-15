@@ -22,7 +22,6 @@ class FREDTimeSerie(TimeSerie):
     CPUS = 1
     GPUS = 0
 
-    @TimeSerie._post_init_routines()
     def __init__(self, unique_identifiers: list[str],
                  local_kwargs_to_ignore=["unique_identifiers"],
 

@@ -22,7 +22,6 @@ class SimulatedPrices(TimeSerie):
     """
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
 
-    @TimeSerie._post_init_routines()
     def __init__(self, asset_list: ModelList, *args, **kwargs):
         """
         Initialize the SimpleCryptoFeature time series.
@@ -187,7 +186,6 @@ class TAFeature(TimeSerie):
     The name of the TA feature (ta_feature) and the lookback period (ta_length) are provided as parameters.
     """
     SIMULATION_OFFSET_START=datetime.timedelta(days=50)
-    @TimeSerie._post_init_routines()
     def __init__(self, asset_list: ModelList, ta_feature: str, ta_length: int = 14,
                  local_kwargs_to_ignore=["asset_list"],
                  *args, **kwargs):

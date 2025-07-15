@@ -30,7 +30,6 @@ class FamaFrenchTimeSerie(TimeSerie):
     """
     SIM_OFFSET_START = datetime.timedelta(days=365*10)  # 1 year fallback
 
-    @TimeSerie._post_init_routines()
     def __init__(self, *args, **kwargs):
         # No asset_list is required, we dynamically discover equities from Polygon.
         super().__init__(*args, **kwargs)

@@ -5,7 +5,6 @@ import os
 import pandas as pd
 
 from mainsequence.client import AssetMixin, Asset, MARKETS_CONSTANTS
-from mainsequence.tdag.time_series import ModelList
 import json
 from pydantic import FieldValidationInfo, field_validator, root_validator, Field
 

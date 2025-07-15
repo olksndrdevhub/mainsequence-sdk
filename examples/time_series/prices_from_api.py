@@ -25,7 +25,6 @@ class PricesFromApi(TimeSerie):
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
 
-    @TimeSerie._post_init_routines()
     def __init__(self, asset_list, *args, **kwargs):
         """
         Initialize the SimpleCryptoFeature time series.
