@@ -258,7 +258,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     description: Optional[str] = Field(None, description="Optional HTML description")
     localtimeserieupdatedetails: Optional[Union["LocalTimeSerieUpdateDetails",int]] = None
     run_configuration: Optional["RunConfiguration"]=None
-    data_schema:Optional[Dict] = None
     open_for_everyone: bool = Field(default=False, description="Whether the ts is open for everyone")
 
     @property
