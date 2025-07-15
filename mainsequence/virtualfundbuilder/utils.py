@@ -242,6 +242,22 @@ def parse_object_signature_raw(elem, parent_description=None, attr_name=None, at
     if isinstance(attr_default, Enum):
         attr_default = attr_default.value
 
+    potential_field_info = attr_default
+    if isinstance(potential_field_info, tuple) and len(potential_field_info) > 0 and isinstance(potential_field_info[0], FieldInfo):
+        potential_field_info = potential_field_info[0]
+
+    if isinstance(potential_field_info, FieldInfo):
+        # Handle both Pydantic v1 ('extra') and v2 ('json_schema_extra') to be robust
+        extra_data = getattr(potential_field_info, 'json_schema_extra', None) or getattr(potential_field_info, 'extra', {})
+        example = extra_data.get('example')
+
+        if example is not None:
+            attr_default = example
+        elif potential_field_info.default is not PydanticUndefined:
+            attr_default = potential_field_info.default
+        else:
+            attr_default = None
+
     element_info = {
         "name": attr_name,
         "type": elem,
