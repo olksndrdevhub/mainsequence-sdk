@@ -2062,6 +2062,20 @@ class TimeSerie(CommonMethodsMixin, DataPersistanceMethods, GraphNodeMethods, Ti
         git_hash = hash_object.hexdigest()
         return git_hash
 
+    def _post_init_routines() -> Callable:
+        """
+        A decorator to run routines after the __init__ method of a TimeSerie.
+        It handles argument processing, configuration creation, and other setup tasks.
+        """
+        def wrap(init_method):
+            @wraps(init_method)
+            def run_init(*args, **kwargs):
+                logger.warning("this decorator is depreciated it is not needed anymore and will be removed in future versions")
+
+            return run_init
+
+        return wrap
+
     @staticmethod
     def sanitize_default_build_metadata(build_meta_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
