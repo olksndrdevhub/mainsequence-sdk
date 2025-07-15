@@ -1913,7 +1913,6 @@ class TimeSerie(CommonMethodsMixin, DataPersistanceMethods, GraphNodeMethods, Ti
             **kwargs):
         """
         Initializes the TimeSerie object with the provided metadata and configurations. For extension of the method
-        the method should always be decorated by TimeSerie._post_init_routines
 
         This method sets up the time series object, loading the necessary configurations
         and metadata.
@@ -1955,10 +1954,50 @@ class TimeSerie(CommonMethodsMixin, DataPersistanceMethods, GraphNodeMethods, Ti
         self._data_source: Optional[DynamicTableDataSource] = None # is set later
         self._local_persist_manager: Optional[PersistManager] = None
 
-        # asser that method is decorated
-        if not len(self.__init__.__closure__) == 1:
-            logger.error("init method is not decorated with @TimeSerie._post_init_routines()")
-            raise Exception
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        This special method is called when TimeSerie is subclassed.
+        It automatically wraps the subclass's __init__ method to add post-init routines.
+        """
+        super().__init_subclass__(**kwargs)
+
+        # Get the original __init__ from the new subclass
+        original_init = cls.__init__
+
+        @wraps(original_init)
+        def wrapped_init(self, *args, **kwargs):
+            # --- This is the logic from the old decorator ---
+
+            # 1. Call the original __init__ of the subclass first
+            original_init(self, *args, **kwargs)
+
+            # 2. Capture all arguments passed to create the final config
+            # We inspect the original_init to find what arguments it was called with.
+            sig = inspect.signature(original_init)
+            bound_args = sig.bind(self, *args, **kwargs)
+            bound_args.apply_defaults()
+            final_kwargs = bound_args.arguments
+            final_kwargs.pop('self', None)  # Remove self
+
+
+            # 3. Run the post-initialization routines
+            logger.info(f"Running post-init routines for {self.__class__.__name__}")
+
+            # Add import path to the config kwargs
+            final_kwargs["time_series_class_import_path"] = {
+                "module": self.__class__.__module__,
+                "qualname": self.__class__.__qualname__
+            }
+
+            self._create_config(kwargs=final_kwargs,post_init_log_messages=[]) # Assuming these methods exist
+            self.run_after_post_init_routines()
+            self.patch_build_configuration()
+
+            logger.info(f"Post-init routines for {self.__class__.__name__} complete.")
+
+        # Replace the subclass's __init__ with our new wrapped version
+        cls.__init__ = wrapped_init
 
     @staticmethod
     def set_context_in_logger(logger_context: Dict[str, Any]) -> None:
