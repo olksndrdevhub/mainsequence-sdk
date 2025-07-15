@@ -6,7 +6,7 @@ This script is used to Mock the Process of integrating and execution engine into
 import pytz
 import numpy as np
 ## GEt
-from mainsequence.client import TargetPortfolio, Account, RebalanceTargetPosition, OrderSide
+from mainsequence.client import Portfolio, Account, RebalanceTargetPosition, OrderSide
 from mainsequence.client import OrderManager, OrderManagerTargetQuantity,Order, \
     Asset, MarketOrder, AccountHistoricalHoldings,OrderType,OrderStatus,OrderTimeInForce,Trade,TradeSide
 from mainsequence.client import AssetOnlyPortfolio
@@ -22,7 +22,7 @@ ACCOUNT_NAME="Default MainSequence Portfolios Account"
 
 #%%
 
-portfolio_to_mock_trading=TargetPortfolio.get(portfolio_ticker=PORTFOLIO_TICKER)
+portfolio_to_mock_trading=Portfolio.get(portfolio_ticker=PORTFOLIO_TICKER)
 
 
 

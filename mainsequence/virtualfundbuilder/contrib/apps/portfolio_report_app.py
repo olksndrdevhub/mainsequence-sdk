@@ -5,7 +5,7 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-from mainsequence.client import TargetPortfolio
+from mainsequence.client import Portfolio
 from mainsequence.reportbuilder.model import StyleSettings, ThemeMode
 from mainsequence.reportbuilder.slide_templates import generic_plotly_line_chart
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
@@ -19,7 +19,7 @@ logger = get_vfb_logger()
 
 PortfolioNameEnum = Enum(
     "PortfolioEnum",
-    {portfolio.portfolio_name: portfolio.portfolio_ticker for portfolio in TargetPortfolio.filter(is_asset_only=False, local_time_serie__isnull=False)},
+    {portfolio.portfolio_name: portfolio.portfolio_ticker for portfolio in Portfolio.filter(is_asset_only=False, local_time_serie__isnull=False)},
     type=str,
 )
 class PortfolioReportConfiguration(BaseModel):
@@ -34,6 +34,7 @@ class PortfolioReport(HtmlApp):
     def __init__(self, configuration: PortfolioReportConfiguration):
         logger.info(f"Create portfolio report {configuration}")
         self.configuration = configuration
+        super().__init__()
 
     def run(self) -> str:
         styles = StyleSettings(mode=ThemeMode.light)
@@ -45,7 +46,7 @@ class PortfolioReport(HtmlApp):
         portfolio_data_map = {}
         for ticker in self.configuration.portfolio_tickers:
             try:
-                portfolio = TargetPortfolio.get(portfolio_ticker=ticker)
+                portfolio = Portfolio.get(portfolio_ticker=ticker)
                 data = portfolio.local_time_serie.get_data_between_dates_from_api()
                 data['time_index'] = pd.to_datetime(data['time_index'])
                 report_data = data[data['time_index'] >= start_date].copy().sort_values('time_index')
@@ -61,7 +62,7 @@ class PortfolioReport(HtmlApp):
         for ticker in self.configuration.portfolio_tickers:
             if ticker in portfolio_data_map:
                 report_data = portfolio_data_map[ticker]
-                portfolio = TargetPortfolio.get(portfolio_ticker=ticker)
+                portfolio = Portfolio.get(portfolio_ticker=ticker)
 
                 # Reindex to common date range and forward-fill missing values
                 processed_data = report_data.set_index('time_index').reindex(all_dates).ffill().reset_index()

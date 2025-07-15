@@ -3,7 +3,8 @@ import json
 import os
 from abc import abstractmethod
 from typing import Any
-
+from pydantic import BaseModel
+import inspect
 from mainsequence.client.models_tdag import Artifact, add_created_object_to_jobrun
 from mainsequence.virtualfundbuilder.enums import ResourceType
 from mainsequence.virtualfundbuilder.resource_factory.base_factory import insert_in_registry, BaseResource
@@ -30,6 +31,46 @@ class BaseApp(BaseResource):
             logger.info("Output added successfully")
         else:
             logger.info("This is not a Job Run - no output can be added")
+    @staticmethod
+    def hash_pydantic_object(obj: Any,digest_size: int = 16) -> str:
+        """
+        Generate a unique SHA-256 hash for any Pydantic object (including nested dependencies),
+        ensuring that lists of objects are deterministically ordered.
+
+        Args:
+            obj: A Pydantic BaseModel instance or any JSON-serializable structure.
+
+        Returns:
+            A hex string representing the SHA-256 hash of the canonical JSON representation.
+        """
+
+        def serialize(item: Any) -> Any:
+            if isinstance(item, BaseModel):
+                return serialize(item.dict(by_alias=True, exclude_unset=True))
+            elif isinstance(item, dict):
+                return {str(k): serialize(v) for k, v in sorted(item.items())}
+            elif isinstance(item, (list, tuple, set)):
+                serialized_items = [serialize(v) for v in item]
+                try:
+                    return sorted(
+                        serialized_items,
+                        key=lambda x: json.dumps(x, sort_keys=True, separators=(",", ":"))
+                    )
+                except (TypeError, ValueError):
+                    return serialized_items
+            else:
+                if hasattr(item, "isoformat"):
+                    try:
+                        return item.isoformat()
+                    except Exception:
+                        pass
+                return item
+
+        json_str = json.dumps(serialize(obj), sort_keys=True, separators=(",", ":"))
+        h = hashlib.blake2b(digest_size=digest_size)
+        h.update(json_str.encode("utf-8"))
+        return h.hexdigest()
+
 
 APP_REGISTRY = APP_REGISTRY if 'APP_REGISTRY' in globals() else {}
 def register_app(name=None, register_in_agent=True):

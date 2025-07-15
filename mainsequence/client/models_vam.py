@@ -65,7 +65,7 @@ def get_model_class(model_class: str):
         "AssetCurrencyPair": AssetCurrencyPair,
         "AssetFutureUSDM": AssetFutureUSDM,
         "IndexAsset": IndexAsset,
-        "TargetPortfolioIndexAsset": TargetPortfolioIndexAsset,
+        "PortfolioIndexAsset": PortfolioIndexAsset,
         "Calendar": Calendar
     }
     return MODEL_CLASS_MAP[model_class]
@@ -400,9 +400,9 @@ class AssetFilter(BaseModel):
     def filter_triggered(self, asset: "Asset") -> bool:
         if asset.execution_venue_symbol != self.execution_venue_symbol:
             return False
-        if self.security_type is not None and asset.security_type != self.security_type:
+        if self.security_type and asset.security_type != self.security_type:
             return False
-        if self.security_market_sector is not None and asset.security_market_sector != self.security_market_sector:
+        if self.security_market_sector and asset.security_market_sector != self.security_market_sector:
             return False
         return True
 
@@ -525,7 +525,7 @@ class Asset(AssetMixin, BaseObjectOrm):
             reference_portfolio: int,
             valuation_asset: int,
             timeout = None
-    ) -> "TargetPortfolioIndexAsset":
+    ) -> "PortfolioIndexAsset":
         url = f"{cls.get_object_url()}/create_or_update_index_asset_from_portfolios/"
         payload = {
             "json": dict(
@@ -544,7 +544,7 @@ class Asset(AssetMixin, BaseObjectOrm):
         if r.status_code not in [200,201]:
             raise Exception(f"{r.text}")
 
-        return TargetPortfolioIndexAsset(**r.json())
+        return PortfolioIndexAsset(**r.json())
 
     @classmethod
     def register_figi_as_asset_in_main_sequence_venue(cls, figi, timeout=None)->"Asset":
@@ -616,9 +616,9 @@ class Asset(AssetMixin, BaseObjectOrm):
 class IndexAsset(Asset):
     valuation_asset: AssetMixin
 
-class TargetPortfolioIndexAsset(IndexAsset):
+class PortfolioIndexAsset(IndexAsset):
     can_trade:bool=False
-    reference_portfolio : "TargetPortfolio"
+    reference_portfolio : "Portfolio"
     execution_venue: "ExecutionVenue"= Field(
         default_factory=lambda: ExecutionVenue(**CONSTANTS.VENUE_MAIN_SEQUENCE_PORTFOLIOS)
     )
@@ -693,7 +693,7 @@ class AccountPortfolioHistoricalPositions(BaseObjectOrm, BasePydanticModel):
 
 
 
-class AccountTargetPortfolio(BaseObjectOrm, BasePydanticModel):
+class AccountPortfolio(BaseObjectOrm, BasePydanticModel):
     id:int
     related_account:Optional[int]
     latest_positions:Optional[AccountPortfolioHistoricalPositions]=None
@@ -713,7 +713,7 @@ class AccountMixin(BasePydanticModel):
     account_name: Optional[str] = None
     cash_asset: Asset
     is_paper: bool
-    account_target_portfolio: AccountTargetPortfolio
+    account_target_portfolio: AccountPortfolio
     latest_holdings: Union["AccountLatestHoldings",None]=None
 
     @property
@@ -1104,42 +1104,29 @@ class PortfolioTags(BasePydanticModel):
 
 from typing import TypedDict
 
-class TargetPortfolioAbout(TypedDict):
+class PortfolioAbout(TypedDict):
     description: str
     signal_name: str
     signal_description: str
     rebalance_strategy_name: str
 
 
-class TargetPortfolioMixin:
+class PortfolioMixin:
     id: Optional[int] = None
     portfolio_name: str = Field(..., max_length=255)
     portfolio_ticker: str = Field(..., max_length=150)
-    latest_rebalance: Optional[datetime.datetime] = None
-    calendar: Optional[Calendar]
-
     is_asset_only: bool = False
-    build_purpose: str
     is_active: bool = False
-    local_time_serie: Optional[LocalTimeSerie]
-    signal_local_time_serie: Optional[LocalTimeSerie]
-
-    builds_from_predictions: bool = False
-    builds_from_target_positions: bool = False
+    local_time_serie: Optional['LocalTimeSerie']
+    signal_local_time_serie: Optional['LocalTimeSerie']
     follow_account_rebalance: bool = False
-    tracking_funds_expected_exposure_from_latest_holdings: bool = Field(
-        default=False,
-        description="Flag indicating if the system should track the funds' expected exposure based on the latest holdings. This is helpful when building your execution engine"
-    )
-    required_venues: List[Union[int, ExecutionVenue]]
-    latest_weights: Optional[List[Dict]] = None
-
-    creation_date: Optional[datetime.datetime] = None
-
+    required_venues: List[Union[int, 'ExecutionVenue']]
+    build_purpose: str
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
-    tags: Optional[List[PortfolioTags]] = None
-    valuation_asset: Union[Asset, int]
+    tags: Optional[List['PortfolioTags']] = None
+    valuation_asset: Union['Asset', int]
+    calendar: Optional['Calendar']
 
     @classmethod
     def create_from_time_series(
@@ -1154,11 +1141,11 @@ class TargetPortfolioMixin:
             calendar_name: str,
             tracking_funds_expected_exposure_from_latest_holdings: bool,
             is_asset_only: bool,
-            target_portfolio_about: TargetPortfolioAbout,
+            target_portfolio_about: PortfolioAbout,
             backtest_table_price_column_name: str,
             tags: Optional[list] = None,
             timeout=None
-    ) -> "TargetPortfolio":
+    ) -> "Portfolio":
         url = f"{cls.get_object_url()}/create_from_time_series/"
         # Build the payload with the required arguments.
         payload_data = {
@@ -1184,7 +1171,7 @@ class TargetPortfolioMixin:
             raise Exception(f" {r.text}")
         response = r.json()
 
-        return cls(**response["portfolio"]), TargetPortfolioIndexAsset(**response["portfolio_index_asset"])
+        return cls(**response["portfolio"]), PortfolioIndexAsset(**response["portfolio_index_asset"])
 
     def add_venue(self, venue_id) -> None:
         url = f"{self.get_object_url()}/{self.id}/add_venue/"
@@ -1193,10 +1180,19 @@ class TargetPortfolioMixin:
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
 
-class TargetPortfolio(TargetPortfolioMixin, BaseObjectOrm, BasePydanticModel):
+    def get_latest_weights(self,timeout=None)->Dict[str, float]:
+        url = f"{self.get_object_url()}/{self.id}/get_latest_weights/"
+        r = make_request(s=self.build_session(), loaders=self.LOADERS, r_type="GET", url=url,
+                         time_out=timeout
+                         )
+        if r.status_code in [200] == False:
+            raise Exception(f" {r.text()}")
+        return r.json()
+
+class Portfolio(PortfolioMixin, BaseObjectOrm, BasePydanticModel):
     pass
 
-class AssetOnlyPortfolio(TargetPortfolioMixin,BaseObjectOrm, BasePydanticModel):
+class AssetOnlyPortfolio(PortfolioMixin,BaseObjectOrm, BasePydanticModel):
     local_time_serie: Optional[LocalTimeSerie]=None
     signal_local_time_serie:Optional[LocalTimeSerie]=None
 
@@ -1282,7 +1278,7 @@ class TargetRebalance(BaseModel):
 
 class VirtualFund(BaseObjectOrm, BasePydanticModel):
     id: Optional[float] = None
-    target_portfolio: Union[int,"TargetPortfolio"]
+    target_portfolio: Union[int,"Portfolio"]
     target_account: AccountMixin
     notional_exposure_in_account: float
     latest_holdings: "VirtualFundHistoricalHoldings" = None

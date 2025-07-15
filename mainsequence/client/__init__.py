@@ -13,4 +13,5 @@ from mainsequence.logconf import logger
 
 from .models_helpers import *
 from .models_vam import *
+from .models_report_studio import *
 

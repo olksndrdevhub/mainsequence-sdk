@@ -4,7 +4,7 @@ from typing import List, Union
 
 import numpy as np
 import pandas as pd
-from mainsequence.client import TargetPortfolio
+from mainsequence.client import Portfolio
 from mainsequence.reportbuilder.model import StyleSettings, ThemeMode
 from mainsequence.reportbuilder.slide_templates import generic_plotly_table
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
@@ -20,7 +20,7 @@ PortfolioNameEnum = Enum(
     "PortfolioEnum",
     {
         p.portfolio_name: p.portfolio_ticker
-        for p in TargetPortfolio.filter(is_asset_only=False, local_time_serie__isnull=False)
+        for p in Portfolio.filter(is_asset_only=False, local_time_serie__isnull=False)
     },
     type=str,
 )
@@ -42,6 +42,7 @@ class PortfolioTable(HtmlApp):
     def __init__(self, configuration: PortfolioTableConfiguration):
         logger.info(f"Create portfolio table with configuration {configuration}")
         self.configuration = configuration
+        super().__init__()
 
     def run(self) -> str:
         style = StyleSettings(mode=ThemeMode.light)
@@ -84,8 +85,8 @@ class PortfolioTable(HtmlApp):
             liquidity_rows = [
                 ["Repo Agreement", "", "", "$55,000,000.00", "12.50%", "0.01", "9.50%", "5"],
                 ["Cash Equiv. (Local)", "", "", "$150.00", "0.00%", "", "", ""],
-                ["Cash Equiv. (USD)", "50,000", "", "$1,000,000.00", "0.20%", "", "", ""],
-                ["TOTAL", "", "", "$56,000,150.00", "12.70%", "", "", ""]
+                # ["Cash Equiv. (USD)", "50,000", "", "$1,000,000.00", "0.20%", "", "", ""],
+                # ["TOTAL", "", "", "$56,000,150.00", "12.70%", "", "", ""]
             ]
 
             html_table = generic_plotly_table(
