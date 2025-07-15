@@ -2062,48 +2062,6 @@ class TimeSerie(CommonMethodsMixin, DataPersistanceMethods, GraphNodeMethods, Ti
         git_hash = hash_object.hexdigest()
         return git_hash
 
-    def _post_init_routines() -> Callable:
-        """
-        A decorator to run routines after the __init__ method of a TimeSerie.
-        It handles argument processing, configuration creation, and other setup tasks.
-        """
-        def wrap(init_method):
-            @wraps(init_method)
-            def run_init(*args, **kwargs):
-                import inspect
-                expected_arguments = [i for i in inspect.getfullargspec(init_method).args if i != "self"]
-                signature = inspect.signature(init_method)
-                default_arguments = {k: v.default
-                                     for k, v in signature.parameters.items()
-                                     if v.default is not inspect.Parameter.empty}
-                post_init_log_messages = []
-                for a in expected_arguments:
-                    if a not in kwargs.keys():
-                        if a in default_arguments.keys():
-                            kwargs[a] = default_arguments[a]
-                            post_init_log_messages.append(
-                                f' In {args[0].__class__.__name__} Used default value for {a} in __init__({a}={default_arguments[a]} ,*args,**kwargs)')
-                        else:
-                            raise Exception(
-                                f' In {args[0].__class__.__name__} explicitly declare argument {a} in __init__({a}= ,*args,**kwargs')
-                init_method(*args, **kwargs)
-
-                self = args[0]
-
-                kwargs["time_series_class_import_path"] = {"module": self.__class__.__module__,
-                                                           "qualname": self.__class__.__qualname__}
-
-                self._create_config(kwargs=kwargs, post_init_log_messages=post_init_log_messages)
-                # create logger
-                self.run_after_post_init_routines()
-
-                # patch if necesary build configuration
-                self.patch_build_configuration()
-
-            return run_init
-
-        return wrap
-
     @staticmethod
     def sanitize_default_build_metadata(build_meta_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
