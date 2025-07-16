@@ -524,7 +524,7 @@ class InterpolatedPrices(TimeSerie):
         return required
 
     def _run_post_update_routines(self, error_on_last_update, update_statistics):
-        if not self.persistance.metadata.protect_from_deletion:
+        if not self.persistence.metadata.protect_from_deletion:
             self.local_persist_manager.protect_from_deletion()
 
     def _transform_raw_data_to_upsampled_df(
@@ -631,7 +631,7 @@ class InterpolatedPrices(TimeSerie):
 
         raw_data_df = self.bars_ts.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map)
 
-        if raw_data_df.shape[0] == 0:
+        if raw_data_df.empty == True:
             self.logger.info("New new data to interpolate")
             return pd.DataFrame()
 

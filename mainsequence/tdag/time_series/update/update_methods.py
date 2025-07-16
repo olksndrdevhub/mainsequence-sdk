@@ -123,7 +123,6 @@ class TimeSerieUpdater:
                                          logger=self.time_serie.logger,
                                          state_data=None, debug=False)
 
-        self.time_serie._run_pre_load_routines()
         with tracer.start_as_current_span("Waiting for depencencies update") as waiting_span:
 
             while are_dependencies_updated == False:

@@ -80,6 +80,17 @@ class APIPersistManager:
             A pandas DataFrame with the requested data.
         """
         filtered_data = self.metadata.get_data_between_dates_from_api(*args, **kwargs)
+
+        # fix types
+        stc = self.metadata.sourcetableconfiguration
+        filtered_data[stc.time_index_name] = pd.to_datetime(filtered_data[stc.time_index_name], utc=True)
+        for c, c_type in stc.column_dtypes_map.items():
+            if c != stc.time_index_name:
+                if c_type == "object":
+                    c_type = "str"
+                filtered_data[c] = filtered_data[c].astype(c_type)
+        filtered_data = filtered_data.set_index(stc.index_names)
+
         return filtered_data
 
 
