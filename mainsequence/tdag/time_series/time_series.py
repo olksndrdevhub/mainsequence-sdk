@@ -469,7 +469,7 @@ class ConfigSerializer:
                 rebuild_function = lambda x: cls.deserialize_pickle_state(x, **state_kwargs)
                 new_value = rebuild_with_type(value, rebuild_function=rebuild_function)
             elif "is_model_list" in value.keys():
-                new_value = ModelList([build_model(v) for v in value['model_list']])
+                new_value = [build_model(v) for v in value['model_list']]
             elif "is_time_serie_pickled" in value.keys():
                 try:
                     full_path = TimeSerie.get_pickle_path(local_hash_id=value['local_hash_id'],

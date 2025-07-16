@@ -543,8 +543,6 @@ class PersistManager:
                 )
 
                 local_metadata = LocalTimeSerie.get_or_create(**metadata_kwargs,)
-
-
             else:
                 local_metadata = local_update
 
