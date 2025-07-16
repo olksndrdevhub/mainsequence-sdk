@@ -2651,11 +2651,11 @@ class TimeSerie(DataAccessMixin,ABC):
         return self.hashed_name
 
     @property
-    def data_source(self) -> Any:
+    def data_source(self) -> DataSource:
         return self.persistence.data_source
 
     @property
-    def local_time_serie(self) -> Any:
+    def local_time_serie(self) -> LocalTimeSerie:
         """The local time series metadata object."""
         return self.local_persist_manager.local_metadata
     @property

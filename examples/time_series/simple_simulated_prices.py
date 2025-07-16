@@ -1,39 +1,99 @@
+"""
+================================================================================
+Instructions for Implementing a `mainsequence.tdag.TimeSerie` Subclass
+================================================================================
+
+This file serves as a reference for creating custom time series. To create a new,
+functioning time series, you must subclass `TimeSerie` and implement its abstract
+methods.
+
+---
+### 1. Code Style and Documentation Requirements (IMPORTANT)
+
+All generated code MUST adhere to the following quality standards:
+
+-   **Docstrings**: Every class and method **MUST** have a clear, concise docstring
+    explaining its purpose. Methods should include sections for arguments (`Args:`)
+    and return values (`Returns:`).
+-   **Type Hinting**: All function and method signatures **MUST** use Python type hints
+    for all parameters and return values (e.g., `def my_method(self, assets: List[Asset]) -> pd.DataFrame:`).
+-   **Inline Comments**: Complex or non-obvious lines of code **MUST** be explained with
+    inline comments (`# ...`). Explain the "why" behind the code, not just the "what".
+-   **Readability**: Keep functions focused on a single responsibility. Break down
+    long, complex methods into smaller, private helper methods where appropriate.
+
+---
+### 2. The `__init__` Method
+The constructor defines the unique identity of the time series and its dependencies.
+
+-   **Uniqueness**: The arguments passed to `__init__` are hashed to create a unique ID.
+    Instantiating a class with the same arguments will always result in the same time series object.
+-   **Dependencies**: To declare a dependency on another `TimeSerie`, you **MUST** instantiate it
+    within `__init__` and assign it to an instance attribute (e.g., `self.my_dependency = OtherTimeSerie()`).
+    The framework will **automatically scan all instance attributes** to find these dependencies
+    and build the execution graph.
+-   **Special Arguments**: The following arguments are special and are **NOT** included in the hash:
+    - `init_meta`: For temporary, runtime-only options.
+    - `build_meta_data`: For controlling backend table creation.
+    - `local_kwargs_to_ignore`: A list of argument names to exclude from the *local* hash.
+
+---
+### 3. The `update` Method (Required)
+This is the core method containing the business logic for generating data.
+
+-   **Purpose**: **MUST** be implemented. Its job is to fetch, calculate, or generate new data points.
+-   **Input (`update_statistics`)**: This object tells you the timestamp of the last successful
+    update for each asset, allowing you to fetch data incrementally.
+    -   **Asset Universe**: When looping through assets, you **MUST** iterate over `update_statistics.asset_list`.
+        This ensures consistency with the assets prepared for the current run.
+    -   **Timestamps**: Use `update_statistics[unique_id]` to get the latest timestamp for a specific asset.
+
+-   **DataFrame Requirements**: The method **MUST** return a pandas DataFrame that adheres to the
+    following strict format:
+    -   **Index**: Must be a `pandas.MultiIndex` with the names `("time_index", "unique_identifier")`.
+    -   **`time_index` Level**: Must contain `datetime.datetime` objects with UTC timezone (`tzinfo=pytz.utc`).
+    -   **Column Names**: All column names **MUST** be lowercase and **have a maximum length of 63 characters**.
+    -   **Column Values**: No column (other than the index) may contain Python `datetime` objects.
+        If you need to store a timestamp in a column, it **MUST** be converted to an integer
+        (e.g., a UNIX epoch timestamp).
+
+---
+### 4. Optional Hooks (Override as Needed)
+These methods have default behaviors but can be overridden for customization.
+
+-   `_get_asset_list(self) -> List[Asset]`:
+    - **Purpose**: [OPTIONAL] Implement to dynamically define the list of assets this time series
+      should process during an update. Useful for fetching all assets in a category.
+    - **Returns**: A list of `Asset` objects.
+
+-   `_get_column_metadata(self) -> List[ColumnMetaData]`:
+    - **Purpose**: [OPTIONAL] Implement to provide rich descriptions for your data columns. This
+      metadata is used in documentation and user interfaces.
+    - **Returns**: A list of `ColumnMetaData` objects.
+
+-   `_run_post_update_routines(self, ...)`:
+    - **Purpose**: [OPTIONAL] Implement to run custom logic *after* an update is finished.
+      Useful for logging, cleanup, or registering the time series in an external system.
+"""
+
+
+# Imports should be at the top of the file
+import numpy as np
+np.NaN = np.nan # Fix for a pandas-ta compatibility issue
+from mainsequence.tdag import TimeSerie
+from mainsequence.client.models_tdag import DataUpdates, ColumnMetaData
+import mainsequence.client as ms_client
+from typing import Union, Optional, List, Dict
+import datetime
 import pytz
 import pandas as pd
-import datetime
-import numpy as np
-np.NaN = np.nan
-import dotenv
-dotenv.load_dotenv('../../.env')
+import pandas_ta as ta
 
-from mainsequence.tdag import TimeSerie, ModelList
-from mainsequence.client.models_tdag import DataUpdates
-from typing import Union,Optional
 
-class SimulatedPrices(TimeSerie):
-    """
-    A basic time series example tracking BTC and ETH price updates.
+class SimulatedPricesManager:
 
-    Simulation periods:
-      - If no update statistics are provided, simulate data from 30 days before now
-        until 20 days before now.
-      - Otherwise, simulate data per asset from one hour after its last update until
-        yesterday at midnight (UTC).
-    """
-    OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
-
-    def __init__(self, asset_list: ModelList, *args, **kwargs):
-        """
-        Initialize the SimpleCryptoFeature time series.
-
-        Args:
-            asset_list (ModelList): List of asset objects.
-            *args: Additional positional arguments.
-            **kwargs: Additional keyword arguments.
-        """
-        self.asset_list = asset_list
-        self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
-        super().__init__(*args, **kwargs)
+    def __init__(self,owner:TimeSerie):
+        self.owner = owner
 
     @staticmethod
     def _get_last_price(obs_df: pd.DataFrame, unique_id: str, fallback: float) -> float:
@@ -84,7 +144,7 @@ class SimulatedPrices(TimeSerie):
 
         # Get the latest historical observations; assumed to be a DataFrame with a multi-index:
         # (time_index, unique_identifier) and a column "feature_1" for the last observed price.
-        last_observation = self.get_last_observation()
+        last_observation = self.owner.get_last_observation()
         # Define simulation end: yesterday at midnight (UTC)
         yesterday_midnight = datetime.datetime.now(pytz.utc).replace(
             hour=0, minute=0, second=0, microsecond=0
@@ -139,54 +199,239 @@ class SimulatedPrices(TimeSerie):
         return columns_metadata
 
 
+class SingleIndexTS(TimeSerie):
+    """
+       A simple time series with a single index, generating random numbers daily.
+       This serves as a basic, non-asset-based example.
+       """
+    OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
+
+    def update(self, update_statistics: ms_client.DataUpdates):
+        today_utc = datetime.datetime.now(tz=pytz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+        if update_statistics.last_observation.empty:
+            start_date = self.OFFSET_START
+        else:
+            last_time = update_statistics.last_observation.index.max()
+            start_date = last_time + datetime.timedelta(days=1)
+
+        if start_date > today_utc:
+            return pd.DataFrame()
+
+        num_days = (today_utc - start_date).days + 1
+        time_index = pd.date_range(start=start_date, periods=num_days, freq='D', tz=pytz.utc)
+        random_values = np.random.rand(num_days)
+
+        df = pd.DataFrame({'random_number': random_values}, index=time_index)
+        df.index.name = 'time_index'
+        return df
+
+    def _get_column_metadata(self):
+        """
+        Add MetaData information to the TimeSerie Table
+        Returns:
+
+        """
+        from mainsequence.client.models_tdag import ColumnMetaData
+        columns_metadata = [ColumnMetaData(column_name="random_number",
+                                           dtype="float",
+                                           label="Random Number ",
+                                           description=(
+                                               "A random number with no meaning whatsoever"
+                                           )
+                                           ),
+
+                            ]
+        return columns_metadata
+
+    def _run_post_update_routines(self, error_on_last_update, update_statistics: DataUpdates):
+        MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "simple_time_serie_example"
+        source_table = self.local_time_serie.remote_table
+
+        try:
+            mts = ms_client.MarketsTimeSeriesDetails.get(
+                unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER
+            )
+            if mts.source_table.id != source_table.id:
+                mts = mts.patch(source_table__id=source_table.id)
+        except ms_client.DoesNotExist:
+            mts = ms_client.MarketsTimeSeriesDetails.update_or_create(
+                unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+                source_table__id=source_table.id,
+                data_frequency_id=ms_client.DataFrequency.one_d,
+                description="This is a simple time serie with only one index",
+            )
+        #No assets to inlcude in the time serie
+class SimulatedPrices(TimeSerie):
+    """
+    Simulates price updates for a specific list of assets provided at initialization.
+    """
+    OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
+
+    def __init__(self, asset_list: List,
+                 local_kwargs_to_ignore=["asset_list"],
+
+                 *args, **kwargs):
+        """
+        Initialize the SimpleCryptoFeature time series.
+
+        Args:
+            asset_list (ModelList): List of asset objects.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
+        self.asset_list = asset_list
+        self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
+        super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
+
+    def update(self,update_statistics:ms_client.DataUpdates):
+        update_manager=SimulatedPricesManager(self)
+        df=update_manager.update(update_statistics)
+        return df
+    def _get_column_metadata(self):
+        """
+        Add MetaData information to the TimeSerie Table
+        Returns:
+
+        """
+        from mainsequence.client.models_tdag import ColumnMetaData
+        columns_metadata = [ColumnMetaData(column_name="feature_1",
+                                           dtype="float",
+                                           label="Feature 1",
+                                           description=(
+                                               "Simulated Feature 1"
+                                           )
+                                           ),
+
+
+                            ]
+        return columns_metadata
+    def _run_post_update_routines(self, error_on_last_update, update_statistics: DataUpdates):
+        MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "simulated_prices_from_category"
+        source_table=self.local_time_serie.remote_table
+
+        try:
+            mts = ms_client.MarketsTimeSeriesDetails.get(
+                unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER
+            )
+            if mts.source_table.id != source_table.id:
+                mts = mts.patch(source_table__id=source_table.id)
+        except ms_client.DoesNotExist:
+            mts = ms_client.MarketsTimeSeriesDetails.update_or_create(
+                unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+                source_table__id=source_table.id,
+                data_frequency_id=ms_client.DataFrequency.one_d,
+                description="This is a simulated prices time serie",
+            )
+
+        new_assets = []
+        for asset in update_statistics.asset_list:
+            if asset.id not in mts.assets_in_data_source:
+                new_assets.append(asset)
+
+        mts.append_asset_list_source(asset_list=new_assets)
+
+class CategorySimulatedPrices(TimeSerie):
+    """
+        Simulates price updates for all assets belonging to a specified category.
+        This demonstrates using a hook (`_get_asset_list`) to dynamically define the asset universe.
+        It also shows a dependency on another TimeSerie (`SingleIndexTS`).
+        """
+    OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
+
+    def __init__(self, asset_category_id:str,
+                 local_kwargs_to_ignore=["asset_category_id"],
+                 *args, **kwargs):
+        """
+        Initialize the SimpleCryptoFeature time series.
+
+        Args:
+            asset_list (ModelList): List of asset objects.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
+        self.asset_category_id = asset_category_id
+
+        #this time serie has a dependency to include dependencies is just enough to declared them in the init method
+        self.simple_ts=SingleIndexTS()
+
+        super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
+
+    def _get_asset_list(self):
+        """[Hook] Dynamically fetches the list of assets from a category."""
+
+        asset_category=ms_client.AssetCategory.get(unique_identifier=self.asset_category_id)
+        asset_list=ms_client.Asset.filter(id__in=asset_category.assets)
+        return asset_list
+    def update(self,update_statistics:ms_client.DataUpdates):
+        """
+              Simulates prices and then adds a random number from its dependency,
+              demonstrating how to combine data from multiple sources.
+              """
+        update_manager=SimulatedPricesManager(self)
+        data=update_manager.update(update_statistics)
+        if data.empty:
+            return pd.DataFrame()
+        #an example of a dependencies calls
+        historical_random_data=self.simple_ts.get_df_between_dates(start_date=update_statistics.max_time_index_value)
+        number=historical_random_data["random_number"].iloc[-1]
+        return data+number
+
+    def _get_column_metadata(self):
+        """
+        Add MetaData information to the TimeSerie Table
+        Returns:
+
+        """
+        from mainsequence.client.models_tdag import ColumnMetaData
+        columns_metadata = [ColumnMetaData(column_name="feature_1",
+                                           dtype="float",
+                                           label="Feature 1",
+                                           description=(
+                                               "Simulated Feature 1"
+                                           )
+                                           ),
+
+                            ]
+        return columns_metadata
+
+    def _run_post_update_routines(self, error_on_last_update, update_statistics: DataUpdates):
+        MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "simulated_prices_from_category"
+        source_table = self.local_time_serie.remote_table
+
+        try:
+            mts = ms_client.MarketsTimeSeriesDetails.get(
+                unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER
+            )
+            if mts.source_table.id != source_table.id:
+                mts = mts.patch(source_table__id=source_table.id)
+        except ms_client.DoesNotExist:
+            mts = ms_client.MarketsTimeSeriesDetails.update_or_create(
+                unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+                source_table__id=source_table.id,
+                data_frequency_id=ms_client.DataFrequency.one_d,
+                description="This is a simulated prices time serie from asset category",
+            )
+
+        new_assets = []
+        for asset in update_statistics.asset_list:
+            if asset.id not in mts.assets_in_data_source:
+                new_assets.append(asset)
+
+        mts.append_asset_list_source(asset_list=new_assets)
+
+
+
+
 # Mocking DataUpdates and Running the Test
-def test_simple_crypto_feature():
-    from mainsequence.client import Asset
-    from mainsequence.client import MARKETS_CONSTANTS
-
-    # Filter assets for BTCUSDT and ETHUSDT.
-    assets = Asset.filter(
-        symbol__in=["BTCUSDT", "ETHUSDT"],
-        asset_type=MARKETS_CONSTANTS.ASSET_TYPE_CURRENCY_PAIR,
-        execution_venue__symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL
-    )
-    ts = SimulatedPrices(asset_list=ModelList(assets))
-
-    # CASE 1: Run simulation with an empty DataUpdates instance.
-    print("=== Simulation using empty DataUpdates ===")
-    data_update_df = ts.update(DataUpdates())
-    print(data_update_df)
-
-    # Efficiently extract the latest time per unique_identifier using groupby.
-    update_dict = (
-        data_update_df
-        .reset_index()
-        .groupby("unique_identifier")["time_index"]
-        .max()
-        .to_dict()
-    )
-
-    # Build a new DataUpdates instance with the extracted update times.
-    updates = DataUpdates(update_statistics=update_dict,
-                          max_time_index_value=data_update_df.index.get_level_values("time_index").max())
-    # CASE 2: Run simulation using the provided update_statistics instance.
-    print("=== Simulation using extracted update_statistics ===")
-    df_updates = ts.update(updates)
-    print(df_updates)
 
 
 class TAFeature(TimeSerie):
     """
-    A time series that derives a technical analysis (TA) feature from simulated crypto prices.
-
-    This class depends on SimulatedCryptoPrices as its base price simulation. It retrieves
-    simulated prices over a defined period using the base feature's get_df_between_dates() method,
-    then applies a TA indicator (e.g. SMA, RSI, EMA) using pandas-ta.
-
-    The name of the TA feature (ta_feature) and the lookback period (ta_length) are provided as parameters.
-    """
+       A derived time series that calculates a technical analysis feature from another price series.
+       """
     SIMULATION_OFFSET_START=datetime.timedelta(days=50)
-    def __init__(self, asset_list: ModelList, ta_feature: str, ta_length: int = 14,
+    def __init__(self, asset_list: List[ms_client.Asset], ta_feature: str, ta_length: int = 14,
                  local_kwargs_to_ignore=["asset_list"],
                  *args, **kwargs):
         """
@@ -207,155 +452,131 @@ class TAFeature(TimeSerie):
         # Instantiate the base price simulation.
         # Replace this import with the actual location of SimulatedCryptoPrices if needed.
 
-        self.prices_time_serie = SimulatedPrices(asset_list=asset_list, *args, **kwargs)
-        super().__init__(*args, **kwargs)
+        self.prices_time_serie = SimulatedPrices(asset_list=asset_list,
+                                                 local_kwargs_to_ignore=local_kwargs_to_ignore,
+                                                 *args, **kwargs)
+        super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
-    def update(self, update_statistics: DataUpdates):
+    def update(self, update_statistics: DataUpdates) -> pd.DataFrame:
         """
-        Retrieves simulated crypto prices and calculates a TA indicator on those prices.
-        It does NOT skip if update_statistics is empty. Instead, for each asset:
+        [Core Logic] Calculates a technical analysis feature based on a dependent price series.
 
-          1. Determine the asset's last update from update_statistics. If none exists,
-             fallback to (now - SIMULATION_OFFSET_START).
-          2. Subtract a rolling window (based on ta_length) from the last update to ensure
-             enough history is retrieved for the TA calculation.
-          3. Build a unique_identifier_range_map so the base feature only returns data
-             after (last_update - rolling window).
-          4. Pivot to wide format, call the appropriate pandas_ta function, then pivot back.
+        This method serves as a template for creating a derived time series. It follows a
+        three-step process:
+        1.  **Prepare a request**: It determines the required historical data for each asset,
+            ensuring a sufficient lookback window for the TA calculation.
+        2.  **Fetch data**: It retrieves the necessary price data from its dependency
+            (self.prices_time_serie) using a single, efficient call.
+        3.  **Calculate and reshape**: It transforms the data, applies the specified TA
+            indicator, and formats the result into the required long-format DataFrame.
 
         Args:
-            update_statistics (DataUpdates): Update statistics containing last updates
-                                             per unique identifier. If empty, we still
-                                             run a fallback flow.
+            update_statistics: An object containing the last update timestamp for each asset.
+                               This is used to calculate the precise data range needed.
 
         Returns:
-            pd.DataFrame: A DataFrame with a multi-index ("time_index", "unique_identifier")
-                          and a single column "feature_1" for the computed TA feature.
+            A DataFrame with a ("time_index", "unique_identifier") multi-index and a
+            single column containing the calculated TA feature values.
         """
-        import datetime
-        import pytz
-        import pandas as pd
         import pandas_ta as ta
+        import pytz
 
-        now = datetime.datetime.now(pytz.utc)
+        # --- Step 1: Prepare the Data Request ---
+        # We need to fetch not just new data, but also a "lookback" window of older data
+        # to ensure the TA indicator can be calculated correctly from the very first new point.
+        rolling_window = datetime.timedelta(days=self.ta_length * 2)  # Fetch 2x the window for safety
+        asset_range_descriptor = {}
 
-        # 1. For each asset, ensure it exists in update_statistics with a fallback date.
-        #    This ensures update_statistics.update_statistics is never None for these assets.
-        update_statistics = update_statistics.update_assets(
-            self.asset_list,
-            init_fallback_date=now - self.SIMULATION_OFFSET_START
-        )
+        for asset in self.asset_list:
+            # For each asset, find its last update time. If it's a new asset,
+            # fall back to the global offset defined on the class.
+            last_update = update_statistics.get(
+                asset.unique_identifier,
+                default=datetime.datetime.now(pytz.utc) - self.SIMULATION_OFFSET_START
+            )
 
-        # 2. Construct a unique_identifier_range_map using (last_update - rolling_window).
-        #    Here, we interpret self.ta_length as days for a basic rolling window approach.
-        #    If you prefer hours or another measure, adjust accordingly.
-        rolling_window = datetime.timedelta(days=self.ta_length)
-        unique_identifier_range_map = {}
-
-        for unique_id, last_update in update_statistics.update_statistics.items():
-            # Subtract rolling_window from last_update to ensure enough history
-            # is retrieved for TA calculations.
+            # The start date for our data request is the last update time minus the lookback window.
             start_date_for_asset = last_update - rolling_window
-
-            unique_identifier_range_map[unique_id] = {
+            asset_range_descriptor[asset.unique_identifier] = {
                 "start_date": start_date_for_asset,
-                "start_date_operand": ">"
+                "start_date_operand": ">="  # Use ">=" to include the start of the window
             }
 
-        # 3. Retrieve price data from the base feature. We do not define an end_date here;
-        #    the method can fetch up to the present or whatever the base feature defaults to.
-        prices_df = self.prices_time_serie.get_df_between_dates(
-            start_date=None,
-            end_date=None,
-            unique_identifier_list=self.asset_symbols_filter,
-            unique_identifier_range_map=unique_identifier_range_map
+        # --- Step 2: Fetch Data From Dependency ---
+        # This is a key pattern for derived features. We use a data access method from the base
+        # TimeSerie class (via the DataAccessMixin) to query our dependency.
+        #
+        # `get_ranged_data_per_asset` is highly efficient because it takes a dictionary
+        # that specifies a *different* start date for each asset, allowing us to get all
+        # the data we need in a single call.
+        prices_df = self.prices_time_serie.get_ranged_data_per_asset(
+            unique_identifier_range_map=asset_range_descriptor
         )
 
-        # If no data is returned, just return an empty DataFrame.
         if prices_df.empty:
+            self.logger.warning("Base price data was empty for the requested range.")
             return pd.DataFrame()
 
-        # Pivot the data so each unique_identifier is a column, index = time_index.
+        # --- Step 3: Calculate the TA Feature and Reshape the Data ---
+        # The pandas-ta library expects data in a "wide" format, where each column
+        # is a different time series. We pivot the data to create this structure.
         prices_pivot = (
             prices_df
             .reset_index()
             .pivot(index="time_index", columns="unique_identifier", values="feature_1")
         )
 
-        # 4. Dynamically call the appropriate TA function (e.g., sma, rsi, ema) from pandas_ta.
+        # Dynamically get the TA function (e.g., ta.sma, ta.rsi) from the pandas_ta library.
         ta_func = getattr(ta, self.ta_feature.lower(), None)
-        ta_results = pd.DataFrame(index=prices_pivot.index)
+        if ta_func is None:
+            self.logger.warning(f"TA feature '{self.ta_feature}' not found in pandas_ta. Returning raw prices.")
+            ta_results = prices_pivot  # Fallback to raw prices
+        else:
+            # Apply the function to the wide-format DataFrame.
+            # This calculates the indicator for all assets at once.
+            ta_results = prices_pivot.ta(kind=self.ta_feature.lower(), length=self.ta_length)
 
-        for asset_col in prices_pivot.columns:
-            col_series = prices_pivot[asset_col]
-
-            if ta_func is not None:
-                # Some pandas_ta functions return a DataFrame (e.g. Bollinger Bands) or a Series.
-                result = ta_func(col_series, length=self.ta_length)
-                if isinstance(result, pd.DataFrame):
-                    # If multiple columns are returned, pick the first or rename them as needed.
-                    first_col = result.columns[0]
-                    ta_results[asset_col] = result[first_col]
-                else:
-                    ta_results[asset_col] = result
-            else:
-                # If no matching TA function is found, just use the raw price.
-                ta_results[asset_col] = col_series
-
-        # Drop rows that are entirely NaN (common at the start of TA calculations).
-        ta_results.dropna(how="all", inplace=True)
-        # If your TA function only returns a single column, "all" might be replaced with "any" if needed.
-
-        # Convert from wide to long format with a multi-index.
+        # The result needs to be cleaned and reshaped back to the required "long" format.
         ta_long = (
             ta_results
+            .dropna(how="all")  # Drop rows at the start where the indicator is all NaN
             .reset_index()
             .melt(id_vars="time_index", var_name="unique_identifier", value_name="feature_1")
+            .dropna(subset=["feature_1"])  # Drop any remaining individual NaNs
             .set_index(["time_index", "unique_identifier"])
         )
 
         return ta_long
 
 
-# Example test function for the TA dependent feature.
-def test_ta_feature_simulated_crypto_prices():
-    """
-    Test the TAFeatureSimulatedCryptoPrices time series by:
-      - Filtering assets.
-      - Creating a base simulation of crypto prices.
-      - Calculating a TA feature (e.g., SMA) on the simulated prices.
-    """
-    from mainsequence.client import AssetCurrencyPair
+
+
+def test_simulated_prices():
+    from mainsequence.client import Asset
     from mainsequence.client import MARKETS_CONSTANTS
 
-    # Filter assets for BTCUSDT and ETHUSDT.
-    assets = AssetCurrencyPair.filter(
-        ticker__in=["BTCUSDT", "ETHUSDT"], exchange_code=None,
+    assets = Asset.filter(
+        ticker__in=["NVDA", "APPL"],
+
         execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV
     )
-    ts = TAFeature(asset_list=ModelList(assets), ta_feature="SMA", ta_length=14)
+    ts = SimulatedPrices(asset_list=assets)
+    ts_2=CategorySimulatedPrices(asset_category_id="external_magnificent_7")
+
+    ts_0=SingleIndexTS()
+    ts_0.run(debug_mode=True,force_update=True)
+    # ms_client.SessionDataSource.set_local_db() #run on duck
+    ts.run(debug_mode=True,force_update=True)
+    ts_2.run(debug_mode=True,force_update=True)
+
+    ts = TAFeature(asset_list=assets, ta_feature="SMA", ta_length=14)
 
     ts.run(debug_mode=True,
            update_tree=True,
            force_update=True,
-           update_only_tree=False,
-    )
-    print("Two asset time serie updated", ts.local_hash_id)
-    assets = AssetCurrencyPair.filter(
-        ticker__in=["BTCUSDT"], exchange_code=None,
-        execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV
-    )
-    ts = TAFeature(asset_list=ModelList(assets), ta_feature="SMA", ta_length=14)
-
-    ts.run(debug_mode=True,
-           update_tree=True,
-           force_update=False,
-           update_only_tree=False,
            )
-    print("one asset time serie updated", ts.local_hash_id)
+
 
 if __name__ == "__main__":
-    test_ta_feature_simulated_crypto_prices()
-
-
+    test_simulated_prices()
 

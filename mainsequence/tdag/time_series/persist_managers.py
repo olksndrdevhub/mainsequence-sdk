@@ -539,7 +539,6 @@ class PersistManager:
                     local_hash_id=self.local_hash_id,
                     build_configuration=local_configuration,
                     remote_table__hash_id=remote_table_hash_id,
-                    description=self.description,
                     data_source_id=self.data_source.id
                 )
 
