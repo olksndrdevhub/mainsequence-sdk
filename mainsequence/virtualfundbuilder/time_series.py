@@ -135,8 +135,7 @@ class PortfolioStrategy(TimeSerie):
             Tuple[datetime, datetime]: A tuple containing the start date and end date for processing.
         """
         # Get last observations for each exchange
-        update_statics_from_dependencies = self.bars_ts.get_update_statistics(
-            unique_identifier_list=[a.unique_identifier for a in update_statistics.asset_list])
+        update_statics_from_dependencies = self.bars_ts.get_update_statistics()
 
         earliest_last_value = update_statics_from_dependencies._max_time_in_update_statistics
 

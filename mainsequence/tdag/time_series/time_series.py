@@ -1,6 +1,5 @@
 import datetime
 import os
-from venv import logger
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -929,12 +928,12 @@ class BuildManager:
         if patch_build == True:
             self.local_persist_manager # ensure lpm exists
             self.verify_and_build_remote_objects()  # just call it before to initilaize dts
-            self.logger.warning(f"Patching build configuration for {self.hash_id}")
+            self.owner.logger.warning(f"Patching build configuration for {self.owner.hash_id}")
             self.flush_pickle()
 
-            self.local_persist_manager.patch_build_configuration(local_configuration=self.local_initial_configuration,
-                                                                 remote_configuration=self.remote_initial_configuration,
-                                                                 remote_build_metadata=self.remote_build_metadata,
+            self.local_persist_manager.patch_build_configuration(local_configuration=self.owner.local_initial_configuration,
+                                                                 remote_configuration=self.owner.remote_initial_configuration,
+                                                                 remote_build_metadata=self.owner.remote_build_metadata,
                                                                  )
     def verify_backend_git_hash_with_pickle(self) -> None:
         """Verifies if the git hash in the backend matches the one from the pickled object."""
@@ -1112,8 +1111,8 @@ class BuildManager:
 
     @property
     def pickle_path(self) -> str:
-        pp = data_source_dir_path(self.data_source.id)
-        path = f"{pp}/{self.local_hash_id}.pickle"
+        pp = data_source_dir_path(self.owner.data_source.id)
+        path = f"{pp}/{self.owner.local_hash_id}.pickle"
         return path
 
     def _update_git_and_code_in_backend(self) -> None:
@@ -1136,7 +1135,7 @@ class BuildManager:
         import cloudpickle
         path = self.pickle_path
         # after persisting pickle , build_hash and source code need to be patched
-        self.logger.debug(f"Persisting pickle and patching source code and git hash for {self.hash_id}")
+        self.owner.logger.debug(f"Persisting pickle and patching source code and git hash for {self.hash_id}")
         self._update_git_and_code_in_backend()
 
         pp = data_source_pickle_path(self.data_source.id)
@@ -1145,7 +1144,7 @@ class BuildManager:
 
         if os.path.isfile(path) == False or overwrite == True:
             if overwrite == True:
-                self.logger.warning("overwriting pickle")
+                self.owner.logger.warning("overwriting pickle")
 
             with open(path, 'wb') as handle:
                 cloudpickle.dump(self, handle)
@@ -2658,6 +2657,11 @@ class TimeSerie(DataAccessMixin,ABC):
     def local_time_serie(self) -> LocalTimeSerie:
         """The local time series metadata object."""
         return self.local_persist_manager.local_metadata
+
+    @property
+    def metadata(self) -> "DynamicTableMetaData":
+        return self.local_persist_manager.metadata
+
     @property
     def local_persist_manager(self) -> PersistManager:
         if self._local_persist_manager is None:
