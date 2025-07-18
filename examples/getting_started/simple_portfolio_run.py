@@ -1,26 +1,14 @@
+import mainsequence.client as ms_client
+import datetime
+portfolio_ticker = "portfo446B" # An example ticker that should exist
+portfolios = ms_client.Portfolio.filter()
 
-#comment out for local testing out of Main Sequence Platform
+# portfolio=[p for p in portfolios if p.local_time_serie is not None][0]
 
 
-from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
-from mainsequence.virtualfundbuilder.contrib.time_series.external_weights import WeightsFromCSV
-from mainsequence.client import SessionDataSource,Asset,CONSTANTS
 #
-# PortfolioInterface.list_configurations()
+# historical_weights=portfolio.get_historical_weights(start_date_timestamp=datetime.datetime(2020,1,1).timestamp(),
+#                                  end_date_timestamp=datetime.datetime(2025,1,2).timestamp(),
+#                                  )
 #
-# portfolio = PortfolioInterface.load_from_configuration("market_cap")
-#
-#
-# res = portfolio.run(local_database=True)
-# res.head()
-
-
-
-
-
-SessionDataSource.set_local_db()
-ts=WeightsFromCSV(csv_file_path="/home/jose/tdag/data/weights_example.csv",
-                  signal_assets_configuration=None)
-
-ts.run(debug_mode=True,force_update=True)
-a=5
+# a=5

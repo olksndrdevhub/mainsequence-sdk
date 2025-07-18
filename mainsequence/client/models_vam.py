@@ -884,6 +884,68 @@ class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
         )
 
 
+    def get_historical_holdings(self,start_date:Optional[datetime.datetime]=None,
+                                end_date:Optional[datetime.datetime]=None,timeout=None)->pd.DataFrame:
+        """
+        Retrieves historical holdings data for the account over a specified date range.
+
+        Args:
+            start_date_timestamp (datetime, optional): The start datetime (UTC) for filtering holdings.
+            end_date_timestamp (datetime, optional): The end datetime (UTC) for filtering holdings.
+            timeout (int, optional): Optional timeout parameter for the query (currently unused).
+
+        Returns:
+            pd.DataFrame: A DataFrame indexed by a multi-index of `time_index` (UTC datetime) and `asset_id` (int),
+            containing the following columns:
+
+            - **missing_price (bool)**: Indicates whether the price for the asset was missing on that date.
+            - **price (float)**: The recorded price of the asset at the time of the holding.
+            - **quantity (float)**: The quantity of the asset held at that time.
+
+            If no holdings are found within the specified range, an empty DataFrame is returned.
+
+        Example Output:
+                                                        missing_price  price   quantity
+        time_index                     asset_id
+        2025-06-23 17:59:57+00:00      62376               False        1.0   1000000.0
+        2025-05-30 09:43:19+00:00      62376               False        1.0   1000000.0
+        2025-05-30 09:43:26+00:00      62376               False        1.0   1000000.0
+        """
+
+
+
+        filter_search=dict(related_account__id=self.id)
+        if start_date is not None:
+            if isinstance(start_date, datetime.datetime):
+                if start_date.tzinfo is None:
+                    start_date_timestamp = start_date.replace(tzinfo=pytz.utc)
+                filter_search['holdings_date__gte'] = start_date_timestamp.isoformat()
+
+        if end_date is not None:
+            if isinstance(end_date, datetime.datetime):
+                if end_date.tzinfo is None:
+                    end_date = end_date.replace(tzinfo=pytz.utc)
+            filter_search['holdings_date__lte'] = end_date.isoformat()
+
+        holdings = AccountHistoricalHoldings.filter(**filter_search)
+        if len(holdings)==0:
+            return pd.DataFrame()
+        positions_df = []
+        for holding in holdings:
+            holding_date = holding.holdings_date
+            for position in holding.holdings:
+                pos = position.model_dump()
+                pos.pop("orm_class", None)
+                pos.pop("parents_holdings", None)
+                pos.pop("id", None)
+                pos.pop("extra_details", None)
+                pos["time_index"] = holding_date
+
+                positions_df.append(pos)
+
+        positions_df = pd.DataFrame(positions_df).rename(
+            columns={"asset": "asset_id"}).set_index(["time_index", "asset_id"])
+        return positions_df
 
 class AccountPositionDetail(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = None
@@ -1007,35 +1069,7 @@ class WeightPosition(BaseObjectOrm, BasePydanticModel):
          
         return values
 
-class HistoricalWeights(BaseObjectOrm,BasePydanticModel):
-    id: int
-    weights_date: datetime.datetime
-    comments: Optional[str] = None
-    target_portfolio: int
-    weights: Union[List[WeightPosition],List[int]]
 
-    @classmethod
-    def add_from_time_serie(cls, local_time_serie_id: int, positions_list: list,
-                            weights_date: datetime.datetime,
-                            comments: Union[str, None] = None, timeout=None):
-        """
-
-        :param session:
-        :return:
-        """
-        url = f"{cls.get_object_url()}/add_from_time_serie/"
-        payload = {"json": {"local_time_serie_id": local_time_serie_id,
-                            "weights_date": weights_date.strftime(DATE_FORMAT),
-                            "positions_list": positions_list,
-
-                            }, }
-
-        r = make_request(s=cls.build_session(),
-                         loaders=cls.LOADERS, r_type="POST", url=url, payload=payload, time_out=timeout)
-        if r.status_code not in [201, 200]:
-            raise Exception(f"Error inserting new weights {r.text}")
-     
-        return cls(**r.json())
 
 class ExecutionVenue(BaseObjectOrm,BasePydanticModel):
     id: Optional[int] = None
@@ -1128,6 +1162,20 @@ class PortfolioMixin:
     valuation_asset: Union['Asset', int]
     calendar: Optional['Calendar']
 
+    def pretty_print(self) -> str:
+        def format_field(name, value):
+            if isinstance(value, list):
+                val = ', '.join(str(v) for v in value)
+            elif hasattr(value, '__str__'):
+                val = str(value)
+            else:
+                val = repr(value)
+            return f"{name:35}: {val}"
+
+        fields = self.__fields__
+        lines = [format_field(name, getattr(self, name, None)) for name in fields]
+        return "\n".join(lines)
+
     @classmethod
     def create_from_time_series(
             cls,
@@ -1188,6 +1236,14 @@ class PortfolioMixin:
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
         return r.json()
+
+    def get_historical_weights(self,
+                               start_date_timestamp:float,end_date_timestamp:float,
+                               timeout=None)->Dict[str, float]:
+        if self.local_time_serie is None:
+            print("this portfolio does not have a weights table")
+        self.local_time_serie
+
 
 class Portfolio(PortfolioMixin, BaseObjectOrm, BasePydanticModel):
     pass
