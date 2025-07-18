@@ -46,7 +46,7 @@ from mainsequence.logconf import logger
 from functools import singledispatch
 from types import SimpleNamespace
 from mainsequence.client import BaseObjectOrm
-
+import mainsequence.client as ms_client
 
 # 1. Create a "registry" function using the decorator
 @singledispatch
@@ -1418,6 +1418,63 @@ class PersistenceManager:
 
                     self.metadata.sourcetableconfiguration.set_or_update_columns_metadata(columns_metadata=columns_metadata)
 
+    def set_markets_meta_details(self, update_statistics: DataUpdates):
+        """
+        Creates or updates the MarketsTimeSeriesDetails metadata in the backend.
+
+        This method orchestrates the synchronization of the time series metadata,
+        including its description, frequency, and associated assets, based on the
+        configuration returned by `_get_time_series_meta_details`.
+        """
+        if not (self.metadata and self.metadata.sourcetableconfiguration):
+            return
+
+        # 1. Get the user-defined metadata configuration for the time series.
+        mts_details = self.owner._get_time_series_meta_details()
+        if mts_details is None:
+            return
+
+        # 2. Get or create the MarketsTimeSeriesDetails object in the backend.
+        source_table_id = self.local_time_serie.remote_table.id
+        try:
+            mts = ms_client.MarketsTimeSeriesDetails.get(
+                unique_identifier=mts_details.unique_identifier
+            )
+            # Ensure it's linked to the correct source table.
+            if mts.source_table.id != source_table_id:
+                mts = mts.patch(source_table__id=source_table_id)
+        except ms_client.DoesNotExist:
+            mts = ms_client.MarketsTimeSeriesDetails.update_or_create(
+                unique_identifier=mts_details.unique_identifier,
+                source_table__id=source_table_id,
+                data_frequency_id=mts_details.data_frequency_id,
+                description=mts_details.description,
+            )
+
+        # 3. Handle the asset synchronization based on the user's configuration.
+        if mts_details.assets_in_data_source is not None:
+            # --- Replacement Logic ---
+            # If a list of assets is provided, it replaces the existing list.
+            # This is useful for defining a fixed, static universe.
+
+            # To avoid unnecessary API calls, only patch if the asset list has changed.
+            if set(mts.assets_in_data_source) != set(mts_details.assets_in_data_source):
+                mts.patch(assets_in_data_source=mts_details.assets_in_data_source)
+
+        else:
+            # --- Additive Logic ---
+            # If `assets_in_data_source` is None, assets from `update_statistics`
+            # are additively appended. This is ideal for dynamic universes.
+            if update_statistics.asset_list:
+                # Identify assets that are in the update but not yet in the metadata.
+                new_assets = [
+                    asset for asset in update_statistics.asset_list
+                    if asset.id not in mts.assets_in_data_source
+                ]
+                if new_assets:
+                    mts.append_asset_list_source(asset_list=new_assets)
+
+
     def load_ts_df(self, session: Optional[object] = None, *args, **kwargs) -> pd.DataFrame:
         """
         Loads the time series DataFrame, updating it if it's not persisted.
@@ -2231,6 +2288,7 @@ class RunManager:
                                                  )
 
             running_time_serie.persistence.set_column_metadata()
+            running_time_serie.persistence.set_markets_meta_details(update_statistics=update_statistics)
 
         return error_on_last_update
 
@@ -2707,6 +2765,35 @@ class TimeSerie(DataAccessMixin,ABC):
         Controls the minimum depth that needs to be rebuilt.
         """
         return 0
+
+    def _get_time_series_meta_details(self)->Optional[ms_client.MarketsTimeSeriesDetails]:
+        """Provides the metadata configuration for a market time series.
+
+         This method should be implemented by the user to return a configured
+         `MarketsTimeSeriesDetails` object. The system uses this object to
+         get_or_create the corresponding time series entry in the backend.
+
+         Notes:
+             - The `source_table` attribute does NOT need to be set. The system
+               will automatically link the time series to its underlying data table.
+             - The `assets_in_data_source` attribute controls how assets are
+               managed:
+                 - If `assets_in_data_source` is set to `None` (or omitted), the
+                   system will automatically and additively populate the assets
+                   from the `update_statistics` object during the update process.
+                   This is the recommended approach for dynamic asset lists.
+                 - If `assets_in_data_source` is provided as a list of asset IDs,
+                   it will REPLACE all existing assets associated with this time
+                   series. This is useful for defining a fixed, static universe
+                   of assets.
+
+         Returns:
+             ms_client.MarketsTimeSeriesDetails:
+                 An instance containing the desired configuration for the time series.
+         """
+
+
+        return None
 
     def _get_column_metadata(self) -> Optional[List[ColumnMetaData]]:
         """
