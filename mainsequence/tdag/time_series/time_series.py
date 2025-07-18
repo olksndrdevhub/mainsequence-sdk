@@ -160,7 +160,7 @@ def rebuild_with_type(value: Dict[str, Any], rebuild_function: Callable) -> Unio
         raise NotImplementedError
 
 
-from mainsequence.client.models_helpers import get_model_class, MarketsTimeSeriesDetails
+from mainsequence.client.models_helpers import get_model_class
 
 build_model = lambda model_data: get_model_class(model_data["orm_class"])(**model_data)
 
@@ -1411,14 +1411,14 @@ class PersistenceManager:
         if self.metadata:
             if self.metadata.sourcetableconfiguration != None:
                 if self.metadata.sourcetableconfiguration.columns_metadata is not None:
-                    columns_metadata=self.owner._get_column_metadata()
+                    columns_metadata=self.owner.get_column_metadata()
                     if columns_metadata is None:
-                        self.owner.logger.info(f"_get_column_metadata method not implemented")
+                        self.owner.logger.info(f"get_column_metadata method not implemented")
                         return
 
                     self.metadata.sourcetableconfiguration.set_or_update_columns_metadata(columns_metadata=columns_metadata)
 
-    def set_markets_meta_details(self, update_statistics: DataUpdates):
+    def set_table_metadata(self, update_statistics: DataUpdates):
         """
         Creates or updates the MarketsTimeSeriesDetails metadata in the backend.
 
@@ -1430,49 +1430,13 @@ class PersistenceManager:
             return
 
         # 1. Get the user-defined metadata configuration for the time series.
-        mts_details = self.owner._get_time_series_meta_details()
-        if mts_details is None:
+        table_metadata = self.owner.get_table_metadata(update_statistics)
+        if table_metadata is None:
             return
 
         # 2. Get or create the MarketsTimeSeriesDetails object in the backend.
-        source_table_id = self.local_time_serie.remote_table.id
-        try:
-            mts = ms_client.MarketsTimeSeriesDetails.get(
-                unique_identifier=mts_details.unique_identifier
-            )
-            # Ensure it's linked to the correct source table.
-            if mts.source_table.id != source_table_id:
-                mts = mts.patch(source_table__id=source_table_id)
-        except ms_client.DoesNotExist:
-            mts = ms_client.MarketsTimeSeriesDetails.update_or_create(
-                unique_identifier=mts_details.unique_identifier,
-                source_table__id=source_table_id,
-                data_frequency_id=mts_details.data_frequency_id,
-                description=mts_details.description,
-            )
+        source_table_id =self.metadata.patch(**table_metadata.model_dump()       )
 
-        # 3. Handle the asset synchronization based on the user's configuration.
-        if mts_details.assets_in_data_source is not None:
-            # --- Replacement Logic ---
-            # If a list of assets is provided, it replaces the existing list.
-            # This is useful for defining a fixed, static universe.
-
-            # To avoid unnecessary API calls, only patch if the asset list has changed.
-            if set(mts.assets_in_data_source) != set(mts_details.assets_in_data_source):
-                mts.patch(assets_in_data_source=mts_details.assets_in_data_source)
-
-        else:
-            # --- Additive Logic ---
-            # If `assets_in_data_source` is None, assets from `update_statistics`
-            # are additively appended. This is ideal for dynamic universes.
-            if update_statistics.asset_list:
-                # Identify assets that are in the update but not yet in the metadata.
-                new_assets = [
-                    asset for asset in update_statistics.asset_list
-                    if asset.id not in mts.assets_in_data_source
-                ]
-                if new_assets:
-                    mts.append_asset_list_source(asset_list=new_assets)
 
 
     def load_ts_df(self, session: Optional[object] = None, *args, **kwargs) -> pd.DataFrame:
@@ -1819,7 +1783,7 @@ class RunManager:
         """
         # Filter update_statistics to include only assets in self.asset_list.
 
-        asset_list = self.owner._get_asset_list()
+        asset_list = self.owner.get_asset_list()
         self.owner._setted_asset_list = asset_list
 
         update_statistics = update_statistics.update_assets(
@@ -2288,7 +2252,7 @@ class RunManager:
                                                  )
 
             running_time_serie.persistence.set_column_metadata()
-            running_time_serie.persistence.set_markets_meta_details(update_statistics=update_statistics)
+            running_time_serie.persistence.set_table_metadata(update_statistics=update_statistics)
 
         return error_on_last_update
 
@@ -2766,36 +2730,15 @@ class TimeSerie(DataAccessMixin,ABC):
         """
         return 0
 
-    def _get_time_series_meta_details(self)->Optional[ms_client.MarketsTimeSeriesDetails]:
+    def get_table_metadata(self,update_statistics:ms_client.DataUpdates)->Optional[ms_client.TableMetaData]:
         """Provides the metadata configuration for a market time series.
 
-         This method should be implemented by the user to return a configured
-         `MarketsTimeSeriesDetails` object. The system uses this object to
-         get_or_create the corresponding time series entry in the backend.
-
-         Notes:
-             - The `source_table` attribute does NOT need to be set. The system
-               will automatically link the time series to its underlying data table.
-             - The `assets_in_data_source` attribute controls how assets are
-               managed:
-                 - If `assets_in_data_source` is set to `None` (or omitted), the
-                   system will automatically and additively populate the assets
-                   from the `update_statistics` object during the update process.
-                   This is the recommended approach for dynamic asset lists.
-                 - If `assets_in_data_source` is provided as a list of asset IDs,
-                   it will REPLACE all existing assets associated with this time
-                   series. This is useful for defining a fixed, static universe
-                   of assets.
-
-         Returns:
-             ms_client.MarketsTimeSeriesDetails:
-                 An instance containing the desired configuration for the time series.
          """
 
 
         return None
 
-    def _get_column_metadata(self) -> Optional[List[ColumnMetaData]]:
+    def get_column_metadata(self) -> Optional[List[ColumnMetaData]]:
         """
         This Method should return a list for ColumnMetaData to add extra context to each time series
         Examples:
@@ -2823,7 +2766,7 @@ class TimeSerie(DataAccessMixin,ABC):
         """
         return None
 
-    def _get_asset_list(self) -> Optional[List["Asset"]]:
+    def get_asset_list(self) -> Optional[List["Asset"]]:
         """
         Provide the list of assets that this TimeSerie should include when updating.
 
@@ -2901,19 +2844,20 @@ class WrapperTimeSerie(TimeSerie):
         """
         super().__init__(*args, **kwargs)
 
-        def get_time_serie_from_markets_unique_id(market_time_serie_unique_identifier: str) -> TimeSerie:
+        def get_time_serie_from_markets_unique_id(table_identifier: str) -> TimeSerie:
             """
             Returns the appropriate bar time series based on the asset list and source.
             """
             from mainsequence.client import DoesNotExist
             try:
-                hbs = MarketsTimeSeriesDetails.get(unique_identifier=market_time_serie_unique_identifier, include_relations_detail=True)
+                metadata = ms_client.DynamicTableMetaData.get(identifier=table_identifier)
+
             except DoesNotExist as e:
                 logger.exception(f"HistoricalBarsSource does not exist for {market_time_serie_unique_identifier}")
                 raise e
             api_ts = APITimeSerie(
-                data_source_id=hbs.source_table.data_source,
-                source_table_hash_id=hbs.source_table.hash_id
+                data_source_id=metadata.data_source,
+                source_table_hash_id=source_table.hash_id
             )
             return api_ts
 
@@ -2923,7 +2867,7 @@ class WrapperTimeSerie(TimeSerie):
         for rule in translation_table.rules:
             if rule.markets_time_serie_unique_identifier not in self.api_ts_map:
                 self.api_ts_map[rule.markets_time_serie_unique_identifier] = get_time_serie_from_markets_unique_id(
-                    market_time_serie_unique_identifier=rule.markets_time_serie_unique_identifier)
+                    table_identifier=rule.markets_time_serie_unique_identifier)
 
         self.translation_table = translation_table
 

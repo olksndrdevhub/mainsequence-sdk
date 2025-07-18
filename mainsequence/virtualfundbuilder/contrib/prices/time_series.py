@@ -12,7 +12,7 @@ from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTi
                                   DataUpdates, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
                                  )
 from mainsequence.client import MARKETS_CONSTANTS, ExecutionVenue
-from mainsequence.client import HistoricalBarsSource, DoesNotExist, Asset, MarketsTimeSeriesDetails
+from mainsequence.client import  DoesNotExist, Asset
 from mainsequence.tdag.time_series.time_series import WrapperTimeSerie
 from mainsequence.tdag.time_series.utils import (
     string_frequency_to_minutes,
@@ -640,7 +640,7 @@ class InterpolatedPrices(TimeSerie):
         )
         return upsampled_df
 
-    def _get_asset_list(self):
+    def get_asset_list(self):
         """
         Creates mappings from symbols to IDs
         """
@@ -702,7 +702,7 @@ class ExternalPrices(TimeSerie):
         self.asset_category_unique_id = asset_category_unique_id
         super().__init__(*args, **kwargs)
 
-    def _get_asset_list(self):
+    def get_asset_list(self):
         """
         Creates mappings from symbols to IDs
         """

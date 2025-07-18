@@ -245,14 +245,14 @@ class TimeSerie:
 
 
 
-### `_get_column_metadata() → list[ColumnMetaData]`  *(recommended)*
+### `get_column_metadata() → list[ColumnMetaData]`  *(recommended)*
 
 While this method is not obligatory is also a best practice to have as it helps the Main Sequence Data Engine.
 *Return a list that documents each column’s name, data type, label, and description.*  
 This enriches downstream applications and is strongly encouraged for every new series.
 
 ```python
-    def _get_column_metadata(self)->list[ColumnMetaData]:
+    def get_column_metadata(self)->list[ColumnMetaData]:
         """
         This Method should return a list for ColumnMetaData to add extra context to each time series
         Examples:
@@ -290,7 +290,7 @@ This enriches downstream applications and is strongly encouraged for every new s
 
 ## 2  Conditionally Required Methods
 
-### `_get_asset_list() → Optional[List[Asset]]`
+### `get_asset_list() → Optional[List[Asset]]`
 
 Implement this method **only** when both conditions hold:
 
@@ -308,7 +308,7 @@ Implement this method **only** when both conditions hold:
 #### Code Reference
 
 ```python
-    def _get_asset_list(self) -> Optional[List["Asset"]]:
+    def get_asset_list(self) -> Optional[List["Asset"]]:
 
         """
         Provide the list of assets that this TimeSerie should include when updating.

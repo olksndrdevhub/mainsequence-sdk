@@ -27,6 +27,8 @@ import gzip
 import base64
 import numpy as np
 import concurrent.futures
+from enum import IntEnum, Enum
+
 
 _default_data_source = None  # Module-level cache
 
@@ -428,7 +430,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                 "last_observation": last_observation,
             }
         }
-        logger.debug(f"Set last update index with {payload['json']}")
         r = make_request(s=s, loaders=self.LOADERS, payload=payload, r_type="POST", url=url, time_out=timeout)
 
         if r.status_code == 404:
@@ -662,6 +663,20 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         if r.status_code != 201:
             raise Exception(f"Error in request {r.text}")
 
+class DataFrequency(str, Enum):
+    one_m = "1m"
+    five_m = "5m"
+    one_d = "1d"
+    one_w = "1w"
+    one_year = "1y"
+    one_month ="1mo"
+    one_quarter ="1q"
+
+class TableMetaData(BaseModel):
+    identifier: str = None
+    description: Optional[str] = None
+    data_frequency_id: Optional[DataFrequency] = None
+
 class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     id: int = Field(None, description="Primary key, auto-incremented ID")
     hash_id: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
@@ -686,6 +701,13 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     #TS specifi
     compression_policy_config: Optional[Dict] = None
     retention_policy_config: Optional[Dict] = None
+
+    #MetaData
+    identifier: Optional[str] = None
+    description: Optional[str] =None
+    data_frequency_id: Optional[DataFrequency] = None
+
+
 
     _drop_indices: bool = False  # for direct incertion we can pass this values
     _rebuild_indices: bool = False  # for direct incertion we can pass this values

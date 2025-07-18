@@ -61,19 +61,18 @@ This is the core method containing the business logic for generating data.
 ### 4. Optional Hooks (Override as Needed)
 These methods have default behaviors but can be overridden for customization.
 
--   `_get_time_series_meta_details(self) -> Optional[ms_client.MarketsTimeSeriesDetails]`:
-    -   **Purpose**: [OPTIONAL] Implement this hook to link your `TimeSerie` to a persistent, user-facing `MarketTimeSeries` entry in the backend. You should implement this for any time series that you want to be discoverable and available to end-users. If this method is not implemented, the `TimeSerie` will still function and store data but will be treated as an internal or intermediate step, not visible in public UIs or APIs.
-    -   **Returns**: A configured `ms_client.MarketsTimeSeriesDetails` object with the following key attributes:
-        -   `unique_identifier` (str): A human-readable, public ID for your time series (e.g., "my_daily_rsi_feature"). **Must be unique across all market time series.**
+-   `get_table_metadata(self) -> Optional[ms_client.TableMetaData]`:
+    -   **Purpose**: [OPTIONAL] Implement this hook to add human identifier and description to a table.
+    -   **Returns**: A configured `ms_client.TableMetaData` object with the following key attributes:
+        -   `identifier` (str): A human-readable, public ID for your time series (e.g., "my_daily_rsi_feature"). **Must be unique across all tables**
         -   `data_frequency_id` (ms_client.DataFrequency): The data frequency (e.g., `ms_client.DataFrequency.one_d`).
-        -   `description` (str): A user-friendly description.
-        -   `assets_in_data_source` (Optional[List[int]]): Controls asset management. If `None` (recommended), assets are added automatically from your `update` data. If a `List[int]` of asset IDs is provided, it performs a **destructive replacement**, setting the asset list to a fixed, static universe.
+        -   `description` (str): A user-friendly description of the table.
 
--   `_get_asset_list(self) -> List[Asset]`:
+-   `get_asset_list(self) -> List[Asset]`:
     -   **Purpose**: [OPTIONAL] Implement to dynamically define the list of assets this time series should process during an update. Useful for fetching all assets in a category.
     -   **Returns**: A list of `Asset` objects.
 
--   `_get_column_metadata(self) -> List[ColumnMetaData]`:
+-   `get_column_metadata(self) -> List[ColumnMetaData]`:
     -   **Purpose**: [OPTIONAL] Implement to provide rich descriptions for your data columns. This metadata is used in documentation and user interfaces.
     -   **Returns**: A list of `ColumnMetaData` objects.
 
@@ -187,7 +186,7 @@ class SimulatedPricesManager:
 
 
 
-    def _get_column_metadata(self):
+    def get_column_metadata(self):
         from mainsequence.client.models_tdag import ColumnMetaData
         columns_metadata = [ColumnMetaData(column_name="feature_1",
                                            dtype="float",
@@ -229,7 +228,7 @@ class SingleIndexTS(TimeSerie):
         df.index.name = 'time_index'
         return df
 
-    def _get_column_metadata(self):
+    def get_column_metadata(self):
         """
         Add MetaData information to the TimeSerie Table
         Returns:
@@ -248,20 +247,21 @@ class SingleIndexTS(TimeSerie):
         return columns_metadata
 
 
-    def _get_time_series_meta_details(self)->ms_client.MarketsTimeSeriesDetails:
+    def get_table_metadata(self,update_statistics:ms_client.DataUpdates)->ms_client.TableMetaData:
         """
-        REturns the market time serie unique identifier, assets to append , or asset to overwrite
-        Returns:
+
 
         """
         MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "simple_time_serie_example"
-        mts=ms_client.MarketsTimeSeriesDetails(unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+        mts=ms_client.TableMetaData(unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
                                                data_frequency_id=ms_client.DataFrequency.one_d,
                                                description="This is a simulated prices time serie from asset category",
                                                )
 
 
         return mts
+
+
 
 class SimulatedPrices(TimeSerie):
     """
@@ -289,7 +289,7 @@ class SimulatedPrices(TimeSerie):
         update_manager=SimulatedPricesManager(self)
         df=update_manager.update(update_statistics)
         return df
-    def _get_column_metadata(self):
+    def get_column_metadata(self):
         """
         Add MetaData information to the TimeSerie Table
         Returns:
@@ -308,14 +308,14 @@ class SimulatedPrices(TimeSerie):
                             ]
         return columns_metadata
 
-    def _get_time_series_meta_details(self)->ms_client.MarketsTimeSeriesDetails:
+    def get_table_metadata(self,update_statistics:DataUpdates)->ms_client.TableMetaData:
         """
         REturns the market time serie unique identifier, assets to append , or asset to overwrite
         Returns:
 
         """
         MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "simulated_prices_from_category"
-        mts=ms_client.MarketsTimeSeriesDetails(unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+        mts=ms_client.TableMetaData(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
                                                data_frequency_id=ms_client.DataFrequency.one_d,
                                                description="This is a simulated prices time serie from asset category",
                                                )
@@ -326,7 +326,7 @@ class SimulatedPrices(TimeSerie):
 class CategorySimulatedPrices(TimeSerie):
     """
         Simulates price updates for all assets belonging to a specified category.
-        This demonstrates using a hook (`_get_asset_list`) to dynamically define the asset universe.
+        This demonstrates using a hook (`get_asset_list`) to dynamically define the asset universe.
         It also shows a dependency on another TimeSerie (`SingleIndexTS`).
         """
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
@@ -349,7 +349,7 @@ class CategorySimulatedPrices(TimeSerie):
 
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
-    def _get_asset_list(self):
+    def get_asset_list(self):
         """[Hook] Dynamically fetches the list of assets from a category."""
 
         asset_category=ms_client.AssetCategory.get(unique_identifier=self.asset_category_id)
@@ -369,7 +369,7 @@ class CategorySimulatedPrices(TimeSerie):
         number=historical_random_data["random_number"].iloc[-1]
         return data+number
 
-    def _get_column_metadata(self):
+    def get_column_metadata(self):
         """
         Add MetaData information to the TimeSerie Table
         Returns:
@@ -387,20 +387,18 @@ class CategorySimulatedPrices(TimeSerie):
                             ]
         return columns_metadata
 
-    def _get_time_series_meta_details(self)->ms_client.MarketsTimeSeriesDetails:
+    def get_table_metadata(self,update_statistics)->ms_client.TableMetaData:
         """
-        REturns the market time serie unique identifier, assets to append , or asset to overwrite
-        Returns:
 
         """
         MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "simulated_prices_from_category"
-        mts=ms_client.MarketsTimeSeriesDetails(unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+        meta=ms_client.TableMetaData(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
                                                data_frequency_id=ms_client.DataFrequency.one_d,
                                                description="This is a simulated prices time serie from asset category",
                                                )
 
 
-        return mts
+        return meta
 
 
 
@@ -412,7 +410,7 @@ class TAFeature(TimeSerie):
     """
        A derived time series that calculates a technical analysis feature from another price series.
        """
-    SIMULATION_OFFSET_START=datetime.timedelta(days=50)
+
     def __init__(self, asset_list: List[ms_client.Asset], ta_feature: str, ta_length: int = 14,
                  local_kwargs_to_ignore=["asset_list"],
                  *args, **kwargs):
@@ -460,6 +458,7 @@ class TAFeature(TimeSerie):
             A DataFrame with a ("time_index", "unique_identifier") multi-index and a
             single column containing the calculated TA feature values.
         """
+        SIMULATION_OFFSET_START = datetime.timedelta(days=50)
         import pandas_ta as ta
         import pytz
 
@@ -469,17 +468,15 @@ class TAFeature(TimeSerie):
         rolling_window = datetime.timedelta(days=self.ta_length * 2)  # Fetch 2x the window for safety
         asset_range_descriptor = {}
 
-        for asset in self.asset_list:
+        for unique_id,last_asset_update in update_statistics.update_statistics.items():
             # For each asset, find its last update time. If it's a new asset,
             # fall back to the global offset defined on the class.
-            last_update = update_statistics.get(
-                asset.unique_identifier,
-                default=datetime.datetime.now(pytz.utc) - self.SIMULATION_OFFSET_START
-            )
+            last_update = last_asset_update- SIMULATION_OFFSET_START
+
 
             # The start date for our data request is the last update time minus the lookback window.
             start_date_for_asset = last_update - rolling_window
-            asset_range_descriptor[asset.unique_identifier] = {
+            asset_range_descriptor[unique_id] = {
                 "start_date": start_date_for_asset,
                 "start_date_operand": ">="  # Use ">=" to include the start of the window
             }
@@ -491,9 +488,7 @@ class TAFeature(TimeSerie):
         # `get_ranged_data_per_asset` is highly efficient because it takes a dictionary
         # that specifies a *different* start date for each asset, allowing us to get all
         # the data we need in a single call.
-        prices_df = self.prices_time_serie.get_ranged_data_per_asset(
-            unique_identifier_range_map=asset_range_descriptor
-        )
+        prices_df = self.prices_time_serie.get_ranged_data_per_asset( range_descriptor=asset_range_descriptor  )
 
         if prices_df.empty:
             self.logger.warning("Base price data was empty for the requested range.")

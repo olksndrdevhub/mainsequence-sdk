@@ -1080,13 +1080,7 @@ class ExecutionVenue(BaseObjectOrm,BasePydanticModel):
     def unique_identifier(self):
         return f"{self.symbol}"
 
-class DataFrequency(str, Enum):
-    one_m = "1m"
-    five_m = "5m"
-    one_d = "1d"
-    one_w = "1w"
-    one_month ="1mo"
-    one_quarter ="1q"
+
 
 class TradeSide(IntEnum):
     SELL = -1
