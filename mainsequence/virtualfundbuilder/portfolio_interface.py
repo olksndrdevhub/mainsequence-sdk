@@ -77,11 +77,10 @@ class PortfolioInterface():
             signal_weights_ts = ts.signal_weights
 
             #timeseries can be running in local lake so need to request the id
-
             standard_kwargs = dict(is_asset_only=False,
-                                   local_time_serie_id=ts.local_metadata.id,
+                                   local_time_serie_id=ts.local_time_serie.id,
                                    is_active=True,
-                                   signal_local_time_serie_id=signal_weights_ts.local_metadata.id,
+                                   signal_local_time_serie_id=signal_weights_ts.local_time_serie.id,
                                    build_purpose=build_purpose,
                                    )
 
@@ -106,7 +105,7 @@ class PortfolioInterface():
 
             standard_kwargs["backtest_table_price_column_name"] = "close"
 
-            target_portfolio = Portfolio.get_or_none(local_time_serie__id=ts.local_metadata.id)
+            target_portfolio = Portfolio.get_or_none(local_time_serie__id=ts.local_time_serie.id)
             if target_portfolio is None:
                 target_portfolio, index_asset = Portfolio.create_from_time_series(**standard_kwargs)
             else:

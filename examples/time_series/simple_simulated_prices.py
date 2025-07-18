@@ -87,8 +87,6 @@ from typing import Union, Optional, List, Dict
 import datetime
 import pytz
 import pandas as pd
-import pandas_ta as ta
-
 
 class SimulatedPricesManager:
 
