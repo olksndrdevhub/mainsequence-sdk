@@ -1152,6 +1152,90 @@ class UpdateStatistics(BaseModel):
         return _min_in_nested(stats)
 
 
+    def filter_assets_by_level(self,
+                               level:int,
+                               filters:List,
+                              ):
+        """
+          Prune `self.asset_time_statistics` so that at the specified index level
+          only the given keys remain.  Works for any depth of nesting.
+
+          Parameters
+          ----------
+          level_name : str
+              The name of the index-level to filter on (must be one of
+              self.metadata.sourcetableconfiguration.index_names).
+          filters : List
+              The allowed values at that level.  Any branches whose key at
+              `level_name` is not in this list will be removed.
+
+          Returns
+          -------
+          self
+              (Allows method chaining.)
+          """
+        # Grab the full list of index names, in order
+
+
+
+        # Determine the numeric depth of the target level
+        #   0 == unique_identifier, 1 == first nested level, etc.
+        target_depth = level-1
+
+        # Special‐case: filtering on unique_identifier itself
+        if target_depth == 0:
+            self.asset_time_statistics = {
+                asset: stats
+                for asset, stats in self.asset_time_statistics.items()
+                if asset in filters
+            }
+            return self
+
+        allowed = set(filters)
+        default = self._initial_fallback_date
+
+        def _prune(node: Any, current_depth: int) -> Any:
+            # leaf timestamp
+            if not isinstance(node, dict):
+                return node
+
+            # we've reached the level to filter
+            if current_depth == target_depth:
+                out: Dict[str, Any] = {}
+                for key in allowed:
+                    if key in node:
+                        out[key] = node[key]
+                    else:
+                        # missing filter → assign fallback date
+                        out[key] = default
+                return out
+
+            # otherwise recurse deeper
+            pruned: Dict[str, Any] = {}
+            for key, subnode in node.items():
+                new_sub = _prune(subnode, current_depth + 1)
+                # keep non-empty dicts or valid leaves
+                if isinstance(new_sub, dict):
+                    if new_sub:
+                        pruned[key] = new_sub
+                elif new_sub is not None:
+                    pruned[key] = new_sub
+            return pruned
+
+        new_stats: Dict[str, Any] = {}
+        # stats dict sits at depth=1 under each asset
+        for asset, stats in self.asset_time_statistics.items():
+            if stats is None:
+                new_stats[asset] = {f:self._initial_fallback_date for f in allowed}
+            else:
+                pr = _prune(stats, current_depth=1)
+                new_stats[asset] = pr or None
+
+        self.asset_time_statistics = new_stats
+        return self
+
+
+
     def update_assets(
             self,
             asset_list: Optional[List],

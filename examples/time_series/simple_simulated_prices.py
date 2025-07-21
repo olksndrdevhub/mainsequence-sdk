@@ -461,6 +461,11 @@ class TAFeature(TimeSerie):
         SIMULATION_OFFSET_START = datetime.timedelta(days=50)
         import pandas_ta as ta
         import pytz
+        #when using more than 2 indices in a multiindex table it is extremely importnat to make all the filters
+        #accross all levels to keep consistency in the update
+        update_statistics.filter_assets_by_level(
+                                                 level=2,
+                                                 filters=[json.dumps(c) for c in self.ta_feature_config])
 
         # --- Step 1: Prepare the Data Request ---
         # We need to fetch not just new data, but also a "lookback" window of older data
@@ -562,14 +567,16 @@ def test_simulated_prices():
     # ts.run(debug_mode=True,force_update=True)
     # ts_2.run(debug_mode=True,force_update=True)
 
-    ts = TAFeature(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=14),
+    ts = TAFeature(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=28),
                                                          dict(kind="SMA", length=21),
-                                                         dict(kind="RSI", length=21)]
+                                                         dict(kind="RSI", length=21)
+
+                                                         ]
 
                    )
 
     ts.run(debug_mode=True,
-           update_tree=False,
+           update_tree=True,
            force_update=True,
            )
 

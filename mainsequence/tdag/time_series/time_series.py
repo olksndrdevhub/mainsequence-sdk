@@ -2023,7 +2023,6 @@ class RunManager:
                         try:
 
                             error_on_last_update = ts.run_manager._start_time_serie_update(debug_mode=debug_mode,
-                                                                                            raise_exceptions=True,
                                                                                             update_tree=False,
                                                                                             update_tracker=self.update_tracker
                                                                                             )
