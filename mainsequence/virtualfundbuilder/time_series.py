@@ -1,7 +1,7 @@
 import copy
 import os
 
-from mainsequence.client import  DataUpdates, AssetCategory, Asset
+from mainsequence.client import  UpdateStatistics, AssetCategory, Asset
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie
 from datetime import datetime
 import numpy as np
@@ -123,7 +123,7 @@ class PortfolioStrategy(TimeSerie):
         asset_list = Asset.filter(id__in=asset_category.assets) # no need for specifics as only symbols are relevant
         return asset_list
 
-    def _calculate_start_end_dates(self, update_statistics: DataUpdates):
+    def _calculate_start_end_dates(self, update_statistics: UpdateStatistics):
         """
         Calculates the start and end dates for processing based on the latest value and available data.
         The end date is calcualted to get the end dates of the prices of all assets involved, and using the earliest to ensure that all assets have prices.
@@ -292,7 +292,7 @@ rebalance details:"""
 
         return portfolio_returns
 
-    def _calculate_portfolio_values(self, portfolio: pd.DataFrame, update_statistics: DataUpdates) -> pd.DataFrame:
+    def _calculate_portfolio_values(self, portfolio: pd.DataFrame, update_statistics: UpdateStatistics) -> pd.DataFrame:
         """
         Calculates and applies cumulative returns to get the current portfolio values.
         For re-executions, the last portfolio values are retrieved from the database.

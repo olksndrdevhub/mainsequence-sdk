@@ -26,7 +26,7 @@ import structlog.contextvars as cvars
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager, APIPersistManager
 from mainsequence.client.models_tdag import (DataSource, LocalTimeSeriesHistoricalUpdate,
-                                             DataUpdates, UniqueIdentifierRangeMap, ColumnMetaData, POD_PROJECT
+                                             UpdateStatistics, UniqueIdentifierRangeMap, ColumnMetaData, POD_PROJECT
                                              )
 from pandas.api.types import is_datetime64_any_dtype
 
@@ -1418,7 +1418,7 @@ class PersistenceManager:
 
                     self.metadata.sourcetableconfiguration.set_or_update_columns_metadata(columns_metadata=columns_metadata)
 
-    def set_table_metadata(self, update_statistics: DataUpdates):
+    def set_table_metadata(self, update_statistics: UpdateStatistics):
         """
         Creates or updates the MarketsTimeSeriesDetails metadata in the backend.
 
@@ -1529,7 +1529,7 @@ class PersistenceManager:
             persisted = True
         return persisted
 
-    def get_update_statistics(self) -> DataUpdates:
+    def get_update_statistics(self) -> UpdateStatistics:
         """
         Gets the latest update statistics from the database.
 
@@ -1537,13 +1537,13 @@ class PersistenceManager:
             unique_identifier_list: An optional list of unique identifiers to filter by.
 
         Returns:
-            A DataUpdates object with the latest statistics.
+            A UpdateStatistics object with the latest statistics.
         """
         if isinstance(self.metadata,int):
             self.local_persist_manager.set_local_metadata_lazy(force_registry=True,include_relations_detail=True)
 
         if  self.metadata.sourcetableconfiguration is None:
-            return DataUpdates()
+            return UpdateStatistics()
 
         update_stats =  self.metadata.sourcetableconfiguration.get_data_updates()
         return update_stats
@@ -1774,7 +1774,7 @@ class RunManager:
         self.owner = owner
 
 
-    def set_update_statistics(self, update_statistics: DataUpdates) -> DataUpdates:
+    def set_update_statistics(self, update_statistics: UpdateStatistics) -> UpdateStatistics:
         """
         Default method to narrow down update statistics un local time series,
         the method will filter using asset_list if the attribute exists as well as the init fallback date
@@ -1921,7 +1921,6 @@ class RunManager:
                     update_tree=update_tree,
                     update_only_tree=update_only_tree,
                     local_time_series_map=local_map,
-                    raise_exceptions=True,
                     use_state_for_update=True
                 )
                 del self.update_tracker
@@ -2177,7 +2176,7 @@ class RunManager:
             raise DependencyUpdateError(f"Update Stop from error in children \n {ts_with_errors}")
     @tracer.start_as_current_span("TS: Update")
     def _start_time_serie_update(self, update_tracker: object, debug_mode: bool,
-                                raise_exceptions: bool = True, update_tree: bool = False,
+                                update_tree: bool = False,
                                 local_time_series_map: Optional[Dict[str, "LocalTimeSerie"]] = None,
                                 update_only_tree: bool = False, force_update: bool = False,
                                 use_state_for_update: bool = False) -> bool:
@@ -2187,7 +2186,6 @@ class RunManager:
         Args:
             update_tracker: The update tracker object.
             debug_mode: Whether to run in debug mode.
-            raise_exceptions: Whether to raise exceptions on errors.
             update_tree: Whether to update the entire dependency tree.
             local_time_series_map: A map of local time series.
             update_only_tree: If True, only updates the dependency tree structure.
@@ -2218,11 +2216,6 @@ class RunManager:
 
         try:
             if must_update == True:
-                max_update_time_days = os.getenv("TDAG_MAX_UPDATE_TIME_DAYS", None)
-                update_on_batches = False
-                if update_on_batches is not None:
-                    max_update_time_days = datetime.timedelta(days=update_on_batches)
-                    update_on_batches = True
 
                 self._update_local(update_tree=update_tree, debug_mode=debug_mode,
                                         overwrite_latest_value=latest_value,
@@ -2258,7 +2251,7 @@ class RunManager:
 
     @tracer.start_as_current_span("TimeSerie.update_local")
     def _update_local(self, update_tree: bool, update_tracker: object, debug_mode: bool,
-                     update_statistics: DataUpdates,
+                     update_statistics: UpdateStatistics,
                      local_time_series_map: Optional[dict] = None,
                      overwrite_latest_value: Optional[datetime.datetime] = None, update_only_tree: bool = False,
                      use_state_for_update: bool = False,
@@ -2292,14 +2285,7 @@ class RunManager:
                 running_time_serie.logger.info(f'Local Time Series  {running_time_serie} only tree updated')
                 return None
 
-        # hardcore check to fix missing values
-        # from mainsequence.tdag_client.utils import read_one_value_from_table
-        #
-        # if self.local_persist_manager.metadata["sourcetableconfiguration"] is None:
-        #     r=read_one_value_from_table(self.hashed_name)
-        #     if len(r)>0:
-        #         #there is data but not source table configuration overwrite
-        #         overwrite_latest_value=datetime.datetime(2023,6,23).replace(tzinfo=pytz.utc)
+
 
         with tracer.start_as_current_span("Update Calculation") as update_span:
 
@@ -2506,7 +2492,7 @@ class APITimeSerie(DataAccessMixin):
         last_update_in_table, last_update_per_asset = self.local_persist_manager.get_update_statistics(
             remote_table_hash_id=self.remote_table_hashed_name,
             asset_symbols=asset_symbols, time_serie=self)
-        return DataUpdates(
+        return UpdateStatistics(
         max_time_index_value=last_update_in_table,
         max_time_per_identifier=last_update_per_asset or {}
     )
@@ -2683,6 +2669,9 @@ class TimeSerie(DataAccessMixin,ABC):
     @property
     def metadata(self) -> "DynamicTableMetaData":
         return self.local_persist_manager.metadata
+    @property
+    def table(self)->"DynamicTableMetaData":
+        return self.local_persist_manager.metadata
 
     @property
     def local_persist_manager(self) -> PersistManager:
@@ -2696,7 +2685,7 @@ class TimeSerie(DataAccessMixin,ABC):
 
 
     #Necessary passhtrough methods
-    def get_update_statistics(self) -> DataUpdates:
+    def get_update_statistics(self) -> UpdateStatistics:
         return self.persistence.get_update_statistics()
 
     def run(
@@ -2730,7 +2719,7 @@ class TimeSerie(DataAccessMixin,ABC):
         """
         return 0
 
-    def get_table_metadata(self,update_statistics:ms_client.DataUpdates)->Optional[ms_client.TableMetaData]:
+    def get_table_metadata(self,update_statistics:ms_client.UpdateStatistics)->Optional[ms_client.TableMetaData]:
         """Provides the metadata configuration for a market time series.
 
          """
@@ -2790,16 +2779,16 @@ class TimeSerie(DataAccessMixin,ABC):
 
         return None
 
-    def _run_post_update_routines(self, error_on_last_update: bool, update_statistics: DataUpdates) -> None:
+    def _run_post_update_routines(self, error_on_last_update: bool, update_statistics: UpdateStatistics) -> None:
         """ Should be overwritten by subclass """
         pass
 
     @abstractmethod
-    def update(self, update_statistics: DataUpdates) -> pd.DataFrame:
+    def update(self, update_statistics: UpdateStatistics) -> pd.DataFrame:
         """
         Fetch and ingest only the new rows for this TimeSerie based on prior update checkpoints.
 
-        DataUpdates provides the last-ingested positions:
+        UpdateStatistics provides the last-ingested positions:
           - For a single-index series (time_index only), `update_statistics.max_time` is either:
               - None: no prior data—fetch all available rows.
               - a datetime: fetch rows where `time_index > max_time`.
@@ -2818,7 +2807,7 @@ class TimeSerie(DataAccessMixin,ABC):
 
         Parameters
         ----------
-        update_statistics : DataUpdates
+        update_statistics : UpdateStatistics
             Object capturing the previous update state. Must expose:
               - `max_time` (datetime | None)
               - `max_time_per_id` (dict[str, datetime] | None)

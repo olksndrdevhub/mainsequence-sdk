@@ -8,7 +8,7 @@ from mainsequence.logconf import logger
 from mainsequence.client import (LocalTimeSerie, UniqueIdentifierRangeMap,
                                  LocalTimeSeriesDoesNotExist,
                                  DynamicTableDoesNotExist, DynamicTableDataSource, TDAG_CONSTANTS as CONSTANTS, DynamicTableMetaData,
-                                 DataUpdates, DoesNotExist)
+                                 UpdateStatistics, DoesNotExist)
 
 from mainsequence.client.models_tdag import DynamicTableHelpers, LocalTimeSerieUpdateDetails
 import json

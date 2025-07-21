@@ -41,7 +41,7 @@ class ExternalWeights(WeightsBase, TimeSerie):
         asset_list = Asset.filter(id__in=asset_category.assets)
         return asset_list
 
-    def update(self, update_statistics: "DataUpdates"):
+    def update(self, update_statistics: "UpdateStatistics"):
         source_artifact = Artifact.get(bucket__name=self.bucket_name, name=self.artifact_name)
         weights_source = pd.read_csv(source_artifact.content)
 

@@ -6,7 +6,7 @@ from .models_tdag import (request_to_datetime, LocalTimeSeriesDoesNotExist, Dyna
                           DynamicTableMetaData, DynamicTableDataSource, LocalTimeSerieNode,
 ColumnMetaData,Artifact,TableMetaData ,DataFrequency,
                           Project, UniqueIdentifierRangeMap, LocalTimeSeriesHistoricalUpdate,
-                          DataUpdates, DataSource, PodDataSource, SessionDataSource)
+                          UpdateStatistics, DataSource, PodDataSource, SessionDataSource)
 
 from .utils import TDAG_CONSTANTS, MARKETS_CONSTANTS
 from mainsequence.logconf import logger

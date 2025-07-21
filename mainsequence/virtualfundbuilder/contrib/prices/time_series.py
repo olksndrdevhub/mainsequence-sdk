@@ -9,7 +9,7 @@ import pandas_market_calendars as mcal
 
 from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, APITimeSerie, data_source_pickle_path
 from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
-                                  DataUpdates, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
+                                  UpdateStatistics, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
                                  )
 from mainsequence.client import MARKETS_CONSTANTS, ExecutionVenue
 from mainsequence.client import  DoesNotExist, Asset
@@ -615,7 +615,7 @@ class InterpolatedPrices(TimeSerie):
 
     def get_upsampled_data(
             self,
-            update_statistics: DataUpdates,
+            update_statistics: UpdateStatistics,
     ) -> pd.DataFrame:
         """
         Main method to get upsampled data for prices.
@@ -654,7 +654,7 @@ class InterpolatedPrices(TimeSerie):
 
     def update(
             self,
-            update_statistics: DataUpdates
+            update_statistics: UpdateStatistics
     ) -> pd.DataFrame:
         """
         Updates the series from the source based on the latest value.
@@ -712,7 +712,7 @@ class ExternalPrices(TimeSerie):
 
     def update(
             self,
-            update_statistics: DataUpdates
+            update_statistics: UpdateStatistics
     ) -> pd.DataFrame:
         from mainsequence.client.models_tdag import Artifact
         source_artifact = Artifact.get(bucket__name=self.bucket_name, name=self.artifact_name)

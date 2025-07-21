@@ -79,13 +79,13 @@ These methods have default behaviors but can be overridden for customization.
 -   `_run_post_update_routines(self, ...)`:
     -   **Purpose**: [OPTIONAL] Implement to run custom logic *after* an update is finished. Useful for logging, cleanup, or registering the time series in an external system.
 """
-
+import json
 
 # Imports should be at the top of the file
 import numpy as np
 np.NaN = np.nan # Fix for a pandas-ta compatibility issue
 from mainsequence.tdag import TimeSerie
-from mainsequence.client.models_tdag import DataUpdates, ColumnMetaData
+from mainsequence.client.models_tdag import UpdateStatistics, ColumnMetaData
 import mainsequence.client as ms_client
 from typing import Union, Optional, List, Dict
 import datetime
@@ -122,7 +122,7 @@ class SimulatedPricesManager:
         except (KeyError, IndexError):
             # KeyError if unique_id not present, IndexError if slice is empty
             return fallback
-    def update(self, update_statistics: DataUpdates)->pd.DataFrame:
+    def update(self, update_statistics: UpdateStatistics)->pd.DataFrame:
         """
         Mocks price updates for assets with stochastic lognormal returns.
 
@@ -208,7 +208,7 @@ class SingleIndexTS(TimeSerie):
        """
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
 
-    def update(self, update_statistics: ms_client.DataUpdates):
+    def update(self, update_statistics: ms_client.UpdateStatistics):
         today_utc = datetime.datetime.now(tz=pytz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
         if update_statistics.last_observation.empty:
@@ -247,7 +247,7 @@ class SingleIndexTS(TimeSerie):
         return columns_metadata
 
 
-    def get_table_metadata(self,update_statistics:ms_client.DataUpdates)->ms_client.TableMetaData:
+    def get_table_metadata(self,update_statistics:ms_client.UpdateStatistics)->ms_client.TableMetaData:
         """
 
 
@@ -285,7 +285,7 @@ class SimulatedPrices(TimeSerie):
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
-    def update(self,update_statistics:ms_client.DataUpdates):
+    def update(self,update_statistics:ms_client.UpdateStatistics):
         update_manager=SimulatedPricesManager(self)
         df=update_manager.update(update_statistics)
         return df
@@ -308,7 +308,7 @@ class SimulatedPrices(TimeSerie):
                             ]
         return columns_metadata
 
-    def get_table_metadata(self,update_statistics:DataUpdates)->ms_client.TableMetaData:
+    def get_table_metadata(self,update_statistics:UpdateStatistics)->ms_client.TableMetaData:
         """
         REturns the market time serie unique identifier, assets to append , or asset to overwrite
         Returns:
@@ -355,7 +355,7 @@ class CategorySimulatedPrices(TimeSerie):
         asset_category=ms_client.AssetCategory.get(unique_identifier=self.asset_category_id)
         asset_list=ms_client.Asset.filter(id__in=asset_category.assets)
         return asset_list
-    def update(self,update_statistics:ms_client.DataUpdates):
+    def update(self,update_statistics:ms_client.UpdateStatistics):
         """
               Simulates prices and then adds a random number from its dependency,
               demonstrating how to combine data from multiple sources.
@@ -403,7 +403,7 @@ class CategorySimulatedPrices(TimeSerie):
 
 
 
-# Mocking DataUpdates and Running the Test
+# Mocking UpdateStatistics and Running the Test
 
 
 class TAFeature(TimeSerie):
@@ -411,8 +411,8 @@ class TAFeature(TimeSerie):
        A derived time series that calculates a technical analysis feature from another price series.
        """
 
-    def __init__(self, asset_list: List[ms_client.Asset], ta_feature: str, ta_length: int = 14,
-                 local_kwargs_to_ignore=["asset_list"],
+    def __init__(self, asset_list: List[ms_client.Asset], ta_feature_config:List[dict],
+                 local_kwargs_to_ignore=["asset_list","ta_feature_config"],
                  *args, **kwargs):
         """
         Initialize the TA feature time series.
@@ -426,8 +426,8 @@ class TAFeature(TimeSerie):
         """
         self.asset_list = asset_list
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
-        self.ta_feature = ta_feature.upper()  # standardize to uppercase
-        self.ta_length = ta_length
+        self.ta_feature_config = ta_feature_config
+
 
         # Instantiate the base price simulation.
         # Replace this import with the actual location of SimulatedCryptoPrices if needed.
@@ -437,7 +437,7 @@ class TAFeature(TimeSerie):
                                                  *args, **kwargs)
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
-    def update(self, update_statistics: DataUpdates) -> pd.DataFrame:
+    def update(self, update_statistics: UpdateStatistics) -> pd.DataFrame:
         """
         [Core Logic] Calculates a technical analysis feature based on a dependent price series.
 
@@ -465,18 +465,18 @@ class TAFeature(TimeSerie):
         # --- Step 1: Prepare the Data Request ---
         # We need to fetch not just new data, but also a "lookback" window of older data
         # to ensure the TA indicator can be calculated correctly from the very first new point.
-        rolling_window = datetime.timedelta(days=self.ta_length * 2)  # Fetch 2x the window for safety
+        rolling_window = datetime.timedelta(days=np.max([a["length"] for a in self.ta_feature_config]).item()+1)  #Fetch the max of the required features
         asset_range_descriptor = {}
 
-        for unique_id,last_asset_update in update_statistics.update_statistics.items():
+        for asset in update_statistics.asset_list:
             # For each asset, find its last update time. If it's a new asset,
             # fall back to the global offset defined on the class.
-            last_update = last_asset_update- SIMULATION_OFFSET_START
+            last_update = update_statistics.get_asset_earliest_multiindex_update(asset)- SIMULATION_OFFSET_START
 
 
             # The start date for our data request is the last update time minus the lookback window.
             start_date_for_asset = last_update - rolling_window
-            asset_range_descriptor[unique_id] = {
+            asset_range_descriptor[asset.unique_identifier] = {
                 "start_date": start_date_for_asset,
                 "start_date_operand": ">="  # Use ">=" to include the start of the window
             }
@@ -503,27 +503,43 @@ class TAFeature(TimeSerie):
             .pivot(index="time_index", columns="unique_identifier", values="feature_1")
         )
 
-        # Dynamically get the TA function (e.g., ta.sma, ta.rsi) from the pandas_ta library.
-        ta_func = getattr(ta, self.ta_feature.lower(), None)
-        if ta_func is None:
-            self.logger.warning(f"TA feature '{self.ta_feature}' not found in pandas_ta. Returning raw prices.")
-            ta_results = prices_pivot  # Fallback to raw prices
-        else:
-            # Apply the function to the wide-format DataFrame.
-            # This calculates the indicator for all assets at once.
-            ta_results = prices_pivot.ta(kind=self.ta_feature.lower(), length=self.ta_length)
 
-        # The result needs to be cleaned and reshaped back to the required "long" format.
-        ta_long = (
-            ta_results
-            .dropna(how="all")  # Drop rows at the start where the indicator is all NaN
-            .reset_index()
-            .melt(id_vars="time_index", var_name="unique_identifier", value_name="feature_1")
-            .dropna(subset=["feature_1"])  # Drop any remaining individual NaNs
-            .set_index(["time_index", "unique_identifier"])
-        )
 
-        return ta_long
+        all_features=[]
+        for feature_config in self.ta_feature_config:
+            feature_name=json.dumps(feature_config)
+            feature_kind=feature_config["kind"].lower()
+            feature_config.pop("kind")
+            func = getattr(ta, feature_kind)
+            ta_results = prices_pivot.apply(lambda col: func(col, **feature_config))
+
+            # The result needs to be cleaned and reshaped back to the required "long" format.
+            ta_long = (
+                ta_results
+                .dropna(how="all")  # Drop rows at the start where the indicator is all NaN
+                .reset_index()
+                .melt(id_vars="time_index", var_name="unique_identifier", value_name="feature_value")
+                .dropna(subset=["feature_value"])  # Drop any remaining individual NaNs
+                .set_index(["time_index", "unique_identifier"])
+            )
+            # pull out the existing levels as arrays
+            times = ta_long.index.get_level_values('time_index')
+            assets = ta_long.index.get_level_values('unique_identifier')
+
+            # make a constant array of your feature-name
+            feat = [feature_name] * len(ta_long)
+
+            midx = pd.MultiIndex.from_arrays(
+                [times, assets, feat],
+                names=['time_index', 'unique_identifier', 'feature_name']
+            )
+            ta_long.index = midx
+
+            all_features.append(ta_long)
+
+        all_features=pd.concat(all_features,axis=0)
+
+        return all_features
 
 
 
@@ -541,15 +557,19 @@ def test_simulated_prices():
     ts_2=CategorySimulatedPrices(asset_category_id="external_magnificent_7")
 
     ts_0=SingleIndexTS()
-    ts_0.run(debug_mode=True,force_update=True)
+    # ts_0.run(debug_mode=True,force_update=True)
     # ms_client.SessionDataSource.set_local_db() #run on duck
-    ts.run(debug_mode=True,force_update=True)
-    ts_2.run(debug_mode=True,force_update=True)
+    # ts.run(debug_mode=True,force_update=True)
+    # ts_2.run(debug_mode=True,force_update=True)
 
-    ts = TAFeature(asset_list=assets, ta_feature="SMA", ta_length=14)
+    ts = TAFeature(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=14),
+                                                         dict(kind="SMA", length=21),
+                                                         dict(kind="RSI", length=21)]
+
+                   )
 
     ts.run(debug_mode=True,
-           update_tree=True,
+           update_tree=False,
            force_update=True,
            )
 

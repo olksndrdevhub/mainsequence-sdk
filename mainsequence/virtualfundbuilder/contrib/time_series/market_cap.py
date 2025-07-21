@@ -168,7 +168,7 @@ class MarketCap(WeightsBase, TimeSerie):
         asset_list = Asset.filter(id__in=asset_category.assets)
         return asset_list
 
-    def update(self, update_statistics: "DataUpdates"):
+    def update(self, update_statistics: "UpdateStatistics"):
         """
         Args:
             latest_value (Union[datetime, None]): The timestamp of the most recent data point.

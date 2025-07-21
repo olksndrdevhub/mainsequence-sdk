@@ -189,7 +189,6 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     earliest_index_value: Optional[datetime.datetime] = Field(None, description="Earliest index value")
     multi_index_stats: Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field")
     table_partition: Dict[str, Any] = Field(..., description="Table partition settings")
-    last_observation: Optional[Dict]
     open_for_everyone: bool = Field(default=False, description="Whether the table configuration is open for everyone")
     columns_metadata:Optional[List[ColumnMetaData]]=None
 
@@ -199,9 +198,9 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
             max_per_asset = self.multi_index_stats["max_per_asset_symbol"]
             max_per_asset = {k: request_to_datetime(v) for k, v in max_per_asset.items()}
 
-        du = DataUpdates(
+        du = UpdateStatistics(
             max_time_index_value=self.last_time_index_value,
-            update_statistics=max_per_asset
+            asset_time_statistics=max_per_asset
         )
 
         du._max_time_in_update_statistics = self.last_time_index_value
@@ -327,30 +326,29 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         if r.status_code != 201:
             raise Exception(f"Error in request {r.text}")
 
+        def _recurse_to_datetime(node):
+            if isinstance(node, dict):
+                return {k: _recurse_to_datetime(v) for k, v in node.items()}
+            # leaf: assume it’s your timestamp string
+            return request_to_datetime(node)
+
         result = r.json()
         if result["last_time_index_value"] is not None:
             result["last_time_index_value"] = datetime.datetime.fromtimestamp(result["last_time_index_value"]).replace(
                 tzinfo=pytz.utc)
 
-        if result['update_statistics'] is not None:
-            result['update_statistics'] = {k: request_to_datetime(v) for k, v in result['update_statistics'].items()}
+        if result['asset_time_statistics'] is not None:
+            result['asset_time_statistics'] = _recurse_to_datetime(
+                result['asset_time_statistics']
+            )
 
-        last_observation = pd.DataFrame()
-        if result["last_observation"] is not None:
-            last_observation = pd.DataFrame(result["last_observation"]).T
-            last_observation[result["time_index_name"]] = pd.to_datetime(last_observation.loc[:, result["time_index_name"]], unit='s', utc=True)
-            if len(result["index_names"]) > 1:
-                last_observation.index.name="unique_identifier"
-            else:
-                raise NotImplementedError
-            last_observation = last_observation.reset_index().set_index(result["index_names"])
+
 
         hu = LocalTimeSeriesHistoricalUpdate(
             **result["historical_update"],
-            update_statistics=DataUpdates(
-                update_statistics=result['update_statistics'],
+            update_statistics=UpdateStatistics(
+                asset_time_statistics=result['asset_time_statistics'],
                 max_time_index_value=result["last_time_index_value"],
-                last_observation=last_observation,
             ),
             must_update=result["must_update"],
             direct_dependencies_ids=result["direct_dependencies_ids"]
@@ -418,7 +416,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             self,
             last_time_index_value: float,
             max_per_asset_symbol,
-            last_observation: dict,
             timeout=None
     ) -> "LocalTimeSerie":
         s = self.build_session()
@@ -427,7 +424,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             "json": {
                 "last_time_index_value": last_time_index_value,
                 "max_per_asset_symbol": max_per_asset_symbol,
-                "last_observation": last_observation,
             }
         }
         r = make_request(s=s, loaders=self.LOADERS, payload=payload, r_type="POST", url=url, time_out=timeout)
@@ -559,7 +555,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             chunk_df = serialized_data_frame.iloc[start_idx:end_idx]
 
             # Compute grouped_dates for this chunk
-            chunk_stats, grouped_dates, last_chunk_observation = get_chunk_stats(
+            chunk_stats, grouped_dates = get_chunk_stats(
                 chunk_df=chunk_df,
                 index_names=index_names,
                 time_index_name=time_index_name
@@ -578,7 +574,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                 "overwrite": overwrite,
                 "chunk_index": i,
                 "total_chunks": total_chunks,
-                "last_observation": last_chunk_observation
             })
             try:
                 r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url, time_out=60 * 15)
@@ -1075,14 +1070,14 @@ class LocalTimeSerieUpdateDetails(BasePydanticModel, BaseObjectOrm):
                 parameters[key] = ",".join(value)
         return parameters
 
-class DataUpdates(BaseModel):
+class UpdateStatistics(BaseModel):
     """
     This class contains the  update details of the table in the main sequence engine
     """
-    update_statistics: Optional[Dict[str, Union[datetime.datetime, None]]] = None
+    asset_time_statistics: Optional[Dict[str, Union[datetime.datetime, None,Dict]]] = None
     max_time_index_value: Optional[datetime.datetime] = None  # does not include fitler
     _max_time_in_update_statistics: Optional[datetime.datetime] = None  # include filter
-    last_observation: Optional[pd.DataFrame] = Field(default_factory=pd.DataFrame)
+    _initial_fallback_date:Optional[datetime.datetime]=None
 
     asset_list:Optional[List]=None
 
@@ -1115,26 +1110,47 @@ class DataUpdates(BaseModel):
         print(f"  _max_time_in_update_statistics: {self._max_time_in_update_statistics}")
 
     def is_empty(self):
-        return self.update_statistics is None and self.max_time_index_value is None
+        return self.asset_time_statistics is None and self.max_time_index_value is None
 
     def get_min_latest_value(self, init_fallback_date: datetime = None):
-        if not self.update_statistics:
+        if not self.asset_time_statistics:
             return init_fallback_date
-        return min(self.update_statistics.values())
+        return min(self.asset_time_statistics.values())
 
     def get_max_latest_value(self, init_fallback_date: datetime = None):
-        if not self.update_statistics:
+        if not self.asset_time_statistics:
             if self.max_time_index_value:
                 return self.max_time_index_value #its a 1 colum index
             return init_fallback_date
-        return max(self.update_statistics.values())
+        return max(self.asset_time_statistics.values())
 
     def asset_identifier(self):
-        return list(self.update_statistics.keys())
+        return list(self.asset_time_statistics.keys())
 
     def get_update_range_map_great_or_equal(self):
-        range_map={k:DateInfo({"start_date_operand":">=","start_date":v}) for k,v in self.update_statistics.items()}
+        range_map={k:DateInfo({"start_date_operand":">=","start_date":v}) for k,v in self.asset_time_statistics.items()}
         return range_map
+
+
+    def get_asset_earliest_multiindex_update(self,asset):
+        stats = self.asset_time_statistics.get(asset.unique_identifier)
+        if not stats:
+            return self._initial_fallback_date
+
+        def _min_in_nested(node):
+            # If this is a dict, recurse into its values
+            if isinstance(node, dict):
+                m = None
+                for v in node.values():
+                    cand = _min_in_nested(v)
+                    if cand is not None and (m is None or cand < m):
+                        m = cand
+                return m
+            # Leaf: assume it’s a timestamp (datetime or numeric)
+            return node
+
+        return _min_in_nested(stats)
+
 
     def update_assets(
             self,
@@ -1144,108 +1160,151 @@ class DataUpdates(BaseModel):
             unique_identifier_list: Union[list, None] = None
     ):
         self.asset_list = asset_list
-        new_update_statistics = self.update_statistics
-        last_observation = self.last_observation
+        new_update_statistics = self.asset_time_statistics
         if asset_list is not None or unique_identifier_list is not None:
             new_update_statistics = {}
             unique_identifier_list = [a.unique_identifier for a in asset_list] if unique_identifier_list is None else unique_identifier_list
 
             for unique_identifier in unique_identifier_list:
 
-                if self.update_statistics and unique_identifier in self.update_statistics:
-                    new_update_statistics[unique_identifier] = self.update_statistics[unique_identifier]
+                if self.asset_time_statistics and unique_identifier in self.asset_time_statistics:
+                    new_update_statistics[unique_identifier] = self.asset_time_statistics[unique_identifier]
                 else:
-                    if init_fallback_date is None: raise ValueError(f"No initial start date for {unique_identifier} assets defined")
-                    new_update_statistics[unique_identifier] = init_fallback_date
 
-            _max_time_in_update_statistics = max(new_update_statistics.values()) if len(new_update_statistics) > 0 else None
-            if not last_observation.empty:
-                last_observation = last_observation[last_observation.index.get_level_values("unique_identifier").isin(unique_identifier_list)]
+                    new_update_statistics[unique_identifier] = None
+
+            def _max_in_nested(d):
+                """
+                Recursively find the max leaf value in a nested dict-of-dicts,
+                where the leaves are comparable (e.g. datetime objects).
+                Returns None if there are no leaves.
+                """
+                max_val = None
+                for v in d.values():
+                    if isinstance(v, dict):
+                        candidate = _max_in_nested(v)
+                    else:
+                        candidate = v
+                    if candidate is not None and (max_val is None or candidate > max_val):
+                        max_val = candidate
+                return max_val
+
+            _max_time_in_asset_time_statistics = _max_in_nested(new_update_statistics) if len(new_update_statistics) > 0 else None
+
         else:
-            _max_time_in_update_statistics = self.max_time_index_value or init_fallback_date
+            _max_time_in_asset_time_statistics = self.max_time_index_value or init_fallback_date
 
-        du = DataUpdates(
-            update_statistics=new_update_statistics,
+        du = UpdateStatistics(
+            asset_time_statistics=new_update_statistics,
             max_time_index_value=self.max_time_index_value,
-            last_observation=last_observation,
             asset_list=asset_list
         )
-        du._max_time_in_update_statistics = _max_time_in_update_statistics
+        du._max_time_in_asset_time_statistics = _max_time_in_asset_time_statistics
+        du._initial_fallback_date=init_fallback_date
         return du
 
     def is_empty(self):
         return self.max_time_index_value is None
 
     def __getitem__(self, key: str) -> Any:
-        if self.update_statistics is None:
-            raise KeyError(f"{key} not found (update_statistics is None).")
-        return self.update_statistics[key]
+        if self.asset_time_statistics is None:
+            raise KeyError(f"{key} not found (asset_time_statistics is None).")
+        return self.asset_time_statistics[key]
 
     def __setitem__(self, key: str, value: Any) -> None:
-        if self.update_statistics is None:
-            self.update_statistics = {}
-        self.update_statistics[key] = value
+        if self.asset_time_statistics is None:
+            self.asset_time_statistics = {}
+        self.asset_time_statistics[key] = value
 
     def __delitem__(self, key: str) -> None:
-        if not self.update_statistics or key not in self.update_statistics:
-            raise KeyError(f"{key} not found in update_statistics.")
-        del self.update_statistics[key]
+        if not self.asset_time_statistics or key not in self.asset_time_statistics:
+            raise KeyError(f"{key} not found in asset_time_statistics.")
+        del self.asset_time_statistics[key]
 
     def __iter__(self):
         """Iterate over keys."""
-        if self.update_statistics is None:
+        if self.asset_time_statistics is None:
             return iter([])
-        return iter(self.update_statistics)
+        return iter(self.asset_time_statistics)
 
     def __len__(self) -> int:
-        if not self.update_statistics:
+        if not self.asset_time_statistics:
             return 0
-        return len(self.update_statistics)
+        return len(self.asset_time_statistics)
 
     def keys(self):
-        if not self.update_statistics:
+        if not self.asset_time_statistics:
             return []
-        return self.update_statistics.keys()
+        return self.asset_time_statistics.keys()
 
     def values(self):
-        if not self.update_statistics:
+        if not self.asset_time_statistics:
             return []
-        return self.update_statistics.values()
+        return self.asset_time_statistics.values()
 
     def items(self):
-        if not self.update_statistics:
+        if not self.asset_time_statistics:
             return []
-        return self.update_statistics.items()
+        return self.asset_time_statistics.items()
 
     def filter_df_by_latest_value(self, df: pd.DataFrame) -> pd.DataFrame:
-        if df.shape[0] == 0:
+        if self.is_empty():
             return df
 
-        if not self.is_empty():
-            if (self.update_statistics is None or "unique_identifier" not in df.index.names) and self.max_time_index_value is not None:
-                # single index time serie
-                return df[df.index>=self.max_time_index_value]
+            # Single-index time series fallback
+        if (
+                (self.asset_time_statistics is None or "unique_identifier" not in df.index.names)
+                and self.max_time_index_value is not None
+        ):
+            return df[df.index >= self.max_time_index_value]
 
-            for unique_identifier, last_update in self.update_statistics.items():
-                df = df[
-                    (
-                        (df.index.get_level_values("unique_identifier") == unique_identifier) &
-                        (df.index.get_level_values("time_index") > last_update)
-                    )
-                    |
-                    (
-                        (df.index.get_level_values("unique_identifier") != unique_identifier)
-                    )
-                ]
-            duplicated = df.index.duplicated(keep='first')
+        names = df.index.names
+        time_level = names[0]
 
-            if duplicated.any():
-                num_duplicates = duplicated.sum()
-                logger.warning(
-                    f"Removed {num_duplicates} duplicated rows for unique_identifier and time_index combinations.")
-                df = df[~duplicated]
-            return df
+        grouping_levels = [n for n in names if n != time_level]
+
+        # Build a mask by iterating over each row tuple + its timestamp
+        mask = []
+        for idx_tuple, ts in zip(df.index, df.index.get_level_values(time_level)):
+            # map level names → values
+            level_vals = dict(zip(names, idx_tuple))
+            asset = level_vals["unique_identifier"]
+
+            # fetch this asset’s nested stats
+            stats = self.asset_time_statistics.get(asset)
+            if stats is None:
+                # no prior stats for this asset → keep row
+                mask.append(True)
+                continue
+
+            # drill into the nested stats for the remaining levels
+            nested = stats
+            for lvl in grouping_levels[1:]:  # skip 'unique_identifier'
+                key = level_vals[lvl]
+                if not isinstance(nested, dict) or key not in nested:
+                    # no prior stats for this subgroup → keep row
+                    nested = None
+                    break
+                nested = nested[key]
+
+            # if we couldn’t find a prior timestamp, or this ts is newer, keep it
+            if nested is None or ts > nested:
+                mask.append(True)
+            else:
+                # ts ≤ last seen → filter out
+                mask.append(False)
+
+        # apply the mask
+        df = df[mask]
+
+        # drop any exact duplicate multi‐index rows that remain
+        dup = df.index.duplicated(keep="first")
+        if dup.any():
+            n = dup.sum()
+            logger.warning(f"Removed {n} duplicated rows after filtering.")
+            df = df[~dup]
         return df
+
 
 def get_chunk_stats(chunk_df, time_index_name, index_names):
     chunk_stats = {
@@ -1255,29 +1314,48 @@ def get_chunk_stats(chunk_df, time_index_name, index_names):
         }
     }
 
-    last_observation = chunk_df.loc[[chunk_df['time_index'].idxmax()]]
-    last_observation[time_index_name] = last_observation[time_index_name].apply(lambda x: x.timestamp())
-    last_observation = last_observation.set_index(time_index_name).to_dict("index")
+
 
     grouped_dates = None
     if len(index_names) > 1:
-        grouped_dates = chunk_df.groupby(["unique_identifier"])[
+        grouped_dates = chunk_df.groupby(index_names[1:])[
             time_index_name].agg(
             ["min", "max"])
-        chunk_stats["_PER_ASSET_"] = {
-            row["unique_identifier"]: {
-                "max": row["max"].timestamp(),
-                "min": row["min"].timestamp(),
-            }
-            for _, row in grouped_dates.reset_index().iterrows()
-        }
 
-        idx = chunk_df.groupby('unique_identifier')[time_index_name].idxmax()
-        last_observation = chunk_df.loc[idx].reset_index(drop=True)
-        last_observation[time_index_name] = last_observation[time_index_name].apply(lambda x: x.timestamp())
-        last_observation = last_observation.set_index("unique_identifier").to_dict("index")
+        # 2) decompose the grouped index names
+        first, *rest = grouped_dates.index.names
 
-    return chunk_stats, grouped_dates, last_observation
+        # 3) reset to a flat DataFrame for easy iteration
+        df = grouped_dates.reset_index()
+
+        # 4) build the nested dict
+        per_asset: dict = {}
+        for _, row in df.iterrows():
+            uid = row[first]  # e.g. the unique_identifier
+            # only one extra level beyond uid?
+            if len(rest) == 1:
+                feat = row[rest[0]]
+                per_asset.setdefault(uid, {})[feat] = {
+                    "min": row["min"].timestamp(),
+                    "max": row["max"].timestamp(),
+                }
+            else:
+                # multiple extra levels → walk a path of dicts
+                keys = [row[level] for level in rest]
+                sub = per_asset.setdefault(uid, {})
+                for key in keys[:-1]:
+                    sub = sub.setdefault(key, {})
+                sub[keys[-1]] = {
+                    "min": row["min"].timestamp(),
+                    "max": row["max"].timestamp(),
+                }
+        # 5) assign into your stats structure
+        chunk_stats["_PER_ASSET_"] = per_asset
+
+
+
+
+    return chunk_stats, grouped_dates
 
 class LocalTimeSeriesHistoricalUpdate(BasePydanticModel, BaseObjectOrm):
     id: Optional[int] = None
@@ -1291,7 +1369,7 @@ class LocalTimeSeriesHistoricalUpdate(BasePydanticModel, BaseObjectOrm):
     last_time_index_value: Optional[datetime.datetime] = None
 
     # extra fields for local control
-    update_statistics: Optional[DataUpdates]
+    update_statistics: Optional[UpdateStatistics]
     must_update: Optional[bool]
     direct_dependencies_ids: Optional[List[int]]
 
@@ -2055,7 +2133,7 @@ class DynamicTableHelpers:
         if duplicates_exist:
             raise Exception(f"Duplicates found in columns: {index_names}")
 
-        global_stats, grouped_dates, global_last_observation = get_chunk_stats(
+        global_stats, grouped_dates = get_chunk_stats(
             chunk_df=data,
             index_names=index_names,
             time_index_name=time_index_name
@@ -2074,14 +2152,21 @@ class DynamicTableHelpers:
 
         min_d, last_time_index_value = global_stats["_GLOBAL_"]["min"], global_stats["_GLOBAL_"]["max"]
         max_per_asset_symbol = None
+
+        def extract_max(node):
+            # Leaf case: a dict with 'min' and 'max'
+            if isinstance(node, dict) and "min" in node and "max" in node:
+                return node["max"]
+            # Otherwise recurse
+            return {k: extract_max(v) for k, v in node.items()}
         if len(index_names) > 1:
             max_per_asset_symbol = {
-                unique_identifier: stats["max"] for unique_identifier, stats in global_stats["_PER_ASSET_"].items()
+                uid: extract_max(stats)
+                for uid, stats in global_stats["_PER_ASSET_"].items()
             }
         local_metadata = local_metadata.set_last_update_index_time_from_update_stats(
             max_per_asset_symbol=max_per_asset_symbol,
             last_time_index_value=last_time_index_value,
-            last_observation=global_last_observation
         )
         return local_metadata
 
