@@ -11,10 +11,12 @@ from mainsequence.client import (LocalTimeSerie, UniqueIdentifierRangeMap,
                                  UpdateStatistics, DoesNotExist)
 
 from mainsequence.client.models_tdag import DynamicTableHelpers, LocalTimeSerieUpdateDetails
+import mainsequence.client as ms_client
 import json
 import threading
 from concurrent.futures import Future
 from .. import  future_registry
+from mainsequence.instrumentation import tracer, tracer_instrumentator
 
 
 class APIPersistManager:
@@ -296,7 +298,7 @@ class PersistManager:
         """
         from IPython.core.display import display, HTML, Javascript
 
-        response = TimeSerieLocalUpdate.get_mermaid_dependency_diagram(local_hash_id=self.local_hash_id,
+        response = ms_client.TimeSerieLocalUpdate.get_mermaid_dependency_diagram(local_hash_id=self.local_hash_id,
                                                                        data_source_id=self.data_source.id
                                                                        )
         from IPython.core.display import display, HTML, Javascript
@@ -334,6 +336,54 @@ class PersistManager:
            """
 
         return mermaid_chart
+
+    def get_mermaid_dependency_diagram(self) -> str:
+        """
+        Displays a Mermaid.js dependency diagram in a Jupyter environment.
+
+        Returns:
+            The Mermaid diagram string.
+        """
+        from IPython.display import display, HTML
+
+        mermaid_diagram = self.display_mermaid_dependency_diagram()
+
+        # Mermaid.js initialization script (only run once)
+        if not hasattr(display, "_mermaid_initialized"):
+            mermaid_initialize = """
+                   <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+                   <script>
+                       function initializeMermaid() {
+                           if (typeof mermaid !== 'undefined') {
+                               console.log('Initializing Mermaid.js...');
+                               const mermaidDivs = document.querySelectorAll('.mermaid');
+                               mermaidDivs.forEach(mermaidDiv => {
+                                   mermaid.init(undefined, mermaidDiv);
+                               });
+                           } else {
+                               console.error('Mermaid.js is not loaded.');
+                           }
+                       }
+                   </script>
+                   """
+            display(HTML(mermaid_initialize))
+            display._mermaid_initialized = True
+
+        # HTML template for rendering the Mermaid diagram
+        html_template = f"""
+               <div class="mermaid">
+               {mermaid_diagram}
+               </div>
+               <script>
+                   initializeMermaid();
+               </script>
+               """
+
+        # Display the Mermaid diagram in the notebook
+        display(HTML(html_template))
+
+        # Optionally return the raw diagram code for further use
+        return mermaid_diagram
 
     def get_all_dependencies_update_priority(self) -> pd.DataFrame:
         """
@@ -613,7 +663,7 @@ class PersistManager:
             self.metadata.sourcetableconfiguration.patch(open_for_everyone=open_for_everyone)
 
     def get_update_statistics(self, asset_symbols: List[str],
-                              remote_table_hash_id: str, time_serie: "TimeSerie"
+                              remote_table_hash_id: str, time_serie: "TimeSerie" #necessary for uatomated methods
                               ) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
         """
         Gets update statistics for the time series.
@@ -640,24 +690,7 @@ class PersistManager:
 
         return last_update_in_table, last_update_per_asset
 
-    def persist_updated_data(self, temp_df: pd.DataFrame, historical_update_id: Optional[int],
-                             update_tracker: Optional[object] = None,
-                             overwrite: bool = False) -> None:
-        """
-        Main update time series function, called from the TimeSerie class.
 
-        Args:
-            temp_df: DataFrame with the data to persist.
-            historical_update_id: ID of the historical update record.
-            update_tracker: The update tracker object.
-            overwrite: Whether to overwrite existing data.
-        """
-        self._local_metadata_cached = DynamicTableHelpers.upsert_data_into_table(
-            local_metadata=self.local_metadata,
-            data=temp_df,
-            data_source=self.data_source,
-
-        )
 
     def get_df_between_dates(self, *args, **kwargs) -> pd.DataFrame:
         """
@@ -669,6 +702,99 @@ class PersistManager:
         )
         return filtered_data
 
+    def set_column_metadata(self,
+                            columns_metadata: Optional[List[ms_client.ColumnMetaData]]
+                            ) -> None:
+        if self.metadata:
+            if self.metadata.sourcetableconfiguration != None:
+                if self.metadata.sourcetableconfiguration.columns_metadata is not None:
+                    if columns_metadata is None:
+                        self.logger.info(f"get_column_metadata method not implemented")
+                        return
+
+                    self.metadata.sourcetableconfiguration.set_or_update_columns_metadata(
+                        columns_metadata=columns_metadata)
+
+    def set_table_metadata(self,
+                           table_metadata: ms_client.TableMetaData,
+                           ):
+        """
+        Creates or updates the MarketsTimeSeriesDetails metadata in the backend.
+
+        This method orchestrates the synchronization of the time series metadata,
+        including its description, frequency, and associated assets, based on the
+        configuration returned by `_get_time_series_meta_details`.
+        """
+        if not (self.metadata and self.metadata.sourcetableconfiguration):
+            return
+
+        # 1. Get the user-defined metadata configuration for the time series.
+
+        if table_metadata is None:
+            return
+
+        # 2. Get or create the MarketsTimeSeriesDetails object in the backend.
+        source_table_id = self.metadata.patch(**table_metadata.model_dump())
+
+    def delete_table(self) -> None:
+        if self.data_source.related_resource.class_type == "duck_db":
+            from mainsequence.client.data_sources_interfaces.duckdb import DuckDBInterface
+            db_interface = DuckDBInterface()
+            db_interface.drop_table(self.metadata.hash_id)
+
+        self.metadata.delete()
+
+    @tracer.start_as_current_span("TS: Persist Data")
+    def persist_updated_data(self,
+                             temp_df: pd.DataFrame, update_tracker: object, overwrite: bool = False) -> bool:
+        """
+        Persists the updated data to the database.
+
+        Args:
+            temp_df: The DataFrame with updated data.
+            update_tracker: The update tracker object.
+            overwrite: If True, overwrites existing data.
+
+        Returns:
+            True if data was persisted, False otherwise.
+        """
+        persisted = False
+        if not temp_df.empty:
+            if overwrite == True:
+                self.logger.warning(f"Values will be overwritten")
+
+            self._local_metadata_cached = DynamicTableHelpers.upsert_data_into_table(
+                local_metadata=self.local_metadata,
+                data=temp_df,
+                data_source=self.data_source,
+
+            )
+
+
+            persisted = True
+        return persisted
+
+    def get_update_statistics(self) -> ms_client.UpdateStatistics:
+        """
+        Gets the latest update statistics from the database.
+
+        Args:
+            unique_identifier_list: An optional list of unique identifiers to filter by.
+
+        Returns:
+            A UpdateStatistics object with the latest statistics.
+        """
+        if isinstance(self.metadata, int):
+            self.set_local_metadata_lazy(force_registry=True, include_relations_detail=True)
+
+        if self.metadata.sourcetableconfiguration is None:
+            return ms_client.UpdateStatistics()
+
+        update_stats = self.metadata.sourcetableconfiguration.get_data_updates()
+        return update_stats
+
+    def is_local_relation_tree_set(self) -> bool:
+        return self.local_metadata.ogm_dependencies_linked
 
 class TimeScaleLocalPersistManager(PersistManager):
     """

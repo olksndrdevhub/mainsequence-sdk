@@ -15,12 +15,9 @@ from mainsequence.tdag.config import bcolors
 from typing import Union, List, Dict, Optional, Any, Tuple
 import ray
 import pandas as pd
-from mainsequence.tdag.time_series.time_series import DependencyUpdateError, TimeSerie
-import gc
-from mainsequence.logconf import  logger
-
-from contextlib import contextmanager
-from mainsequence.client import  DynamicTableDataSource
+from mainsequence.tdag.time_series.time_series import  TimeSerie
+import mainsequence.tdag.time_series.run_operations as run_operations
+from mainsequence.tdag.time_series.time_series import BuildManager
 
 USE_PICKLE = os.environ.get('TDAG_USE_PICKLE', True)
 USE_PICKLE = USE_PICKLE in ["True", "true", True]
@@ -61,15 +58,15 @@ class TimeSerieHeadUpdateActor:
                                                      )
 
         if USE_PICKLE == False:
-            ts = TimeSerie.rebuild_from_configuration(local_hash_id=local_hash_id,
+            ts = BuildManager.rebuild_from_configuration(local_hash_id=local_hash_id,
                                                       remote_table_hashed_name=remote_table_hashed_name,
                                                       data_source=data_source_id,
                                                       )
         else:
-            ts, pickle_path = rebuild_and_set_from_local_hash_id(local_hash_id=local_hash_id,data_source_id=data_source_id,
+            ts, pickle_path = BuildManager.rebuild_and_set_from_local_hash_id(local_hash_id=local_hash_id,data_source_id=data_source_id,
                                                                graph_depth_limit=0)
 
-        ts.set_actor_manager(actor_manager=distributed_actor_manager)
+        run_operations.set_actor_manager(actor_manager=distributed_actor_manager,time_serie_instance=ts)
 
         return ts
 

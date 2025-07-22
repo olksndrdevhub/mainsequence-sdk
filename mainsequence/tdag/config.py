@@ -5,6 +5,8 @@ from .utils import read_key_from_yaml, write_yaml, read_yaml
 
 DEFAULT_RETENTION_POLICY = dict(scheduler_name="default", retention_policy_time="90 days")
 
+API_TS_PICKLE_PREFIFX = "api-"
+
 TIME_SERIES_SOURCE_TIMESCALE = "timescale"
 TIME_SERIES_SOURCE_PARQUET = "parquet"
 

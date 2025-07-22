@@ -1417,9 +1417,9 @@ def get_chunk_stats(chunk_df, time_index_name, index_names):
         for _, row in df.iterrows():
             uid = row[first]  # e.g. the unique_identifier
             # only one extra level beyond uid?
-            if len(rest) == 1:
-                feat = row[rest[0]]
-                per_asset.setdefault(uid, {})[feat] = {
+            if len(rest) == 0:
+
+                per_asset[uid] = {
                     "min": row["min"].timestamp(),
                     "max": row["max"].timestamp(),
                 }

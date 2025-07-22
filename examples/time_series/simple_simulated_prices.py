@@ -38,7 +38,11 @@ The constructor defines the unique identity of the time series and its dependenc
     - `local_kwargs_to_ignore`: A list of argument names to exclude from the *local* hash.
 
 ---
-### 3. The `update` Method (Required)
+### 3. The `dependencies` Method (Required)
+This method is the core method to build a DAG for dependencies between TimeSeries. Only the TimeSeries that
+are returned in this method will be included in the creation of the dependecy chart
+
+### 4. The `update` Method (Required)
 This is the core method containing the business logic for generating data.
 
 -   **Purpose**: **MUST** be implemented. Its job is to fetch, calculate, or generate new data points.
@@ -50,15 +54,24 @@ This is the core method containing the business logic for generating data.
 
 -   **DataFrame Requirements**: The method **MUST** return a pandas DataFrame that adheres to the
     following strict format:
-    -   **Index**: Must be a `pandas.MultiIndex` with the names `("time_index", "unique_identifier")`.
+    -   **Index**: Must be a `pandas.MultiIndex` with the names `("time_index", "unique_identifier",level_1,...,level_0)`.
     -   **`time_index` Level**: Must contain `datetime.datetime` objects with UTC timezone (`tzinfo=pytz.utc`).
     -   **Column Names**: All column names **MUST** be lowercase and **have a maximum length of 63 characters**.
     -   **Column Values**: No column (other than the index) may contain Python `datetime` objects.
         If you need to store a timestamp in a column, it **MUST** be converted to an integer
         (e.g., a UNIX epoch timestamp).
+    -   **MultiIndex** When the index is a `pandas.MultiIndex` and has more than 2 levels ("time_index", "unique_identifier")
+        It is mandatory to run at the beggining of the update method  update_statistics.filter_assets_by_level whith
+        the extra filters for example
+         update_statistics.filter_assets_by_level(
+                                                 level=2,
+                                                 filters=[json.dumps(c) for c in self.ta_feature_config])
+
+
+
 
 ---
-### 4. Optional Hooks (Override as Needed)
+### 5. Optional Hooks (Override as Needed)
 These methods have default behaviors but can be overridden for customization.
 
 -   `get_table_metadata(self) -> Optional[ms_client.TableMetaData]`:
@@ -87,10 +100,12 @@ np.NaN = np.nan # Fix for a pandas-ta compatibility issue
 from mainsequence.tdag import TimeSerie
 from mainsequence.client.models_tdag import UpdateStatistics, ColumnMetaData
 import mainsequence.client as ms_client
-from typing import Union, Optional, List, Dict
+from typing import Union, Optional, List, Dict, Any
 import datetime
 import pytz
 import pandas as pd
+from sklearn.linear_model import ElasticNet
+import copy
 
 class SimulatedPricesManager:
 
@@ -115,9 +130,9 @@ class SimulatedPricesManager:
         if obs_df is None:
             return fallback
 
-        # Try to slice for this asset and get the last 'feature_1' value
+        # Try to slice for this asset and get the last 'close' value
         try:
-            slice_df = obs_df.xs(unique_id, level="unique_identifier")["feature_1"]
+            slice_df = obs_df.xs(unique_id, level="unique_identifier")["close"]
             return slice_df.iloc[-1]
         except (KeyError, IndexError):
             # KeyError if unique_id not present, IndexError if slice is empty
@@ -134,7 +149,7 @@ class SimulatedPricesManager:
 
         Returns:
             pd.DataFrame: A DataFrame with a multi-index (time_index, unique_identifier)
-                          and a single column 'feature_1' containing the simulated prices.
+                          and a single column 'close' containing the simulated prices.
         """
         import numpy as np
 
@@ -145,16 +160,16 @@ class SimulatedPricesManager:
         df_list = []
 
         # Get the latest historical observations; assumed to be a DataFrame with a multi-index:
-        # (time_index, unique_identifier) and a column "feature_1" for the last observed price.
+        # (time_index, unique_identifier) and a column "close" for the last observed price.
         last_observation = self.owner.get_last_observation()
         # Define simulation end: yesterday at midnight (UTC)
         yesterday_midnight = datetime.datetime.now(pytz.utc).replace(
             hour=0, minute=0, second=0, microsecond=0
         ) - datetime.timedelta(days=1)
         # Loop over each unique identifier and its last update timestamp.
-        for unique_id, last_update in update_statistics.update_statistics.items():
+        for asset in update_statistics.asset_list:
             # Simulation starts one hour after the last update.
-            start_time = last_update + datetime.timedelta(hours=1)
+            start_time = update_statistics.get_asset_earliest_multiindex_update(asset=asset) + datetime.timedelta(hours=1)
             if start_time > yesterday_midnight:
                 continue  # Skip if no simulation period is available.
             time_range = pd.date_range(start=start_time, end=yesterday_midnight, freq='H')
@@ -164,13 +179,13 @@ class SimulatedPricesManager:
                 # Get or fallback to initial_price
             last_price = self._get_last_price(
                 obs_df=last_observation,
-                unique_id=unique_id,
+                unique_id=asset.unique_identifier,
                 fallback=initial_price
             )
 
             random_returns = np.random.lognormal(mean=mu, sigma=sigma, size=len(time_range))
             simulated_prices = last_price * np.cumprod(random_returns)
-            df_asset = pd.DataFrame({unique_id: simulated_prices}, index=time_range)
+            df_asset = pd.DataFrame({asset.unique_identifier: simulated_prices}, index=time_range)
             df_list.append(df_asset)
 
         if df_list:
@@ -180,7 +195,7 @@ class SimulatedPricesManager:
 
         # Reshape the DataFrame into long format with a multi-index.
         data.index.name = "time_index"
-        data = data.melt(ignore_index=False, var_name="unique_identifier", value_name="feature_1")
+        data = data.melt(ignore_index=False, var_name="unique_identifier", value_name="close")
         data = data.set_index("unique_identifier", append=True)
         return data
 
@@ -188,11 +203,11 @@ class SimulatedPricesManager:
 
     def get_column_metadata(self):
         from mainsequence.client.models_tdag import ColumnMetaData
-        columns_metadata = [ColumnMetaData(column_name="feature_1",
+        columns_metadata = [ColumnMetaData(column_name="close",
                                            dtype="float",
-                                           label="Feature 1",
+                                           label="Close ",
                                            description=(
-                                               "Feature calculated like XXX "
+                                               "Simulated close price"
                                            )
                                            ),
 
@@ -208,6 +223,8 @@ class SingleIndexTS(TimeSerie):
        """
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
 
+    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+        pass
     def update(self, update_statistics: ms_client.UpdateStatistics):
         today_utc = datetime.datetime.now(tz=pytz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -285,6 +302,9 @@ class SimulatedPrices(TimeSerie):
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
+    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+        pass
+
     def update(self,update_statistics:ms_client.UpdateStatistics):
         update_manager=SimulatedPricesManager(self)
         df=update_manager.update(update_statistics)
@@ -296,11 +316,11 @@ class SimulatedPrices(TimeSerie):
 
         """
         from mainsequence.client.models_tdag import ColumnMetaData
-        columns_metadata = [ColumnMetaData(column_name="feature_1",
+        columns_metadata = [ColumnMetaData(column_name="close",
                                            dtype="float",
-                                           label="Feature 1",
+                                           label="Close",
                                            description=(
-                                               "Simulated Feature 1"
+                                               "Simulated Close Price"
                                            )
                                            ),
 
@@ -349,6 +369,9 @@ class CategorySimulatedPrices(TimeSerie):
 
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
+    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+        return {"simple_ts":self.simple_ts}
+
     def get_asset_list(self):
         """[Hook] Dynamically fetches the list of assets from a category."""
 
@@ -376,11 +399,11 @@ class CategorySimulatedPrices(TimeSerie):
 
         """
         from mainsequence.client.models_tdag import ColumnMetaData
-        columns_metadata = [ColumnMetaData(column_name="feature_1",
+        columns_metadata = [ColumnMetaData(column_name="close",
                                            dtype="float",
-                                           label="Feature 1",
+                                           label="Close",
                                            description=(
-                                               "Simulated Feature 1"
+                                               "Simulated Close Price"
                                            )
                                            ),
 
@@ -433,9 +456,14 @@ class TAFeature(TimeSerie):
         # Replace this import with the actual location of SimulatedCryptoPrices if needed.
 
         self.prices_time_serie = SimulatedPrices(asset_list=asset_list,
-                                                 local_kwargs_to_ignore=local_kwargs_to_ignore,
                                                  *args, **kwargs)
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
+
+    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+        return {
+            "prices_time_serie": self.prices_time_serie,
+
+        }
 
     def update(self, update_statistics: UpdateStatistics) -> pd.DataFrame:
         """
@@ -505,14 +533,15 @@ class TAFeature(TimeSerie):
         prices_pivot = (
             prices_df
             .reset_index()
-            .pivot(index="time_index", columns="unique_identifier", values="feature_1")
+            .pivot(index="time_index", columns="unique_identifier", values="close")
         )
 
 
 
         all_features=[]
         for feature_config in self.ta_feature_config:
-            feature_name=json.dumps(feature_config)
+            f_conf=copy.deepcopy(feature_config)
+            feature_name=json.dumps(f_conf)
             feature_kind=feature_config["kind"].lower()
             feature_config.pop("kind")
             func = getattr(ta, feature_kind)
@@ -548,6 +577,182 @@ class TAFeature(TimeSerie):
 
 
 
+class NextDayEN(TimeSerie):
+    """
+    Predicts the next-day return via a rolling ElasticNet regression on TA features.
+
+    Dependencies:
+      - TAFeature: configured technical indicators.
+      - SimulatedPrices: base price series for return calculation.
+
+    Args:
+        asset_list: List of ms_client.Asset to include.
+        ta_feature_config: List of dicts, each with keys "kind" and parameters
+                           for the TA indicator (e.g. {"kind":"SMA","length":14}).
+        elastic_net_config: Dict of parameters to pass into sklearn.linear_model.ElasticNet.
+        window_size: Number of past observations to use in each rolling regression.
+        local_kwargs_to_ignore: Names of init kwargs to exclude from the unique ID hash.
+    """
+
+    def __init__(
+        self,
+        asset_list: List[ms_client.Asset],
+        ta_feature_config: List[Dict[str, Any]],
+        elastic_net_config: Dict[str, Any],
+        window_size: int,
+        local_kwargs_to_ignore: List[str] = ["asset_list", "ta_feature_config"],
+        *args,
+        **kwargs
+    ):
+        # Core configuration
+        self.asset_list = asset_list
+        self.ta_feature_config = ta_feature_config
+        self.elastic_net_config = elastic_net_config
+        self.window_size = window_size
+
+        # Declare dependencies by instantiating them as attributes
+        self.feature_ts = TAFeature(
+            asset_list=asset_list,
+            ta_feature_config=ta_feature_config,
+            *args,
+            **kwargs
+        )
+        self.prices_ts = SimulatedPrices(
+            asset_list=asset_list,
+            *args,
+            **kwargs
+        )
+
+        super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore, *args, **kwargs)
+
+    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+        return {
+            "prices_ts": self.prices_ts,
+            "feature_ts": self.feature_ts
+        }
+
+
+    def update(self, update_statistics: UpdateStatistics) -> pd.DataFrame:
+        """
+        For each asset, fits a rolling-window ElasticNet to predict the return
+        from today to tomorrow. X = today's TA features; y = tomorrow's 1d return.
+        """
+        # Build range descriptors from the earliest needed date
+        # 1) Build range descriptors
+        start_date = getattr(
+            self.prices_ts,
+            "OFFSET_START",
+            datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
+        )
+        range_descriptor = {
+            asset.unique_identifier: {
+                "start_date": start_date,
+                "start_date_operand": ">="
+            }
+            for asset in update_statistics.asset_list
+        }
+
+        # 2) Fetch raw TA features (long) and prices
+        feats_long = self.feature_ts.get_ranged_data_per_asset(range_descriptor=range_descriptor)
+        prices_df = self.prices_ts.get_ranged_data_per_asset(range_descriptor=range_descriptor)
+        if feats_long.empty or prices_df.empty:
+            return pd.DataFrame()
+
+        # 3) Pivot TA features into wide form:
+        #    index = (time_index, unique_identifier),
+        #    columns = one column per feature_name,
+        #    values = feature_value
+        feats_wide = (
+            feats_long["feature_value"]
+            .reset_index()
+            .pivot(
+                index=["time_index", "unique_identifier"],
+                columns="feature_name",
+                values="feature_value"
+            )
+        )
+
+        # 4) Build price series with the same MultiIndex and compute next-day returns
+        price_ser = (
+            prices_df
+            .reset_index()
+            .rename(columns={"close": "price"})  # or whatever your price column is
+            .set_index(["time_index", "unique_identifier"])["price"]
+        )
+        returns = (
+            price_ser
+            .groupby(level="unique_identifier")
+            .pct_change()
+            .shift(-1)  # align so return_1d at t = (p_{t+1}/p_t - 1)
+            .to_frame(name="return_1d")
+        )
+
+        # 5) Join features + target; drop any rows missing either
+        data = feats_wide.join(returns, how="inner").dropna()
+        if data.empty:
+            return pd.DataFrame()
+
+        # 6) Loop per asset via groupby; drop the UID level so asset_df is purely wide
+        records: list = []
+        for uid, grp in data.groupby(level="unique_identifier"):
+            asset_df = (
+                grp
+                .droplevel("unique_identifier")
+                .sort_index()
+            )
+            # asset_df now has columns = [<feature1>, <feature2>, ..., "return_1d"]
+
+            # need at least window_size + 1 rows to train & predict
+            if len(asset_df) < self.window_size + 1:
+                continue
+
+            feature_cols = [c for c in asset_df.columns if c != "return_1d"]
+            for i in range(self.window_size, len(asset_df)):
+                train_win = asset_df.iloc[i - self.window_size: i]
+                X_train = train_win[feature_cols].to_numpy()  # shape (window_size, n_features)
+                y_train = train_win["return_1d"].to_numpy()  # shape (window_size,)
+
+                # Fit ElasticNet with user‐supplied hyperparams
+                model = ElasticNet(**self.elastic_net_config)
+                model.fit(X_train, y_train)
+
+                # Predict using today's features
+                X_today = asset_df.iloc[[i]][feature_cols].to_numpy()
+                pred = model.predict(X_today)[0]
+
+                ts = asset_df.index[i]
+                records.append((ts, uid, pred))
+
+        # 7) Assemble output
+        if not records:
+            return pd.DataFrame()
+
+        idx = pd.MultiIndex.from_tuples(
+            [(t, u) for t, u, _ in records],
+            names=["time_index", "unique_identifier"]
+        )
+        return pd.DataFrame(
+            {"predicted_return": [v for _, _, v in records]},
+            index=idx
+        )
+
+    def get_column_metadata(self) -> List[ColumnMetaData]:
+        return [
+            ColumnMetaData(
+                column_name="predicted_return",
+                dtype="float",
+                label="Predicted Next-Day Return",
+                description="Return from today to tomorrow predicted by rolling ElasticNet"
+            )
+        ]
+
+    def get_table_metadata(self, update_statistics: UpdateStatistics) -> ms_client.TableMetaData:
+        return ms_client.TableMetaData(
+            identifier="next_day_elastic_net",
+            data_frequency_id=ms_client.DataFrequency.one_d,
+            description="Next-day return via rolling ElasticNet on TA indicators"
+        )
+
 
 def test_simulated_prices():
     from mainsequence.client import Asset
@@ -567,6 +772,7 @@ def test_simulated_prices():
     # ts.run(debug_mode=True,force_update=True)
     # ts_2.run(debug_mode=True,force_update=True)
 
+
     ts = TAFeature(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=28),
                                                          dict(kind="SMA", length=21),
                                                          dict(kind="RSI", length=21)
@@ -574,6 +780,22 @@ def test_simulated_prices():
                                                          ]
 
                    )
+    # ts.run(debug_mode=True,
+    #        update_tree=True,
+    #        force_update=True,
+    #        )
+
+
+    ta_cfg = [{"kind": "RSI", "length": 21}, {"kind": "RSI", "length": 14}]
+    en_cfg = {"alpha": 1.0, "l1_ratio": 0.5, "fit_intercept": True}
+    window = 360  # use the last 30 days for each regression
+
+    ts = NextDayEN(
+        asset_list=assets,
+        ta_feature_config=ta_cfg,
+        elastic_net_config=en_cfg,
+        window_size=window
+    )
 
     ts.run(debug_mode=True,
            update_tree=True,
@@ -581,6 +803,5 @@ def test_simulated_prices():
            )
 
 
-if __name__ == "__main__":
-    test_simulated_prices()
+
 
