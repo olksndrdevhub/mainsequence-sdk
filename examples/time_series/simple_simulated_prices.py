@@ -130,7 +130,7 @@ class SimulatedPricesManager:
             float: Last observed price or the fallback value.
         """
         # If there's no historical data at all, return fallback immediately
-        if obs_df is None:
+        if obs_df.empty:
             return fallback
 
         # Try to slice for this asset and get the last 'close' value

@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 import structlog.contextvars as cvars
-
+import pytz
 # Internal Project Imports
 
 
@@ -233,7 +233,7 @@ class UpdateRunner:
 
         # Check that the time index is a UTC datetime
         time_index = df.index.get_level_values(0)
-        if not pd.api.types.is_datetime64_ns_dtype(time_index) or time_index.tz.zone != 'UTC':
+        if not pd.api.types.is_datetime64_ns_dtype(time_index) or time_index.tz !=datetime.timezone.utc  :
             raise TypeError(f"Time index must be datetime64[ns, UTC], but found {time_index.dtype}")
 
         # Check for forbidden data types and enforce lowercase columns
