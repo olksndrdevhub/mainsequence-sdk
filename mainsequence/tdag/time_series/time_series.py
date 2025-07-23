@@ -42,6 +42,8 @@ import mainsequence.tdag.time_series.run_operations as run_operations
 import mainsequence.tdag.time_series.build_operations as build_operations
 
 
+
+
 def get_data_source_from_orm() -> Any:
     from mainsequence.client import SessionDataSource
     if SessionDataSource.data_source.related_resource is None:
@@ -90,7 +92,8 @@ def last_update_per_unique_identifier(unique_identifier_list: Optional[list],
 
 
 
-
+class DependencyUpdateError(Exception):
+    pass
 
 
 
@@ -104,6 +107,79 @@ class DataAccessMixin:
             local_id = 0
         repr = self.__class__.__name__ + f" {os.environ['TDAG_ENDPOINT']}/local-time-series/details/?local_time_serie_id={local_id}"
         return repr
+
+    def get_pickle_path_from_time_serie(self) -> str:
+        path = build_operations.get_pickle_path(local_hash_id=self.local_hash_id,
+                               data_source_id=self.data_source_id,
+                               is_api=self.is_api
+                               )
+        return path
+
+    def persist_to_pickle(self, overwrite: bool = False) -> Tuple[str, str]:
+        """
+        Persists the TimeSerie object to a pickle file using an atomic write.
+
+        Uses a single method to determine the pickle path and dispatches to
+        type-specific logic only where necessary.
+
+        Args:
+            overwrite: If True, overwrites any existing pickle file.
+
+        Returns:
+            A tuple containing the full path and the relative path of the pickle file.
+        """
+        # 1. Common Logic: Determine the pickle path for both types
+        path = build_operations.get_pickle_path_from_time_serie(time_serie_instance=self)
+
+        # 2. Type-Specific Logic: Run pre-dump actions only for standard TimeSerie
+        if not self.is_api:
+            self.logger.debug(f"Patching source code and git hash for {self.hash_id}")
+            self.local_persist_manager.update_git_and_code_in_backend(time_serie_class=self.__class__)
+            # Prepare for pickling by removing the unpicklable ThreadLock
+            self._local_persist_manager = None
+
+        # 3. Common Logic: Persist the data source if needed
+        data_source_id = getattr(self.data_source, 'id', self.data_source_id)
+        data_source_path = build_operations.data_source_pickle_path(data_source_id)
+        if not os.path.isfile(data_source_path) or overwrite:
+            self.data_source.persist_to_pickle(data_source_path)
+
+        # 4. Common Logic: Atomically write the main pickle file
+        if os.path.isfile(path) and not overwrite:
+            self.logger.debug(f"Pickle file already exists at {path}. Skipping.")
+        else:
+            if overwrite:
+                self.logger.warning(f"Overwriting pickle file at {path}")
+            self._atomic_pickle_dump(path)
+
+        # 5. Common Logic: Return the full and relative paths
+        return path, path.replace(ogm.pickle_storage_path + "/", "")
+
+    def _atomic_pickle_dump(self, path: str) -> None:
+        """
+        Private helper to atomically dump the object to a pickle file.
+        This prevents file corruption if the process is interrupted.
+        """
+        dir_, fname = os.path.split(path)
+        # Ensure the target directory exists
+        os.makedirs(dir_, exist_ok=True)
+
+        fd, tmp_path = tempfile.mkstemp(prefix=f"{fname}~", dir=dir_)
+        os.close(fd)
+        try:
+            with open(tmp_path, 'wb') as handle:
+                cloudpickle.dump(self, handle)
+            # Atomic replace is safer than a direct write
+            os.replace(tmp_path, path)
+            self.logger.debug(f"Successfully persisted pickle to {path}")
+        except Exception:
+            # Clean up the temporary file on error to avoid clutter
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            raise
+
 
     def get_logger_context_variables(self) -> Dict[str, Any]:
         return dict(local_hash_id=self.local_hash_id,
@@ -234,29 +310,7 @@ class DataAccessMixin:
 
 
 
-    def get_last_observation(self) -> Optional[pd.DataFrame]:
-        """
-        Gets the last observation from the time series.
 
-        Args:
-            unique_identifier_list: An optional list of unique identifiers to filter by.
-
-        Returns:
-            A DataFrame with the last observation, or None if not found.
-        """
-        update_statistics = self.get_update_statistics()
-        if update_statistics.is_empty():
-            return None
-        # todo request specific endpoint
-        return self.get_df_between_dates(
-            start_date=update_statistics.max_time_index_value,
-            great_or_equal=True,
-        )
-
-    @property
-    def last_observation(self) -> Optional[pd.DataFrame]:
-        """The last observation(s) in the time series."""
-        return self.get_last_observation()
 
 
 
@@ -272,12 +326,12 @@ class APITimeSerie(DataAccessMixin):
                    )
 
     @classmethod
-    def build_from_unique_identifier(cls, unique_identifier: str) -> "APITimeSerie":
-        from mainsequence.client import MarketsTimeSeriesDetails
-        tdag_api_data_source = MarketsTimeSeriesDetails.get(unique_identifier=unique_identifier)
+    def build_from_identifier(cls, identifier: str) -> "APITimeSerie":
+
+        table = ms_client.DynamicTableMetaData.get(identifier=identifier)
         ts = cls(
-            data_source_id=tdag_api_data_source.source_table.data_source,
-            source_table_hash_id=tdag_api_data_source.source_table.hash_id
+            data_source_id=table.data_source.id,
+            source_table_hash_id=table.hash_id
         )
         return ts
 
@@ -295,6 +349,7 @@ class APITimeSerie(DataAccessMixin):
         if data_source_local_lake is not None:
             assert data_source_local_lake.data_type in CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE, "data_source_local_lake should be of type CONSTANTS.DATA_SOURCE_TYPE_LOCAL_DISK_LAKE"
 
+        assert isinstance(data_source_id, int)
         self.data_source_id = data_source_id
         self.source_table_hash_id = source_table_hash_id
         self.data_source = data_source_local_lake
@@ -366,31 +421,6 @@ class APITimeSerie(DataAccessMixin):
         assert metadata is not None, f"Verify that the table {self.source_table_hash_id} exists "
 
 
-
-    @property
-    def pickle_path(self) -> str:
-        pp = data_source_dir_path(self.data_source_id)
-        path = f"{pp}/{self.PICKLE_PREFIFX}{self.local_hash_id}.pickle"
-        return path
-
-    @classmethod
-    def get_pickle_path(cls, source_table_hash_id: str, data_source_id: int) -> str:
-        return f"{ogm.pickle_storage_path}/{data_source_id}/{cls.PICKLE_PREFIFX}{cls._get_local_hash_id()}.pickle"
-
-    def persist_to_pickle(self, overwrite: bool = False) -> Tuple[str, str]:
-        path = self.pickle_path
-        # after persisting pickle , build_hash and source code need to be patched
-        self.logger.debug(f"Persisting pickle")
-
-        pp = build_operations.data_source_pickle_path(self.data_source_id)
-        if os.path.isfile(pp) == False or overwrite == True:
-            self.data_source.persist_to_pickle(pp)
-
-        if os.path.isfile(path) == False or overwrite == True:
-            with open(path, 'wb') as handle:
-                cloudpickle.dump(self, handle)
-        return path, path.replace(ogm.pickle_storage_path + "/", "")
-
     def get_update_statistics(self, asset_symbols: Optional[list] = None) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
         """
         Gets update statistics from the database.
@@ -432,11 +462,29 @@ class APITimeSerie(DataAccessMixin):
         self.logger.info("Not updating series")
         pass
 
+
+
 class TimeSerie(DataAccessMixin,ABC):
     """
     Base TimeSerie class
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
+
+
+    # --- Dunder & Serialization Methods ---
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        # Restore instance attributes (i.e., filename and lineno).
+        self.__dict__.update(state)
+
+    def __getstate__(self) -> Dict[str, Any]:
+        # Copy the object's state from self.__dict__ which contains
+        # all our instance attributes. Always use the dict.copy()
+        # method to avoid modifying the original state.
+        state = self._prepare_state_for_pickle(state=self.__dict__)
+
+        # Remove the unpicklable entries.
+        return state
 
     def __init__(
             self,
@@ -483,11 +531,8 @@ class TimeSerie(DataAccessMixin,ABC):
 
         self.init_meta = init_meta
 
-        if build_meta_data is None:
-            build_meta_data = {"initialize_with_default_partitions": True}
-
-        if "initialize_with_default_partitions" not in build_meta_data.keys():
-            build_meta_data["initialize_with_default_partitions"] = True
+        self.build_meta_data = build_meta_data or {}
+        self.build_meta_data.setdefault("initialize_with_default_partitions", True)
 
         self.build_meta_data = build_meta_data
         self.local_kwargs_to_ignore = local_kwargs_to_ignore
@@ -528,17 +573,7 @@ class TimeSerie(DataAccessMixin,ABC):
             # 3. Run the post-initialization routines
             logger.info(f"Running post-init routines for {self.__class__.__name__}")
 
-            # Add import path to the config kwargs
-            final_kwargs["time_series_class_import_path"] = {
-                "module": self.__class__.__module__,
-                "qualname": self.__class__.__qualname__
-            }
-
-            config=build_operations.create_config(kwargs=final_kwargs,
-                                                  ts_class_name=self.__class__.__name__
-                                                  ) # Assuming these methods exist
-            for field_name, value in asdict(config).items():
-                setattr(self, field_name, value)
+            self._initialize_configuration(init_kwargs=final_kwargs)
 
             # 7. Final setup
             self.set_data_source()
@@ -554,15 +589,53 @@ class TimeSerie(DataAccessMixin,ABC):
             self.scheduler : Optional[Scheduler] = None
             self.update_details_tree :Optional[Dict[str,Any]] =None
 
-
-
-
-            build_operations.patch_build_configuration(time_serie_instance=self)
+            self._patch_build_from_env()
 
             logger.info(f"Post-init routines for {self.__class__.__name__} complete.")
 
         # Replace the subclass's __init__ with our new wrapped version
         cls.__init__ = wrapped_init
+
+    def _initialize_configuration(self, init_kwargs: dict) -> None:
+        """Creates config from init args and sets them as instance attributes."""
+        logger.info(f"Creating configuration for {self.__class__.__name__}")
+
+        init_kwargs["time_series_class_import_path"] = {
+            "module": self.__class__.__module__,
+            "qualname": self.__class__.__qualname__
+        }
+
+        config = build_operations.create_config(
+            kwargs=init_kwargs,
+            ts_class_name=self.__class__.__name__
+        )
+
+        for field_name, value in asdict(config).items():
+            setattr(self, field_name, value)
+    def _patch_build_from_env(self) -> None:
+        """
+        Checks for the PATCH_BUILD_CONFIGURATION environment variable and,
+        if set, flushes the pickle and patches the build configuration.
+        """
+        patch_build = os.environ.get("PATCH_BUILD_CONFIGURATION", "false").lower() in ["true", "1"]
+        if patch_build:
+            self.logger.warning(f"Patching build configuration for {self.hash_id}")
+
+            # Ensure dependencies are initialized
+            self.local_persist_manager
+            self.verify_and_build_remote_objects()
+
+            pickle_path = build_operations.get_pickle_path_from_time_serie(time_serie_instance=self)
+            build_operations.flush_pickle(pickle_path=pickle_path)
+
+            self.local_persist_manager.patch_build_configuration(
+                local_configuration=self.local_initial_configuration,
+                remote_configuration=self.remote_initial_configuration,
+                remote_build_metadata=self.remote_build_metadata,
+            )
+
+
+    # --- Core Properties ---
 
 
     @property
@@ -580,10 +653,6 @@ class TimeSerie(DataAccessMixin,ABC):
     @property
     def local_hash_id(self) -> str:
         return self.hashed_name
-
-    @property
-    def data_source(self) -> DataSource:
-        return self.persistence.data_source
 
     @property
     def local_time_serie(self) -> LocalTimeSerie:
@@ -604,52 +673,96 @@ class TimeSerie(DataAccessMixin,ABC):
             self._set_local_persist_manager(local_hash_id=self.local_hash_id,
                                             )
         return self._local_persist_manager
+    @property
+    def data_source(self) -> Any:
+        if self._data_source is not None:
+            return self._data_source
+        else:
+            raise Exception("Data source has not been set")
 
-    def persist_to_pickle(self, overwrite: bool = False) -> Tuple[str, str]:
+    # --- Persistence & Backend Methods ---
+
+    @tracer.start_as_current_span("TS: set_state_with_sessions")
+    def _set_state_with_sessions(self, include_vam_client_objects: bool = True,
+                                graph_depth_limit: int = 1000,
+                                graph_depth: int = 0) -> None:
         """
-        Persists the TimeSerie object to a pickle file.
+        Sets the state of the TimeSerie after loading from pickle, including sessions.
 
         Args:
-            overwrite: If True, overwrites the existing pickle file.
+            include_vam_client_objects: Whether to include VAM client objects.
+            graph_depth_limit: The depth limit for graph traversal.
+            graph_depth: The current depth in the graph.
+        """
+        if graph_depth_limit == -1:
+            graph_depth_limit = 1e6
+
+        minimum_required_depth_for_update = self.get_minimum_required_depth_for_update()
+
+        state = self.__dict__
+
+        if graph_depth_limit < minimum_required_depth_for_update and graph_depth == 0:
+            graph_depth_limit = minimum_required_depth_for_update
+            self.logger.warning(f"Graph depht limit overrided to {minimum_required_depth_for_update}")
+
+        # if the data source is not local then the de-serialization needs to happend after setting the local persist manager
+        # to guranteed a proper patch in the back-end
+        if graph_depth <= graph_depth_limit and self.data_source.related_resource_class_type:
+            self._set_local_persist_manager(
+                local_hash_id=self.local_hash_id,
+                local_metadata=None,
+            )
+
+        deserializer = build_operations.DeserializerManager()
+        state = deserializer.deserialize_pickle_state(
+            state=state,
+            data_source_id=self.data_source.id,
+            include_vam_client_objects=include_vam_client_objects,
+            graph_depth_limit=graph_depth_limit,
+            graph_depth=graph_depth + 1
+        )
+
+        self.__dict__.update(state)
+
+        self.local_persist_manager.synchronize_metadata(local_metadata=None)
+
+    def _prepare_state_for_pickle(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Prepares the object's state for pickling by serializing and removing unpicklable entries.
+
+        Args:
+            state: The object's __dict__.
 
         Returns:
-            A tuple containing the full path and the relative path of the pickle file.
+            A pickle-safe dictionary representing the object's state.
         """
-        import cloudpickle
-        path = build_operations.get_pickle_path_from_time_serie(time_serie_instance=self)
-        # after persisting pickle , build_hash and source code need to be patched
-        self.logger.debug \
-            (f"Persisting pickle and patching source code and git hash for {self.hash_id}")
-        build_operations.update_git_and_code_in_backend(time_serie_instance=self)
+        properties = state
+        serializer = build_operations.Serializer()
+        properties = serializer.serialize_for_pickle(properties)
+        names_to_remove = []
+        for name, attr in properties.items():
+            if name in [
+                "local_persist_manager",
+                "logger",
+                "init_meta",
+                "_local_metadata_future",
+                "_local_metadata_lock",
+                "_local_persist_manager",
+                "update_tracker",
+            ]:
+                names_to_remove.append(name)
+                continue
 
-        pp = build_operations.data_source_pickle_path(self.data_source.id)
-        if os.path.isfile(pp) == False or overwrite == True:
-            self.data_source.persist_to_pickle(pp)
-
-        if os.path.isfile(path) == False or overwrite == True:
-            if overwrite == True:
-                self.logger.warning("overwriting pickle")
-
-            self._local_persist_manager=None #delete the local persist manager because it has a ThreadLock
-
-            dir_, fname = os.path.split(path)
-            fd, tmp_path = tempfile.mkstemp(prefix=fname, dir=dir_ or None)
-            os.close(fd)
             try:
-                with open(tmp_path, 'wb') as handle:
-                    cloudpickle.dump(self, handle)
-                # atomic replace (works on POSIX and Windows Python ≥ 3.3)
-                os.replace(tmp_path, path)
-            except Exception:
-                # clean up temp file on error
-                try:
-                    os.remove(tmp_path)
-                except OSError:
-                    pass
-                raise
+                cloudpickle.dumps(attr)
+            except Exception as e:
+                logger.exception(f"Cant Pickle property {name}")
+                raise e
 
-        return path, path.replace(ogm.pickle_storage_path + "/", "")
+        for n in names_to_remove:
+            properties.pop(n, None)
 
+        return properties
     def _set_local_persist_manager(self, local_hash_id: str,
                                   local_metadata: Union[None, dict] = None,
 
@@ -674,14 +787,6 @@ class TimeSerie(DataAccessMixin,ABC):
             data_source=self.data_source
         )
 
-    #Necessary passhtrough methods
-
-    @property
-    def data_source(self) -> Any:
-        if self._data_source is not None:
-            return self._data_source
-        else:
-            raise Exception("Data source has not been set")
 
     def set_data_source(self,
                         data_source: Optional[object] = None) -> None:
@@ -730,17 +835,40 @@ class TimeSerie(DataAccessMixin,ABC):
             self.logger.info(f"Connecting dependency '{name}'...")
 
             # Ensure the dependency itself is properly initialized
-            dependency_ts.verify_and_build_remote_objects()
-
             is_api = dependency_ts.is_api
+            if is_api == False:
+                dependency_ts.verify_and_build_remote_objects()
+
+
             self.local_persist_manager.depends_on_connect(dependency_ts, is_api=is_api)
 
             # Recursively set the relation tree for the dependency
             dependency_ts.set_relation_tree()
 
         self.local_persist_manager.set_ogm_dependencies_linked()
-    def get_update_statistics(self) -> UpdateStatistics:
-        return self.local_persist_manager.get_update_statistics()
+
+
+
+    def _set_update_statistics(self,
+                              update_statistics: UpdateStatistics) -> UpdateStatistics:
+        """
+        Default method to narrow down update statistics un local time series,
+        the method will filter using asset_list if the attribute exists as well as the init fallback date
+        :param update_statistics:
+        :return:
+        """
+        # Filter update_statistics to include only assets in self.asset_list.
+
+        asset_list = self.get_asset_list()
+        self._setted_asset_list = asset_list
+
+        update_statistics = update_statistics.update_assets(
+            asset_list, init_fallback_date=self.OFFSET_START
+        )
+        return update_statistics
+
+
+    # --- Public API ---
 
     def run(
             self,
@@ -749,19 +877,19 @@ class TimeSerie(DataAccessMixin,ABC):
             update_tree: bool = True,
             force_update: bool = False,
             update_only_tree: bool = False,
-            remote_scheduler: Optional[object] = None
+            remote_scheduler: Union[object, None] = None
     ):
-        """
-        Starts the execution of the time series by delegating to the run_operations.
-        """
-        return run_operations.run(
-            running_time_serie=self,
-            debug_mode=debug_mode,
-            update_tree=update_tree,
-            force_update=force_update,
-            update_only_tree=update_only_tree,
-            remote_scheduler=remote_scheduler
-        )
+
+        update_runner=run_operations.UpdateRunner(time_serie=self,
+                     debug_mode=debug_mode,
+                     force_update=force_update,
+                     update_tree=update_tree,
+                     update_only_tree=update_only_tree,
+                     remote_scheduler=remote_scheduler,
+                     )
+        update_runner.run()
+
+
 
 
     # --- Optional Hooks for Customization ---
@@ -834,7 +962,7 @@ class TimeSerie(DataAccessMixin,ABC):
 
         return None
 
-    def _run_post_update_routines(self, error_on_last_update: bool, update_statistics: UpdateStatistics) -> None:
+    def run_post_update_routines(self, error_on_last_update: bool, update_statistics: UpdateStatistics) -> None:
         """ Should be overwritten by subclass """
         pass
 
@@ -907,11 +1035,11 @@ class WrapperTimeSerie(TimeSerie):
                 metadata = ms_client.DynamicTableMetaData.get(identifier=table_identifier)
 
             except DoesNotExist as e:
-                logger.exception(f"HistoricalBarsSource does not exist for {market_time_serie_unique_identifier}")
+                logger.exception(f"HistoricalBarsSource does not exist for {table_identifier}")
                 raise e
             api_ts = APITimeSerie(
-                data_source_id=metadata.data_source,
-                source_table_hash_id=source_table.hash_id
+                data_source_id=metadata.data_source.id,
+                source_table_hash_id=metadata.hash_id
             )
             return api_ts
 
@@ -924,6 +1052,11 @@ class WrapperTimeSerie(TimeSerie):
                     table_identifier=rule.markets_time_serie_unique_identifier)
 
         self.translation_table = translation_table
+
+    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+        return self.api_ts_map
+
+
 
     def get_ranged_data_per_asset(self, range_descriptor: Optional[UniqueIdentifierRangeMap]) -> pd.DataFrame:
         """

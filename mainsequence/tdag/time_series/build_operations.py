@@ -20,15 +20,19 @@ from pathlib import Path
 from mainsequence.instrumentation import tracer, tracer_instrumentator
 from mainsequence.tdag.config import API_TS_PICKLE_PREFIFX
 import mainsequence.client as ms_client
-from .persist_managers import PersistManager
+from .persist_managers import PersistManager, get_time_serie_source_code,get_time_serie_source_code_git_hash
 from mainsequence.tdag.config import (
     ogm
 )
 from dataclasses import dataclass
 from mainsequence.logconf import logger
-
+from abc import ABC, abstractmethod
 
 build_model = lambda model_data: get_model_class(model_data["orm_class"])(**model_data)
+
+
+
+
 
 
 # 1. Create a "registry" function using the decorator
@@ -196,58 +200,30 @@ def prepare_config_kwargs(kwargs: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[
     return kwargs, meta_kwargs  # Returns (core_kwargs, meta_kwargs)
 
 
-def get_time_serie_source_code(TimeSerieClass: "TimeSerie") -> str:
-    """
-    Gets the source code of a TimeSerie class.
-
-    Args:
-        TimeSerieClass: The class to get the source code for.
-
-    Returns:
-        The source code as a string.
-    """
-    global logger
-    try:
-        # First try the standard approach.
-        source = inspect.getsource(TimeSerieClass)
-        if source.strip():
-            return source
-    except Exception:
-        logger.warning \
-            ("Your TimeSeries is not in a python module this will likely bring exceptions when running in a pipeline")
-    from IPython import get_ipython
-    # Fallback: Scan IPython's input history.
-    ip = get_ipython()  # Get the current IPython instance.
-    if ip is not None:
-        # Retrieve the full history as a single string.
-        history = "\n".join(code for _, _, code in ip.history_manager.get_range())
-        marker = f"class {TimeSerieClass.__name__}"
-        idx = history.find(marker)
-        if idx != -1:
-            return history[idx:]
-    return "Source code unavailable."
-
-def get_time_serie_source_code_git_hash(TimeSerieClass: "TimeSerie") -> str:
-    """
-    Hashes the source code of a TimeSerie class using SHA-1 (Git style).
-
-    Args:
-        TimeSerieClass: The class to hash.
-
-    Returns:
-        The Git-style hash of the source code.
-    """
-    time_serie_class_source_code = get_time_serie_source_code(TimeSerieClass)
-    # Prepare the content for Git-style hashing
-    # Git hashing format: "blob <size_of_content>\0<content>"
-    content = f"blob {len(time_serie_class_source_code)}\0{time_serie_class_source_code}"
-    # Compute the SHA-1 hash (Git hash)
-    hash_object = hashlib.sha1(content.encode('utf-8'))
-    git_hash = hash_object.hexdigest()
-    return git_hash
 
 
 
+def verify_backend_git_hash_with_pickle(local_persist_manager:PersistManager,
+                                        time_serie_class: "TimeSerie") -> None:
+    """Verifies if the git hash in the backend matches the one from the pickled object."""
+    if local_persist_manager.metadata is not None:
+        load_git_hash = get_time_serie_source_code_git_hash(time_serie_class)
+
+        persisted_pickle_hash = local_persist_manager.metadata.time_serie_source_code_git_hash
+        if load_git_hash != persisted_pickle_hash:
+            local_persist_manager.logger.warning(
+                f"{bcolors.WARNING}Source code does not match with pickle rebuilding{bcolors.ENDC}")
+            pickle_path = get_pickle_path(local_hash_id=local_persist_manager.local_hash_id,
+                                          data_source_id=local_persist_manager.data_source.id, )
+            flush_pickle(pickle_path)
+
+            rebuild_time_serie = rebuild_from_configuration(local_hash_id=local_persist_manager.local_hash_id,
+                                                            data_source=local_persist_manager.data_source,
+                                                            )
+            rebuild_time_serie.persist_to_pickle()
+        else:
+            # if no need to rebuild, just sync the metadata
+            local_persist_manager.synchronize_metadata(local_metadata=None)
 
 def hash_signature(dictionary: Dict[str, Any]) -> Tuple[str, str]:
     """
@@ -330,7 +306,7 @@ class Serializer:
         new_kwargs = {key: serialize_argument(value, pickle_ts) for key, value in kwargs.items()}
         return collections.OrderedDict(sorted(new_kwargs.items()))
 
-from abc import ABC, abstractmethod
+
 
 class BaseRebuilder(ABC):
     """
@@ -343,6 +319,8 @@ class BaseRebuilder(ABC):
     def registry(self) -> Dict[str, callable]:
         """The registry mapping keys to handler methods."""
         pass
+
+
 
     def rebuild(self, value: Any, **kwargs) -> Any:
         """
@@ -361,7 +339,8 @@ class BaseRebuilder(ABC):
             # Find a handler in the registry and use it
             for key, handler in self.registry.items():
                 if key in value:
-                    return handler(self, value, **kwargs)
+                    return handler(value, **kwargs)
+
 
             # If no handler, it's a generic dict; rebuild its contents
             return {k: self.rebuild(v, **kwargs) for k, v in value.items()}
@@ -372,64 +351,67 @@ class BaseRebuilder(ABC):
 class PickleRebuilder(BaseRebuilder):
     """Specialist for deserializing objects from a pickled state."""
 
-    @classmethod
-    def _rebuild_pickled_timeserie(cls, value: Dict, **state_kwargs) -> "TimeSerie":
+    @property
+    def registry(self) -> Dict[str, Callable]:
+        return {
+            "is_time_serie_pickled": self._handle_pickled_timeserie,
+            "is_api_time_serie_pickled": self._handle_api_timeserie,
+            "pydantic_model_import_path": self._handle_pydantic_model,
+            "is_time_series_config": self._handle_timeseries_config,
+            "orm_class": self._handle_orm_model,
+            "__type__": self._handle_complex_type,
+        }
+    def _handle_pickled_timeserie(self, value: Dict, **state_kwargs) -> "TimeSerie":
         """Handles 'is_time_serie_pickled' markers."""
         import cloudpickle
         # Note: You need to make TimeSerie available here
-        full_path = TimeSerie.get_pickle_path(
+        full_path = get_pickle_path(
             local_hash_id=value['local_hash_id'],
             data_source_id=value['data_source_id']
         )
         with open(full_path, 'rb') as handle:
             ts = cloudpickle.load(handle)
-        ts.set_data_source_from_pickle_path(full_path)
+
+        ds_pickle_path=data_source_pickle_path(value['data_source_id'])
+        data_source = load_data_source_from_pickle(ds_pickle_path)
+        ts.set_data_source(data_source=data_source)
+
+
         if state_kwargs.get('graph_depth', 0) - 1 <= state_kwargs.get('graph_depth_limit', 0):
-            ts.set_state_with_sessions(**state_kwargs)
+            ts._set_state_with_sessions(**state_kwargs)
         return ts
-    @classmethod
-    def _rebuild_api_timeserie(cls, value: Dict, **state_kwargs) -> "APITimeSerie":
+    def _handle_pydantic_model(self, value: Dict, **state_kwargs) -> Any:
+        path_info = value["pydantic_model_import_path"]
+        module = importlib.import_module(path_info["module"])
+        PydanticClass = getattr(module, path_info['qualname'])
+
+        rebuilt_value = self.rebuild(value["serialized_model"], **state_kwargs)
+        return PydanticClass(**rebuilt_value)
+    def _handle_api_timeserie(self, value: Dict, **state_kwargs) -> "APITimeSerie":
         """Handles 'is_api_time_serie_pickled' markers."""
         import cloudpickle
         # Note: You need to make APITimeSerie available here
-        full_path = APITimeSerie.get_pickle_path(
+        full_path = get_pickle_path(
             local_hash_id=value['local_hash_id'],
-            data_source_id=value['data_source_id']
+            data_source_id=value['data_source_id'],is_api=True,
         )
         with open(full_path, 'rb') as handle:
             ts = cloudpickle.load(handle)
         return ts
-    @classmethod
-    def _rebuild_timeseries_config(cls, value: Dict, **state_kwargs) -> Dict:
+    def _handle_timeseries_config(self, value: Dict, **state_kwargs) -> Dict:
         """Handles 'is_time_series_config' markers."""
-        return cls.deserialize_pickle_state(value["config_data"], **state_kwargs)
+        return self.rebuild(value["config_data"], **state_kwargs)
 
-    @classmethod
-    def _rebuild_orm_model(cls, value: Dict, **state_kwargs) -> Any:
+    def _handle_orm_model(self, value: Dict, **state_kwargs) -> Any:
         """Handles 'orm_class' markers for single models."""
         return build_model(value)
-    @classmethod
-    def _rebuild_orm_model_list(cls, value: Dict, **state_kwargs) -> list:
-        """Handles '__type__: orm_model_list' markers."""
-        # Using build_model directly as items are already serialized model dicts
-        return [build_model(item) for item in value["items"]]
 
-    @classmethod
-    def _rebuild_complex_type(cls, value: Dict, **state_kwargs) -> Any:
+    def _handle_complex_type(self, value: Dict, **state_kwargs) -> Any:
         """Handles generic '__type__' markers (like tuples)."""
-        rebuild_function = lambda x: cls.deserialize_value(x, **state_kwargs)
+        rebuild_function = lambda x: self.rebuild(x, **state_kwargs)
         # Assumes rebuild_with_type handles different __type__ values
         return rebuild_with_type(value, rebuild_function=rebuild_function)
-    @property
-    def registry(self) -> Dict[str, callable]:
-        return {
-            "pydantic_model_import_path": self._rebuild_pydantic_model,
-            "is_time_serie_pickled": self._rebuild_pickled_timeserie,
-            "is_api_time_serie_pickled": self._rebuild_api_timeserie,
-            "is_time_series_config": self._rebuild_timeseries_config,
-            "orm_class": self._rebuild_orm_model,
-            "__type__": self._rebuild_complex_type,
-        }
+
 
 class ConfigRebuilder(BaseRebuilder):
 
@@ -486,29 +468,9 @@ class DeserializerManager:
             The rebuilt configuration dictionary.
         """
         config = self.rebuild_config(config=config)
-        if time_serie_class_name == "WrapperTimeSerie":
-            config["time_series_dict"] = self.rebuild_serialized_wrapper_dict(
-                time_series_dict_config=config["time_series_dict"],
-            )
 
         return config
 
-    def rebuild_serialized_wrapper_dict(self, time_series_dict_config: dict) -> Dict[str, Any]:
-        """
-        Rebuilds a dictionary of TimeSerie objects from a serialized wrapper configuration.
-
-        Args:
-            time_series_dict_config: The serialized wrapper dictionary.
-
-        Returns:
-            A dictionary of TimeSerie objects.
-        """
-        time_series_dict = {}
-        for key, value in time_series_dict_config.items():
-            new_ts = self.rebuild_from_configuration(hash_id=value)
-            time_series_dict[key] = new_ts
-
-        return time_series_dict
 
 
     def deserialize_pickle_state(self, state: Any, **kwargs) -> Any:
@@ -552,10 +514,10 @@ def create_config(ts_class_name: str,  kwargs: Dict[str, Any]):
 
     # 5. Create the remote configuration by removing ignored keys
     remote_config = copy.deepcopy(dict_to_hash)
-    if 'local_kwargs_to_ignore' in remote_config:
-        for k in remote_config['local_kwargs_to_ignore']:
-            remote_config.pop(k, None)
-        remote_config.pop('local_kwargs_to_ignore', None)
+    # if 'local_kwargs_to_ignore' in remote_config:
+    #     for k in remote_config['local_kwargs_to_ignore']:
+    #         remote_config.pop(k, None)
+    #     remote_config.pop('local_kwargs_to_ignore', None)
 
 
 
@@ -571,13 +533,14 @@ def create_config(ts_class_name: str,  kwargs: Dict[str, Any]):
     )
 
 
-def flush_pickle(self) -> None:
+def flush_pickle(pickle_path) -> None:
     """Deletes the pickle file for this time series."""
-    if os.path.isfile(self.pickle_path):
-        os.remove(self.pickle_path)
+    if os.path.isfile(pickle_path):
+        os.remove(pickle_path)
+
+
 
 # In class BuildManager:
-
 
 @tracer.start_as_current_span("TS: load_from_pickle")
 def load_from_pickle(pickle_path: str) -> "TimeSerie":
@@ -614,46 +577,17 @@ def load_from_pickle(pickle_path: str) -> "TimeSerie":
     data_source = load_data_source_from_pickle(pickle_path=pickle_path)
     time_serie.set_data_source(data_source=data_source)
     # verify pickle
-    verify_backend_git_hash_with_pickle(time_serie_instance=time_serie)
+    verify_backend_git_hash_with_pickle(local_persist_manager=time_serie.local_persist_manager,
+                                        time_serie_class=time_serie.__class__,
+                                        )
     return time_serie
 
 
-def patch_build_configuration(time_serie_instance :"TimeSerie") -> None:
-    """
-    Patches the build configuration for the time series and its dependencies.
-    """
-    patch_build = os.environ.get("PATCH_BUILD_CONFIGURATION", False) in ["true", "True", 1]
-    if patch_build == True:
-        time_serie_instance.local_persist_manager # ensure lpm exists
-        time_serie_instance.verify_and_build_remote_objects()  # just call it before to initilaize dts
-        time_serie_instance.logger.warning(f"Patching build configuration for {time_serie_instance.hash_id}")
-        flush_pickle()
 
-        time_serie_instance.local_persist_manager.patch_build_configuration \
-            (local_configuration=time_serie_instance.local_initial_configuration,
-                                                                            remote_configuration=time_serie_instance.remote_initial_configuration,
-                                                                            remote_build_metadata=time_serie_instance.remote_build_metadata,
-                                                                            )
-def verify_backend_git_hash_with_pickle(time_serie_instance:"TimeSerie") -> None:
-    """Verifies if the git hash in the backend matches the one from the pickled object."""
-    if time_serie_instance.local_persist_manager.metadata is not None:
-        load_git_hash =  get_time_serie_source_code_git_hash(time_serie_instance.__class__)
-
-        persisted_pickle_hash = time_serie_instance.local_persist_manager.metadata.time_serie_source_code_git_hash
-        if load_git_hash != persisted_pickle_hash:
-            time_serie_instance.logger.warning(
-                f"{bcolors.WARNING}Source code does not match with pickle rebuilding{bcolors.ENDC}")
-            flush_pickle()
-
-            rebuild_time_serie = rebuild_from_configuration(local_hash_id= time_serie_instance.local_hash_id,
-                                                                      data_source= time_serie_instance.data_source,
-                                                                      )
-            rebuild_time_serie.persist_to_pickle()
-        else:
-            # if no need to rebuild, just sync the metadata
-            time_serie_instance.local_persist_manager.synchronize_metadata(local_metadata=None)
-
-
+def get_pickle_path(local_hash_id: str, data_source_id: int, is_api=False) -> str:
+    if is_api:
+        return  os.path.join(ogm.pickle_storage_path, str(data_source_id), f"{API_TS_PICKLE_PREFIFX}{local_hash_id}.pickle")
+    return os.path.join(ogm.pickle_storage_path, str(data_source_id), f"{local_hash_id}.pickle")
 
 def load_data_source_from_pickle( pickle_path: str) -> Any:
     data_path = Path(pickle_path).parent / "data_source.pickle"
@@ -697,15 +631,8 @@ def rebuild_and_set_from_local_hash_id( local_hash_id: int, data_source_id: int,
     ts.logger.debug(f"ts {local_hash_id} loaded from pickle ")
     return ts, pickle_path
 
-def set_data_source_from_pickle_path(self, pikle_path: str) -> None:
-    """
-    Sets the data source for the TimeSerie from a pickle path.
 
-    Args:
-        pikle_path: The path to the pickle file.
-    """
-    data_source =  self.owner.load_data_source_from_pickle(pikle_path)
-    self.owner.set_data_source(data_source=data_source)
+
 
 def load_and_set_from_pickle( pickle_path: str, graph_depth_limit: int = 1) -> "TimeSerie":
     """
@@ -719,8 +646,7 @@ def load_and_set_from_pickle( pickle_path: str, graph_depth_limit: int = 1) -> "
         The loaded and configured TimeSerie object.
     """
     ts = load_from_pickle(pickle_path)
-    set_state_with_sessions(
-        time_serie_instance=ts,
+    ts._set_state_with_sessions(
         graph_depth=0,
         graph_depth_limit=graph_depth_limit,
         include_vam_client_objects=False)
@@ -769,7 +695,7 @@ def rebuild_from_configuration( local_hash_id: str,
     time_serie_class_name = time_serie_config["time_series_class_import_path"]["qualname"]
 
     time_serie_config.pop("time_series_class_import_path")
-    time_serie_config = Deserializer().rebuild_serialized_config(time_serie_config,
+    time_serie_config = DeserializerManager().rebuild_serialized_config(time_serie_config,
                                                                    time_serie_class_name=time_serie_class_name)
     time_serie_config["init_meta"] = {}
 
@@ -777,21 +703,7 @@ def rebuild_from_configuration( local_hash_id: str,
 
     return re_build_ts
 
-def __setstate__(self, state: Dict[str, Any]) -> None:
-    # Restore instance attributes (i.e., filename and lineno).
-    self.owner.__dict__.update(state)
 
-def __getstate__(self) -> Dict[str, Any]:
-    # Copy the object's state from self.__dict__ which contains
-    # all our instance attributes. Always use the dict.copy()
-    # method to avoid modifying the original state.
-    state = self._prepare_state_for_pickle(state=self.__dict__)
-
-    # Remove the unpicklable entries.
-    return state
-
-def get_pickle_path( local_hash_id: str, data_source_id: int) -> str:
-    return os.path.join(ogm.pickle_storage_path, str(data_source_id), f"{local_hash_id}.pickle")
 
 def load_and_set_from_hash_id( local_hash_id: int, data_source_id: int) -> "TimeSerie":
     path = get_pickle_path(local_hash_id=local_hash_id ,data_source_id=data_source_id)
@@ -799,125 +711,11 @@ def load_and_set_from_hash_id( local_hash_id: int, data_source_id: int) -> "Time
     return ts
 
 
-def get_pickle_path_from_time_serie(time_serie_instance) -> str:
-    pp = data_source_dir_path(time_serie_instance.data_source.id)
-    path = f"{pp}/{time_serie_instance.local_hash_id}.pickle"
-    return path
-def update_git_and_code_in_backend(time_serie_instance :PersistManager) -> None:
-    """Updates the source code and git hash information in the backend."""
-    time_serie_instance.local_persist_manager.update_source_informmation(
-        git_hash_id=get_time_serie_source_code_git_hash(time_serie_instance.__class__),
-        source_code=get_time_serie_source_code(time_serie_instance.__class__),
-    )
 
 
-@tracer.start_as_current_span("TS: set_state_with_sessions")
-def set_state_with_sessions(time_serie_instance :"TimeSerie", include_vam_client_objects: bool = True,
-                            graph_depth_limit: int = 1000,
-                            graph_depth: int = 0) -> None:
-    """
-    Sets the state of the TimeSerie after loading from pickle, including sessions.
-
-    Args:
-        include_vam_client_objects: Whether to include VAM client objects.
-        graph_depth_limit: The depth limit for graph traversal.
-        graph_depth: The current depth in the graph.
-    """
-    if graph_depth_limit == -1:
-        graph_depth_limit = 1e6
-
-    minimum_required_depth_for_update = time_serie_instance.get_minimum_required_depth_for_update()
-
-    state = time_serie_instance.__dict__
-
-    if graph_depth_limit < minimum_required_depth_for_update and graph_depth == 0:
-        graph_depth_limit = minimum_required_depth_for_update
-        time_serie_instance.logger.warning(f"Graph depht limit overrided to {minimum_required_depth_for_update}")
-
-    # if the data source is not local then the de-serialization needs to happend after setting the local persist manager
-    # to guranteed a proper patch in the back-end
-    if graph_depth <= graph_depth_limit and time_serie_instance.data_source.related_resource_class_type:
-        time_serie_instance._set_local_persist_manager(
-            local_hash_id=time_serie_instance.local_hash_id,
-            local_metadata=None,
-        )
-
-    serializer = Deserializer()
-    state = serializer.deserialize_pickle_state(
-        state=state,
-        data_source_id=time_serie_instance.data_source.id,
-        include_vam_client_objects=include_vam_client_objects,
-        graph_depth_limit=graph_depth_limit,
-        graph_depth=graph_depth + 1
-    )
-
-    time_serie_instance.__dict__.update(state)
-
-    time_serie_instance.local_persist_manager.synchronize_metadata(local_metadata=None)
 
 
-def _prepare_state_for_pickle(logger, state: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Prepares the object's state for pickling by serializing and removing unpicklable entries.
 
-    Args:
-        state: The object's __dict__.
 
-    Returns:
-        A pickle-safe dictionary representing the object's state.
-    """
-    properties = state
-    serializer = Serializer()
-    properties = serializer.serialize_for_pickle(properties)
-    names_to_remove = []
-    for name, attr in properties.items():
-        if name in [
-            "local_persist_manager",
-            "logger",
-            "init_meta",
-            "_local_metadata_future",
-            "_local_metadata_lock",
-            "_local_persist_manager",
-            "update_tracker",
-        ]:
-            names_to_remove.append(name)
-            continue
 
-        try:
-            cloudpickle.dumps(attr)
-        except Exception as e:
-            logger.exception(f"Cant Pickle property {name}")
-            raise e
 
-    for n in names_to_remove:
-        properties.pop(n, None)
-
-    return properties
-def run_in_debug_scheduler(time_serie_instance :"TimeSerie", break_after_one_update: bool = True, run_head_in_main_process: bool = True,
-                           wait_for_update: bool = True, force_update: bool = True, debug: bool = True,
-                           update_tree: bool = True,
-                           raise_exception_on_error: bool = True) -> None:
-    """
-    Runs the TimeSerie update in a debug scheduler.
-
-    Args:
-        break_after_one_update: If True, stops after one update cycle.
-        run_head_in_main_process: If True, runs the head node in the main process.
-        wait_for_update: If True, waits for the update to complete.
-        force_update: If True, forces an update.
-        debug: If True, runs in debug mode.
-        update_tree: If True, updates the entire dependency tree.
-        raise_exception_on_error: If True, raises exceptions on errors.
-    """
-    from .update.scheduler import SchedulerUpdater
-    SchedulerUpdater.debug_schedule_ts(
-        time_serie_hash_id= time_serie_instance.local_hash_id,
-        data_source_id= time_serie_instance.data_source.id,
-        break_after_one_update=break_after_one_update,
-        run_head_in_main_process=True,
-        wait_for_update=False,
-        force_update=True,
-        debug=True,
-        update_tree=True,
-        raise_exception_on_error=raise_exception_on_error
-    )

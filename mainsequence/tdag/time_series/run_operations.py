@@ -1,687 +1,627 @@
-from typing import Tuple, Optional, Dict, Any, Union
-from mainsequence.client import UpdateStatistics, LocalTimeSerieUpdateDetails
-from mainsequence.instrumentation import tracer, tracer_instrumentator
-import mainsequence.client as ms_client
-import structlog.contextvars as cvars
-import datetime
-import pandas as pd
-import time
-import numpy as np
-from mainsequence.instrumentation import tracer, tracer_instrumentator
-import mainsequence.tdag.time_series.build_operations as build_operations
 
+# Standard Library Imports
+import gc
+import time
+import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+# Third-Party Library Imports
+import numpy as np
+import pandas as pd
+import structlog.contextvars as cvars
+
+# Internal Project Imports
+
+
+
+# Client and ORM Models
+import mainsequence.client as ms_client
+from mainsequence.client import (
+    LocalTimeSerie,
+    LocalTimeSerieUpdateDetails,
+    Scheduler,
+    UpdateStatistics
+)
+
+# Instrumentation and Logging
+from mainsequence.instrumentation import (
+    tracer,
+    tracer_instrumentator,
+    TracerInstrumentator
+)
+from mainsequence.instrumentation.utils import Status, StatusCode
+
+# TDAG Core Components and Helpers
+from mainsequence.tdag.time_series import build_operations
+from mainsequence.tdag.time_series.update.utils import (
+    UpdateInterface,
+    wait_for_update_time
+)
+
+# Custom Exceptions
 class DependencyUpdateError(Exception):
     pass
 
 
-def get_update_map( declared_dependencies: Dict[str,'TimeSerie'],
-                    logger:object,
-                    dependecy_map: Optional[Dict] = None) -> Dict[
-    Tuple[str, int], Dict[str, Any]]:
+class UpdateRunner:
     """
-    Obtains all TimeSerie objects in the dependency graph by recursively
-    calling the dependencies() method.
+       Orchestrates the entire update process for a TimeSerie instance.
+       It handles scheduling, dependency resolution, execution, and error handling.
+       """
 
-    This approach is more robust than introspecting class members as it relies
-    on an explicit declaration of dependencies.
+    def __init__(self, time_serie: "TimeSerie", debug_mode: bool = False, force_update: bool = False,
+                 update_tree: bool = True, update_only_tree: bool = False,
+                 remote_scheduler: Optional[Scheduler] = None):
+        from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
+        self.ts = time_serie
+        self.logger = self.ts.logger
+        self.debug_mode = debug_mode
+        self.force_update = force_update
+        self.update_tree = update_tree
+        self.update_only_tree = update_only_tree
+        if self.update_tree:
+            self.update_only_tree = False
 
-    Args:
-        time_serie_instance: The TimeSerie instance from which to start the dependency traversal.
-        dependecy_map: An optional dictionary to store the dependency map, used for recursion.
+        self.remote_scheduler = remote_scheduler
+        self.scheduler: Optional[Scheduler] = None
+        self.update_tracker: Optional[UpdateInterface] = None
+        self.update_actor_manager: Optional[RayUpdateManager] = None
 
-    Returns:
-        A dictionary mapping (local_hash_id, data_source_id) to TimeSerie info.
-    """
-    # Initialize the map on the first call
-    if dependecy_map is None:
-        dependecy_map = {}
+    def _setup_scheduler(self) -> None:
+        """Initializes or retrieves the scheduler and starts its heartbeat."""
+        if self.remote_scheduler:
+            self.scheduler = self.remote_scheduler
+            return
 
-    # Get the explicitly declared dependencies, just like set_relation_tree
-
-
-    for name, dependency_ts in declared_dependencies.items():
-        key = (dependency_ts.local_hash_id, dependency_ts.data_source_id)
-
-        # If we have already processed this node, skip it to prevent infinite loops
-        if key in dependecy_map:
-            continue
-
-        # Ensure the dependency is initialized in the persistence layer
-        dependency_ts.local_persist_manager
-
-        logger.debug(f"Adding dependency '{name}' to update map.")
-        dependecy_map[key] = {"is_pickle": False, "ts": dependency_ts}
-        declared_dependencies=dependency_ts.dependencies() or {}
-        # Recursively call get_update_map on the dependency to traverse the entire graph
-        get_update_map(declared_dependencies=declared_dependencies,
-                       logger=logger,
-                       dependecy_map=dependecy_map)
-
-    return dependecy_map
-
-def load_dependencies(time_serie_instance :"TimeSerie") -> None:
-    """Fetches and sets the dependencies DataFrame."""
-    if time_serie_instance.dependencies_df is None:  # Lazy loading
-        time_serie_instance.logger.debug("Initializing dependency data...")
-        depth_df = time_serie_instance.local_persist_manager.get_all_dependencies_update_priority()
-        time_serie_instance.depth_df = depth_df
-
-        if not depth_df.empty:
-            # Filter out the owner itself from the dependency list
-            time_serie_instance.dependencies_df = depth_df[
-                depth_df["local_time_serie_id"] != time_serie_instance.local_persist_manager.local_metadata.id].copy()
-        else:
-            time_serie_instance.dependencies_df = pd.DataFrame()
-
-
-def pre_update_setting_routines(run_time_serie:"TimeSerie", scheduler: "Scheduler", set_time_serie_queue_status: bool, update_tree: bool,
-                                 local_metadata: Optional[dict] = None) -> Tuple[Dict, Any]:
-    """
-    Routines to execute before an update.
-
-    Args:
-        scheduler: The scheduler object.
-        set_time_serie_queue_status: Whether to set the queue status.
-        update_tree: Whether to update the tree.
-        metadata: Optional remote metadata.
-        local_metadata: Optional local metadata.
-
-    Returns:
-        A tuple containing the local metadata map and state data.
-    """
-    # reset metadata
-    run_time_serie.local_persist_manager.synchronize_metadata(local_metadata=local_metadata)
-    run_time_serie.set_relation_tree()
-
-
-    update_priority_dict = None
-    # build priority update
-
-    load_dependencies(time_serie_instance=run_time_serie)
-
-    if not run_time_serie._scheduler_tree_connected and update_tree:
-        run_time_serie.logger.debug("Connecting dependency tree to scheduler...")
-        # only set once
-        all_local_time_series_ids_in_tree = []
-
-        if not run_time_serie.depth_df.empty:
-            all_local_time_series_ids_in_tree = run_time_serie.depth_df["local_time_serie_id"].to_list()
-            if update_tree == True:
-                scheduler.in_active_tree_connect(local_time_series_ids=all_local_time_series_ids_in_tree + [run_time_serie.local_persist_manager.local_metadata.id])
-            run_time_serie._scheduler_tree_connected = True
-
-    depth_df = run_time_serie.depth_df.copy()
-    # set active tree connections
-
-    if not depth_df.empty > 0:
-        all_local_time_series_ids_in_tree = depth_df[["local_time_serie_id"]].to_dict("records")
-    all_local_time_series_ids_in_tree.append({"local_time_serie_id":run_time_serie.local_persist_manager.local_metadata.id})
-
-    update_details_batch = dict(error_on_last_update=False,
-                                active_update_scheduler_uid=scheduler.uid)
-    if set_time_serie_queue_status == True:
-        update_details_batch['active_update_status'] = "Q"
-    all_metadatas = ms_client.LocalTimeSerie.get_metadatas_and_set_updates(local_time_series_ids=[i["local_time_serie_id"] for i in all_local_time_series_ids_in_tree],
-
-                                                       update_details_kwargs=update_details_batch,
-                                                       update_priority_dict=update_priority_dict,
-                                                       )
-    state_data, local_metadatas, source_table_config_map = all_metadatas['state_data'], all_metadatas[
-        "local_metadatas"], all_metadatas["source_table_config_map"]
-    local_metadatas = {m.id: m for m in local_metadatas}
-
-    run_time_serie.scheduler = scheduler
-
-    run_time_serie.update_details_tree = {key: v.run_configuration for key, v in local_metadatas.items()}
-    return local_metadatas, state_data
-
-
-
-
-def set_update_statistics(time_serie_instance: "TimeSerie",
-                          update_statistics: UpdateStatistics) -> UpdateStatistics:
-    """
-    Default method to narrow down update statistics un local time series,
-    the method will filter using asset_list if the attribute exists as well as the init fallback date
-    :param update_statistics:
-    :return:
-    """
-    # Filter update_statistics to include only assets in self.asset_list.
-
-    asset_list = time_serie_instance.get_asset_list()
-    time_serie_instance._setted_asset_list = asset_list
-
-    update_statistics = update_statistics.update_assets(
-        asset_list, init_fallback_date=time_serie_instance.OFFSET_START
-    )
-    return update_statistics
-
-
-@tracer.start_as_current_span("Starting TS Update")
-def start_time_serie_update(
-        run_time_serie: "TimeSerie",
-        update_tracker: object, debug_mode: bool,
-        update_tree: bool = False,
-        local_time_series_map: Optional[Dict[str, "LocalTimeSerie"]] = None,
-        update_only_tree: bool = False, force_update: bool = False,
-        use_state_for_update: bool = False) -> bool:
-    """
-    Main update method for a TimeSerie that interacts with the graph node.
-
-    Args:
-        update_tracker: The update tracker object.
-        debug_mode: Whether to run in debug mode.
-        update_tree: Whether to update the entire dependency tree.
-        local_time_series_map: A map of local time series.
-        update_only_tree: If True, only updates the dependency tree structure.
-        force_update: If True, forces an update.
-        use_state_for_update: If True, uses the current state for the update.
-
-    Returns:
-        True if there was an error on the last update, False otherwise.
-    """
-    running_time_serie = run_time_serie
-    try:
-        local_time_serie_historical_update = running_time_serie.local_persist_manager.local_metadata.set_start_of_execution(
-            active_update_scheduler_uid=update_tracker.scheduler_uid)
-    except Exception as e:
-        raise e
-
-    latest_value, must_update = local_time_serie_historical_update.last_time_index_value, local_time_serie_historical_update.must_update
-    update_statistics = local_time_serie_historical_update.update_statistics
-    error_on_last_update = False
-
-    if force_update == True or update_statistics.max_time_index_value is None:
-        must_update = True
-
-    # Update statistics and build and rebuild localmetadata with foreign relations
-    running_time_serie.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True)
-    update_statistics = set_update_statistics(time_serie_instance=running_time_serie,
-                                              update_statistics=update_statistics)
-
-    try:
-        if must_update == True:
-
-            update_local(
-                running_time_serie=running_time_serie,
-                update_tree=update_tree, debug_mode=debug_mode,
-                overwrite_latest_value=latest_value,
-                local_time_series_map=local_time_series_map,
-                update_tracker=update_tracker, update_only_tree=update_only_tree,
-                use_state_for_update=use_state_for_update, update_statistics=update_statistics
-            )
-
-            running_time_serie.local_persist_manager.local_metadata.set_end_of_execution(
-                historical_update_id=local_time_serie_historical_update.id,
-                error_on_update=error_on_last_update)
-        else:
-            running_time_serie.logger.info("Already updated, waiting until next update time")
-
-    except Exception as e:
-        error_on_last_update = True
-        raise e
-    finally:
-        running_time_serie.local_persist_manager.local_metadata.set_end_of_execution(
-            historical_update_id=local_time_serie_historical_update.id,
-            error_on_update=error_on_last_update)
-        # always set last relations details
-        running_time_serie.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True,
-                                                                         )
-        running_time_serie._run_post_update_routines(error_on_last_update=error_on_last_update,
-                                                     update_statistics=update_statistics
-                                                     )
-
-        running_time_serie.local_persist_manager.set_column_metadata(
-                                               columns_metadata=running_time_serie.get_column_metadata()
-                                               )
-        running_time_serie.local_persist_manager.set_table_metadata(
-                                              table_metadata=running_time_serie.get_table_metadata(
-                                                  update_statistics=update_statistics)
-                                              )
-
-    return error_on_last_update
-
-
-def set_actor_manager(
-        time_serie_instance: "TimeSerie",
-        actor_manager: object) -> None:
-    """
-    Sets the actor manager for distributed updates.
-
-    Args:
-        actor_manager: The actor manager object.
-    """
-    time_serie_instance.update_actor_manager = actor_manager
-
-
-def setup_scheduler(running_time_serie: "TimeSerie", debug_mode: bool,
-                    remote_scheduler: Optional[object]) -> "Scheduler":
-    from mainsequence.client import Scheduler
-
-    """Initializes or retrieves the scheduler and starts its heartbeat."""
-    if remote_scheduler is None:
-        name_prefix = "DEBUG_" if debug_mode else ""
-        scheduler = Scheduler.build_and_assign_to_ts(
-            scheduler_name=f"{name_prefix}{running_time_serie.local_hash_id}_{running_time_serie.data_source.id}",
-            local_hash_id_list=[(running_time_serie.local_hash_id, running_time_serie.data_source.id)],
+        name_prefix = "DEBUG_" if self.debug_mode else ""
+        self.scheduler = ms_client.Scheduler.build_and_assign_to_ts(
+            scheduler_name=f"{name_prefix}{self.ts.local_hash_id}_{self.ts.data_source.id}",
+            local_hash_id_list=[(self.ts.local_hash_id, self.ts.data_source.id)],
             remove_from_other_schedulers=True,
-            running_in_debug_mode=debug_mode
+            running_in_debug_mode=self.debug_mode
         )
-        scheduler.start_heart_beat()
-        return scheduler
-    return remote_scheduler
-
-
-def setup_execution_environment(running_time_serie: "TimeSerie", scheduler: "Scheduler", debug_mode: bool,
-                                update_tree: bool) -> Tuple[
-    object, dict]:
-    from mainsequence.tdag.time_series.update.utils import UpdateInterface, wait_for_update_time
-    from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
-    """Sets up distributed actors and gathers pre-update state."""
-    distributed_actor_manager = RayUpdateManager(scheduler_uid=scheduler.uid, skip_health_check=True)
-    set_actor_manager(time_serie_instance=running_time_serie,
-                      actor_manager=distributed_actor_manager)
-
-    local_time_series_map, state_data = pre_update_setting_routines(
-        run_time_serie=running_time_serie,
-        scheduler=scheduler,
-        set_time_serie_queue_status=False,
-        update_tree=update_tree
-    )
-
-    update_tracker = UpdateInterface(
-        head_hash=running_time_serie.local_hash_id,
-        logger=running_time_serie.logger,
-        state_data=state_data,
-        debug=debug_mode,
-        scheduler_uid=scheduler.uid,
-        trace_id=None,
-    )
-    return update_tracker, local_time_series_map
-
-
-def execute_core_update(
-        running_time_serie: "TimeSerie",
-        update_tracker: object, force_update: bool, **kwargs):
-    """Waits if necessary, then starts the main update process."""
-    from mainsequence.tdag.time_series.update.utils import wait_for_update_time
-
-    if not force_update:
-        wait_for_update_time(
-            local_hash_id=running_time_serie.local_hash_id,
-            data_source_id=running_time_serie.data_source.id,
-            logger=running_time_serie.logger,
-            force_next_start_of_minute=False
-        )
-
-    # This is the final delegation to the BuildManager to start the update
-    return start_time_serie_update(
-        run_time_serie=running_time_serie,
-        update_tracker=update_tracker,
-        force_update=force_update,
-        **kwargs
-    )
-
-
-def run(
-        running_time_serie: "TimeSerie",
-        debug_mode: bool,
-        *,
-        update_tree: bool = True,
-        force_update: bool = False,
-        update_only_tree: bool = False,
-        remote_scheduler: Union[object, None] = None
-):
-    """
-
-    Args:
-        debug_mode: if the time serie is run in debug mode the DAG will be run node by node in the same process
-        update_tree: if set to False then only the selected time series will be run, default is True
-        force_update: Force an update even if the time serie schedule does not require an update
-        update_only_tree: If set to True then only the dependency graph of the selected time serie will be updated
-        remote_scheduler:
-    """
-    from mainsequence.instrumentation import TracerInstrumentator
-    from mainsequence.tdag.time_series.update.utils import UpdateInterface, wait_for_update_time
-    from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
-    import gc
-    global logger
-    if update_tree:
-        update_only_tree = False
-
-    # set tracing
-    tracer_instrumentator = TracerInstrumentator()
-    tracer = tracer_instrumentator.build_tracer()
-    error_on_update = None
-    # 1 Create Scheduler for this time serie
-
-    scheduler = setup_scheduler(running_time_serie=running_time_serie,
-                                debug_mode=debug_mode, remote_scheduler=remote_scheduler)
-    cvars.bind_contextvars(scheduler_name=scheduler.name, head_local_ts_hash_id=running_time_serie.local_hash_id)
-
-    error_to_raise = None
-    with tracer.start_as_current_span(f"Scheduler TS Head Update ") as span:
-        span.set_attribute("time_serie_local_hash_id", running_time_serie.local_hash_id)
-        span.set_attribute("remote_table_hashed_name", running_time_serie.remote_table_hashed_name)
-        span.set_attribute("head_scheduler", scheduler.name)
-
-        # 2 add actor manager for distributed
-        distributed_actor_manager = RayUpdateManager(scheduler_uid=scheduler.uid,
-                                                     skip_health_check=True
-                                                     )
-        try:
-            update_tracker, local_map = setup_execution_environment(running_time_serie=running_time_serie,
-                                                                    scheduler=scheduler, debug_mode=debug_mode,
-                                                                    update_tree=update_tree)
-
-            set_actor_manager(actor_manager=distributed_actor_manager, time_serie_instance=running_time_serie)
-            running_time_serie.logger.debug("state set with dependencies metadatas")
-
-            running_time_serie.update_tracker = update_tracker
-            execute_core_update(
-                running_time_serie=running_time_serie,
-                update_tracker=update_tracker,
-                debug_mode=debug_mode,
-                force_update=force_update,
-                update_tree=update_tree,
-                update_only_tree=update_only_tree,
-                local_time_series_map=local_map,
-                use_state_for_update=True
-            )
-            del running_time_serie.update_tracker
-            gc.collect()
-        except TimeoutError as te:
-            running_time_serie.logger.error("TimeoutError Error on update")
-            error_to_raise = te
-        except DependencyUpdateError as de:
-            running_time_serie.logger.error("DependecyError on update")
-            error_to_raise = de
-        except Exception as e:
-            running_time_serie.logger.exception(e)
-            error_to_raise = e
-
-    if remote_scheduler == None:
-        scheduler.stop_heart_beat()
-    if error_to_raise != None:
-        raise error_to_raise
-
-
-@tracer.start_as_current_span("Verify time series tree update")
-def verify_tree_is_updated(
-        run_time_serie: "TimeSerie",
-        local_time_series_map: Dict[int, "LocalTimeSerie"],
-        debug_mode: bool,
-        use_state_for_update: bool = False
-) -> None:
-    """
-    Verifies that the dependency tree is updated.
-
-    Args:
-        local_time_series_map: A map of local time series objects.
-        debug_mode: Whether to run in debug mode.
-        use_state_for_update: If True, uses the current state for the update.
-    """
-    # build tree
-    if run_time_serie.local_persist_manager.is_local_relation_tree_set() == False:
-        start_tree_relationship_update_time = time.time()
-        run_time_serie.set_relation_tree(time_serie_instance=run_time_serie)
-        run_time_serie.logger.debug(
-            f"relationship tree updated took {time.time() - start_tree_relationship_update_time} seconds ")
-
-    else:
-        run_time_serie.logger.debug("Tree is not updated as is_local_relation_tree_set== True")
-
-    update_map = {}
-    if use_state_for_update == True:
-        declared_dependencies = run_time_serie.dependencies() or {}
-
-        update_map = get_update_map(declared_dependencies=declared_dependencies,
-                                                     logger=run_time_serie.logger)
-
-    run_time_serie.logger.debug(
-        f"Updating tree with update map {list(update_map.keys())} and dependencies {run_time_serie.dependencies_df['local_hash_id'].to_list()}")
-
-    if debug_mode == False:
-        tmp_ts = run_time_serie.dependencies_df.copy()
-        if tmp_ts.shape[0] == 0:
-            run_time_serie.logger.debug("No dependencies in this time serie")
-            return None
-        tmp_ts = tmp_ts[tmp_ts["source_class_name"] != "WrapperTimeSerie"]
-
-        if tmp_ts.shape[0] > 0:
-            execute_parallel_distributed_update(tmp_ts=tmp_ts,
-                                                local_time_series_map=local_time_series_map,
-                                                )
-    else:
-        updated_uids = []
-        if run_time_serie.dependencies_df.shape[0] > 0:
-            unique_priorities = run_time_serie.dependencies_df["update_priority"].unique().tolist()
-            unique_priorities.sort()
-
-            local_time_series_list = run_time_serie.dependencies_df[
-                run_time_serie.dependencies_df["source_class_name"] != "WrapperTimeSerie"
-                ][["local_hash_id", "data_source_id"]].values.tolist()
-            for prioriity in unique_priorities:
-                # get hierarchies ids
-                tmp_ts = run_time_serie.dependencies_df[
-                    run_time_serie.dependencies_df["update_priority"] == prioriity].sort_values(
-                    "number_of_upstreams", ascending=False).copy()
-
-                tmp_ts = tmp_ts[tmp_ts["source_class_name"] != "WrapperTimeSerie"]
-                tmp_ts = tmp_ts[~tmp_ts.index.isin(updated_uids)]
-
-                # update on the same process
-                for row, ts_row in tmp_ts.iterrows():
-
-                    if (ts_row["local_hash_id"], ts_row["data_source_id"]) in update_map.keys():
-                        ts = update_map[(ts_row["local_hash_id"], ts_row["data_source_id"])]["ts"]
-                    else:
-                        try:
-
-                            ts, _ = build_operations.rebuild_and_set_from_local_hash_id(
-                                local_hash_id=ts_row["local_hash_id"],
-                                data_source_id=ts_row["data_source_id"]
-                            )
-
-                        except Exception as e:
-                            run_time_serie.logger.exception(
-                                f"Error updating dependency {ts_row['local_hash_id']} when loading pickle")
-                            raise e
-
-                    try:
-                        #todo: remove
-                        ts, _ = build_operations.rebuild_and_set_from_local_hash_id(
-                            local_hash_id=ts_row["local_hash_id"],
-                            data_source_id=ts_row["data_source_id"]
-                        )
-                        error_on_last_update = start_time_serie_update(run_time_serie=ts,
-                                                                       debug_mode=debug_mode,
-                                                                       update_tree=False,
-                                                                       update_tracker=run_time_serie.update_tracker
-                                                                       )
-
-
-                    except Exception as e:
-                        run_time_serie.logger.exception(f"Error updating dependencie {ts.local_hash_id}")
-                        raise e
-                updated_uids.extend(tmp_ts.index.to_list())
-    run_time_serie.logger.debug(f'Dependency Tree evaluated for  {run_time_serie}')
-
-
-@tracer.start_as_current_span("Execute distributed parallel update")
-def execute_parallel_distributed_update(run_time_serie: "TimeSerie", tmp_ts: pd.DataFrame,
-                                        local_time_series_map: Dict[int, "LocalTimeSerie"]) -> None:
-    """
-    Executes a parallel distributed update of dependencies.
-
-    Args:
-        tmp_ts: A DataFrame of time series to update.
-        local_time_series_map: A map of local time series objects.
-    """
-
-    telemetry_carrier = tracer_instrumentator.get_telemetry_carrier()
-
-    pre_loaded_ts = [t.hash_id for t in run_time_serie.scheduler.pre_loads_in_tree]
-    tmp_ts = tmp_ts.sort_values(["update_priority", "number_of_upstreams"], ascending=[True, False])
-    pre_load_df = tmp_ts[tmp_ts["local_time_serie_id"].isin(pre_loaded_ts)].copy()
-    tmp_ts = tmp_ts[~tmp_ts["local_time_serie_id"].isin(pre_loaded_ts)].copy()
-    tmp_ts = pd.concat([pre_load_df, tmp_ts], axis=0)
-
-    futures_ = []
-
-    local_time_series_list = run_time_serie.dependencies_df[
-        run_time_serie.dependencies_df["source_class_name"] != "WrapperTimeSerie"
-        ]["local_time_serie_id"].values.tolist()
-
-    for counter, (uid, data) in enumerate(tmp_ts.iterrows()):
-        local_time_serie_id = data['local_time_serie_id']
-        data_source_id = data['data_source_id']
-        local_hash_id = data['local_hash_id']
-
-        kwargs_update = dict(local_time_serie_id=local_time_serie_id,
-                             local_hash_id=local_hash_id,
-                             data_source_id=data_source_id,
-                             telemetry_carrier=telemetry_carrier,
-                             scheduler_uid=run_time_serie.scheduler.uid
-                             )
-
-        update_details = run_time_serie.update_details_tree[local_time_serie_id]
-        run_configuration = local_time_series_map[local_time_serie_id].run_configuration
-        num_cpus = run_configuration.required_cpus
-
-        task_kwargs = dict(task_options={"num_cpus": num_cpus,
-                                         "name": f"local_time_serie_id_{local_time_serie_id}",
-
-                                         "max_retries": run_configuration.retry_on_error},
-                           kwargs_update=kwargs_update)
-
-        p = run_time_serie.update_actor_manager.launch_update_task(**task_kwargs)
-
-        # p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
-        # continue
-        # logger.warning("REMOVE LINES ABOVE FOR DEBUG")
-
-        futures_.append(p)
-
-        # are_dependencies_updated, all_dependencies_nodes, pending_nodes, error_on_dependencies = self.update_tracker.get_pending_update_nodes(
-        #     hash_id_list=list(all_start_data.keys()))
-        # self.are_dependencies_updated( target_nodes=all_dependencies_nodes)
-        # raise Exception
-
-    tasks_with_errors = run_time_serie.update_actor_manager.get_results_from_futures_list(futures=futures_)
-    if len(tasks_with_errors) > 0:
-        raise DependencyUpdateError(f"Update Stop from error in Ray in tasks {tasks_with_errors}")
-    # verify there is no error in hierarchy. this prevents to updating next level if dependencies fails
-
-    dependencies_update_details = LocalTimeSerieUpdateDetails.filter(
-        related_table__id__in=tmp_ts["local_time_serie_id"].astype(str).to_list())
-    ts_with_errors = []
-    for local_ts_update_details in dependencies_update_details:
-        if local_ts_update_details.error_on_last_update == True:
-            ts_with_errors.append(local_ts_update_details.related_table.id)
-    # Verify there are no errors after finishing hierarchy
-    if len(ts_with_errors) > 0:
-        raise DependencyUpdateError(f"Update Stop from error in children \n {ts_with_errors}")
-
-
-@tracer.start_as_current_span("TimeSerie.update_local")
-def update_local(running_time_serie: "TimeSerie", update_tree: bool, update_tracker: object, debug_mode: bool,
-                 update_statistics: UpdateStatistics,
-                 local_time_series_map: Optional[dict] = None,
-                 overwrite_latest_value: Optional[datetime.datetime] = None, update_only_tree: bool = False,
-                 use_state_for_update: bool = False,
-                 *args, **kwargs) -> Optional[bool]:
-    """
-    Performs a local update of the time series data.
-
-    Args:
-        update_tree: Whether to update the dependency tree.
-        update_tracker: The update tracker object.
-        debug_mode: Whether to run in debug mode.
-        update_statistics: The data update statistics.
-        local_time_series_map: A map of local time series objects.
-        overwrite_latest_value: An optional timestamp to overwrite the latest value.
-        update_only_tree: If True, only updates the dependency tree structure.
-        use_state_for_update: If True, uses the current state for the update.
-
-    Returns:
-        True if data was persisted, False otherwise.
-    """
-    from mainsequence.instrumentation.utils import Status, StatusCode
-    persisted = False
-    if update_tree == True:
-
-        verify_tree_is_updated(debug_mode=debug_mode, run_time_serie=running_time_serie,
-                               local_time_series_map=local_time_series_map,
-                               use_state_for_update=use_state_for_update,
-                               )
-        if update_only_tree == True:
-            running_time_serie.logger.info(f'Local Time Series  {running_time_serie} only tree updated')
-            return None
-
-    with tracer.start_as_current_span("Update Calculation") as update_span:
-
-        if overwrite_latest_value is not None:  # overwrite latest values is passed form def_update method to reduce calls to api
-            latest_value = overwrite_latest_value
-
-            running_time_serie.logger.info(
-                f'Updating Local Time Series for  {running_time_serie}  since {latest_value}')
-            temp_df = running_time_serie.update(update_statistics)
-
-            if temp_df.shape[0] == 0:
-                # concatenate empty
-
-                running_time_serie.logger.info(f'Local Time Series Nothing to update  {running_time_serie}  updated')
-                return False
-
-            for col, ddtype in temp_df.dtypes.items():
-                if "datetime64" in str(ddtype):
-                    running_time_serie.logger.info(f"WARNING DATETIME TYPE IN {running_time_serie}")
-                    raise Exception(f"""Datetime in {col}
-                                        {temp_df}""")
-            running_time_serie.logger.info(f'Persisting Time Series for  {running_time_serie}  since {latest_value} ')
-
+        self.scheduler.start_heart_beat()
+
+    def _pre_update_routines(self, local_metadata: Optional[dict] = None) -> Tuple[Dict[int,ms_client.LocalTimeSerie], Any]:
+        """
+        Prepares the TimeSerie and its dependencies for an update by fetching the
+        latest metadata for the entire dependency graph.
+
+        Args:
+            local_metadata: Optional dictionary with metadata for the head node,
+                            used to synchronize before fetching the full tree.
+
+        Returns:
+            A tuple containing a dictionary of all local metadata objects in the
+            tree (keyed by ID) and the corresponding state data.
+        """
+        # 1. Synchronize the head node and load its dependency structure.
+        self.ts.local_persist_manager.synchronize_metadata(local_metadata=local_metadata)
+        self.ts.set_relation_tree()
+
+        # The `load_dependencies` logic is now integrated here.
+        if self.ts.dependencies_df is None:
+            depth_df = self.ts.local_persist_manager.get_all_dependencies_update_priority()
+            self.ts.depth_df = depth_df
+            if not depth_df.empty:
+                self.ts.dependencies_df = depth_df[
+                    depth_df["local_time_serie_id"] != self.ts.local_time_serie.id].copy()
+            else:
+                self.ts.dependencies_df = pd.DataFrame()
+
+        # 2. Connect the dependency tree to the scheduler if it hasn't been already.
+        if not self.ts._scheduler_tree_connected and self.update_tree:
+            self.logger.debug("Connecting dependency tree to scheduler...")
+            if not self.ts.depth_df.empty:
+                all_ids = self.ts.depth_df["local_time_serie_id"].to_list() + [self.ts.local_time_serie.id]
+                self.scheduler.in_active_tree_connect(local_time_series_ids=all_ids)
+            self.ts._scheduler_tree_connected = True
+
+        # 3. Collect all IDs in the dependency graph to fetch their metadata.
+        # This correctly initializes the list, fixing the original bug.
+        if not self.ts.depth_df.empty:
+            all_ids_in_tree = self.ts.depth_df["local_time_serie_id"].to_list()
         else:
+            all_ids_in_tree = []
+
+        # Always include the head node itself.
+        all_ids_in_tree.append(self.ts.local_time_serie.id)
+
+        # 4. Fetch the latest metadata for the entire tree from the backend.
+        update_details_batch = dict(
+            error_on_last_update=False,
+            active_update_scheduler_uid=self.scheduler.uid,
+            active_update_status="Q"  # Assuming queue status is always set here
+        )
+
+        all_metadatas_response = ms_client.LocalTimeSerie.get_metadatas_and_set_updates(
+            local_time_series_ids=all_ids_in_tree,
+            update_details_kwargs=update_details_batch,
+            update_priority_dict=None
+        )
+
+        # 5. Process and return the results.
+        state_data = all_metadatas_response['state_data']
+        local_metadatas_list = all_metadatas_response["local_metadatas"]
+        local_metadatas_map = {m.id: m for m in local_metadatas_list}
+
+        self.ts.scheduler = self.scheduler
+        self.ts.update_details_tree = {key: v.run_configuration for key, v in local_metadatas_map.items()}
+
+        return local_metadatas_map, state_data
+
+    def _setup_execution_environment(self) -> Dict[int, LocalTimeSerie]:
+        from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
+
+        """Sets up distributed actors and gathers pre-update state."""
+        self.update_actor_manager = RayUpdateManager(scheduler_uid=self.scheduler.uid, skip_health_check=True)
+        self.ts.update_actor_manager = self.update_actor_manager  # Assign to TS if it needs direct access
+
+        local_metadatas, state_data = self._pre_update_routines()
+
+        self.update_tracker = UpdateInterface(
+            head_hash=self.ts.local_hash_id,
+            logger=self.logger,
+            state_data=state_data,
+            debug=self.debug_mode,
+            scheduler_uid=self.scheduler.uid,
+            trace_id=None,
+        )
+        self.ts.update_tracker = self.update_tracker  # Assign to TS if it needs direct access
+        return local_metadatas
+
+    def _start_update(self, local_time_series_map: Dict, use_state_for_update: bool):
+        """Orchestrates a single TimeSerie update, including pre/post routines."""
+        historical_update = self.ts.local_persist_manager.local_metadata.set_start_of_execution(
+            active_update_scheduler_uid=self.scheduler.uid
+        )
+        update_statistics = historical_update.update_statistics
+        must_update = historical_update.must_update or self.force_update
+
+        # 👇 THIS IS THE ADDED LINE
+        # Ensure metadata is fully loaded with relationship details before proceeding.
+        self.ts.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True)
+
+        # The TimeSerie defines how to scope its statistics
+        update_statistics = self.ts._set_update_statistics(update_statistics)
+
+        error_on_last_update = False
+        try:
+            if must_update:
+                self.logger.info(f"Update required for {self.ts}.")
+                self._update_local(
+                    update_statistics=update_statistics,
+                    local_time_series_map=local_time_series_map,
+                    overwrite_latest_value=historical_update.last_time_index_value,
+                    use_state_for_update=use_state_for_update
+                )
+            else:
+                self.logger.info(f"Already up-to-date. Skipping update for {self.ts}.")
+        except Exception as e:
+            error_on_last_update = True
+            raise e
+        finally:
+            self.ts.local_persist_manager.local_metadata.set_end_of_execution(
+                historical_update_id=historical_update.id,
+                error_on_update=error_on_last_update
+            )
+
+            # 👇 IT IS ALSO IMPORTANT TO RE-SYNC AT THE END
+            # Always set last relations details after the run completes.
+            self.ts.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True)
+
+            self.ts.run_post_update_routines(error_on_last_update=error_on_last_update,
+                                             update_statistics=update_statistics)
+            self.ts.local_persist_manager.set_column_metadata(columns_metadata=self.ts.get_column_metadata())
+            self.ts.local_persist_manager.set_table_metadata(
+                table_metadata=self.ts.get_table_metadata(update_statistics=update_statistics))
+
+        return error_on_last_update
+
+    def _validate_update_dataframe(self, df: pd.DataFrame) -> None:
+        """
+        Performs a series of critical checks on the DataFrame before persistence.
+
+        Args:
+            df: The DataFrame returned from the TimeSerie's update method.
+
+        Raises:
+            AssertionError or Exception if any validation check fails.
+        """
+        # Check for infinite values
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+
+        # Check that the time index is a UTC datetime
+        time_index = df.index.get_level_values(0)
+        if not pd.api.types.is_datetime64_ns_dtype(time_index) or time_index.tz.zone != 'UTC':
+            raise TypeError(f"Time index must be datetime64[ns, UTC], but found {time_index.dtype}")
+
+        # Check for forbidden data types and enforce lowercase columns
+        for col, dtype in df.dtypes.items():
+            if not isinstance(col, str) or not col.islower():
+                raise ValueError(f"Column name '{col}' must be a lowercase string.")
+            if "datetime64" in str(dtype):
+                raise TypeError(f"Column '{col}' has a forbidden datetime64 dtype.")
+    @tracer.start_as_current_span("UpdateRunner._update_local")
+    def _update_local(
+            self,
+            update_statistics: UpdateStatistics,
+            local_time_series_map: Dict[int, Any],
+            overwrite_latest_value: Optional[datetime.datetime],
+            use_state_for_update: bool,
+    ) -> Optional[bool]:
+        """
+        Calculates, validates, and persists the data update for the time series.
+        """
+        # 1. Handle dependency tree update first
+
+        if self.update_tree:
+            self._verify_tree_is_updated(local_time_series_map, use_state_for_update)
+            if self.update_only_tree:
+                self.logger.info(f'Dependency tree for {self.ts} updated. Halting run as requested.')
+                return None
+
+        # 2. Execute the core data calculation
+        with tracer.start_as_current_span("Update Calculation") as update_span:
+
+            # 👇 THIS IS THE CORRECTED LOGIC
+            # Add specific log message for the initial run
             if not update_statistics:
-                running_time_serie.logger.info(f'Updating Local Time Series for  {running_time_serie}  for first time')
+                self.logger.info(f"Performing first-time update for {self.ts}...")
+            else:
+                self.logger.info(f'Calculating update for {self.ts}...')
+
             try:
-                temp_df = running_time_serie.update(update_statistics)
-                temp_df = update_statistics.filter_df_by_latest_value(temp_df)
-                temp_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+                # Call the business logic defined on the TimeSerie class
+                temp_df = self.ts.update(update_statistics)
+
+                # If the update method returns no data, we're done.
+                if temp_df.empty:
+                    self.logger.warning(f"No new data returned from update for {self.ts}.")
+                    return False
+
+                # In a normal run, filter out data we already have.
+                if overwrite_latest_value is None:
+                    temp_df = update_statistics.filter_df_by_latest_value(temp_df)
+
+                # If filtering left nothing, we're done.
+                if temp_df.empty:
+                    self.logger.info(f"No new data to persist for {self.ts} after filtering.")
+                    return False
+
+                # Validate the structure and content of the DataFrame
+                self._validate_update_dataframe(temp_df)
+
+                # Persist the validated data
+                self.logger.info(f'Persisting {len(temp_df)} new rows for {self.ts}.')
+                persisted = self.ts.local_persist_manager.persist_updated_data(
+                    temp_df=temp_df,
+                    update_tracker=self.update_tracker,
+                    overwrite=(overwrite_latest_value is not None)
+                )
+                update_span.set_status(Status(StatusCode.OK))
+                self.logger.info(f'Successfully updated {self.ts}.')
+                return persisted
 
             except Exception as e:
-                import traceback
-                traceback.print_exc()
+                self.logger.exception("Failed during update calculation or persistence.")
+                update_span.set_status(Status(StatusCode.ERROR, description=str(e)))
                 raise e
 
-            if not temp_df.empty:
-                lvl0 = temp_df.index.get_level_values(0)
-                is_dt64_utc = str(lvl0.dtype) == "datetime64[ns, UTC]"
-                assert is_dt64_utc, f"Time index must be datetime64[ns, UTC] ({lvl0} is used)"
-            else:
-                running_time_serie.logger.warning(f"Time Series {running_time_serie} does not return data from update")
+    @tracer.start_as_current_span("UpdateRunner._verify_tree_is_updated")
+    def _verify_tree_is_updated(
+            self,
+            local_time_series_map: Dict[int, Any],
+            use_state_for_update: bool,
+    ) -> None:
+        """
+        Ensures all dependencies in the tree are updated before the head node.
 
-            for col in temp_df.columns:
-                assert col.islower(), f"Error Column '{col}': Column names must be lower case"
+        This method checks if the dependency graph is defined in the backend and
+        then delegates the update execution to either a sequential (debug) or
+        parallel (production) helper method.
 
-            for col, ddtype in temp_df.dtypes.items():
-                if "datetime64" in str(ddtype):
-                    running_time_serie.logger.info(f"WARNING DATETIME TYPE IN {running_time_serie}")
-                    raise Exception
+        Args:
+            local_time_series_map: A map of local time series objects in the tree.
+            use_state_for_update: If True, uses the current state for the update.
+        """
+        # 1. Ensure the dependency graph is built in the backend
+        if not self.ts.local_persist_manager.is_local_relation_tree_set():
+            self.logger.info("Dependency tree not set. Building now...")
+            start_time = time.time()
+            self.ts.set_relation_tree()
+            self.logger.debug(f"Tree build took {time.time() - start_time:.2f}s.")
 
+        # 2. Get the list of dependencies to update
+        dependencies_df = self.ts.dependencies_df
+        if dependencies_df.empty:
+            self.logger.debug("No dependencies to update.")
+            return
+
+        # 3. Build a map of dependency instances if needed for debug mode
+        update_map = {}
+        if self.debug_mode and use_state_for_update:
+            declared_dependencies = self.ts.dependencies() or {}
+            update_map = self._get_update_map(declared_dependencies,
+                                              logger=self.logger
+                                              )
+
+        # 4. Delegate to the appropriate execution method
+        self.logger.info(f"Starting update for {len(dependencies_df)} dependencies...")
+
+        dependencies_df = dependencies_df[dependencies_df["source_class_name"] != "WrapperTimeSerie"]
+
+        if self.debug_mode:
+            self._execute_sequential_debug_update(dependencies_df, update_map,
+                                                  local_time_series_map)
+        else:
+            # Filter out WrapperTimeSerie as they don't have a backend table to update
+            deps_to_run = dependencies_df[dependencies_df["source_class_name"] != "WrapperTimeSerie"]
+            if not deps_to_run.empty:
+                self._execute_parallel_distributed_update(deps_to_run, local_time_series_map)
+
+        self.logger.debug(f'Dependency tree evaluation complete for {self.ts}.')
+
+
+    def _get_update_map(self,declared_dependencies: Dict[str, 'TimeSerie'],
+                       logger: object,
+                       dependecy_map: Optional[Dict] = None) -> Dict[
+        Tuple[str, int], Dict[str, Any]]:
+        """
+        Obtains all TimeSerie objects in the dependency graph by recursively
+        calling the dependencies() method.
+
+        This approach is more robust than introspecting class members as it relies
+        on an explicit declaration of dependencies.
+
+        Args:
+            time_serie_instance: The TimeSerie instance from which to start the dependency traversal.
+            dependecy_map: An optional dictionary to store the dependency map, used for recursion.
+
+        Returns:
+            A dictionary mapping (local_hash_id, data_source_id) to TimeSerie info.
+        """
+        # Initialize the map on the first call
+        if dependecy_map is None:
+            dependecy_map = {}
+
+        # Get the explicitly declared dependencies, just like set_relation_tree
+
+        for name, dependency_ts in declared_dependencies.items():
+            key = (dependency_ts.local_hash_id, dependency_ts.data_source_id)
+
+            # If we have already processed this node, skip it to prevent infinite loops
+            if key in dependecy_map:
+                continue
+            if dependency_ts.is_api == True:
+                continue
+
+            # Ensure the dependency is initialized in the persistence layer
+            dependency_ts.local_persist_manager
+
+            logger.debug(f"Adding dependency '{name}' to update map.")
+            dependecy_map[key] = {"is_pickle": False, "ts": dependency_ts}
+            declared_dependencies = dependency_ts.dependencies() or {}
+            # Recursively call get_update_map on the dependency to traverse the entire graph
+            self._get_update_map(declared_dependencies=declared_dependencies,
+                           logger=logger,
+                           dependecy_map=dependecy_map)
+
+        return dependecy_map
+
+    def _execute_sequential_debug_update(
+            self,
+            dependencies_df: pd.DataFrame,
+            update_map: Dict[Tuple[str, int], Dict],
+            local_time_series_map:Dict[int, ms_client.LocalTimeSerie]
+    ) -> None:
+        """Runs dependency updates sequentially in the same process for debugging."""
+        self.logger.info("Executing dependency updates in sequential debug mode.")
+        # Sort by priority to respect the DAG execution order
+        sorted_priorities = sorted(dependencies_df["update_priority"].unique())
+
+
+        for priority in sorted_priorities:
+            priority_df = dependencies_df[dependencies_df["update_priority"] == priority]
+            # Sort by number of upstreams to potentially optimize within a priority level
+            sorted_deps = priority_df.sort_values("number_of_upstreams", ascending=False)
+
+
+
+            for _, ts_row in sorted_deps.iterrows():
+                key = (ts_row["local_hash_id"], ts_row["data_source_id"])
+                ts_to_update = None
+                try:
+                    if key in update_map:
+                        ts_to_update = update_map[key]["ts"]
+                    else:
+                        # If not in the map, it must be rebuilt from storage
+                        ts_to_update, _ = build_operations.rebuild_and_set_from_local_hash_id(
+                            local_hash_id=key[0], data_source_id=key[1]
+                        )
+
+                    if ts_to_update:
+                        self.logger.debug(f"Running debug update for dependency: {ts_to_update.local_hash_id}")
+                        # Each dependency gets its own clean runner
+                        dep_runner = UpdateRunner(
+                            time_serie=ts_to_update,
+                            debug_mode=True,
+                            update_tree=False,  # We only update one node at a time
+                            force_update=self.force_update,
+                            remote_scheduler=self.scheduler,
+                        )
+                        dep_runner._setup_scheduler()
+                        dep_runner.update_tracker = self.update_tracker
+
+                        dep_runner._start_update(
+                            local_time_series_map=local_time_series_map,
+                            use_state_for_update=False,
+                        )
+                except Exception as e:
+                    self.logger.exception(f"Failed to update dependency {key[0]}")
+                    raise e  # Re-raise to halt the entire process on failure
+
+    # This code is a method within the UpdateRunner class.
+    # Assumes 'ms_client', 'tracer_instrumentator', and 'DependencyUpdateError' are imported.
+
+    @tracer.start_as_current_span("UpdateRunner._execute_parallel_distributed_update")
+    def _execute_parallel_distributed_update(
+            self,
+            dependencies_to_run_df: pd.DataFrame,
+            local_time_series_map: Dict[int, "LocalTimeSerie"]
+    ) -> None:
+        """
+        Launches and manages a parallel, distributed update for a set of dependencies.
+
+        This method sorts the dependencies, prepares and launches remote execution
+        tasks (e.g., via Ray), and then waits for their completion, handling
+        any errors that arise from the distributed run.
+
+        Args:
+            dependencies_to_run_df: A DataFrame of time series dependencies to update.
+            local_time_series_map: A map of local time series objects keyed by ID.
+
+        Raises:
+            DependencyUpdateError: If any of the distributed tasks fail.
+        """
+        # 1. Prepare tasks, prioritizing any pre-loaded time series
+        telemetry_carrier = tracer_instrumentator.get_telemetry_carrier()
+        pre_loaded_ts_ids = [t.hash_id for t in self.scheduler.pre_loads_in_tree]
+
+        # Sort all dependencies by priority and structure
+        sorted_deps = dependencies_to_run_df.sort_values(
+            ["update_priority", "number_of_upstreams"], ascending=[True, False]
+        )
+        # Separate and move pre-loaded tasks to the front of the queue
+        pre_load_df = sorted_deps[sorted_deps["local_time_serie_id"].isin(pre_loaded_ts_ids)]
+        other_deps_df = sorted_deps[~sorted_deps["local_time_serie_id"].isin(pre_loaded_ts_ids)]
+        tasks_df = pd.concat([pre_load_df, other_deps_df], axis=0)
+
+        # 2. Launch all dependency updates as distributed tasks
+        futures_ = []
+        for _, data_row in tasks_df.iterrows():
+            local_ts_id = data_row['local_time_serie_id']
+
+            # Get the specific run configuration for this dependency
+            run_configuration = local_time_series_map[local_ts_id].run_configuration
+
+            # Prepare arguments for the remote task
+            kwargs_update = dict(
+                local_time_serie_id=local_ts_id,
+                local_hash_id=data_row['local_hash_id'],
+                data_source_id=data_row['data_source_id'],
+                telemetry_carrier=telemetry_carrier,
+                scheduler_uid=self.scheduler.uid
+            )
+            task_options = dict(
+                num_cpus=run_configuration.required_cpus,
+                name=f"ts_update_{local_ts_id}",
+                max_retries=run_configuration.retry_on_error
+            )
+
+            p = self.update_actor_manager.launch_update_task(
+                task_options=task_options,
+                kwargs_update=kwargs_update
+            )
+
+            # p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
+            # continue
+            # logger.warning("REMOVE LINES ABOVE FOR DEBUG")
+
+            futures_.append(p)
+
+            # are_dependencies_updated, all_dependencies_nodes, pending_nodes, error_on_dependencies = self.update_tracker.get_pending_update_nodes(
+            #     hash_id_list=list(all_start_data.keys()))
+            # self.are_dependencies_updated( target_nodes=all_dependencies_nodes)
+            # raise Exception
+
+        # 3. Wait for results and check for errors from the distributed run
+        tasks_with_errors = self.update_actor_manager.get_results_from_futures_list(futures=futures_)
+        if tasks_with_errors:
+            raise DependencyUpdateError(f"Update stopped due to errors in Ray tasks: {tasks_with_errors}")
+
+        # 4. Final verification: Check the database status for all tasks in the batch
+        updated_ids = tasks_df["local_time_serie_id"].astype(str).to_list()
+        dependencies_update_details = ms_client.LocalTimeSerieUpdateDetails.filter(
+            related_table__id__in=updated_ids
+        )
+
+        failed_ids = [
+            detail.related_table.id for detail in dependencies_update_details if detail.error_on_last_update
+        ]
+
+        if failed_ids:
+            raise DependencyUpdateError(f"Update stopped after children reported errors: {failed_ids}")
+
+    # This method is the primary public method of the UpdateRunner class.
+    # Assumes other private methods (_setup_scheduler, _setup_execution_environment, etc.)
+    # and necessary imports are defined within the class.
+
+    def run(self) -> None:
+        """
+        Executes the full update lifecycle for the time series.
+
+        This is the main entry point for the runner. It orchestrates the setup
+        of scheduling and the execution environment, triggers the core update
+        process, and handles all error reporting and cleanup.
+        """
+        # Initialize tracing and set initial flags
+        tracer_instrumentator = TracerInstrumentator()
+        tracer = tracer_instrumentator.build_tracer()
+        error_to_raise = None
+
+        # 1. Set up the scheduler for this run
         try:
+            self._setup_scheduler()
+            cvars.bind_contextvars(scheduler_name=self.scheduler.name, head_local_ts_hash_id=self.ts.local_hash_id)
 
-            # verify index order is correct
-            overwrite = True if overwrite_latest_value is not None else False
-            persisted = running_time_serie.local_persist_manager.persist_updated_data(temp_df=temp_df,
-                                                                            update_tracker=update_tracker,
-                                                                            overwrite=overwrite)
+            # 2. Start the main execution block with tracing
+            with tracer.start_as_current_span(f"Scheduler Head Update: {self.ts.local_hash_id}") as span:
+                span.set_attribute("time_serie_local_hash_id", self.ts.local_hash_id)
+                span.set_attribute("remote_table_hashed_name", self.ts.remote_table_hashed_name)
+                span.set_attribute("head_scheduler", self.scheduler.name)
 
-            update_span.set_status(Status(StatusCode.OK))
+                # 3. Prepare the execution environment (Ray actors, dependency metadata)
+                local_time_series_map = self._setup_execution_environment()
+                self.logger.debug("Execution environment and dependency metadata are set.")
+
+                # 4. Wait for the scheduled update time, if not forcing an immediate run
+                if not self.force_update:
+                    wait_for_update_time(
+                        local_hash_id=self.ts.local_hash_id,
+                        data_source_id=self.ts.data_source.id,
+                        logger=self.logger
+                    )
+
+                # 5. Trigger the core update process
+                self._start_update(
+                    local_time_series_map=local_time_series_map,
+                    use_state_for_update=True
+                )
+
+        except DependencyUpdateError as de:
+            self.logger.error("A dependency failed to update, halting the run.", error=de)
+            error_to_raise = de
+        except TimeoutError as te:
+            self.logger.error("The update process timed out.", error=te)
+            error_to_raise = te
         except Exception as e:
-            running_time_serie.logger.exception("Error updating time serie")
-            update_span.set_status(Status(StatusCode.ERROR))
-            raise e
-        running_time_serie.logger.info(f'Local Time Series  {running_time_serie}  updated')
+            self.logger.exception("An unexpected error occurred during the update run.")
+            error_to_raise = e
+        finally:
+            # 6. Clean up resources
+            # Stop the scheduler heartbeat if it was created by this runner
+            if self.remote_scheduler is None and self.scheduler:
+                self.scheduler.stop_heart_beat()
 
-        return persisted
+            # Clean up temporary attributes on the TimeSerie instance
+            if hasattr(self.ts, 'update_tracker'):
+                del self.ts.update_tracker
+            if hasattr(self.ts, 'update_actor_manager'):
+                del self.ts.update_actor_manager
+
+            gc.collect()
+
+        # 7. Re-raise any captured exception after cleanup
+        if error_to_raise:
+            raise error_to_raise

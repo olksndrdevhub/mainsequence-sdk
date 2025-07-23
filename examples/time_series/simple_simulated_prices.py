@@ -89,7 +89,7 @@ These methods have default behaviors but can be overridden for customization.
     -   **Purpose**: [OPTIONAL] Implement to provide rich descriptions for your data columns. This metadata is used in documentation and user interfaces.
     -   **Returns**: A list of `ColumnMetaData` objects.
 
--   `_run_post_update_routines(self, ...)`:
+-   `run_post_update_routines(self, ...)`:
     -   **Purpose**: [OPTIONAL] Implement to run custom logic *after* an update is finished. Useful for logging, cleanup, or registering the time series in an external system.
 """
 import json
@@ -97,7 +97,7 @@ import json
 # Imports should be at the top of the file
 import numpy as np
 np.NaN = np.nan # Fix for a pandas-ta compatibility issue
-from mainsequence.tdag import TimeSerie
+from mainsequence.tdag import TimeSerie,APITimeSerie, WrapperTimeSerie
 from mainsequence.client.models_tdag import UpdateStatistics, ColumnMetaData
 import mainsequence.client as ms_client
 from typing import Union, Optional, List, Dict, Any
@@ -106,6 +106,9 @@ import pytz
 import pandas as pd
 from sklearn.linear_model import ElasticNet
 import copy
+
+MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES = "simulated_prices_from_category"
+TEST_TRANSLATION_TABLE_UID="test_translation_table"
 
 class SimulatedPricesManager:
 
@@ -161,7 +164,8 @@ class SimulatedPricesManager:
 
         # Get the latest historical observations; assumed to be a DataFrame with a multi-index:
         # (time_index, unique_identifier) and a column "close" for the last observed price.
-        last_observation = self.owner.get_last_observation()
+        range_descriptor=update_statistics.get_update_range_map_great_or_equal()
+        last_observation = self.owner.get_ranged_data_per_asset(range_descriptor=range_descriptor)
         # Define simulation end: yesterday at midnight (UTC)
         yesterday_midnight = datetime.datetime.now(pytz.utc).replace(
             hour=0, minute=0, second=0, microsecond=0
@@ -228,10 +232,10 @@ class SingleIndexTS(TimeSerie):
     def update(self, update_statistics: ms_client.UpdateStatistics):
         today_utc = datetime.datetime.now(tz=pytz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
-        if update_statistics.last_observation.empty:
+        if update_statistics.max_time_index_value is None:
             start_date = self.OFFSET_START
         else:
-            last_time = update_statistics.last_observation.index.max()
+            last_time = update_statistics.max_time_index_value
             start_date = last_time + datetime.timedelta(days=1)
 
         if start_date > today_utc:
@@ -334,8 +338,7 @@ class SimulatedPrices(TimeSerie):
         Returns:
 
         """
-        MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "simulated_prices_from_category"
-        mts=ms_client.TableMetaData(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+        mts=ms_client.TableMetaData(identifier="simulated_prices",
                                                data_frequency_id=ms_client.DataFrequency.one_d,
                                                description="This is a simulated prices time serie from asset category",
                                                )
@@ -414,8 +417,7 @@ class CategorySimulatedPrices(TimeSerie):
         """
 
         """
-        MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "simulated_prices_from_category"
-        meta=ms_client.TableMetaData(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+        meta=ms_client.TableMetaData(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES,
                                                data_frequency_id=ms_client.DataFrequency.one_d,
                                                description="This is a simulated prices time serie from asset category",
                                                )
@@ -423,8 +425,38 @@ class CategorySimulatedPrices(TimeSerie):
 
         return meta
 
+    def run_post_update_routines(self, error_on_last_update: bool, update_statistics: UpdateStatistics) -> None:
+        """
+        In this example we will use the post init routines to build an  Asset Translation Table that points
+        prices to this prices
+        Args:
+            error_on_last_update:
+            update_statistics:
 
+        Returns:
 
+        """
+        translation_table = ms_client.AssetTranslationTable.get_or_none(unique_identifier=TEST_TRANSLATION_TABLE_UID)
+
+        rules = [
+            ms_client.AssetTranslationRule(
+                asset_filter=ms_client.AssetFilter(
+                    execution_venue_symbol=ms_client.MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+                    security_type=ms_client.MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
+                ),
+                markets_time_serie_unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES,
+                target_execution_venue_symbol=ms_client.MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+            )
+        ]
+        rules_serialized = [r.model_dump() for r in rules]
+
+        if translation_table is None:
+            translation_table = ms_client.AssetTranslationTable.create(
+                unique_identifier=TEST_TRANSLATION_TABLE_UID,
+                rules=rules_serialized,
+            )
+        else:
+            translation_table.add_rules(rules)
 
 # Mocking UpdateStatistics and Running the Test
 
@@ -623,12 +655,20 @@ class NextDayEN(TimeSerie):
             **kwargs
         )
 
-        super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore, *args, **kwargs)
+        #even more prices from a TimeSerie not in the project using APITimeSerie
+
+        self.external_prices=APITimeSerie.build_from_identifier(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES)
+        translation_table=ms_client.AssetTranslationTable.get(unique_identifier=TEST_TRANSLATION_TABLE_UID)
+        self.translated_prices_ts=WrapperTimeSerie(translation_table=translation_table)
+
+        super().__init__( *args, **kwargs)
 
     def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
         return {
             "prices_ts": self.prices_ts,
-            "feature_ts": self.feature_ts
+            "feature_ts": self.feature_ts,
+            "api_prices":self.external_prices,
+            "translated_prices_ts": self.translated_prices_ts,
         }
 
 
@@ -770,7 +810,7 @@ def test_simulated_prices():
     # ts_0.run(debug_mode=True,force_update=True)
     # ms_client.SessionDataSource.set_local_db() #run on duck
     # ts.run(debug_mode=True,force_update=True)
-    # ts_2.run(debug_mode=True,force_update=True)
+    ts_2.run(debug_mode=True,force_update=True)
 
 
     ts = TAFeature(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=28),
@@ -797,10 +837,13 @@ def test_simulated_prices():
         window_size=window
     )
 
+
     ts.run(debug_mode=True,
            update_tree=True,
            force_update=True,
            )
+
+
 
 
 

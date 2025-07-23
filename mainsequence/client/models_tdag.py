@@ -1128,7 +1128,7 @@ class UpdateStatistics(BaseModel):
         return list(self.asset_time_statistics.keys())
 
     def get_update_range_map_great_or_equal(self):
-        range_map={k:DateInfo({"start_date_operand":">=","start_date":v}) for k,v in self.asset_time_statistics.items()}
+        range_map={k:DateInfo({"start_date_operand":">=","start_date":v or self._initial_fallback_date}) for k,v in self.asset_time_statistics.items()}
         return range_map
 
 

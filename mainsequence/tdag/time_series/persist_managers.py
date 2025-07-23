@@ -17,6 +17,58 @@ import threading
 from concurrent.futures import Future
 from .. import  future_registry
 from mainsequence.instrumentation import tracer, tracer_instrumentator
+import inspect
+import hashlib
+
+def get_time_serie_source_code(TimeSerieClass: "TimeSerie") -> str:
+    """
+    Gets the source code of a TimeSerie class.
+
+    Args:
+        TimeSerieClass: The class to get the source code for.
+
+    Returns:
+        The source code as a string.
+    """
+    global logger
+    try:
+        # First try the standard approach.
+        source = inspect.getsource(TimeSerieClass)
+        if source.strip():
+            return source
+    except Exception:
+        logger.warning \
+            ("Your TimeSeries is not in a python module this will likely bring exceptions when running in a pipeline")
+    from IPython import get_ipython
+    # Fallback: Scan IPython's input history.
+    ip = get_ipython()  # Get the current IPython instance.
+    if ip is not None:
+        # Retrieve the full history as a single string.
+        history = "\n".join(code for _, _, code in ip.history_manager.get_range())
+        marker = f"class {TimeSerieClass.__name__}"
+        idx = history.find(marker)
+        if idx != -1:
+            return history[idx:]
+    return "Source code unavailable."
+
+def get_time_serie_source_code_git_hash(TimeSerieClass: "TimeSerie") -> str:
+    """
+    Hashes the source code of a TimeSerie class using SHA-1 (Git style).
+
+    Args:
+        TimeSerieClass: The class to hash.
+
+    Returns:
+        The Git-style hash of the source code.
+    """
+    time_serie_class_source_code = get_time_serie_source_code(TimeSerieClass)
+    # Prepare the content for Git-style hashing
+    # Git hashing format: "blob <size_of_content>\0<content>"
+    content = f"blob {len(time_serie_class_source_code)}\0{time_serie_class_source_code}"
+    # Compute the SHA-1 hash (Git hash)
+    hash_object = hashlib.sha1(content.encode('utf-8'))
+    git_hash = hash_object.hexdigest()
+    return git_hash
 
 
 class APIPersistManager:
@@ -795,6 +847,15 @@ class PersistManager:
 
     def is_local_relation_tree_set(self) -> bool:
         return self.local_metadata.ogm_dependencies_linked
+
+
+
+    def update_git_and_code_in_backend(self,time_serie_class) -> None:
+        """Updates the source code and git hash information in the backend."""
+        self.update_source_informmation(
+            git_hash_id=get_time_serie_source_code_git_hash(time_serie_class),
+            source_code=get_time_serie_source_code(time_serie_class),
+        )
 
 class TimeScaleLocalPersistManager(PersistManager):
     """
