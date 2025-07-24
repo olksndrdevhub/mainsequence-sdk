@@ -10,7 +10,7 @@ from mainsequence.client import (LocalTimeSerie, UniqueIdentifierRangeMap,
                                  DynamicTableDoesNotExist, DynamicTableDataSource, TDAG_CONSTANTS as CONSTANTS, DynamicTableMetaData,
                                  UpdateStatistics, DoesNotExist)
 
-from mainsequence.client.models_tdag import DynamicTableHelpers, LocalTimeSerieUpdateDetails
+from mainsequence.client.models_tdag import  LocalTimeSerieUpdateDetails
 import mainsequence.client as ms_client
 import json
 import threading
@@ -322,14 +322,11 @@ class PersistManager:
         """
         if not is_api:
             self.local_metadata.depends_on_connect(
-                                        source_local_hash_id=self.local_metadata.local_hash_id,
-                                        target_local_hash_id=new_ts.local_hash_id,
-                                        target_class_name=new_ts.__class__.__name__,
-                                        source_data_source_id=self.data_source.id,
-                                        target_data_source_id=new_ts.data_source.id
+                                       target_time_serie_id=new_ts.local_time_serie.id
                                         )
         else:
             try:
+                raise NotImplementedError
                 self.local_metadata.depends_on_connect_remote_table(
                     source_hash_id=self.metadata.hash_id,
                     source_local_hash_id=self.local_metadata.local_hash_id,
@@ -448,7 +445,7 @@ class PersistManager:
         return depth_df
 
     def set_ogm_dependencies_linked(self) -> None:
-        self.local_metadata.set_ogm_dependencies_linked()
+        self.local_metadata.patch(ogm_dependencies_linked=True)
 
     @property
     def update_details(self) -> Optional[LocalTimeSerieUpdateDetails]:
@@ -476,29 +473,7 @@ class PersistManager:
             time_serie_source_code=source_code,
         )
 
-    @staticmethod
-    def batch_data_persisted(hash_id_list: List[str]) -> Dict[str, bool]:
-        """
-        Checks for the existence of multiple time series in the database.
 
-        Args:
-            hash_id_list: A list of remote table hash IDs.
-
-        Returns:
-            A dictionary mapping each hash ID to a boolean indicating its existence.
-        """
-        exist = {}
-        dth = DynamicTableHelpers()
-        in_db, _ = dth.exist(hash_id__in=hash_id_list)
-
-        for t in hash_id_list:
-
-            if t in in_db:
-                exist[t] = True
-            else:
-                exist[t] = False
-
-        return exist
 
     def add_tags(self, tags: List[str]) -> None:
         """Adds tags to the local time series metadata if they don't already exist."""
@@ -735,7 +710,7 @@ class PersistManager:
             if metadata.sourcetableconfiguration.multi_index_stats is not None:
                 last_update_per_asset = metadata.sourcetableconfiguration.multi_index_stats['max_per_asset_symbol']
                 if last_update_per_asset is not None:
-                    last_update_per_asset = {unique_identifier: DynamicTableHelpers.request_to_datetime(v) for unique_identifier, v in last_update_per_asset.items()}
+                    last_update_per_asset = {unique_identifier: ms_client.request_to_datetime(v) for unique_identifier, v in last_update_per_asset.items()}
 
         if asset_symbols is not None and last_update_per_asset is not None:
             last_update_per_asset = {asset: value for asset, value in last_update_per_asset.items() if asset in asset_symbols}
@@ -815,8 +790,7 @@ class PersistManager:
             if overwrite == True:
                 self.logger.warning(f"Values will be overwritten")
 
-            self._local_metadata_cached = DynamicTableHelpers.upsert_data_into_table(
-                local_metadata=self.local_metadata,
+            self._local_metadata_cached = self.local_metadata.upsert_data_into_table(
                 data=temp_df,
                 data_source=self.data_source,
 

@@ -75,81 +75,7 @@ class DynamicTableDoesNotExist(Exception):
 class SourceTableConfigurationDoesNotExist(Exception):
     pass
 
-class TimeSerieNode(BasePydanticModel, BaseObjectOrm):
-    uid: str
-    hash_id: str
-    data_source_id: int
-    source_class_name: str
-    creation_date: datetime.datetime
-    relation_tree_frozen: bool
 
-    @classmethod
-    def get_all_dependencies(cls, hash_id):
-        s = cls.build_session()
-        url = cls.get_object_url() + f"/{hash_id}/get_all_dependencies/"
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, )
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-        depth_df = pd.DataFrame(r.json())
-        return depth_df
-
-    @classmethod
-    def delete_with_relationships(cls, *args, **kwargs):
-        s = cls.build_session()
-        url = cls.get_object_url() + f"/delete_with_relationships/"
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload={"json": kwargs})
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-        return r.json()
-
-    @classmethod
-    def get_max_depth(cls, hash_id, timeout=None):
-        s = cls.build_session()
-        url = cls.get_object_url() + f"/{hash_id}/get_max_depth/"
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-        return r.json()["max_depth"]
-
-    @classmethod
-    def get_upstream_nodes(cls, hash_id):
-        s = cls.build_session()
-        url = cls.get_object_url() + f"/{hash_id}/get_upstream_nodes/"
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, )
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-        depth_df = pd.DataFrame(r.json())
-        return depth_df
-
-    @classmethod
-    def set_policy_for_descendants(cls, hash_id, policy, pol_type, exclude_ids, extend_to_classes):
-        s = cls.build_session()
-        url = cls.get_object_url() + f"/{hash_id}/set_policy_for_descendants/"
-        payload = dict(json={"policy": policy,
-                             "pol_type": pol_type,
-                             "exclude_ids": exclude_ids,
-                             "extend_to_classes": extend_to_classes,
-                             })
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="PATCH", url=url, payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-    @classmethod
-    def remove_head_from_all_schedulers(cls, hash_id):
-        url = cls.get_object_url() + f"/{hash_id}/remove_head_from_all_schedulers/"
-        s = cls.build_session()
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="PATCH", url=url, )
-        if r.status_code != 200:
-            raise Exception(r.text)
-
-class LocalTimeSerieNode(BasePydanticModel, BaseObjectOrm):
-    hash_id: str
-    uid: str
-    data_source_id: int
-    updates_to: TimeSerieNode
 
 
 class ColumnMetaData(BasePydanticModel,BaseObjectOrm):
@@ -488,14 +414,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         instance = cls(**r.json())
         return instance
 
-    def set_ogm_dependencies_linked(self):
-        s = self.build_session()
-        url = self.get_object_url("LocalTimeSerieNodesMethods") + f"/{self.id}/set_ogm_dependencies_linked"
-        r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, )
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-        return r
 
     def verify_if_direct_dependencies_are_updated(self) -> dict:
         """
@@ -620,43 +538,166 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         r["local_metadatas"] = [LocalTimeSerie(**v) for v in r["local_metadatas"]]
         return r
 
-    @classmethod
-    def depends_on_connect_remote_table(cls, source_hash_id: str,
-                                        source_local_hash_id: str,
-                                        source_data_source_id: id,
-                                        target_data_source_id: id,
-                                        target_local_hash_id: str):
-        s = cls.build_session()
-        url = cls.get_object_url("TimeSerie") + "/depends_on_connect_remote_table/"
-        payload = dict(json={"source_hash_id": source_hash_id,
-                             "source_local_hash_id": source_local_hash_id,
-                             "source_data_source_id": source_data_source_id,
-                             "target_data_source_id": target_data_source_id,
-                             "target_local_hash_id": target_local_hash_id,
-                             })
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
-            raise Exception(f"Error in request {r.text}")
 
-    @classmethod
-    def depends_on_connect(cls, target_class_name: str,
-                           source_local_hash_id: str,
-                           target_local_hash_id: str,
-                           source_data_source_id: id,
-                           target_data_source_id: id,
+
+    def depends_on_connect(self, target_time_serie_id
                          ):
 
-        s = cls.build_session()
-        url = cls.get_object_url("TimeSerie") + "/depends_on_connect/"
-        payload = dict(json={"target_class_name": target_class_name,
-                             "source_local_hash_id": source_local_hash_id, "target_local_hash_id": target_local_hash_id,
-
-                             "source_data_source_id": source_data_source_id,
-                             "target_data_source_id": target_data_source_id,
+        url = self.get_object_url() + f"/{self.id}/depends_on_connect/"
+        s = self.build_session()
+        payload = dict(json={
+                             "target_time_serie_id": target_time_serie_id,
                              })
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
+        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
+        if r.status_code != 204:
             raise Exception(f"Error in request {r.text}")
+
+    @classmethod
+    def _handle_source_table_configuration(cls,
+                                           metadata: "DynamicTableMetaData",
+                                           column_dtypes_map,
+                                           index_names,
+                                           time_index_name,
+                                           column_index_names,
+                                           data,
+                                           overwrite=False
+                                           ):
+        """
+        Handles the creation or retrieval of the source table configuration.
+
+        Parameters:
+        ----------
+        metadata : dict
+            Metadata dictionary containing "sourcetableconfiguration" and "id".
+        column_dtypes_map : dict
+            Mapping of column names to their data types.
+        index_names : list
+            List of index names.
+        time_index_name : str
+            Name of the time index column.
+        column_index_names : list
+            List of column index names.
+        data : DataFrame
+            The input DataFrame.
+        overwrite : bool, optional
+            Whether to overwrite existing configurations (default is False).
+
+        Returns:
+        -------
+        dict or None
+            Updated metadata with the source table configuration, and potentially filtered data.
+        """
+        stc = metadata.sourcetableconfiguration
+
+        if stc is None:
+            try:
+                stc = SourceTableConfiguration.create(
+                    column_dtypes_map=column_dtypes_map,
+                    index_names=index_names,
+                    time_index_name=time_index_name,
+                    column_index_names=column_index_names,
+                    metadata_id=metadata.id
+                )
+                metadata.sourcetableconfiguration = stc
+            except AlreadyExist:
+
+                if not overwrite:
+                    raise NotImplementedError("TODO Needs to remove values per asset")
+                    # Filter the data based on time_index_name and last_time_index_value
+                    data = data[
+                        data[time_index_name] > self.request_to_datetime(stc.last_time_index_value)
+                        ]
+        return metadata, data
+
+    @classmethod
+    def _break_pandas_dataframe(cls, data_frame: pd.DataFrame, time_index_name: Union[str, None] = None):
+        if time_index_name == None:
+            time_index_name = data_frame.index.names[0]
+            if time_index_name is None:
+                time_index_name = "time_index"
+                names = [c if i != 0 else time_index_name for i, c in
+                         enumerate(data_frame.index.names)]
+                data_frame.index.names = names
+
+        time_col_loc = data_frame.index.names.index(time_index_name)
+        column_index_names = data_frame.columns.names
+        index_names = data_frame.index.names
+        data_frame = data_frame.reset_index()
+        data_frame.columns = [str(c) for c in data_frame.columns]
+        data_frame = data_frame.rename(columns={data_frame.columns[time_col_loc]: time_index_name})
+        column_dtypes_map = {key: str(value) for key, value in data_frame.dtypes.to_dict().items()}
+
+        data_frame = data_frame.replace({np.nan: None})
+
+        return data_frame, column_index_names, index_names, column_dtypes_map, time_index_name
+
+    def upsert_data_into_table(
+                               self,
+                               data: pd.DataFrame,
+                               data_source: "DynamicTableDataSource",
+                               ):
+        overwrite = True  # ALWAYS OVERWRITE
+        metadata = self.remote_table
+
+        data, column_index_names, index_names, column_dtypes_map, time_index_name = self._break_pandas_dataframe(
+            data)
+
+        # overwrite data origina data frame to release memory
+        if not data[time_index_name].is_monotonic_increasing:
+            data = data.sort_values(time_index_name)
+
+        metadata, data = (
+            result if (
+                          result := self._handle_source_table_configuration(
+                              metadata=metadata, column_dtypes_map=column_dtypes_map,
+                              index_names=index_names,
+                              time_index_name=time_index_name,
+                              column_index_names=column_index_names, data=data,
+                              overwrite=overwrite
+                          )
+                      ) is not None
+            else (metadata, data)
+        )
+
+        duplicates_exist = data.duplicated(subset=index_names).any()
+        if duplicates_exist:
+            raise Exception(f"Duplicates found in columns: {index_names}")
+
+        global_stats, grouped_dates = get_chunk_stats(
+            chunk_df=data,
+            index_names=index_names,
+            time_index_name=time_index_name
+        )
+
+        data_source.insert_data_into_table(
+            serialized_data_frame=data,
+            local_metadata=self,
+            overwrite=overwrite,
+            time_index_name=time_index_name,
+            index_names=index_names,
+            grouped_dates=grouped_dates,
+        )
+
+        min_d, last_time_index_value = global_stats["_GLOBAL_"]["min"], global_stats["_GLOBAL_"]["max"]
+        max_per_asset_symbol = None
+
+        def extract_max(node):
+            # Leaf case: a dict with 'min' and 'max'
+            if isinstance(node, dict) and "min" in node and "max" in node:
+                return node["max"]
+            # Otherwise recurse
+            return {k: extract_max(v) for k, v in node.items()}
+
+        if len(index_names) > 1:
+            max_per_asset_symbol = {
+                uid: extract_max(stats)
+                for uid, stats in global_stats["_PER_ASSET_"].items()
+            }
+        local_metadata = self.set_last_update_index_time_from_update_stats(
+            max_per_asset_symbol=max_per_asset_symbol,
+            last_time_index_value=last_time_index_value,
+        )
+        return local_metadata
 
 class DataFrequency(str, Enum):
     one_m = "1m"
@@ -861,7 +902,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
 
 
 class Scheduler(BasePydanticModel, BaseObjectOrm):
-    uid: str
+    id: Optional[int] = None
     name: str
     is_running: bool
     running_process_pid: Optional[int]
@@ -870,90 +911,122 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
     host: Optional[str]
     api_address: Optional[str]
     api_port: Optional[int]
-    pre_loads_in_tree: Optional[List[str]] = None  # Assuming this is a list of strings
-    in_active_tree: Optional[List[LocalTimeSerieNode]] = None  # Assuming this is a list of strings
-    schedules_to: Optional[List[LocalTimeSerieNode]] = None
+    last_heart_beat: Optional[datetime.datetime] = None
+    pre_loads_in_tree: Optional[List[LocalTimeSerie]] = None  # Assuming this is a list of strings
+    in_active_tree: Optional[List[LocalTimeSerie]] = None  # Assuming this is a list of strings
+    schedules_to: Optional[List[LocalTimeSerie]] = None
     # for heartbeat
     _stop_heart_beat: bool = False
     _executor: Optional[object] = None
 
     @classmethod
-    def get(cls, *args, **kwargs):
-        return super().get(*args, **kwargs)
-
-    @classmethod
-    def filter(cls, payload: Union[dict, None]):
-        return super().filter(payload)
-
-    @classmethod
-    def get_scheduler_for_ts(cls, hash_id: str):
-
+    def get_scheduler_for_ts(cls, ts_id: int):
+        """
+        GET /schedulers/for-ts/?ts_id=<LocalTimeSerie PK>
+        """
         s = cls.build_session()
-        url = cls.get_object_url() + "/get_scheduler_for_ts/"
-        payload = dict(params={"hash_id": hash_id})
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, payload=payload)
+        url = cls.get_object_url() + "/for-ts/"
+        r = make_request(
+            s=s,
+            r_type="GET",
+            url=url,
+            payload={"params": {"ts_id": ts_id}},
+            loaders=cls.LOADERS,
+        )
         if r.status_code == 404:
-            raise SchedulerDoesNotExist(r.text)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-        scheduler = cls(**r.json())
-        return scheduler
+            raise SchedulerDoesNotExist(r.json().get("detail", r.text))
+        r.raise_for_status()
+        return cls(**r.json())
 
     @classmethod
-    def initialize_debug_for_ts(cls, local_hash_id: str,
-                                data_source_id: int,
-                                name_suffix: Union[str, None] = None, ):
-
-
+    def initialize_debug_for_ts(
+            cls,
+            time_serie_id: int,
+            name_suffix: Union[str, None] = None,
+    ):
+        """
+        POST /schedulers/initialize‑debug/
+        body: { time_serie_id, name_suffix? }
+        """
         s = cls.build_session()
-        url = cls.get_object_url() + "/initialize_debug_for_ts/"
-        payload = dict(json={"local_hash_id": local_hash_id, "name_suffix": name_suffix,
-                             "data_source_id": data_source_id
-                             })
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
-            raise Exception(f"Error in request {r.text}")
-        scheduler = cls(**r.json())
-        return scheduler
+        url = cls.get_object_url() + "/initialize-debug/"
+        payload = {
+            "json": {
+                "time_serie_id": time_serie_id,
+                **({"name_suffix": name_suffix} if name_suffix is not None else {}),
+            }
+        }
+        r = make_request(s=s, r_type="POST", url=url, payload=payload, loaders=cls.LOADERS)
+        r.raise_for_status()
+        return cls(**r.json())
 
     @classmethod
-    def build_and_assign_to_ts(cls, scheduler_name: str, local_hash_id_list: list, delink_all_ts=False,
-                               remove_from_other_schedulers=True, **kwargs):
-
-
-
+    def build_and_assign_to_ts(
+            cls,
+            scheduler_name: str,
+            time_serie_ids: List[int],
+            delink_all_ts: bool = False,
+            remove_from_other_schedulers: bool = True,
+            timeout=None,
+            **kwargs,
+    ):
+        """
+        POST /schedulers/build-and-assign/
+        body: {
+          scheduler_name, time_serie_ids, delink_all_ts?,
+          remove_from_other_schedulers?, scheduler_kwargs?
+        }
+        """
         s = cls.build_session()
         url = cls.get_object_url() + "/build_and_assign_to_ts/"
-        payload = dict(json={
-            "scheduler_name": scheduler_name,
-            "delink_all_ts": delink_all_ts,
-            "hash_id_list": local_hash_id_list,
-            "remove_from_other_schedulers": remove_from_other_schedulers,
-            "scheduler_kwargs": kwargs
-        })
-        r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
-        if r.status_code != 201:
-            raise Exception(f"Error in request {r.text}")
-        scheduler = cls(**r.json())
-        return scheduler
+        payload = {
+            "json": {
+                "scheduler_name": scheduler_name,
+                "time_serie_ids": time_serie_ids,
+                "delink_all_ts": delink_all_ts,
+                "remove_from_other_schedulers": remove_from_other_schedulers,
+                "scheduler_kwargs": kwargs or {},
+            }
+        }
+        r = make_request(s=s, r_type="POST", url=url, payload=payload,
+                         time_out=timeout,
+                         loaders=cls.LOADERS)
+        if r.status_code not in [200,201]:
+            r.raise_for_status()
+        return cls(**r.json())
 
-    def in_active_tree_connect(self, local_time_series_ids: list):
-
+    def in_active_tree_connect(self, local_time_series_ids: List[int]):
+        """
+        PATCH /schedulers/{id}/in-active-tree/
+        body: { time_serie_ids }
+        """
         s = self.build_session()
-        url = self.get_object_url() + f"/{self.uid}/in_active_tree_connect/"
-        payload = dict(json={"local_time_series_ids": local_time_series_ids})
-        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
-        if r.status_code != 201:
+        url = f"{self.get_object_url()}/{self.id}/in-active-tree/"
+        r = make_request(
+            s=s,
+            r_type="PATCH",
+            url=url,
+            payload={"json": {"time_serie_ids": local_time_series_ids}},
+            loaders=self.LOADERS,
+        )
+        if r.status_code not in (200, 204):
             raise Exception(f"Error in request {r.text}")
 
-    def assign_to_scheduler(self, hash_id_list: list):
-
+    def assign_to_scheduler(self, time_serie_ids: List[int]):
+        """
+        PATCH /schedulers/{id}/assign/
+        body: { time_serie_ids }
+        """
         s = self.build_session()
-        url = self.get_object_url() + f"/{self.uid}/assign_to_scheduler/"
-        payload = dict(json={"hash_id_list": hash_id_list})
-        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
+        url = f"{self.get_object_url()}/{self.id}/assign/"
+        r = make_request(
+            s=s,
+            r_type="PATCH",
+            url=url,
+            payload={"json": {"time_serie_ids": time_serie_ids}},
+            loaders=self.LOADERS,
+        )
+        r.raise_for_status()
         return Scheduler(**r.json())
 
     def is_scheduler_running_in_process(self):
@@ -1021,14 +1094,7 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
 
         logger.info("Heartbeat thread stopped.")
 
-    def patch(self, time_out=None, *args, **kwargs):
-        url = self.get_object_url() + f"/{self.uid}/update"
-        payload = {"json": serialize_to_json(kwargs)}
-        s = self.build_session()
-        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload, time_out=time_out)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-        return Scheduler(**r.json())
+
 
 class RunConfiguration(BasePydanticModel, BaseObjectOrm):
     local_time_serie_update_details: Optional[int] = None
@@ -1054,10 +1120,9 @@ class LocalTimeSerieUpdateDetails(BasePydanticModel, BaseObjectOrm):
     next_update: Optional[datetime.datetime] = Field(None, description="Timestamp of the next update")
     update_statistics: Optional[Dict[str, Any]] = Field(None, description="JSON field for update statistics")
     active_update_status: str = Field(default="Q", max_length=20, description="Current update status")
-    active_update_scheduler_uid: Optional[str] = Field(None, max_length=100,
-                                                       description="Scheduler UID for active update")
+    active_update_scheduler: Optional[Union[int,Scheduler]] = Field(None,
+                                                       description="Scheduler  for active update")
     update_priority: int = Field(default=0, description="Priority level of the update")
-    direct_dependencies: List = Field(default=[], description="List of direct upstream dependencies IDs")
     last_updated_by_user: Optional[int] = Field(None, description="Foreign key reference to User")
 
     run_configuration: Optional["RunConfiguration"]=None
@@ -1112,17 +1177,6 @@ class UpdateStatistics(BaseModel):
     def is_empty(self):
         return self.asset_time_statistics is None and self.max_time_index_value is None
 
-    def get_min_latest_value(self, init_fallback_date: datetime = None):
-        if not self.asset_time_statistics:
-            return init_fallback_date
-        return min(self.asset_time_statistics.values())
-
-    def get_max_latest_value(self, init_fallback_date: datetime = None):
-        if not self.asset_time_statistics:
-            if self.max_time_index_value:
-                return self.max_time_index_value #its a 1 colum index
-            return init_fallback_date
-        return max(self.asset_time_statistics.values())
 
     def asset_identifier(self):
         return list(self.asset_time_statistics.keys())
@@ -1131,6 +1185,8 @@ class UpdateStatistics(BaseModel):
         range_map={k:DateInfo({"start_date_operand":">=","start_date":v or self._initial_fallback_date}) for k,v in self.asset_time_statistics.items()}
         return range_map
 
+    def get_last_update_index_2d(self,uid):
+        return self.asset_time_statistics[uid] or self._initial_fallback_date
 
     def get_asset_earliest_multiindex_update(self,asset):
         stats = self.asset_time_statistics.get(asset.unique_identifier)
@@ -1255,7 +1311,7 @@ class UpdateStatistics(BaseModel):
                     new_update_statistics[unique_identifier] = self.asset_time_statistics[unique_identifier]
                 else:
 
-                    new_update_statistics[unique_identifier] = None
+                    new_update_statistics[unique_identifier] =None
 
             def _max_in_nested(d):
                 """
@@ -1889,467 +1945,9 @@ class Artifact(BasePydanticModel, BaseObjectOrm):
             artifact = Artifact.create(files=files, **data)
             return artifact
 
-# TODO can we remove this?? ROOT_URLS does not seem to exist
-class DynamicTableHelpers:
-    def set_time_series_orm_uri_db_connection(self, uri: str):
-        self.time_series_orm_uri_db_connection = uri
 
-    def make_request(
-            self,
-            r_type: str,
-            url: str,
-            payload: Union[dict, None] = None,
-            timeout: Union[float, None] = None
-    ):
-        r = make_request(s=self.s, r_type=r_type, url=url, payload=payload,
-                         loaders=self.LOADERS, time_out=timeout)
-        return r
 
-    @property
-    def s(self):
-        from requests.adapters import HTTPAdapter, Retry
-        s = requests.Session()
-        s.headers.update(self.LOADERS.auth_headers)
-        retries = Retry(total=2, backoff_factor=2, )
-        s.mount('http://', HTTPAdapter(max_retries=retries))
-        return s
 
-    @staticmethod
-    def _parse_parameters_filter(parameters):
-
-        for key, value in parameters.items():
-            if "__in" in key:
-                assert isinstance(value, list)
-                parameters[key] = ",".join(value)
-        return parameters
-
-    @staticmethod
-    def request_to_datetime(string_date: str):
-        return request_to_datetime(string_date)
-
-    def get_orm_root_from_base_url(self, base_url):
-        return base_url + "/orm/api"
-
-    @property
-    def root_url(self):
-        return self.ROOT_URL + "/dynamic_table"
-
-    @property
-    def historical_update_url(self):
-        return self.ROOT_URL + "/historical_update"
-
-    @property
-    def update_details_url(self):
-        return self.ROOT_URL + "/update_details"
-
-    @property
-    def local_update_details_url(self):
-        return self.ROOT_URL + "/local_update_details"
-
-    @property
-    def rest_token_auth_url(self):
-        base = self.ROOT_URL.replace("/orm/api", "")
-        return f"{base}/auth/rest-token-auth/"
-
-    def patch_update_details(self, *args, **kwargs):
-        base_url = self.update_details_url
-
-        data = serialize_to_json(kwargs)
-        payload = {"json": data}
-        r = self.make_request(r_type="PATCH", url=f"{base_url}/0/", payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-    def patch_local_update_details(self, *args, **kwargs):
-        base_url = self.local_update_details_url
-
-        data = serialize_to_json(kwargs)
-        payload = {"json": data}
-        r = self.make_request(r_type="PATCH", url=f"{base_url}/0/", payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-    def destroy(self, metadata, delete_only_table: bool):
-        base_url = self.root_url
-
-        payload = {"json": {"delete_only_table": delete_only_table}, }
-        r = self.s.delete(f"{base_url}/{metadata['id']}/", **payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-    def get_all_hash_id(self):
-        base_url = self.root_url
-        r = self.s.get(f"{base_url}/get_all_hash_id", )
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.json()}")
-        return r.json()
-
-    def delete_all_data_after_date(self, after_date: str):
-        base_url = self.root_url
-        data = serialize_to_json({"after_date": after_date})
-        payload = {"json": data, }
-        r = self.s.patch(f"{base_url}/delete_all_data_after_date/", **payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.json()}")
-
-    def delete_after_date(self, metadata: Union[dict, None], after_date: str):
-
-        base_url = self.root_url
-        data = serialize_to_json({"after_date": after_date})
-        payload = {"json": data, }
-        r = self.s.patch(f"{base_url}/{metadata['id']}/delete_after_date/", **payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-
-    def search(self, key_word: str):
-        base_url = self.root_url
-        url = f"{base_url}/?search={key_word}"
-        # r = self.s.get(url )
-        r = self.make_request(r_type="GET", url=url, )
-
-        if r.status_code != 200:
-            raise Exception(f"{base_url} Error in request {r.json}")
-        else:
-            serialized = r.json()
-
-            return serialized, r
-
-    def exist(self, *args, **kwargs):
-        base_url = self.root_url
-        payload = {"json": kwargs, }
-        # r = self.s.patch(, **payload)
-        r = self.make_request(r_type="PATCH", url=f"{base_url}/exist/", payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.json()}")
-        return r.json(), r
-
-    def filter(self, *args, **kwargs):
-        instances, r = self.filter_rest(*args, **kwargs)
-        return instances, r
-
-    def filter_rest(self, *args, **kwargs):
-        base_url = self.root_url
-        params = self._parse_parameters_filter(parameters=kwargs)
-        url = f"{base_url}/"
-        payload = dict(params=params)
-        # r = self.s.get(url, params=params)
-        r = self.make_request(r_type="GET", url=url, payload=payload)
-        if r.status_code == 404:
-            raise DynamicTableDoesNotExist
-        elif r.status_code != 200:
-            raise Exception(f"Error in request {r.url} {r.text}")
-        else:
-            serialized = r.json()
-
-            return serialized, r
-
-    def get_rest(self, *args, **kwargs):
-        instance, r = self.filter_rest(*args, **kwargs)
-
-        if len(instance) > 1:
-            raise Exception(f"Get does not return only one instance {r}")
-        elif len(instance) == 0:
-            return {}, r
-        else:
-            metadata = instance[0]
-            return metadata, r
-
-    def get(self, class_name=None, *args, **kwargs):
-
-        instance, r = self.get_rest(*args, **kwargs)
-        return instance
-
-    def get_configuration(self, hash_id: str):
-        data, _r = self.get(hash_id=hash_id)
-        if len(data) == 0:
-            return None, None
-        build_configuration, build_meta_data = data["build_configuration"], data["build_meta_data"]
-
-        return build_configuration, build_meta_data
-
-    def create(self, metadata_kwargs: dict):
-        metadata_kwargs = serialize_to_json(metadata_kwargs)
-        time_serie_node, metadata = TimeSerieNode.create(metadata_kwargs=metadata_kwargs)
-        return metadata
-
-    def create_table_from_source_table_configuration(self, source_table_config_id: int, timeout=None):
-        base_url = self.source_table_config_url
-
-        r = self.s.post(f"{base_url}/{source_table_config_id}/create_table_from_source_table_configuration/")
-        if r.status_code != 201:
-            raise Exception(r.text)
-
-    def get_update_statistics(self, hash_id):
-        """
-        Gets latest value from Hash_id
-        """
-        r, j = self.get_rest(hash_id=hash_id, class_name=None)
-        if len(r) == 0:
-            return None
-        if r['sourcetableconfiguration'] is None:
-            return None
-        if r['sourcetableconfiguration']["last_time_index_value"] is None:
-            return None
-
-        date = self.request_to_datetime(string_date=r["sourcetableconfiguration"]["last_time_index_value"])
-
-        return date
-
-    @classmethod
-    def _break_pandas_dataframe(cls, data_frame: pd.DataFrame, time_index_name: Union[str, None] = None):
-        if time_index_name == None:
-            time_index_name = data_frame.index.names[0]
-            if time_index_name is None:
-                time_index_name = "time_index"
-                names = [c if i != 0 else time_index_name for i, c in
-                         enumerate(data_frame.index.names)]
-                data_frame.index.names = names
-
-        time_col_loc = data_frame.index.names.index(time_index_name)
-        column_index_names = data_frame.columns.names
-        index_names = data_frame.index.names
-        data_frame = data_frame.reset_index()
-        data_frame.columns = [str(c) for c in data_frame.columns]
-        data_frame = data_frame.rename(columns={data_frame.columns[time_col_loc]: time_index_name})
-        column_dtypes_map = {key: str(value) for key, value in data_frame.dtypes.to_dict().items()}
-
-        data_frame = data_frame.replace({np.nan: None})
-
-        return data_frame, column_index_names, index_names, column_dtypes_map, time_index_name
-
-    def filter_by_hash_id(self, hash_id_list: list):
-        base_url = self.root_url
-        url = f"{base_url}/filter_by_hash_id/"
-        payload = {"json": {"hash_id__in": hash_id_list}, }
-        r = self.make_request(r_type="POST", url=url, payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"{r.text}")
-        all_metadatas = {m["hash_id"]: m for m in r.json()}
-        return all_metadatas
-
-    @classmethod
-    def _handle_source_table_configuration(cls,
-                                           metadata: DynamicTableMetaData,
-                                           column_dtypes_map,
-                                           index_names,
-                                           time_index_name,
-                                           column_index_names,
-                                           data,
-                                           overwrite=False
-                                           ):
-        """
-        Handles the creation or retrieval of the source table configuration.
-
-        Parameters:
-        ----------
-        metadata : dict
-            Metadata dictionary containing "sourcetableconfiguration" and "id".
-        column_dtypes_map : dict
-            Mapping of column names to their data types.
-        index_names : list
-            List of index names.
-        time_index_name : str
-            Name of the time index column.
-        column_index_names : list
-            List of column index names.
-        data : DataFrame
-            The input DataFrame.
-        overwrite : bool, optional
-            Whether to overwrite existing configurations (default is False).
-
-        Returns:
-        -------
-        dict or None
-            Updated metadata with the source table configuration, and potentially filtered data.
-        """
-        stc = metadata.sourcetableconfiguration
-
-        if stc is None:
-            try:
-                stc = SourceTableConfiguration.create(
-                    column_dtypes_map=column_dtypes_map,
-                    index_names=index_names,
-                    time_index_name=time_index_name,
-                    column_index_names=column_index_names,
-                    metadata_id=metadata.id
-                )
-                metadata.sourcetableconfiguration = stc
-            except AlreadyExist:
-
-                if not overwrite:
-                    raise NotImplementedError("TODO Needs to remove values per asset")
-                    # Filter the data based on time_index_name and last_time_index_value
-                    data = data[
-                        data[time_index_name] > self.request_to_datetime(stc.last_time_index_value)
-                        ]
-        return metadata, data
-
-    @classmethod
-    def upsert_data_into_table(cls,
-                               local_metadata: dict,
-                               data: pd.DataFrame,
-                               data_source: DynamicTableDataSource,
-                               ):
-        overwrite = True  # ALWAYS OVERWRITE
-        metadata = local_metadata.remote_table
-
-        data, column_index_names, index_names, column_dtypes_map, time_index_name = cls._break_pandas_dataframe(
-            data)
-
-        # overwrite data origina data frame to release memory
-        if not data[time_index_name].is_monotonic_increasing:
-            data = data.sort_values(time_index_name)
-
-        metadata, data = (
-            result if (
-                result := cls._handle_source_table_configuration(
-                    metadata=metadata, column_dtypes_map=column_dtypes_map,
-                    index_names=index_names,
-                    time_index_name=time_index_name,
-                    column_index_names=column_index_names, data=data,
-                    overwrite=overwrite
-                )
-            ) is not None
-            else (metadata, data)
-        )
-
-        duplicates_exist = data.duplicated(subset=index_names).any()
-        if duplicates_exist:
-            raise Exception(f"Duplicates found in columns: {index_names}")
-
-        global_stats, grouped_dates = get_chunk_stats(
-            chunk_df=data,
-            index_names=index_names,
-            time_index_name=time_index_name
-        )
-
-        data_source.insert_data_into_table(
-            serialized_data_frame=data,
-            local_metadata=local_metadata,
-            overwrite=overwrite,
-            time_index_name=time_index_name,
-            index_names=index_names,
-            grouped_dates=grouped_dates,
-        )
-
-
-
-        min_d, last_time_index_value = global_stats["_GLOBAL_"]["min"], global_stats["_GLOBAL_"]["max"]
-        max_per_asset_symbol = None
-
-        def extract_max(node):
-            # Leaf case: a dict with 'min' and 'max'
-            if isinstance(node, dict) and "min" in node and "max" in node:
-                return node["max"]
-            # Otherwise recurse
-            return {k: extract_max(v) for k, v in node.items()}
-        if len(index_names) > 1:
-            max_per_asset_symbol = {
-                uid: extract_max(stats)
-                for uid, stats in global_stats["_PER_ASSET_"].items()
-            }
-        local_metadata = local_metadata.set_last_update_index_time_from_update_stats(
-            max_per_asset_symbol=max_per_asset_symbol,
-            last_time_index_value=last_time_index_value,
-        )
-        return local_metadata
-
-    def filter_by_assets_ranges(
-            self,
-            metadata: dict,
-            asset_ranges_map: dict,
-            data_source: object,
-            local_hash_id: str
-    ):
-        df = data_source.filter_by_assets_ranges(
-            metadata=metadata,
-            asset_ranges_map=asset_ranges_map,
-            data_source=data_source,
-            local_hash_id=local_hash_id,
-        )
-        return df
-
-    def time_serie_exist_in_db(self, hash_id):
-        metadata, _ = self.get(hash_id=hash_id)
-        if len(metadata) == 0:
-            return False
-        else:
-            if metadata["sourcetableconfiguration"] is not None:
-                if metadata["sourcetableconfiguration"]["last_time_index_value"] is not None:
-                    return True
-        return False
-
-    def set_compression_policy(self, metadata, interval: str):
-        base_url = self.root_url
-
-        payload = {"json": {"interval": interval, }}
-        # r = self.s.patch(f"{base_url}/{metadata['id']}/set_compression_policy/", **payload)
-        url = f"{base_url}/{metadata['id']}/set_compression_policy/"
-        r = self.make_request(r_type="PATCH", url=url, payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"{metadata['hash_id']} : {r.json()}")
-
-    def set_retention_policy(self, metadata, interval: str):
-        base_url = self.root_url
-
-        payload = {"json": {"interval": interval, }}
-        # r = self.s.patch(f"{base_url}/{metadata['id']}/set_retention_policy/", **payload)
-        url = f"{base_url}/{metadata['id']}/set_retention_policy/"
-        r = self.make_request(r_type="PATCH", url=url, payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"{metadata['hash_id']} : {r.text}")
-
-    def set_policy_for_descendants(self, hash_id, policy, pol_type, exclude_ids, extend_to_classes):
-        r = TimeSerieNode.set_policy_for_descendants(hash_id, policy, pol_type, exclude_ids, extend_to_classes)
-
-    def patch(self, metadata, timeout=None, *args, **kwargs):
-        base_url = self.root_url
-
-        payload = {"json": kwargs}
-        # r = self.s.patch(f"{base_url}/{metadata['id']}/", **payload)
-        url = f"{base_url}/{metadata['id']}/"
-        r = self.make_request(r_type="PATCH", url=url, payload=payload, timeout=timeout)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
-        return r.json()
-
-    def reset_dependencies_states(self, metadata, **kwargs):
-        base_url = self.root_url
-
-        payload = {"json": kwargs}
-        # r = self.s.patch(, **payload)
-        url = f"{base_url}/{metadata['id']}/reset_dependencies_states/"
-        r = self.make_request(r_type="PATCH", url=url, payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request ")
-
-    def must_update_by_hash_id(self, hash_id: str):
-        base_url = self.root_url
-
-        payload = {"json": {"use_hash_id": True}}
-        # r = self.s.patch(, **payload)
-        url = f"{base_url}/{hash_id}/must_update/"
-        r = self.make_request(r_type="PATCH", url=url, payload=payload)
-        if r.status_code != 200:
-            raise Exception(f"Error in request ")
-        r = r.json()
-        return r["must_update"], r["metadata"]
-
-    def _build_table_response(self, data: pd.DataFrame, source_table_config: dict):
-        infered_dtypes = {k: str(c) for k, c in data.dtypes.to_dict().items()}
-        config_types = {c: source_table_config["column_dtypes_map"][c] for c in infered_dtypes.keys()}
-        for c, c_type in config_types.items():
-            if c_type != infered_dtypes[c]:
-                if data.shape[0] > 0:
-                    if c_type == 'datetime64[ns, UTC]':
-                        if isinstance(data[c].iloc[0], str):
-                            data[c] = pd.to_datetime(data[c])
-                        else:
-                            data[c] = pd.to_datetime(data[c] * 1e6, utc=True)
-                    else:
-                        data[c] = data[c].astype(c_type)
-        data = data.set_index(source_table_config['index_names'])
-        return data
 
 try:
     POD_PROJECT = Project.get_user_default_project()

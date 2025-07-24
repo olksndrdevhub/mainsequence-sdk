@@ -3,7 +3,7 @@ from .utils import AuthLoaders, bios_uuid
 from .models_tdag import (request_to_datetime, LocalTimeSeriesDoesNotExist, DynamicTableDoesNotExist,
                           SourceTableConfigurationDoesNotExist, LocalTimeSerieUpdateDetails,
                           JSON_COMPRESSED_PREFIX, Scheduler, SchedulerDoesNotExist, LocalTimeSerie,
-                          DynamicTableMetaData, DynamicTableDataSource, LocalTimeSerieNode,
+                          DynamicTableMetaData, DynamicTableDataSource,
 ColumnMetaData,Artifact,TableMetaData ,DataFrequency,
                           Project, UniqueIdentifierRangeMap, LocalTimeSeriesHistoricalUpdate,
                           UpdateStatistics, DataSource, PodDataSource, SessionDataSource)

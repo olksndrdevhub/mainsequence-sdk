@@ -9,11 +9,11 @@ class RayUpdateManager:
     """
     Controller for interactions with ray cluster
     """
-    def __init__(self, scheduler_uid,
+    def __init__(self, scheduler_id,
                  skip_health_check=False,
                  local_mode=False):
 
-        self.scheduler_uid = scheduler_uid
+        self.scheduler_id = scheduler_id
 
         if skip_health_check == False:
             self.is_node_healthy = self.check_node_is_healthy_in_ip()

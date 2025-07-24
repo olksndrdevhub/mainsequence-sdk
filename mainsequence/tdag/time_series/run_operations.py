@@ -75,8 +75,8 @@ class UpdateRunner:
 
         name_prefix = "DEBUG_" if self.debug_mode else ""
         self.scheduler = ms_client.Scheduler.build_and_assign_to_ts(
-            scheduler_name=f"{name_prefix}{self.ts.local_hash_id}_{self.ts.data_source.id}",
-            local_hash_id_list=[(self.ts.local_hash_id, self.ts.data_source.id)],
+            scheduler_name=f"{name_prefix}{self.ts.local_time_serie.id}",
+            time_serie_ids=[self.ts.local_time_serie.id],
             remove_from_other_schedulers=True,
             running_in_debug_mode=self.debug_mode
         )
@@ -130,7 +130,7 @@ class UpdateRunner:
         # 4. Fetch the latest metadata for the entire tree from the backend.
         update_details_batch = dict(
             error_on_last_update=False,
-            active_update_scheduler_uid=self.scheduler.uid,
+            active_update_scheduler_id=self.scheduler.id,
             active_update_status="Q"  # Assuming queue status is always set here
         )
 
@@ -154,7 +154,7 @@ class UpdateRunner:
         from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
 
         """Sets up distributed actors and gathers pre-update state."""
-        self.update_actor_manager = RayUpdateManager(scheduler_uid=self.scheduler.uid, skip_health_check=True)
+        self.update_actor_manager = RayUpdateManager(scheduler_id=self.scheduler.id, skip_health_check=True)
         self.ts.update_actor_manager = self.update_actor_manager  # Assign to TS if it needs direct access
 
         local_metadatas, state_data = self._pre_update_routines()
@@ -164,7 +164,7 @@ class UpdateRunner:
             logger=self.logger,
             state_data=state_data,
             debug=self.debug_mode,
-            scheduler_uid=self.scheduler.uid,
+            scheduler_id=self.scheduler.id,
             trace_id=None,
         )
         self.ts.update_tracker = self.update_tracker  # Assign to TS if it needs direct access
@@ -173,7 +173,7 @@ class UpdateRunner:
     def _start_update(self, local_time_series_map: Dict, use_state_for_update: bool):
         """Orchestrates a single TimeSerie update, including pre/post routines."""
         historical_update = self.ts.local_persist_manager.local_metadata.set_start_of_execution(
-            active_update_scheduler_uid=self.scheduler.uid
+            active_update_scheduler_id=self.scheduler.id
         )
         update_statistics = historical_update.update_statistics
         must_update = historical_update.must_update or self.force_update
@@ -233,7 +233,7 @@ class UpdateRunner:
 
         # Check that the time index is a UTC datetime
         time_index = df.index.get_level_values(0)
-        if not pd.api.types.is_datetime64_ns_dtype(time_index) or time_index.tz !=datetime.timezone.utc  :
+        if not pd.api.types.is_datetime64_ns_dtype(time_index) or str(time_index.tz) !=str(datetime.timezone.utc)  :
             raise TypeError(f"Time index must be datetime64[ns, UTC], but found {time_index.dtype}")
 
         # Check for forbidden data types and enforce lowercase columns
@@ -511,7 +511,7 @@ class UpdateRunner:
                 local_hash_id=data_row['local_hash_id'],
                 data_source_id=data_row['data_source_id'],
                 telemetry_carrier=telemetry_carrier,
-                scheduler_uid=self.scheduler.uid
+                scheduler_id=self.scheduler.id
             )
             task_options = dict(
                 num_cpus=run_configuration.required_cpus,
@@ -572,6 +572,8 @@ class UpdateRunner:
 
         # 1. Set up the scheduler for this run
         try:
+
+            self.ts.verify_and_build_remote_objects()#needed to start sch
             self._setup_scheduler()
             cvars.bind_contextvars(scheduler_name=self.scheduler.name, head_local_ts_hash_id=self.ts.local_hash_id)
 

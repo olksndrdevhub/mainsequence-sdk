@@ -11,7 +11,7 @@ from mainsequence.tdag.time_series import TimeSerie
 
 def update_remote_from_hash_id_local(
                          telemetry_carrier: str,
-scheduler_uid:str,
+scheduler_id:int,
                                local_time_serie_id: int,data_source_id:int,
 local_hash_id:str,
 
@@ -53,7 +53,7 @@ local_hash_id:str,
         try:
 
             ts_updater = TimeSerieUpdater(time_serie=ts, update_tree=False   )
-            ts_updater.do_step_update(scheduler_uid)
+            ts_updater.do_step_update(scheduler_id)
         except Exception as e:
             ts.logger.exception(f'{e} ')
         
@@ -104,7 +104,7 @@ class TimeSerieUpdater:
 
         return dependencies_update_details["updated"], dependencies_update_details["error_on_update_dependencies"]
 
-    def do_step_update(self,scheduler_uid)->bool:
+    def do_step_update(self,scheduler_id)->bool:
 
         from mainsequence.tdag import configuration
         from .utils import UpdateInterface
@@ -119,7 +119,7 @@ class TimeSerieUpdater:
         are_dependencies_updated,error_on_dependencies=self._check_if_dependencies_are_updated()
 
 
-        update_tracker = UpdateInterface(head_hash=None, trace_id=None,scheduler_uid=scheduler_uid,
+        update_tracker = UpdateInterface(head_hash=None, trace_id=None,scheduler_id=scheduler_id,
                                          logger=self.time_serie.logger,
                                          state_data=None, debug=False)
 

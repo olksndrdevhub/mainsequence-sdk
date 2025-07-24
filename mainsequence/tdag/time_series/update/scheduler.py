@@ -5,6 +5,7 @@ import time
 
 from ray.util.client.common import ClientActorHandle
 
+from build.lib.mainsequence.tdag_client import DynamicTableMetaData
 from mainsequence.client import (Scheduler, SourceTableConfigurationDoesNotExist,
                                  LocalTimeSerie, SchedulerDoesNotExist
                                  )
@@ -51,9 +52,8 @@ class TimeSerieHeadUpdateActor:
     def _load_time_serie(self, local_hash_id: str,
                          remote_table_hashed_name: str, data_source_id: int,
                          scheduler: Scheduler) -> "TimeSerie":
-        from mainsequence.tdag.time_series import TimeSerie
 
-        distributed_actor_manager = RayUpdateManager(scheduler_uid=scheduler.uid,
+        distributed_actor_manager = RayUpdateManager(scheduler_id=scheduler.id,
                                                      skip_health_check=True
                                                      )
 
@@ -185,7 +185,7 @@ class SchedulerUpdater:
 
     def _build_actor_handle(self, running_distributed_heads: bool, update_init_kwargs: Dict[str, Any],
                             actor_options: Dict[str, Any],
-                            local_time_serie_uid: str, actors_map: Dict[str, Dict[str, Any]]
+                            local_time_serie_id: int, actors_map: Dict[str, Dict[str, Any]]
     ) -> Dict[str, Dict[str, Any]]:
 
         if running_distributed_heads == True:
@@ -193,9 +193,9 @@ class SchedulerUpdater:
         else:
             actor_handle = TimeSerieHeadUpdateActor(**update_init_kwargs)
 
-        force_next_update = False if local_time_serie_uid not in actors_map.keys() else actors_map[local_time_serie_uid][
+        force_next_update = False if local_time_serie_id not in actors_map.keys() else actors_map[local_time_serie_id][
             'force_next_update']
-        actors_map[local_time_serie_uid] = dict(actor_handle=actor_handle, actor_options=actor_options,
+        actors_map[local_time_serie_id] = dict(actor_handle=actor_handle, actor_options=actor_options,
                                          task_handle=None, force_next_update=force_next_update,
                                          update_init_kwargs=update_init_kwargs
                                          )
@@ -267,10 +267,8 @@ class SchedulerUpdater:
         """
         Queries ts_orm scheduler and build update actors if not exist
         """
-        from mainsequence.client import DynamicTableHelpers
-        dth = DynamicTableHelpers()
         self.refresh_node_scheduler()
-        local_to_remote = {t.uid: {"updates_to":t.updates_to,"local_hash_id":t.hash_id} for t in self.node_scheduler.schedules_to}
+        local_to_remote = {t.id: {"updates_to":t.updates_to} for t in self.node_scheduler.schedules_to}
         target_ts = self.node_scheduler.schedules_to
 
         # verify target_ts_in actors
@@ -295,21 +293,19 @@ class SchedulerUpdater:
             f"{bcolors.OKBLUE} TODO: Implement clear logic for  update and remove schedulers{bcolors.ENDC}")
 
         for head_ts in target_ts:
-            uid = head_ts.uid
+            id = head_ts.id
 
-            if uid in actors_map.keys():
+            if id in actors_map.keys():
                 continue
-            metadata = dth.get(hash_id=local_to_remote[uid]["updates_to"].hash_id,
-                               data_source__id=local_to_remote[uid]["updates_to"].data_source_id,
-                               )
+            metadata = DynamicTableMetaData.get(id=local_to_remote[id]["updates_to"].id,)
             update_details = {"distributed_num_cpus": 1}
             if "dynamictableupdatedetails" in metadata.keys():
                 raise NotImplementedError
                 update_details = metadata["dynamictableupdatedetails"]
 
             update_init_kwargs = dict(local_hash_id=head_ts.hash_id,
-                                      remote_table_hashed_name=local_to_remote[uid]["updates_to"].hash_id,
-                                      data_source_id=local_to_remote[uid]["updates_to"].data_source_id,
+                                      remote_table_hashed_name=local_to_remote[id]["updates_to"].hash_id,
+                                      data_source_id=local_to_remote[id]["updates_to"].data_source_id,
                                       scheduler=self.node_scheduler,
 
                                       debug=debug, update_tree=update_tree,
@@ -321,13 +317,13 @@ class SchedulerUpdater:
                              "get_if_exists": True, "max_task_retries": 0, "max_concurrency": 2, "max_restarts": 0}
 
             actors_map = self._build_actor_handle(running_distributed_heads=running_distributed_heads,
-                                                  local_time_serie_uid=head_ts.uid,
+                                                  local_time_serie_id=head_ts.id,
                                                   actor_options=actor_options, update_init_kwargs=update_init_kwargs,
                                                   actors_map=actors_map
                                                   )
             if first_launch == True and running_distributed_heads == True:
                 time.sleep(30)
-            _, nu = get_time_to_wait_from_hash_id(local_hash_id=head_ts.hash_id,data_source_id=head_ts.data_source_id)
+            _, nu = get_time_to_wait_from_hash_id(local_time_serie_id=head_ts.id)
             wait_list[uid] = {"next_update": nu,
                                   "remote_table_hashed_name": local_to_remote[uid]["updates_to"].hash_id,
                                   "data_source_id": local_to_remote[uid]["updates_to"].data_source_id,
@@ -442,7 +438,7 @@ class SchedulerUpdater:
 
         update_extra_kwargs = {} if update_extra_kwargs is None else update_extra_kwargs
         if debug ==False:
-            _ = RayUpdateManager(scheduler_uid=self.node_scheduler.uid)  # on initi verifys ray is running
+            _ = RayUpdateManager(scheduler_id=self.node_scheduler.id)  # on initi verifys ray is running
         running_distributed_heads = True
         if run_head_in_main_process == True or debug == True:
             running_distributed_heads = False
@@ -493,7 +489,7 @@ class SchedulerUpdater:
                     break
                 ts_updating = [c.hash_id for c in target_ts if c.uid not in wait_list.keys()]
 
-                self.logger.info(f"""{bcolors.OKBLUE}Waiting for tasks to finish in scheduler {self.node_scheduler.uid}"
+                self.logger.info(f"""{bcolors.OKBLUE}Waiting for tasks to finish in scheduler {self.node_scheduler.id}"
                                      timeseries updating {ts_updating}
                                      timeseries waiting:
                                      {pd.Series(wait_list).to_frame('next_update')} 

@@ -117,12 +117,14 @@ class BaseObjectOrm:
         "AssetTranslationTable": "assets/asset-translation-tables",
 
         # TDAG
-        "TimeSerie": "ogm/time_serie",
-        "Scheduler": "ogm/scheduler",
+        "Scheduler": "ts_manager/scheduler",
         "MultiIndexMetadata": "orm/multi_index_metadata",
         "ContinuousAggMultiIndex": "ts_manager/cont_agg_multi_ind",
         "DynamicTableMetaData": "ts_manager/dynamic_table",
-        "LocalTimeSerieNodesMethods": "ogm/local_time_serie",
+        # "LocalTimeSerieNodesMethods": "ogm/local_time_serie",
+
+        "LocalTimeSerieNodesMethods": "ts_manager/local_time_serie",
+
         "LocalTimeSerie": "ts_manager/local_time_serie",
         "LocalTimeSerieUpdateDetails": "ts_manager/local_time_serie_update_details",
         "LocalTimeSerieHistoricalUpdate": "ts_manager/lts_historical_update",

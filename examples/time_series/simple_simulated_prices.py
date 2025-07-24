@@ -106,6 +106,7 @@ import pytz
 import pandas as pd
 from sklearn.linear_model import ElasticNet
 import copy
+from abc import ABC, abstractmethod
 
 MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES = "simulated_prices_from_category"
 TEST_TRANSLATION_TABLE_UID="test_translation_table"
@@ -176,7 +177,7 @@ class SimulatedPricesManager:
             start_time = update_statistics.get_asset_earliest_multiindex_update(asset=asset) + datetime.timedelta(hours=1)
             if start_time > yesterday_midnight:
                 continue  # Skip if no simulation period is available.
-            time_range = pd.date_range(start=start_time, end=yesterday_midnight, freq='H')
+            time_range = pd.date_range(start=start_time, end=yesterday_midnight, freq='D')
             if len(time_range) == 0:
                 continue
             # Use the last observed price for the asset as the starting price.
@@ -218,7 +219,6 @@ class SimulatedPricesManager:
 
                             ]
         return columns_metadata
-
 
 class SingleIndexTS(TimeSerie):
     """
@@ -607,9 +607,231 @@ class TAFeature(TimeSerie):
 
         return all_features
 
+from pydantic import BaseModel
+
+class ModelConfiguration(BaseModel):
+    """
+    Abstract base for any model’s hyperparameter/configuration object.
+    Subclasses must implement build_model() to return a fresh model instance.
+    """
+
+    def build_model(self) -> Any:
+       raise NotImplementedError
 
 
-class NextDayEN(TimeSerie):
+class ElasticNetConfiguration(ModelConfiguration):
+    """
+    Configuration for sklearn.linear_model.ElasticNet.
+    All fields map 1:1 to its __init__ parameters.
+    """
+    alpha: float = 1.0
+    l1_ratio: float = 0.5
+    fit_intercept: bool = True
+    normalize: bool = False
+    precompute: bool = False
+    max_iter: int = 1000
+    tol: float = 1e-4
+    selection: str = "cyclic"
+
+    def build_model(self) -> ElasticNet:
+        """Instantiate sklearn’s ElasticNet with these hyperparameters."""
+        return ElasticNet(
+            alpha=self.alpha,
+            l1_ratio=self.l1_ratio,
+            fit_intercept=self.fit_intercept,
+            normalize=self.normalize,
+            precompute=self.precompute,
+            max_iter=self.max_iter,
+            tol=self.tol,
+            selection=self.selection,
+        )
+
+
+def _prepare_model_data(
+        feature_ts: TimeSerie,
+        prices_ts: TimeSerie,
+        update_statistics: UpdateStatistics
+) -> pd.DataFrame:
+    """
+    Helper to fetch, align, and prepare feature and target data for modeling.
+
+    1. Fetches feature and price data from dependencies.
+    2. Pivots features from long to wide format.
+    3. Computes next-day returns from prices.
+    4. Joins features and returns into a single DataFrame.
+
+    Returns:
+        A cleaned DataFrame with features and 'return_1d' as columns,
+        indexed by ('time_index', 'unique_identifier'). Returns an empty
+        DataFrame if prerequisites are not met.
+    """
+    start = getattr(prices_ts, "OFFSET_START", datetime.datetime(2024, 1, 1, tzinfo=pytz.utc))
+    range_descriptor = {
+        a.unique_identifier: {"start_date": start, "start_date_operand": ">="}
+        for a in update_statistics.asset_list
+    }
+
+    # Fetch raw data
+    feats_long = feature_ts.get_ranged_data_per_asset(range_descriptor=range_descriptor)
+    prices_df = prices_ts.get_ranged_data_per_asset(range_descriptor=range_descriptor)
+
+    if feats_long.empty or prices_df.empty:
+        return pd.DataFrame()
+
+    # Pivot TA features into wide form
+    feats_wide = (
+        feats_long["feature_value"]
+        .reset_index()
+        .pivot(
+            index=["time_index", "unique_identifier"],
+            columns="feature_name",
+            values="feature_value"
+        )
+    )
+
+    # Compute next-day returns
+    price_ser = (
+        prices_df
+        .reset_index()
+        .rename(columns={"close": "price"})
+        .set_index(["time_index", "unique_identifier"])["price"]
+    )
+    returns = (
+        price_ser
+        .groupby(level="unique_identifier")
+        .pct_change()
+        .shift(-1)  # Align so return_1d at t = (p_{t+1}/p_t - 1)
+        .to_frame(name="return_1d")
+    )
+
+    # Join features + target and drop rows with missing values
+    return feats_wide.join(returns, how="inner").dropna()
+
+class ModelTrainTimeSerie(TimeSerie):
+    """
+    TimeSerie dedicated solely to retraining the model at the configured frequency.
+
+    Dependencies:
+      - TAFeature
+      - SimulatedPrices
+
+    Args:
+        asset_list: assets to train on
+        ta_feature_config: TA‐indicator specs
+        model_config: builds the estimator
+        window_size: rows in rolling window
+        retrain_config: when/how often to retrain
+    """
+    def __init__(
+        self,
+        asset_list: List[ms_client.Asset],
+        ta_feature_config: List[Dict[str, Any]],
+        model_config: Any,                  # ModelConfiguration
+        window_size: int,
+        retrain_config_days: int,
+        *args,
+        **kwargs
+    ):
+        self.asset_list = asset_list
+        self.ta_feature_config = ta_feature_config
+        self.model_config = model_config
+        self.window_size = window_size
+        self.retrain_config_days = retrain_config_days
+
+        # downstream TS for features & prices
+        self.feature_ts = TAFeature(asset_list=asset_list, ta_feature_config=ta_feature_config, *args, **kwargs)
+        self.prices_ts  = SimulatedPrices(asset_list=asset_list, *args, **kwargs)
+
+        super().__init__( *args, **kwargs)
+
+    def dependencies(self) -> Dict[str, TimeSerie]:
+        return {
+            "feature_ts": self.feature_ts,
+            "prices_ts": self.prices_ts,
+        }
+
+    def update(self, update_statistics: UpdateStatistics) -> pd.DataFrame:
+        """
+        Retrain once per retrain_frequency.  Returns a DataFrame of
+        model coefficients + intercept for each asset at the retrain timestamp.
+        """
+        data = _prepare_model_data(self.feature_ts, self.prices_ts, update_statistics)
+        if data.empty:
+            return pd.DataFrame()
+
+        feature_cols = [c for c in data.columns if c!="return_1d"]
+
+        now=datetime.datetime.now(pytz.utc).replace(microsecond=0,minute=0,second=0,tzinfo=pytz.utc)
+        records= []
+        for uid, grp in data.groupby(level="unique_identifier"):
+
+            last_retrain = update_statistics.get_last_update_index_2d(uid)
+            if (now-last_retrain).days < self.retrain_config_days:
+                continue
+
+            df = grp.droplevel("unique_identifier").sort_index()
+            if len(df) < self.window_size + 1:
+                continue
+
+            # train on most recent window
+            win = df.iloc[-self.window_size:]
+            X = win[feature_cols].to_numpy()
+            y = win["return_1d"].to_numpy()
+
+            job_id=self._handle_model_train(X,y,uid)
+            retrain_time = win.index[-1]  # use last data timestamp, not now
+            records.append((retrain_time, uid, job_id))
+
+        if not records:
+            return pd.DataFrame()
+
+        # build MultiIndex:
+        df=pd.DataFrame(records, columns=["last_timestamp_on_train", "unique_identifier", "job_id"])
+        df["last_timestamp_on_train"]=df["last_timestamp_on_train"].apply(lambda x: x.timestamp())
+        df["time_index"]=now
+        df=df.set_index(["time_index","unique_identifier"])
+        return df
+
+    def _handle_model_train(self,X, y,uid):
+        """
+        Handle Model Train This could be in a different Job in another cloud service
+        Ideally we get the information regarding the model via ML Flow
+        Args:
+            X:
+            y:
+            uid:
+
+        Returns:
+
+        """
+        import tempfile
+        import pickle
+        # model = self.model_config.build_model()
+        # model.fit(X, y)
+
+        # record coefficients + intercept
+        # Serialize and upload as Artifact
+
+        # with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as tmp:
+        #     pickle.dump(model, tmp)
+        #     tmp.flush()
+        #     artifact = ms_client.Artifact.upload_file(
+        #         filepath=tmp.name,
+        #         name=f"{self.__class__.__name__}_{uid}_{now.isoformat()}",
+        #         created_by_resource_name=self.__class__.__name__,
+        #         bucket_name="ModelArtifacts"
+        #     )
+        return 1
+
+
+    def get_table_metadata(self, update_statistics: UpdateStatistics) -> ms_client.TableMetaData:
+        return ms_client.TableMetaData(
+            identifier="model_retrain",
+            data_frequency_id=None,
+            description="Model coefficients retrained at specified frequency"
+        )
+
+class RollingModelPrediction(TimeSerie):
     """
     Predicts the next-day return via a rolling ElasticNet regression on TA features.
 
@@ -630,16 +852,16 @@ class NextDayEN(TimeSerie):
         self,
         asset_list: List[ms_client.Asset],
         ta_feature_config: List[Dict[str, Any]],
-        elastic_net_config: Dict[str, Any],
+        model_config: ModelConfiguration,
         window_size: int,
-        local_kwargs_to_ignore: List[str] = ["asset_list", "ta_feature_config"],
+        retrain_config_days:int,
         *args,
         **kwargs
     ):
         # Core configuration
         self.asset_list = asset_list
         self.ta_feature_config = ta_feature_config
-        self.elastic_net_config = elastic_net_config
+        self.model_config = model_config
         self.window_size = window_size
 
         # Declare dependencies by instantiating them as attributes
@@ -660,6 +882,15 @@ class NextDayEN(TimeSerie):
         self.external_prices=APITimeSerie.build_from_identifier(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES)
         translation_table=ms_client.AssetTranslationTable.get(unique_identifier=TEST_TRANSLATION_TABLE_UID)
         self.translated_prices_ts=WrapperTimeSerie(translation_table=translation_table)
+        # retrainer TimeSerie
+        self.model_train_ts = ModelTrainTimeSerie(
+            asset_list=asset_list,
+            ta_feature_config=ta_feature_config,
+            model_config=model_config,
+            window_size=window_size,
+            retrain_config_days=retrain_config_days,
+            *args, **kwargs
+        )
 
         super().__init__( *args, **kwargs)
 
@@ -669,6 +900,7 @@ class NextDayEN(TimeSerie):
             "feature_ts": self.feature_ts,
             "api_prices":self.external_prices,
             "translated_prices_ts": self.translated_prices_ts,
+            "model_train_ts": self.model_train_ts,
         }
 
 
@@ -678,61 +910,12 @@ class NextDayEN(TimeSerie):
         from today to tomorrow. X = today's TA features; y = tomorrow's 1d return.
         """
         # Build range descriptors from the earliest needed date
-        # 1) Build range descriptors
-        start_date = getattr(
-            self.prices_ts,
-            "OFFSET_START",
-            datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
-        )
-        range_descriptor = {
-            asset.unique_identifier: {
-                "start_date": start_date,
-                "start_date_operand": ">="
-            }
-            for asset in update_statistics.asset_list
-        }
-
-        # 2) Fetch raw TA features (long) and prices
-        feats_long = self.feature_ts.get_ranged_data_per_asset(range_descriptor=range_descriptor)
-        prices_df = self.prices_ts.get_ranged_data_per_asset(range_descriptor=range_descriptor)
-        if feats_long.empty or prices_df.empty:
-            return pd.DataFrame()
-
-        # 3) Pivot TA features into wide form:
-        #    index = (time_index, unique_identifier),
-        #    columns = one column per feature_name,
-        #    values = feature_value
-        feats_wide = (
-            feats_long["feature_value"]
-            .reset_index()
-            .pivot(
-                index=["time_index", "unique_identifier"],
-                columns="feature_name",
-                values="feature_value"
-            )
-        )
-
-        # 4) Build price series with the same MultiIndex and compute next-day returns
-        price_ser = (
-            prices_df
-            .reset_index()
-            .rename(columns={"close": "price"})  # or whatever your price column is
-            .set_index(["time_index", "unique_identifier"])["price"]
-        )
-        returns = (
-            price_ser
-            .groupby(level="unique_identifier")
-            .pct_change()
-            .shift(-1)  # align so return_1d at t = (p_{t+1}/p_t - 1)
-            .to_frame(name="return_1d")
-        )
-
-        # 5) Join features + target; drop any rows missing either
-        data = feats_wide.join(returns, how="inner").dropna()
+        data = _prepare_model_data(self.feature_ts, self.prices_ts, update_statistics)
         if data.empty:
             return pd.DataFrame()
 
         # 6) Loop per asset via groupby; drop the UID level so asset_df is purely wide
+        trainer = ElasticNetTrainer(model_config=self.model_config)
         records: list = []
         for uid, grp in data.groupby(level="unique_identifier"):
             asset_df = (
@@ -753,8 +936,7 @@ class NextDayEN(TimeSerie):
                 y_train = train_win["return_1d"].to_numpy()  # shape (window_size,)
 
                 # Fit ElasticNet with user‐supplied hyperparams
-                model = ElasticNet(**self.elastic_net_config)
-                model.fit(X_train, y_train)
+                model =  trainer.train(X_train, y_train)
 
                 # Predict using today's features
                 X_today = asset_df.iloc[[i]][feature_cols].to_numpy()
@@ -793,6 +975,111 @@ class NextDayEN(TimeSerie):
             description="Next-day return via rolling ElasticNet on TA indicators"
         )
 
+class LivePrediction(TimeSerie):
+    def __init__(
+            self,
+            asset_list: List[ms_client.Asset],
+            ta_feature_config: List[Dict[str, Any]],
+            model_config: ModelConfiguration,
+            window_size: int,
+            retrain_config_days: int,
+            *args,
+            **kwargs
+    ):
+        # Core configuration
+        self.asset_list = asset_list
+        self.ta_feature_config = ta_feature_config
+        self.model_config = model_config
+        self.window_size = window_size
+
+        # Declare dependencies by instantiating them as attributes
+        self.feature_ts = TAFeature(
+            asset_list=asset_list,
+            ta_feature_config=ta_feature_config,
+            *args,
+            **kwargs
+        )
+        self.prices_ts = SimulatedPrices(
+            asset_list=asset_list,
+            *args,
+            **kwargs
+        )
+
+        # even more prices from a TimeSerie not in the project using APITimeSerie
+
+        self.external_prices = APITimeSerie.build_from_identifier(
+            identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES)
+        translation_table = ms_client.AssetTranslationTable.get(unique_identifier=TEST_TRANSLATION_TABLE_UID)
+        self.translated_prices_ts = WrapperTimeSerie(translation_table=translation_table)
+        # retrainer TimeSerie
+        self.model_train_ts = ModelTrainTimeSerie(
+            asset_list=asset_list,
+            ta_feature_config=ta_feature_config,
+            model_config=model_config,
+            window_size=window_size,
+            retrain_config_days=retrain_config_days,
+            *args, **kwargs
+        )
+
+        super().__init__( *args, **kwargs)
+
+    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+        return {
+            "prices_ts": self.prices_ts,
+            "feature_ts": self.feature_ts,
+            "api_prices": self.external_prices,
+            "translated_prices_ts": self.translated_prices_ts,
+            "model_train_ts": self.model_train_ts,
+        }
+    def update(self,*args,**kwargs):
+        """
+        live predictions from a life databatrse
+        Args:
+            *args:
+            **kwargs:
+
+        Returns:
+
+        """
+        return pd.DataFrame()
+
+class WorkflowManager(TimeSerie):
+    def __init__(
+            self,
+            asset_list: List[ms_client.Asset],
+            ta_feature_config: List[Dict[str, Any]],
+            model_config: ModelConfiguration,
+            window_size: int,
+            retrain_config_days: int,
+            *args,
+            **kwargs
+    ):
+        self.prediction_back_test = RollingModelPrediction(
+            asset_list=asset_list,
+            ta_feature_config=ta_feature_config,
+            model_config=model_config,
+            window_size=window_size,
+            retrain_config_days=retrain_config_days,
+            *args, **kwargs
+        )
+        self.live_back_test=LivePrediction(
+            asset_list=asset_list,
+            ta_feature_config=ta_feature_config,
+            model_config=model_config,
+            window_size=window_size,
+            retrain_config_days=retrain_config_days,
+            *args, **kwargs
+        )
+
+        super().__init__(*args, **kwargs)
+
+    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+        return {"prediction_back_test":self.prediction_back_test,
+                "live_back_test":self.live_back_test
+                }
+    def update(self,*args,**kwargs):
+        pass
+
 
 def test_simulated_prices():
     from mainsequence.client import Asset
@@ -830,11 +1117,12 @@ def test_simulated_prices():
     en_cfg = {"alpha": 1.0, "l1_ratio": 0.5, "fit_intercept": True}
     window = 360  # use the last 30 days for each regression
 
-    ts = NextDayEN(
+    ts = WorkflowManager(
         asset_list=assets,
         ta_feature_config=ta_cfg,
-        elastic_net_config=en_cfg,
-        window_size=window
+        model_config=ElasticNetConfiguration(),
+        window_size=window,
+        retrain_config_days=10
     )
 
 

@@ -8,6 +8,8 @@ from mainsequence.logconf import logger
 import time
 import pandas as pd
 
+import mainsequence.client as ms_client
+
 def wait_for_update_time(local_hash_id, data_source_id, logger, force_next_start_of_minute=False):
     time_to_wait, next_update = get_time_to_wait_from_hash_id(local_hash_id=local_hash_id,
                                                                                data_source_id=data_source_id)
@@ -31,10 +33,9 @@ def get_node_time_to_wait(local_metadata):
         time_to_wait = max(0, time_to_wait)
     return time_to_wait, next_update
 
-def get_time_to_wait_from_hash_id(local_hash_id: str,data_source_id:int):
+def get_time_to_wait_from_hash_id(local_time_serie_id: int):
     local_metadata = LocalTimeSerie.get_or_none(
-        local_hash_id=local_hash_id,
-        remote_table__data_source__id=data_source_id
+        id=local_time_serie_id,
     )
     time_to_wait, next_update = get_node_time_to_wait(local_metadata=local_metadata)
     return time_to_wait, next_update
@@ -45,7 +46,7 @@ class UpdateInterface:
     """
 
     def __init__(self, trace_id: Union[str, None], head_hash: Union[str, None],
-                 logger: logging.Logger,scheduler_uid:str,
+                 logger: logging.Logger,scheduler_id:int,
                  state_data: Union[str, None], debug=False):
         self.debug = debug
         self.trace_id = trace_id
@@ -56,13 +57,13 @@ class UpdateInterface:
 
 
         self.state_data = state_data
-        self.scheduler_uid=scheduler_uid
+        self.scheduler_id=scheduler_id
         self.last_historical_update={}
 
     def _patch_update(self, hash_id,data_source_id:int, update_kwargs: dict):
         update_kwargs["hash_id"] = hash_id
         update_kwargs["data_source_id"] = data_source_id
-        update_details = self.dth.patch_local_update_details(**update_kwargs)
+        # update_details = self.dth.patch_local_update_details(**update_kwargs)
 
     def _sanitize_state_date(self, state_data: dict):
         """
@@ -77,15 +78,14 @@ class UpdateInterface:
         """
 
 
-        dth = DynamicTableHelpers()
         new_state_data = {}
         for key, value in state_data.items():
             new_state_data[key] = value
             if new_state_data[key]['last_time_index_value'] is not None:
-                new_state_data[key]['last_time_index_value'] = dth.request_to_datetime(
+                new_state_data[key]['last_time_index_value'] = ms_client.request_to_datetime(
                     new_state_data[key]['last_time_index_value'])
             if new_state_data[key]['next_update'] is not None:
-                new_state_data[key]['next_update'] = dth.request_to_datetime(
+                new_state_data[key]['next_update'] = ms_client.request_to_datetime(
                     new_state_data[key]['next_update'])
         return new_state_data
 
@@ -124,7 +124,7 @@ class UpdateInterface:
 
 
 
-def start_scheduler_api(scheduler_uid: int,
+def start_scheduler_api(scheduler_id: int,
                     scheduler_kwargs: Union[dict,None]=None,port: Union[int, None]=None,
                     host="0.0.0.0", reload=False):
     import uvicorn
@@ -133,7 +133,7 @@ def start_scheduler_api(scheduler_uid: int,
 
     port =port if port is not None else get_available_port()
     # set state parameters
-    app.state.scheduler_uid = scheduler_uid
+    app.state.scheduler_id = scheduler_id
     app.state.host = host
     app.state.port = port
     app.state.scheduler_kwargs=scheduler_kwargs
