@@ -221,15 +221,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             raise Exception(f"Error in request {r.json()}")
         return r.json()
 
-    def update_details_exist(self, timeout=None):
-        base_url = self.get_object_url()
-        s = self.build_session()
 
-        url = f"{base_url}/{self.id}/update_details_exist/"
-        r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, time_out=timeout)
-        if r.status_code != 200:
-            raise Exception(f"Error in request {r.json()}")
-        return r.json()
 
     @classmethod
     def filter_by_hash_id(cls, local_hash_id_list: list, timeout=None):
@@ -549,6 +541,20 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                              "target_time_serie_id": target_time_serie_id,
                              })
         r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
+        if r.status_code != 204:
+            raise Exception(f"Error in request {r.text}")
+
+    def depends_on_connect_to_api_table(self, target_table_id,
+                           timeout=None):
+
+        url = self.get_object_url() + f"/{self.id}/depends_on_connect_to_api_table/"
+        s = self.build_session()
+        payload = dict(json={
+            "target_table_id": target_table_id,
+        })
+        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url,
+                         time_out=timeout,
+                         payload=payload)
         if r.status_code != 204:
             raise Exception(f"Error in request {r.text}")
 

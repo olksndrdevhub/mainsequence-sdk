@@ -326,13 +326,9 @@ class PersistManager:
                                         )
         else:
             try:
-                raise NotImplementedError
-                self.local_metadata.depends_on_connect_remote_table(
-                    source_hash_id=self.metadata.hash_id,
-                    source_local_hash_id=self.local_metadata.local_hash_id,
-                    source_data_source_id=self.data_source.id,
-                    target_data_source_id=new_ts.data_source_id,
-                    target_local_hash_id=new_ts.local_hash_id
+
+                self.local_metadata.depends_on_connect_to_api_table(
+                    target_table_id=new_ts.local_persist_manager.metadata.id
                 )
             except Exception as exc:
                 raise exc

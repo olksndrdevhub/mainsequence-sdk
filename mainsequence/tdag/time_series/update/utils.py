@@ -116,7 +116,7 @@ class UpdateInterface:
     def set_end_of_execution(self, local_time_serie_id: str,
                              error_on_update=False,):
 
-        TimeSerieLocalUpdate.set_end_of_execution(local_time_serie_id=local_time_serie_id,
+        ms_client.TimeSerieLocalUpdate.set_end_of_execution(local_time_serie_id=local_time_serie_id,
                                                   historical_update_id=self.last_historical_update[local_time_serie_id].id,
                                                   error_on_update=error_on_update)
 
