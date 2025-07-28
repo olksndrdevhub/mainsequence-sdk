@@ -21,6 +21,8 @@ from mainsequence.tdag.config import (
 )
 import tempfile
 import structlog.contextvars as cvars
+from structlog.stdlib import BoundLogger
+
 from mainsequence.logconf import logger
 
 from mainsequence.tdag.time_series.persist_managers import PersistManager, APIPersistManager
@@ -869,7 +871,7 @@ class TimeSerie(DataAccessMixin,ABC):
 
 
     # --- Public API ---
-
+    
     def run(
             self,
             debug_mode: bool,

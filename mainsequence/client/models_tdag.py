@@ -429,6 +429,37 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         return self.remote_table.get_data_between_dates_from_api(  *args,**kwargs)
 
 
+
+    @classmethod
+    def insert_data_into_table(cls,local_metadata_id,records:List[dict],
+                               overwrite=True,add_insertion_time=False):
+        s = cls.build_session()
+        url = cls.get_object_url() + f"/{local_metadata_id}/insert_data_into_table/"
+
+        chunk_json_str=json.dumps(records)
+        compressed = gzip.compress(chunk_json_str.encode('utf-8'))
+        compressed_b64 = base64.b64encode(compressed).decode('utf-8')
+
+        payload = dict(json={
+            "data": compressed_b64,  # compressed JSON data
+            "chunk_stats": None,
+            "overwrite": overwrite,
+            "chunk_index": 0,
+            "total_chunks": 1,
+        })
+
+        try:
+            r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url, time_out=60 * 15)
+            if r.status_code not in [200, 204]:
+                logger.warning(f"Error in request: {r.text}")
+            logger.info(f"Chunk uploaded successfully.")
+        except requests.exceptions.RequestException as e:
+            logger.exception(f"Error uploading chunk : {e}")
+            # Optionally, you could retry or break here
+            raise e
+        if r.status_code not in [200, 204]:
+            raise Exception(r.text)
+
     @classmethod
     def post_data_frame_in_chunks(
             cls,
@@ -597,17 +628,12 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         if not data[time_index_name].is_monotonic_increasing:
             data = data.sort_values(time_index_name)
 
-        metadata, data = (
-            result if (
-                          result := metadata.handle_source_table_configuration(
-                            column_dtypes_map=column_dtypes_map,
-                              index_names=index_names,
-                              time_index_name=time_index_name,
-                              column_index_names=column_index_names, data=data,
-                              overwrite=overwrite
-                          )
-                      ) is not None
-            else (metadata, data)
+        metadata.handle_source_table_configuration_creation(
+            column_dtypes_map=column_dtypes_map,
+            index_names=index_names,
+            time_index_name=time_index_name,
+            column_index_names=column_index_names, data=data,
+            overwrite=overwrite
         )
 
         duplicates_exist = data.duplicated(subset=index_names).any()
@@ -768,8 +794,8 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
 
     def handle_source_table_configuration_creation(self,
 
-                                           column_dtypes_map,
-                                           index_names,
+                                           column_dtypes_map:dict,
+                                           index_names:List[str],
                                            time_index_name,
                                            column_index_names,
                                            data,
@@ -817,10 +843,6 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
                 if not overwrite:
                     raise NotImplementedError("TODO Needs to remove values per asset")
                     # Filter the data based on time_index_name and last_time_index_value
-                    data = data[
-                        data[time_index_name] > self.request_to_datetime(stc.last_time_index_value)
-                        ]
-        return data
 
     def get_data_between_dates_from_api(
             self,

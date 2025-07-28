@@ -749,10 +749,10 @@ class PersistManager:
         configuration returned by `_get_time_series_meta_details`.
         """
         if not (self.metadata):
-            self.warning.error("metadata not set")
+            self.logger.warning("metadata not set")
             return
         if not self.metadata.sourcetableconfiguration:
-            self.warning.error("sourcetableconfiguration not set")
+            self.logger.warning("sourcetableconfiguration not set")
             return
         # 1. Get the user-defined metadata configuration for the time series.
 

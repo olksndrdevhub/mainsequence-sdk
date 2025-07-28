@@ -11,6 +11,11 @@ from requests.structures import CaseInsensitiveDict
 from structlog.dev import ConsoleRenderer
 from .instrumentation import OTelJSONRenderer
 logger = None
+from structlog.stdlib import BoundLogger
+from typing import Dict, Any
+import inspect
+import importlib
+from structlog.threadlocal import wrap_dict
 
 def ensure_dir(file_path):
     directory = os.path.dirname(file_path)
@@ -186,5 +191,71 @@ def build_application_logger(
 
     logger = logger.bind()
     return logger
+
+
+def dump_structlog_bound_logger(logger: BoundLogger) -> Dict[str, Any]:
+    """
+    Serialize a fully‑initialized structlog BoundLogger into a dict:
+      - Global structlog config (as import paths)
+      - Underlying stdlib.Logger name & level
+      - Bound key/value context
+
+    Returns:
+        A dict that can be json-serialized and later reloaded to reconstruct
+        the same structlog setup in another process.
+    """
+
+    # Helper: get module.QualName for function/class or for an instance's class
+    def pathify(obj: Any) -> str:
+        target = obj if inspect.isfunction(obj) or inspect.isclass(obj) else obj.__class__
+        return f"{target.__module__}.{target.__qualname__}"
+
+    # 1) Global structlog config
+    cfg = structlog.get_config()
+    structlog_config = {
+        "processors": [pathify(p) for p in cfg["processors"]],
+        "logger_factory": pathify(cfg["logger_factory"]),
+        "wrapper_class": pathify(cfg["wrapper_class"]),
+        "context_class": pathify(cfg["context_class"]),
+        "cache_logger_on_first_use": cfg["cache_logger_on_first_use"],
+    }
+
+    # 2) Underlying stdlib.Logger info
+    std = logger._logger
+    logger_name = std.name
+    logger_level = std.level
+
+    # 3) Bound context
+    bound_context = dict(logger._context or {})
+
+    # 4) Assemble and return
+    return {
+        "structlog_config": structlog_config,
+        "logger_name": logger_name,
+        "logger_level": logger_level,
+        "bound_context": bound_context,
+    }
+
+
+def load_structlog_bound_logger(dump: Dict[str, Any]) -> BoundLogger:
+    """
+    Given the dict from dump_structlog_bound_logger(),
+    return a BoundLogger with the same name, level, and context,
+    but using the EXISTING global structlog configuration.
+    """
+    name          = dump["logger_name"]
+    level         = dump["logger_level"]
+    bound_context = dump["bound_context"]
+
+    # 1) Grab the already‐configured logger
+    base: BoundLogger = structlog.get_logger(name)
+
+    # 2) (Optional) restore its stdlib level
+    std = getattr(base, "_logger", None)
+    if std is not None:
+        std.setLevel(level)
+
+    # 3) Re‐bind the original context
+    return base.bind(**bound_context)
 
 logger = build_application_logger()
