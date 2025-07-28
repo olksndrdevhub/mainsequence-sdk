@@ -54,7 +54,7 @@ def get_git_revision_short_hash():
 
 setup(
   name='mainsequence',
-  version=f"1.0.0",
+  version=f"1.1.0",
     python_requires='>=3.9.0',
   author='Main Sequence GmbH',
   author_email = 'dev@main-sequence.io',
