@@ -748,9 +748,12 @@ class PersistManager:
         including its description, frequency, and associated assets, based on the
         configuration returned by `_get_time_series_meta_details`.
         """
-        if not (self.metadata and self.metadata.sourcetableconfiguration):
+        if not (self.metadata):
+            self.warning.error("metadata not set")
             return
-
+        if not self.metadata.sourcetableconfiguration:
+            self.warning.error("sourcetableconfiguration not set")
+            return
         # 1. Get the user-defined metadata configuration for the time series.
 
         if table_metadata is None:

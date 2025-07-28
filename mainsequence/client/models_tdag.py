@@ -558,62 +558,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         if r.status_code != 204:
             raise Exception(f"Error in request {r.text}")
 
-    @classmethod
-    def _handle_source_table_configuration(cls,
-                                           metadata: "DynamicTableMetaData",
-                                           column_dtypes_map,
-                                           index_names,
-                                           time_index_name,
-                                           column_index_names,
-                                           data,
-                                           overwrite=False
-                                           ):
-        """
-        Handles the creation or retrieval of the source table configuration.
 
-        Parameters:
-        ----------
-        metadata : dict
-            Metadata dictionary containing "sourcetableconfiguration" and "id".
-        column_dtypes_map : dict
-            Mapping of column names to their data types.
-        index_names : list
-            List of index names.
-        time_index_name : str
-            Name of the time index column.
-        column_index_names : list
-            List of column index names.
-        data : DataFrame
-            The input DataFrame.
-        overwrite : bool, optional
-            Whether to overwrite existing configurations (default is False).
-
-        Returns:
-        -------
-        dict or None
-            Updated metadata with the source table configuration, and potentially filtered data.
-        """
-        stc = metadata.sourcetableconfiguration
-
-        if stc is None:
-            try:
-                stc = SourceTableConfiguration.create(
-                    column_dtypes_map=column_dtypes_map,
-                    index_names=index_names,
-                    time_index_name=time_index_name,
-                    column_index_names=column_index_names,
-                    metadata_id=metadata.id
-                )
-                metadata.sourcetableconfiguration = stc
-            except AlreadyExist:
-
-                if not overwrite:
-                    raise NotImplementedError("TODO Needs to remove values per asset")
-                    # Filter the data based on time_index_name and last_time_index_value
-                    data = data[
-                        data[time_index_name] > self.request_to_datetime(stc.last_time_index_value)
-                        ]
-        return metadata, data
 
     @classmethod
     def _break_pandas_dataframe(cls, data_frame: pd.DataFrame, time_index_name: Union[str, None] = None):
@@ -654,8 +599,8 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
         metadata, data = (
             result if (
-                          result := self._handle_source_table_configuration(
-                              metadata=metadata, column_dtypes_map=column_dtypes_map,
+                          result := metadata.handle_source_table_configuration(
+                            column_dtypes_map=column_dtypes_map,
                               index_names=index_names,
                               time_index_name=time_index_name,
                               column_index_names=column_index_names, data=data,
@@ -820,6 +765,62 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             db_interface.drop_table(self.table_name)
 
         self.delete()
+
+    def handle_source_table_configuration_creation(self,
+
+                                           column_dtypes_map,
+                                           index_names,
+                                           time_index_name,
+                                           column_index_names,
+                                           data,
+                                           overwrite=False
+                                           ):
+        """
+        Handles the creation or retrieval of the source table configuration.
+
+        Parameters:
+        ----------
+        metadata : dict
+            Metadata dictionary containing "sourcetableconfiguration" and "id".
+        column_dtypes_map : dict
+            Mapping of column names to their data types.
+        index_names : list
+            List of index names.
+        time_index_name : str
+            Name of the time index column.
+        column_index_names : list
+            List of column index names.
+        data : DataFrame
+            The input DataFrame.
+        overwrite : bool, optional
+            Whether to overwrite existing configurations (default is False).
+
+        Returns:
+        -------
+        dict or None
+            Updated metadata with the source table configuration, and potentially filtered data.
+        """
+        stc = self.sourcetableconfiguration
+
+        if stc is None:
+            try:
+                stc = SourceTableConfiguration.create(
+                    column_dtypes_map=column_dtypes_map,
+                    index_names=index_names,
+                    time_index_name=time_index_name,
+                    column_index_names=column_index_names,
+                    metadata_id=self.id
+                )
+                self.sourcetableconfiguration = stc
+            except AlreadyExist:
+
+                if not overwrite:
+                    raise NotImplementedError("TODO Needs to remove values per asset")
+                    # Filter the data based on time_index_name and last_time_index_value
+                    data = data[
+                        data[time_index_name] > self.request_to_datetime(stc.last_time_index_value)
+                        ]
+        return data
 
     def get_data_between_dates_from_api(
             self,
