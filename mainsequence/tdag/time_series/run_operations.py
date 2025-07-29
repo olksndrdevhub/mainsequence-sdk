@@ -9,19 +9,13 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 import structlog.contextvars as cvars
-import pytz
-# Internal Project Imports
+
 
 
 
 # Client and ORM Models
 import mainsequence.client as ms_client
-from mainsequence.client import (
-    LocalTimeSerie,
-    LocalTimeSerieUpdateDetails,
-    Scheduler,
-    UpdateStatistics
-)
+import pytz
 
 # Instrumentation and Logging
 from mainsequence.instrumentation import (
@@ -33,10 +27,10 @@ from mainsequence.instrumentation.utils import Status, StatusCode
 
 # TDAG Core Components and Helpers
 from mainsequence.tdag.time_series import build_operations
-from mainsequence.tdag.time_series.update.utils import (
-    UpdateInterface,
-    wait_for_update_time
-)
+
+
+
+
 
 # Custom Exceptions
 class DependencyUpdateError(Exception):
@@ -51,8 +45,7 @@ class UpdateRunner:
 
     def __init__(self, time_serie: "TimeSerie", debug_mode: bool = False, force_update: bool = False,
                  update_tree: bool = True, update_only_tree: bool = False,
-                 remote_scheduler: Optional[Scheduler] = None):
-        from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
+                 remote_scheduler: Optional[ms_client.Scheduler] = None):
         self.ts = time_serie
         self.logger = self.ts.logger
         self.debug_mode = debug_mode
@@ -63,9 +56,7 @@ class UpdateRunner:
             self.update_only_tree = False
 
         self.remote_scheduler = remote_scheduler
-        self.scheduler: Optional[Scheduler] = None
-        self.update_tracker: Optional[UpdateInterface] = None
-        self.update_actor_manager: Optional[RayUpdateManager] = None
+        self.scheduler: Optional[ms_client.Scheduler] = None
 
     def _setup_scheduler(self) -> None:
         """Initializes or retrieves the scheduler and starts its heartbeat."""
@@ -150,24 +141,12 @@ class UpdateRunner:
 
         return local_metadatas_map, state_data
 
-    def _setup_execution_environment(self) -> Dict[int, LocalTimeSerie]:
-        from mainsequence.tdag.time_series.update.ray_manager import RayUpdateManager
+    def _setup_execution_environment(self) -> Dict[int, ms_client.LocalTimeSerie]:
 
-        """Sets up distributed actors and gathers pre-update state."""
-        self.update_actor_manager = RayUpdateManager(scheduler_id=self.scheduler.id, skip_health_check=True)
-        self.ts.update_actor_manager = self.update_actor_manager  # Assign to TS if it needs direct access
 
         local_metadatas, state_data = self._pre_update_routines()
 
-        self.update_tracker = UpdateInterface(
-            head_hash=self.ts.local_hash_id,
-            logger=self.logger,
-            state_data=state_data,
-            debug=self.debug_mode,
-            scheduler_id=self.scheduler.id,
-            trace_id=None,
-        )
-        self.ts.update_tracker = self.update_tracker  # Assign to TS if it needs direct access
+
         return local_metadatas
 
     def _start_update(self, local_time_series_map: Dict, use_state_for_update: bool):
@@ -245,7 +224,7 @@ class UpdateRunner:
     @tracer.start_as_current_span("UpdateRunner._update_local")
     def _update_local(
             self,
-            update_statistics: UpdateStatistics,
+            update_statistics: ms_client.UpdateStatistics,
             local_time_series_map: Dict[int, Any],
             overwrite_latest_value: Optional[datetime.datetime],
             use_state_for_update: bool,
@@ -275,6 +254,9 @@ class UpdateRunner:
                 # Call the business logic defined on the TimeSerie class
                 temp_df = self.ts.update(update_statistics)
 
+                if temp_df is None:
+                    raise Exception(f" {self.ts} update(...) method needs to return a data frame")
+
                 # If the update method returns no data, we're done.
                 if temp_df.empty:
                     self.logger.warning(f"No new data returned from update for {self.ts}.")
@@ -296,7 +278,6 @@ class UpdateRunner:
                 self.logger.info(f'Persisting {len(temp_df)} new rows for {self.ts}.')
                 persisted = self.ts.local_persist_manager.persist_updated_data(
                     temp_df=temp_df,
-                    update_tracker=self.update_tracker,
                     overwrite=(overwrite_latest_value is not None)
                 )
                 update_span.set_status(Status(StatusCode.OK))
@@ -350,15 +331,13 @@ class UpdateRunner:
         self.logger.info(f"Starting update for {len(dependencies_df)} dependencies...")
 
         dependencies_df = dependencies_df[dependencies_df["source_class_name"] != "WrapperTimeSerie"]
-
+        if dependencies_df.empty:
+            return
         if self.debug_mode:
             self._execute_sequential_debug_update(dependencies_df, update_map,
                                                   local_time_series_map)
         else:
-            # Filter out WrapperTimeSerie as they don't have a backend table to update
-            deps_to_run = dependencies_df[dependencies_df["source_class_name"] != "WrapperTimeSerie"]
-            if not deps_to_run.empty:
-                self._execute_parallel_distributed_update(deps_to_run, local_time_series_map)
+            self._execute_parallel_distributed_update(dependencies_df, local_time_series_map)
 
         self.logger.debug(f'Dependency tree evaluation complete for {self.ts}.')
 
@@ -451,7 +430,6 @@ class UpdateRunner:
                             remote_scheduler=self.scheduler,
                         )
                         dep_runner._setup_scheduler()
-                        dep_runner.update_tracker = self.update_tracker
 
                         dep_runner._start_update(
                             local_time_series_map=local_time_series_map,
@@ -467,95 +445,15 @@ class UpdateRunner:
     @tracer.start_as_current_span("UpdateRunner._execute_parallel_distributed_update")
     def _execute_parallel_distributed_update(
             self,
-            dependencies_to_run_df: pd.DataFrame,
+            dependencies_df: pd.DataFrame,
             local_time_series_map: Dict[int, "LocalTimeSerie"]
     ) -> None:
         """
-        Launches and manages a parallel, distributed update for a set of dependencies.
 
-        This method sorts the dependencies, prepares and launches remote execution
-        tasks (e.g., via Ray), and then waits for their completion, handling
-        any errors that arise from the distributed run.
-
-        Args:
-            dependencies_to_run_df: A DataFrame of time series dependencies to update.
-            local_time_series_map: A map of local time series objects keyed by ID.
-
-        Raises:
-            DependencyUpdateError: If any of the distributed tasks fail.
         """
         # 1. Prepare tasks, prioritizing any pre-loaded time series
-        telemetry_carrier = tracer_instrumentator.get_telemetry_carrier()
-        pre_loaded_ts_ids = [t.hash_id for t in self.scheduler.pre_loads_in_tree]
 
-        # Sort all dependencies by priority and structure
-        sorted_deps = dependencies_to_run_df.sort_values(
-            ["update_priority", "number_of_upstreams"], ascending=[True, False]
-        )
-        # Separate and move pre-loaded tasks to the front of the queue
-        pre_load_df = sorted_deps[sorted_deps["local_time_serie_id"].isin(pre_loaded_ts_ids)]
-        other_deps_df = sorted_deps[~sorted_deps["local_time_serie_id"].isin(pre_loaded_ts_ids)]
-        tasks_df = pd.concat([pre_load_df, other_deps_df], axis=0)
-
-        # 2. Launch all dependency updates as distributed tasks
-        futures_ = []
-        for _, data_row in tasks_df.iterrows():
-            local_ts_id = data_row['local_time_serie_id']
-
-            # Get the specific run configuration for this dependency
-            run_configuration = local_time_series_map[local_ts_id].run_configuration
-
-            # Prepare arguments for the remote task
-            kwargs_update = dict(
-                local_time_serie_id=local_ts_id,
-                local_hash_id=data_row['local_hash_id'],
-                data_source_id=data_row['data_source_id'],
-                telemetry_carrier=telemetry_carrier,
-                scheduler_id=self.scheduler.id
-            )
-            task_options = dict(
-                num_cpus=run_configuration.required_cpus,
-                name=f"ts_update_{local_ts_id}",
-                max_retries=run_configuration.retry_on_error
-            )
-
-            p = self.update_actor_manager.launch_update_task(
-                task_options=task_options,
-                kwargs_update=kwargs_update
-            )
-
-            # p = self.update_actor_manager.launch_update_task_in_process( **task_kwargs  )
-            # continue
-            # logger.warning("REMOVE LINES ABOVE FOR DEBUG")
-
-            futures_.append(p)
-
-            # are_dependencies_updated, all_dependencies_nodes, pending_nodes, error_on_dependencies = self.update_tracker.get_pending_update_nodes(
-            #     hash_id_list=list(all_start_data.keys()))
-            # self.are_dependencies_updated( target_nodes=all_dependencies_nodes)
-            # raise Exception
-
-        # 3. Wait for results and check for errors from the distributed run
-        tasks_with_errors = self.update_actor_manager.get_results_from_futures_list(futures=futures_)
-        if tasks_with_errors:
-            raise DependencyUpdateError(f"Update stopped due to errors in Ray tasks: {tasks_with_errors}")
-
-        # 4. Final verification: Check the database status for all tasks in the batch
-        updated_ids = tasks_df["local_time_serie_id"].astype(str).to_list()
-        dependencies_update_details = ms_client.LocalTimeSerieUpdateDetails.filter(
-            related_table__id__in=updated_ids
-        )
-
-        failed_ids = [
-            detail.related_table.id for detail in dependencies_update_details if detail.error_on_last_update
-        ]
-
-        if failed_ids:
-            raise DependencyUpdateError(f"Update stopped after children reported errors: {failed_ids}")
-
-    # This method is the primary public method of the UpdateRunner class.
-    # Assumes other private methods (_setup_scheduler, _setup_execution_environment, etc.)
-    # and necessary imports are defined within the class.
+        raise Exception("This is an Enterprise feature available only in the Main Sequence Platform")
 
     def run(self) -> None:
         """
@@ -589,11 +487,7 @@ class UpdateRunner:
 
                 # 4. Wait for the scheduled update time, if not forcing an immediate run
                 if not self.force_update:
-                    wait_for_update_time(
-                        local_hash_id=self.ts.local_hash_id,
-                        data_source_id=self.ts.data_source.id,
-                        logger=self.logger
-                    )
+                    self.ts.local_time_serie.wait_for_update_time()
 
                 # 5. Trigger the core update process
                 self._start_update(
@@ -619,8 +513,7 @@ class UpdateRunner:
             # Clean up temporary attributes on the TimeSerie instance
             if hasattr(self.ts, 'update_tracker'):
                 del self.ts.update_tracker
-            if hasattr(self.ts, 'update_actor_manager'):
-                del self.ts.update_actor_manager
+
 
             gc.collect()
 

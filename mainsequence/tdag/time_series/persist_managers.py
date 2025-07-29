@@ -772,7 +772,7 @@ class PersistManager:
 
     @tracer.start_as_current_span("TS: Persist Data")
     def persist_updated_data(self,
-                             temp_df: pd.DataFrame, update_tracker: object, overwrite: bool = False) -> bool:
+                             temp_df: pd.DataFrame, overwrite: bool = False) -> bool:
         """
         Persists the updated data to the database.
 

@@ -676,6 +676,27 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         )
         return local_metadata
 
+    def get_node_time_to_wait(self):
+
+        next_update = self.localtimeserieupdatedetails.next_update
+        time_to_wait = 0.0
+        if next_update is not None:
+            time_to_wait = (pd.to_datetime(next_update) - datetime.datetime.now(pytz.utc)).total_seconds()
+            time_to_wait = max(0, time_to_wait)
+        return time_to_wait, next_update
+
+    def wait_for_update_time(self,):
+        time_to_wait, next_update = self.get_node_time_to_wait()
+        if time_to_wait > 0:
+
+            logger.info(f"Scheduler Waiting for ts update time at {next_update} {time_to_wait}")
+            time.sleep(time_to_wait)
+        else:
+            time_to_wait = max(0, 60 - datetime.datetime.now(pytz.utc).second)
+            logger.info(f"Scheduler Waiting for ts update at start of minute")
+            time.sleep(time_to_wait)
+
+
 class DataFrequency(str, Enum):
     one_m = "1m"
     five_m = "5m"
