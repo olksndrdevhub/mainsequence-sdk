@@ -143,58 +143,90 @@ class User(BaseObjectOrm,BasePydanticModel):
 
         return cls(**r.json())
 
+
+class AssetSnapshot(BaseObjectOrm, BasePydanticModel):
+    id: Optional[int] = None
+    asset: Union["AssetMixin", int]
+
+    # Validity window
+    effective_from: datetime.date = Field(
+        default_factory=datetime.date.today,
+        description="Date at which this snapshot became effective"
+    )
+    effective_to: Optional[datetime.date] = Field(
+        None,
+        description="Date at which this snapshot was superseded (null if current)"
+    )
+
+    # Mutable fields
+    name: constr(max_length=255) = Field(
+        ..., description="Security name as recorded in the FIGI database"
+    )
+    ticker: Optional[constr(max_length=50)] = Field(
+        None,
+        description="FIGI ticker field (often shorter symbol used by OpenFIGI)"
+    )
+    exchange_code: Optional[constr(max_length=50)] = Field(
+        None,
+        description="Exchange/market MIC code (e.g. XNYS, XNAS) or composite code"
+    )
+    venue_specific_properties: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Exchange-specific metadata"
+    )
+
 class AssetMixin(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
-    can_trade: bool
-    execution_venue: Union["ExecutionVenue", int]
-    delisted_datetime: Optional[datetime.datetime] = None
-    unique_identifier: str
 
-    real_figi: bool = Field(default=True, description="FIGI identifier is real (default: True)")
-    is_custom_by_organization:bool
-    figi: constr(max_length=12) = Field(
-        ...,
+    # Immutable identifiers
+    unique_identifier: constr(max_length=255)
+    figi: Optional[constr(max_length=12)] = Field(
+        None,
         description="FIGI identifier (unique to a specific instrument on a particular market/exchange)"
     )
     composite: Optional[constr(max_length=12)] = Field(
         None,
         description="Composite FIGI identifier (aggregates multiple local listings within one market)"
     )
-    ticker: Optional[constr(max_length=50)] = Field(
+    share_class: Optional[constr(max_length=12)] = Field(
         None,
-        description="FIGI ticker field (often shorter symbol used by OpenFIGI)"
+        description="Share class designation (e.g. 'Common', 'Class A', 'Preferred') as per FIGI"
     )
+    main_sequence_share_class: Optional[constr(max_length=12)] = Field(
+        None,
+        description="Highest aggregation level for share class grouping"
+    )
+    isin: Optional[constr(max_length=12)] = Field(
+        None,
+        description="International Securities Identification Number"
+    )
+
     security_type: Optional[constr(max_length=50)] = Field(
         None,
-        description="Describes the instrument type (e.g. 'CS' for common stock, 'PS' for preferred, etc.)"
+        description="Instrument type (e.g. 'CS' for common stock, 'PS' for preferred)"
     )
-    security_type_2:Optional[constr(max_length=50)] = Field(
+    security_type_2: Optional[constr(max_length=50)] = Field(
         None,
-        description="Open Figi Security Type 2"
+        description="OpenFIGI Security Type 2"
     )
     security_market_sector: Optional[constr(max_length=50)] = Field(
         None,
         description="High-level sector classification (e.g. 'Equity', 'Corporate Bond') as per FIGI"
     )
-    share_class: Optional[constr(max_length=12)] = Field(
-        None,
-        description="Share class designation (e.g. 'Common', 'Class A', 'Preferred') as per FIGI"
+
+    real_figi: bool = Field(
+        default=False,
+        description="FIGI identifier is real (default: False)"
     )
-    exchange_code: Optional[constr(max_length=50)] = Field(
-        None,
-        description="Exchange/market MIC code (e.g. XNYS, XNAS) or composite code"
+    is_custom_by_organization: bool = Field(
+        default=False,
+        description="Flag indicating if this asset was custom-created by the organization"
     )
-    name: Optional[constr(max_length=255)] = Field(
+
+    # Snapshot relationship
+    current_snapshot: Optional[AssetSnapshot] = Field(
         None,
-        description="Security name as recorded in the FIGI database"
-    )
-    main_sequence_share_class: Optional[constr(max_length=12)] = Field(
-        None,
-        description="Sepcial Main Sequence class . Should be the maximum level of agroupation"
-    )
-    isin: Optional[constr(max_length=12)] = Field(
-        None,
-        description="International Securities Identification Number"
+        description="Latest active snapshot (effective_to is null)"
     )
 
     def __repr__(self) -> str:
