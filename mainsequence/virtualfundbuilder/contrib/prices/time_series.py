@@ -7,7 +7,7 @@ import numpy as np
 import datetime
 import pandas_market_calendars as mcal
 
-from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, APITimeSerie, data_source_pickle_path
+from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, APITimeSerie
 from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
                                   UpdateStatistics, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
                                  )

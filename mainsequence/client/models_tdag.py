@@ -1191,11 +1191,10 @@ class UpdateStatistics(BaseModel):
     """
     asset_time_statistics: Optional[Dict[str, Union[datetime.datetime, None,Dict]]] = None
     max_time_index_value: Optional[datetime.datetime] = None  # does not include fitler
+    asset_list: Optional[List] = None
+
     _max_time_in_update_statistics: Optional[datetime.datetime] = None  # include filter
-    _initial_fallback_date:Optional[datetime.datetime]=None
-
-    asset_list:Optional[List]=None
-
+    _initial_fallback_date: Optional[datetime.datetime] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -1504,8 +1503,6 @@ def get_chunk_stats(chunk_df, time_index_name, index_names):
         }
     }
 
-
-
     grouped_dates = None
     if len(index_names) > 1:
         grouped_dates = chunk_df.groupby(index_names[1:])[
@@ -1541,10 +1538,6 @@ def get_chunk_stats(chunk_df, time_index_name, index_names):
                 }
         # 5) assign into your stats structure
         chunk_stats["_PER_ASSET_"] = per_asset
-
-
-
-
     return chunk_stats, grouped_dates
 
 class LocalTimeSeriesHistoricalUpdate(BasePydanticModel, BaseObjectOrm):
