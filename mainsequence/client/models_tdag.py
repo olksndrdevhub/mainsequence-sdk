@@ -2004,6 +2004,9 @@ class PodDataSource:
         self.data_source = POD_PROJECT.data_source
         logger.info(f"Set remote data source to {self.data_source.related_resource}")
 
+        if self.data_source.related_resource.status != "AVAILABLE":
+            raise Exception(f"Project Database {self.data_source} is not available")
+
     @staticmethod
     def _get_duck_db():
         host_uid = bios_uuid()
