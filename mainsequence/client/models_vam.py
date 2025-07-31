@@ -233,37 +233,48 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         return f"{self.class_name()}: {self.unique_identifier}"
 
     @classmethod
+    def _translate_query_params(cls, query_params: Dict[str, Any]):
+        translation_map = {
+            "ticker": "current_snapshot__ticker",
+            "name": "current_snapshot__name",
+            "exchange_code": "current_snapshot__exchange_code"
+        }
+
+        translated_params = {}
+        for key, value in query_params.items():
+            new_key = key
+            if key in translation_map:
+                new_key = translation_map[key]
+
+            translated_params[new_key] = value
+        return translated_params
+
+    @classmethod
     def filter(cls, *args, **kwargs):
         """
-        Overrides the default filter to remap 'ticker' and 'name' lookup keys
+        Overrides the default filter to remap lookup keys
         to the corresponding fields on the related current_snapshot.
         """
-        # Build a new kwargs dict with transformed keys
-        transformed_kwargs = {}
-        for key, value in kwargs.items():
-            if "ticker" in key:
-                new_key = key.replace("ticker", "current_snapshot__ticker")
-            elif "name" in key:
-                new_key = key.replace("name", "current_snapshot__name")
-            elif "exchange_code" in key:
-                new_key = key.replace("exchange_code", "current_snapshot__exchange_code")
-            else:
-                new_key = key
-            transformed_kwargs[new_key] = value
-
-        # Delegate to the superclass filter with the remapped kwargs
+        transformed_kwargs = cls._translate_query_params(kwargs)
         return super().filter(*args, **transformed_kwargs)
 
+    @classmethod
+    def get(cls, *args, **kwargs):
+        """
+        Overrides the default get to remap lookup keys
+        to the corresponding fields on the related current_snapshot.
+        """
+        transformed_kwargs = cls._translate_query_params(kwargs)
+        return super().get(*args, **transformed_kwargs)
+
     def get_calendar(self):
-
-
         if self.current_snapshot.exchange_code  in COMPOSITE_TO_ISO.keys():
             return Calendar(name=COMPOSITE_TO_ISO[self.current_snapshot.exchange_code])
-        elif self.security_type==CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO:
+        elif self.security_type == CONSTANTS.FIGI_SECURITY_TYPE_CRYPTO:
             return Calendar(name="24/7")
-        elif self.security_type_2==CONSTANTS.FIGI_SECURITY_TYPE_2_CRYPTO:
+        elif self.security_type_2 == CONSTANTS.FIGI_SECURITY_TYPE_2_CRYPTO:
             return Calendar(name="24/7")
-        elif self.security_type_2==CONSTANTS.FIGI_SECURITY_TYPE_2_PERPETUAL:
+        elif self.security_type_2 == CONSTANTS.FIGI_SECURITY_TYPE_2_PERPETUAL:
             return Calendar(name="24/7")
         else:
             return Calendar(name="XNYS")
@@ -614,6 +625,7 @@ class Asset(AssetMixin, BaseObjectOrm):
         if r.status_code not in [200, 201]:
             raise Exception(f"Error appending creating: {r.text}")
         return cls(**r.json())
+
     @classmethod
     def get_or_register_figi_from_isin_as_asset_in_main_sequence_venue(cls,isin,exchange_code, timeout=None)->"Asset":
         url = f"{cls.get_object_url()}/get_or_register_figi_from_isin_as_asset_in_main_sequence_venue/"
@@ -628,6 +640,7 @@ class Asset(AssetMixin, BaseObjectOrm):
         if r.status_code not in [200, 201]:
             raise Exception(f"Error appending creating: {r.text}")
         return cls(**r.json())
+
     @classmethod
     def get_or_register_custom_asset_in_main_sequence_venue(cls, name,ticker,security_type,security_type_2,
                                                             security_market_sector,isin,exchange_code,
@@ -650,6 +663,7 @@ class Asset(AssetMixin, BaseObjectOrm):
         if r.status_code not in [200, 201]:
             raise Exception(f"Error appending creating: {r.text}")
         return cls(**r.json())
+
     @classmethod
     def batch_get_or_register_custom_assets(cls,asset_list:List["Asset"],timeout=None)->List[int]:
         url = f"{cls.get_object_url()}/batch_get_or_register_custom_assets/"
