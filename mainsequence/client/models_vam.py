@@ -233,25 +233,39 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         return f"{self.class_name()}: {self.unique_identifier}"
 
     @classmethod
+    def _translate_query_params(cls, query_params: Dict[str, Any]):
+        translation_map = {
+            "ticker": "current_snapshot__ticker",
+            "name": "current_snapshot__name",
+            "exchange_code": "current_snapshot__exchange_code"
+        }
+
+        translated_params = {}
+        for key, value in query_params.items():
+            # django search uses '__' for nested objects
+            full_query = key.split("__")
+            asset_query = full_query[0]
+
+            if asset_query in translation_map:
+                # Reconstruct the key using the translated base and the original suffix
+                translated_base = translation_map[asset_query]
+                # Join the translated base with the rest of the query parts
+                new_key_parts = [translated_base] + full_query[1:]
+                new_key = "__".join(new_key_parts)
+                translated_params[new_key] = value
+            else:
+                # If no translation is needed, use the original key
+                translated_params[key] = value
+
+        return translated_params
+
+    @classmethod
     def filter(cls, *args, **kwargs):
         """
         Overrides the default filter to remap 'ticker' and 'name' lookup keys
         to the corresponding fields on the related current_snapshot.
         """
-        # Build a new kwargs dict with transformed keys
-        transformed_kwargs = {}
-        for key, value in kwargs.items():
-            if "ticker" in key:
-                new_key = key.replace("ticker", "current_snapshot__ticker")
-            elif "name" in key:
-                new_key = key.replace("name", "current_snapshot__name")
-            elif "exchange_code" in key:
-                new_key = key.replace("exchange_code", "current_snapshot__exchange_code")
-            else:
-                new_key = key
-            transformed_kwargs[new_key] = value
-
-        # Delegate to the superclass filter with the remapped kwargs
+        transformed_kwargs = cls._translate_query_params(kwargs)
         return super().filter(*args, **transformed_kwargs)
 
     @classmethod
@@ -454,7 +468,6 @@ class TranslationError(RuntimeError):
     """Raised when no translation rule (or more than one) matches an asset."""
 
 class AssetFilter(BaseModel):
-    execution_venue_symbol: str
     security_type: Optional[str] = None
     security_market_sector: Optional[str] = None
 
@@ -470,7 +483,6 @@ class AssetFilter(BaseModel):
 class AssetTranslationRule(BaseModel):
     asset_filter: AssetFilter
     markets_time_serie_unique_identifier: str
-    target_execution_venue_symbol: str
     target_exchange_code: Optional[str] = None
 
     def is_asset_in_rule(self, asset: "Asset") -> bool:
@@ -489,7 +501,6 @@ class AssetTranslationTable(BaseObjectOrm, BasePydanticModel):
             if rule.is_asset_in_rule(asset):
                 return {
                     "markets_time_serie_unique_identifier": rule.markets_time_serie_unique_identifier,
-                    "execution_venue_symbol": rule.target_execution_venue_symbol,
                     "exchange_code": rule.target_exchange_code,
                 }
 
@@ -507,7 +518,6 @@ class AssetTranslationTable(BaseObjectOrm, BasePydanticModel):
             if any(
                     r.asset_filter == new_rule.asset_filter
                     and r.markets_time_serie_unique_identifier == new_rule.markets_time_serie_unique_identifier
-                    and r.target_execution_venue_symbol == new_rule.target_execution_venue_symbol
                     and r.target_exchange_code == new_rule.target_exchange_code
                     for r in self.rules
             ):
@@ -549,7 +559,6 @@ class AssetTranslationTable(BaseObjectOrm, BasePydanticModel):
                 r for r in self.rules
                 if r.asset_filter == rule_to_remove.asset_filter
                    and r.markets_time_serie_unique_identifier == rule_to_remove.markets_time_serie_unique_identifier
-                   and r.target_execution_venue_symbol == rule_to_remove.target_execution_venue_symbol
                    and r.target_exchange_code == rule_to_remove.target_exchange_code
             ]
             if not matching_local:
@@ -696,7 +705,6 @@ class AssetCurrencyPair(AssetMixin, BasePydanticModel):
     quote_asset: Union[AssetMixin, int]
 
     def get_spot_reference_asset_unique_identifier(self):
-
         return self.base_asset.unique_identifier
 
     def get_ms_share_class(self):
