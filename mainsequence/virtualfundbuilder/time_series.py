@@ -314,16 +314,10 @@ rebalance details:"""
         last_portfolio_minus_fees = 1
         if update_statistics.is_empty() == False:
             last_obs = self.last_observation
-            if last_obs is None:
-                assert self.data_configuration_path
-                self.logger.warning(
-                    f"No last observation of PortfolioStrategy for last_obs {last_obs} found, starting new portfolio. This is because of datalake."
-                )
-            else:
-                last_portfolio = last_obs["close"].iloc[0]
+            last_portfolio = last_obs["close"].iloc[0]
 
-                # Keep only new returns
-                portfolio = portfolio[portfolio.index > last_obs.index[0]]
+            # Keep only new returns
+            portfolio = portfolio[portfolio.index > last_obs.index[0]]
 
         # Apply cumulative returns
         portfolio["close"] = last_portfolio * np.cumprod(portfolio["return"] + 1)

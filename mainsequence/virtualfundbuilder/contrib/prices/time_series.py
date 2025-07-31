@@ -527,22 +527,26 @@ class InterpolatedPrices(TimeSerie):
         return required
 
     def run_post_update_routines(self, error_on_last_update, update_statistics):
-        if not self.persistence.metadata.protect_from_deletion:
+        if not self.local_persist_manager.metadata.protect_from_deletion:
             self.local_persist_manager.protect_from_deletion()
 
     def _transform_raw_data_to_upsampled_df(
             self,
             raw_data_df: pd.DataFrame,
+            update_statistics: UpdateStatistics,
     ) -> pd.DataFrame:
         """
         Transforms raw data into an upsampled dataframe.
         """
         upsampled_df = []
-        full_last_observation = self.get_last_observation()
+
+        # TODO this should be a helper function
+        unique_identifier_range_map = {a: {"start_date": d} for a, d in update_statistics.asset_time_statistics.items() }
+        full_last_observation = self.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map)
         last_observation_map = {}
 
         for unique_identifier in raw_data_df["unique_identifier"].unique():
-            if full_last_observation is None:
+            if full_last_observation is None or full_last_observation.empty:
                 last_observation_map[unique_identifier] = None
                 continue
 
@@ -623,13 +627,11 @@ class InterpolatedPrices(TimeSerie):
         """
         Main method to get upsampled data for prices.
         """
-        from mainsequence.virtualfundbuilder.time_series import PortfolioStrategy
-
         unique_identifier_range_map = {
             unique_identifier: {
                 "start_date": last_update,
                 "start_date_operand": '>=',
-            } for unique_identifier, last_update in update_statistics.update_statistics.items()
+            } for unique_identifier, last_update in update_statistics.items()
         }
 
         raw_data_df = self.bars_ts.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map)
@@ -640,6 +642,7 @@ class InterpolatedPrices(TimeSerie):
 
         upsampled_df = self._transform_raw_data_to_upsampled_df(
             raw_data_df.reset_index(["unique_identifier"]),
+            update_statistics
         )
         return upsampled_df
 

@@ -2,7 +2,7 @@ from mainsequence.tdag.time_series import TimeSerie, APITimeSerie, WrapperTimeSe
 from mainsequence.client import CONSTANTS, Asset, AssetTranslationTable, AssetTranslationRule, AssetFilter, DoesNotExist
 
 from datetime import datetime, timedelta, tzinfo
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Dict
 
 import pandas as pd
 import pytz
@@ -117,6 +117,9 @@ class MarketCap(WeightsBase, TimeSerie):
     def maximum_forward_fill(self):
         return timedelta(days=1) - TIMEDELTA
 
+    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+        return {"historical_market_cap_ts": self.historical_market_cap_ts}
+
     def get_explanation(self):
         # Convert the asset universe filter (assumed to be stored in self.asset_universe.asset_filter)
         # to a formatted JSON string for display.
@@ -190,7 +193,6 @@ class MarketCap(WeightsBase, TimeSerie):
         # Start Loop on unique identifier
 
         ms_asset_list = Asset.filter_with_asset_class(exchange_code=None,
-                                                      execution_venue__symbol=CONSTANTS.MAIN_SEQUENCE_EV,
                                                       main_sequence_share_class__in=[
                                                           a.main_sequence_share_class
                                                           for a in
