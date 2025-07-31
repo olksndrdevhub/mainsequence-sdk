@@ -131,7 +131,7 @@ class DataAccessMixin:
             A tuple containing the full path and the relative path of the pickle file.
         """
         # 1. Common Logic: Determine the pickle path for both types
-        path = build_operations.get_pickle_path_from_time_serie(time_serie_instance=self)
+        path = self.get_pickle_path_from_time_serie()
 
         # 2. Type-Specific Logic: Run pre-dump actions only for standard TimeSerie
         if not self.is_api:
@@ -437,9 +437,9 @@ class APITimeSerie(DataAccessMixin):
             remote_table_hash_id=self.remote_table_hashed_name,
             asset_symbols=asset_symbols, time_serie=self)
         return UpdateStatistics(
-        max_time_index_value=last_update_in_table,
-        max_time_per_identifier=last_update_per_asset or {}
-    )
+            max_time_index_value=last_update_in_table,
+            max_time_per_identifier=last_update_per_asset or {}
+        )
 
     def get_earliest_updated_asset_filter(self, unique_identifier_list: list,
                                           last_update_per_asset: dict) -> datetime.datetime:
@@ -614,6 +614,7 @@ class TimeSerie(DataAccessMixin,ABC):
 
         for field_name, value in asdict(config).items():
             setattr(self, field_name, value)
+
     def _patch_build_from_env(self) -> None:
         """
         Checks for the PATCH_BUILD_CONFIGURATION environment variable and,
@@ -627,7 +628,7 @@ class TimeSerie(DataAccessMixin,ABC):
             self.local_persist_manager
             self.verify_and_build_remote_objects()
 
-            pickle_path = build_operations.get_pickle_path_from_time_serie(time_serie_instance=self)
+            pickle_path = self.get_pickle_path_from_time_serie()
             build_operations.flush_pickle(pickle_path=pickle_path)
 
             self.local_persist_manager.patch_build_configuration(
@@ -1058,8 +1059,6 @@ class WrapperTimeSerie(TimeSerie):
     def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
         return self.api_ts_map
 
-
-
     def get_ranged_data_per_asset(self, range_descriptor: Optional[UniqueIdentifierRangeMap]) -> pd.DataFrame:
         """
         Gets data based on a range descriptor.
@@ -1119,14 +1118,14 @@ class WrapperTimeSerie(TimeSerie):
         translation_df = pd.DataFrame.from_dict(asset_translation_dict, orient="index")
         try:
             grouped = translation_df.groupby(
-                ["markets_time_serie_unique_identifier", "execution_venue_symbol", "exchange_code"],
+                ["markets_time_serie_unique_identifier", "exchange_code"],
                 dropna=False
             )
         except Exception as e:
             raise e
 
         data_df = []
-        for (mkt_ts_id, target_execution_venue_symbol, target_exchange_code), group_df in grouped:
+        for (mkt_ts_id, target_exchange_code), group_df in grouped:
             # get the correct TimeSerie instance from our pre-built map
             api_ts = self.api_ts_map[mkt_ts_id]
 
@@ -1140,7 +1139,6 @@ class WrapperTimeSerie(TimeSerie):
             # get correct target assets based on the share classes
             main_sequence_share_classes = [a.main_sequence_share_class for a in assets]
             asset_query = dict(
-                execution_venue__symbol=target_execution_venue_symbol,
                 main_sequence_share_class__in=main_sequence_share_classes
             )
             if not pd.isna(target_exchange_code):

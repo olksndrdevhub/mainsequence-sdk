@@ -313,9 +313,6 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         # Rows
         for name, val in rows:
             print(f"{name:<{max_name_len}} | {val}")
-    @property
-    def execution_venue_symbol(self):
-        return self.execution_venue.symbol
 
     @classmethod
     def filter_with_asset_class(
@@ -472,8 +469,6 @@ class AssetFilter(BaseModel):
     security_market_sector: Optional[str] = None
 
     def filter_triggered(self, asset: "Asset") -> bool:
-        if asset.execution_venue_symbol != self.execution_venue_symbol:
-            return False
         if self.security_type and asset.security_type != self.security_type:
             return False
         if self.security_market_sector and asset.security_market_sector != self.security_market_sector:
