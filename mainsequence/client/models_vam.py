@@ -244,7 +244,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         for key, value in query_params.items():
             new_key = key
             if key in translation_map:
-                new_key = key.replace(translation_map[key])
+                new_key = key.replace(key,translation_map[key])
 
             translated_params[new_key] = value
         return translated_params
