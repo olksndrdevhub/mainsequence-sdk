@@ -233,29 +233,25 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         return f"{self.class_name()}: {self.unique_identifier}"
 
     @classmethod
-    def _translate_query_params(cls, query_params: Dict[str, Any]):
-        translation_map = {
-            "ticker": "current_snapshot__ticker",
-            "name": "current_snapshot__name",
-            "exchange_code": "current_snapshot__exchange_code"
-        }
-
-        translated_params = {}
-        for key, value in query_params.items():
-            new_key = key
-            if key in translation_map:
-                new_key = key.replace(key,translation_map[key])
-
-            translated_params[new_key] = value
-        return translated_params
-
-    @classmethod
     def filter(cls, *args, **kwargs):
         """
-        Overrides the default filter to remap lookup keys
+        Overrides the default filter to remap 'ticker' and 'name' lookup keys
         to the corresponding fields on the related current_snapshot.
         """
-        transformed_kwargs = cls._translate_query_params(kwargs)
+        # Build a new kwargs dict with transformed keys
+        transformed_kwargs = {}
+        for key, value in kwargs.items():
+            if "ticker" in key:
+                new_key = key.replace("ticker", "current_snapshot__ticker")
+            elif "name" in key:
+                new_key = key.replace("name", "current_snapshot__name")
+            elif "exchange_code" in key:
+                new_key = key.replace("exchange_code", "current_snapshot__exchange_code")
+            else:
+                new_key = key
+            transformed_kwargs[new_key] = value
+
+        # Delegate to the superclass filter with the remapped kwargs
         return super().filter(*args, **transformed_kwargs)
 
     @classmethod
