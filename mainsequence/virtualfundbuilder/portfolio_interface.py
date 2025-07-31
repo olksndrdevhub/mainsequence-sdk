@@ -89,7 +89,6 @@ class PortfolioInterface():
 
             standard_kwargs.update(user_kwargs)
             standard_kwargs["valuation_asset_id"] = self.portfolio_config.portfolio_build_configuration.valuation_asset.id
-            standard_kwargs["required_venues__symbols"] = ts.get_required_execution_venues()
             standard_kwargs["calendar_name"] = self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
                                                         "calendar"]
 

@@ -734,7 +734,7 @@ class TimeSerie(DataAccessMixin,ABC):
 
         if graph_depth_limit < minimum_required_depth_for_update and graph_depth == 0:
             graph_depth_limit = minimum_required_depth_for_update
-            self.logger.warning(f"Graph depht limit overrided to {minimum_required_depth_for_update}")
+            self.logger.warning(f"Graph depth limit overwritten to {minimum_required_depth_for_update}")
 
         # if the data source is not local then the de-serialization needs to happend after setting the local persist manager
         # to guranteed a proper patch in the back-end
@@ -899,8 +899,8 @@ class TimeSerie(DataAccessMixin,ABC):
         return update_statistics
 
     def get_update_statistics(self):
-        update_statistics=self.local_persist_manager.get_update_statistics_for_table()
-        update_statistics=self._set_update_statistics(update_statistics)
+        update_statistics = self.local_persist_manager.get_update_statistics_for_table()
+        update_statistics = self._set_update_statistics(update_statistics)
         return update_statistics
 
 
