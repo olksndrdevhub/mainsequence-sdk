@@ -685,33 +685,7 @@ class PersistManager:
         if not self.metadata.sourcetableconfiguration.open_for_everyone:
             self.metadata.sourcetableconfiguration.patch(open_for_everyone=open_for_everyone)
 
-    def get_update_statistics(self, asset_symbols: List[str],
-                              remote_table_hash_id: str, time_serie: "TimeSerie" #necessary for uatomated methods
-                              ) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
-        """
-        Gets update statistics for the time series.
 
-        Returns:
-            A tuple containing the last update timestamp for the table and a dictionary of
-            last update timestamps per asset.
-        """
-        metadata = self.local_metadata.remote_table
-
-        last_update_in_table, last_update_per_asset = None, None
-
-        if metadata.sourcetableconfiguration is not None:
-            last_update_in_table = metadata.sourcetableconfiguration.last_time_index_value
-            if last_update_in_table is None:
-                return last_update_in_table, last_update_per_asset
-            if metadata.sourcetableconfiguration.multi_index_stats is not None:
-                last_update_per_asset = metadata.sourcetableconfiguration.multi_index_stats['max_per_asset_symbol']
-                if last_update_per_asset is not None:
-                    last_update_per_asset = {unique_identifier: ms_client.request_to_datetime(v) for unique_identifier, v in last_update_per_asset.items()}
-
-        if asset_symbols is not None and last_update_per_asset is not None:
-            last_update_per_asset = {asset: value for asset, value in last_update_per_asset.items() if asset in asset_symbols}
-
-        return last_update_in_table, last_update_per_asset
 
 
 
@@ -799,7 +773,7 @@ class PersistManager:
             persisted = True
         return persisted
 
-    def get_update_statistics(self) -> ms_client.UpdateStatistics:
+    def get_update_statistics_for_table(self) -> ms_client.UpdateStatistics:
         """
         Gets the latest update statistics from the database.
 

@@ -423,6 +423,34 @@ class APITimeSerie(DataAccessMixin):
         assert metadata is not None, f"Verify that the table {self.source_table_hash_id} exists "
 
 
+    def _get_update_statistics(self, asset_symbols: List[str],
+                              remote_table_hash_id: str, time_serie: "TimeSerie" #necessary for uatomated methods
+                              ) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
+        """
+        Gets update statistics for the time series.
+
+        Returns:
+            A tuple containing the last update timestamp for the table and a dictionary of
+            last update timestamps per asset.
+        """
+        metadata = self.local_metadata.remote_table
+
+        last_update_in_table, last_update_per_asset = None, None
+
+        if metadata.sourcetableconfiguration is not None:
+            last_update_in_table = metadata.sourcetableconfiguration.last_time_index_value
+            if last_update_in_table is None:
+                return last_update_in_table, last_update_per_asset
+            if metadata.sourcetableconfiguration.multi_index_stats is not None:
+                last_update_per_asset = metadata.sourcetableconfiguration.multi_index_stats['max_per_asset_symbol']
+                if last_update_per_asset is not None:
+                    last_update_per_asset = {unique_identifier: ms_client.request_to_datetime(v) for unique_identifier, v in last_update_per_asset.items()}
+
+        if asset_symbols is not None and last_update_per_asset is not None:
+            last_update_per_asset = {asset: value for asset, value in last_update_per_asset.items() if asset in asset_symbols}
+
+        return last_update_in_table, last_update_per_asset
+
     def get_update_statistics(self, asset_symbols: Optional[list] = None) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
         """
         Gets update statistics from the database.
@@ -433,7 +461,7 @@ class APITimeSerie(DataAccessMixin):
         Returns:
             A tuple containing the last update time for the table and a dictionary of last update times per asset.
         """
-        last_update_in_table, last_update_per_asset = self.local_persist_manager.get_update_statistics(
+        last_update_in_table, last_update_per_asset = self._get_update_statistics(
             remote_table_hash_id=self.remote_table_hashed_name,
             asset_symbols=asset_symbols, time_serie=self)
         return UpdateStatistics(
@@ -867,6 +895,11 @@ class TimeSerie(DataAccessMixin,ABC):
         update_statistics = update_statistics.update_assets(
             asset_list, init_fallback_date=self.OFFSET_START
         )
+        return update_statistics
+
+    def get_update_statistics(self):
+        update_statistics=self.local_persist_manager.get_update_statistics_for_table()
+        update_statistics=self._set_update_statistics(update_statistics)
         return update_statistics
 
 
