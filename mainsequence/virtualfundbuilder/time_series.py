@@ -7,7 +7,7 @@ from datetime import datetime
 import numpy as np
 import pytz
 import pandas as pd
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 
 from .models import PortfolioBuildConfiguration
 from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_interpolated_prices_timeseries
@@ -187,6 +187,12 @@ class PortfolioStrategy(TimeSerie):
 
             new_index = pd.date_range(start=start_date, end=end_date, freq=freq)
         return new_index, freq
+
+    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+        return {
+            "bars_ts": self.bars_ts,
+            "signal_weights": self.signal_weights
+        }
 
     def _postprocess_weights(self, weights, update_statistics):
         """
