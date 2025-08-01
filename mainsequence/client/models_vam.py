@@ -64,7 +64,6 @@ def get_model_class(model_class: str):
         "Asset": Asset,
         "AssetCurrencyPair": AssetCurrencyPair,
         "AssetFutureUSDM": AssetFutureUSDM,
-        "IndexAsset": IndexAsset,
         "PortfolioIndexAsset": PortfolioIndexAsset,
         "Calendar": Calendar,
         "ExecutionVenue": ExecutionVenue,
@@ -604,14 +603,12 @@ class Asset(AssetMixin, BaseObjectOrm):
     def create_or_update_index_asset_from_portfolios(
             cls,
             reference_portfolio: int,
-            valuation_asset: int,
             timeout = None
     ) -> "PortfolioIndexAsset":
         url = f"{cls.get_object_url()}/create_or_update_index_asset_from_portfolios/"
         payload = {
             "json": dict(
                 reference_portfolio=reference_portfolio,
-                valuation_asset=valuation_asset,
             )
         }
         r = make_request(
@@ -696,11 +693,7 @@ class Asset(AssetMixin, BaseObjectOrm):
             raise Exception(f"Error appending creating: {r.text}")
         return r.json()
 
-
-class IndexAsset(Asset):
-    valuation_asset: AssetMixin
-
-class PortfolioIndexAsset(IndexAsset):
+class PortfolioIndexAsset(Asset):
     can_trade:bool=False
     reference_portfolio : "Portfolio"
 
@@ -1231,7 +1224,6 @@ class PortfolioMixin:
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
     tags: Optional[List['PortfolioTags']] = None
-    valuation_asset: Union['Asset', int]
     calendar: Optional['Calendar']
 
     def pretty_print(self) -> str:
@@ -1256,7 +1248,6 @@ class PortfolioMixin:
             local_time_serie_id: int,
             signal_local_time_serie_id: int,
             is_active: bool,
-            valuation_asset_id: int,
             calendar_name: str,
             tracking_funds_expected_exposure_from_latest_holdings: bool,
             target_portfolio_about: PortfolioAbout,
@@ -1276,7 +1267,6 @@ class PortfolioMixin:
             "calendar_name": calendar_name,
             "tracking_funds_expected_exposure_from_latest_holdings": tracking_funds_expected_exposure_from_latest_holdings,
             "target_portfolio_about": target_portfolio_about,
-            "valuation_asset_id": valuation_asset_id,
             "backtest_table_price_column_name": backtest_table_price_column_name,
             "tags": tags,
         }

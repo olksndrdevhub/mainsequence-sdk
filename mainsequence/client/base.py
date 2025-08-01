@@ -109,7 +109,7 @@ class BaseObjectOrm:
         "ExecutionPositions": "assets/execution_positions",
         "AccountCoolDown": "assets/account_cooldown",
         "HistoricalWeights": "assets/portfolio_weights",
-        "PortfolioIndexAsset": "assets/target_portfolio_index_asset",
+        "PortfolioIndexAsset": "assets/portfolio_index_asset",
         "HistoricalBarsSource": "data_sources/historical-bars-source",
         "MarketsTimeSeriesDetails": "data_sources/markets-time-series-details",
         "AssetCategory": "assets/asset-category",

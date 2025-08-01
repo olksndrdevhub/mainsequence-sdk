@@ -76,8 +76,7 @@ class PortfolioInterface():
             signal_weights_ts = ts.signal_weights
 
             #timeseries can be running in local lake so need to request the id
-            standard_kwargs = dict(is_asset_only=False,
-                                   local_time_serie_id=ts.local_time_serie.id,
+            standard_kwargs = dict(local_time_serie_id=ts.local_time_serie.id,
                                    is_active=True,
                                    signal_local_time_serie_id=signal_weights_ts.local_time_serie.id,
                                    build_purpose=build_purpose,
@@ -87,7 +86,6 @@ class PortfolioInterface():
             user_kwargs.pop("front_end_details", None)
 
             standard_kwargs.update(user_kwargs)
-            standard_kwargs["valuation_asset_id"] = self.portfolio_config.portfolio_build_configuration.valuation_asset.id
             standard_kwargs["calendar_name"] = self.portfolio_build_configuration.backtesting_weights_configuration.rebalance_strategy_configuration[
                                                         "calendar"]
 
