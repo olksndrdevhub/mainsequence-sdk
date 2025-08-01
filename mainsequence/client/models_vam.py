@@ -170,6 +170,10 @@ class AssetSnapshot(BaseObjectOrm, BasePydanticModel):
         None,
         description="Exchange/market MIC code (e.g. XNYS, XNAS) or composite code"
     )
+    main_sequence_share_class: Optional[constr(max_length=12)] = Field(
+        None,
+        description="Highest aggregation level for share class grouping"
+    )
     venue_specific_properties: Optional[Dict[str, Any]] = Field(
         None,
         description="Exchange-specific metadata"
@@ -192,10 +196,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         None,
         description="Share class designation (e.g. 'Common', 'Class A', 'Preferred') as per FIGI"
     )
-    main_sequence_share_class: Optional[constr(max_length=12)] = Field(
-        None,
-        description="Highest aggregation level for share class grouping"
-    )
+
     isin: Optional[constr(max_length=12)] = Field(
         None,
         description="International Securities Identification Number"
