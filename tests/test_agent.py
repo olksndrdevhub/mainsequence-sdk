@@ -5,8 +5,6 @@ from pathlib import Path
 from mainsequence.client.models_tdag import DynamicResource, Artifact
 from mainsequence.virtualfundbuilder.__main__ import VirtualFundLauncher
 
-os.environ["VFB_PROJECT_PATH"] = str(Path(__file__).parent.absolute())
-
 #comment out for local testing out of Main Sequence Platform
 import dotenv
 dotenv.load_dotenv('../.env.dev')

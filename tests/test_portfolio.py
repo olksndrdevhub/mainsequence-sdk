@@ -2,16 +2,16 @@
 #comment out for local testing out of Main Sequence Platform
 import dotenv
 
-from mainsequence.client import SessionDataSource
+from mainsequence.client import SessionDataSource, Asset
 from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_interpolated_prices_timeseries
 
 dotenv.load_dotenv('../.env.dev')
 
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
-portfolio = PortfolioInterface.load_from_configuration("market_cap_databento")
+portfolio = PortfolioInterface.load_from_configuration("market_cap_vol_control")
 
 # SessionDataSource.set_local_db()
-res = portfolio.run()
+res = portfolio.run(add_portfolio_to_markets_backend=True)
 print(res)
 # bars_ts = get_interpolated_prices_timeseries(portfolio.portfolio_build_configuration.assets_configuration)
 
