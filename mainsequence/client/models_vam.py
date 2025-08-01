@@ -233,12 +233,29 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
     def __repr__(self) -> str:
         return f"{self.class_name()}: {self.unique_identifier}"
 
+    @property
+    def ticker(self):
+        return self.current_snapshot.ticker
+
+    @property
+    def name(self):
+        return self.current_snapshot.name
+
+    @property
+    def exchange_code(self):
+        return self.current_snapshot.exchange_code
+
+    @property
+    def main_sequence_share_class(self):
+        return self.current_snapshot.main_sequence_share_class
+
     @classmethod
     def _translate_query_params(cls, query_params: Dict[str, Any]):
         translation_map = {
             "ticker": "current_snapshot__ticker",
             "name": "current_snapshot__name",
-            "exchange_code": "current_snapshot__exchange_code"
+            "exchange_code": "current_snapshot__exchange_code",
+            "main_sequence_share_class": "current_snapshot__main_sequence_share_class"
         }
 
         translated_params = {}
@@ -332,7 +349,8 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         base_url = cls.get_object_url()
         # Convert `kwargs` to query parameters
         # kwargs["include_relationship_details_depth"]=include_details
-        params = cls._parse_parameters_filter(parameters=kwargs)
+        transformed_kwargs = cls._translate_query_params(kwargs)
+        params = cls._parse_parameters_filter(parameters=transformed_kwargs)
 
         # We'll call the custom action endpoint
         url = f"{base_url}/list_with_asset_class/"
@@ -381,9 +399,6 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
 
         # Convert the accumulated raw data into asset instances with correct classes
         return create_from_serializer_with_class(all_results)
-
-    def get_ms_share_class(self):
-        return self.figi_details.main_sequence_share_class
         
 class AssetCategory(BaseObjectOrm, BasePydanticModel):
     id: int
@@ -688,9 +703,6 @@ class IndexAsset(Asset):
 class PortfolioIndexAsset(IndexAsset):
     can_trade:bool=False
     reference_portfolio : "Portfolio"
-    execution_venue: "ExecutionVenue"= Field(
-        default_factory=lambda: ExecutionVenue(**CONSTANTS.VENUE_MAIN_SEQUENCE_PORTFOLIOS)
-    )
 
     @property
     def reference_portfolio_details_url(self):
@@ -1215,7 +1227,6 @@ class PortfolioMixin:
     local_time_serie: Optional['LocalTimeSerie']
     signal_local_time_serie: Optional['LocalTimeSerie']
     follow_account_rebalance: bool = False
-    required_venues: List[Union[int, 'ExecutionVenue']]
     build_purpose: str
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
