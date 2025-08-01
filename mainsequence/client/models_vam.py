@@ -1211,7 +1211,6 @@ class PortfolioMixin:
     id: Optional[int] = None
     portfolio_name: str = Field(..., max_length=255)
     portfolio_ticker: str = Field(..., max_length=150)
-    is_asset_only: bool = False
     is_active: bool = False
     local_time_serie: Optional['LocalTimeSerie']
     signal_local_time_serie: Optional['LocalTimeSerie']
@@ -1249,7 +1248,6 @@ class PortfolioMixin:
             valuation_asset_id: int,
             calendar_name: str,
             tracking_funds_expected_exposure_from_latest_holdings: bool,
-            is_asset_only: bool,
             target_portfolio_about: PortfolioAbout,
             backtest_table_price_column_name: str,
             tags: Optional[list] = None,
@@ -1266,7 +1264,6 @@ class PortfolioMixin:
             # Using the same ID for local_signal_time_serie_id as specified.
             "calendar_name": calendar_name,
             "tracking_funds_expected_exposure_from_latest_holdings": tracking_funds_expected_exposure_from_latest_holdings,
-            "is_asset_only": is_asset_only,
             "target_portfolio_about": target_portfolio_about,
             "valuation_asset_id": valuation_asset_id,
             "backtest_table_price_column_name": backtest_table_price_column_name,
@@ -1308,9 +1305,7 @@ class PortfolioMixin:
 class Portfolio(PortfolioMixin, BaseObjectOrm, BasePydanticModel):
     pass
 
-class AssetOnlyPortfolio(PortfolioMixin,BaseObjectOrm, BasePydanticModel):
-    local_time_serie: Optional[LocalTimeSerie]=None
-    signal_local_time_serie:Optional[LocalTimeSerie]=None
+
 
 class ExecutionPrediction(BaseObjectOrm):
     @classmethod
