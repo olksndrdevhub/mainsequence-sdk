@@ -110,11 +110,6 @@ class PortfolioStrategy(TimeSerie):
         self.rebalancer_explanation = ""  # TODO: Add rebalancer explanation
         super().__init__(*args, **kwargs)
 
-    def get_required_execution_venues(self):
-        asset_list = self._get_asset_list()
-        required_venues = {a.execution_venue.symbol for a in asset_list}
-        return list(required_venues)
-
     def get_asset_list(self):
         """
         Creates mappings from symbols to IDs
@@ -136,8 +131,7 @@ class PortfolioStrategy(TimeSerie):
         """
         # Get last observations for each exchange
         update_statics_from_dependencies = self.bars_ts.get_update_statistics()
-
-        earliest_last_value = update_statics_from_dependencies._max_time_in_update_statistics
+        earliest_last_value = max(update_statics_from_dependencies.asset_time_statistics.values())
 
         if earliest_last_value is None:
             self.logger.warning(f"update_statics_from_dependencies {update_statics_from_dependencies}")
@@ -362,9 +356,11 @@ rebalance details:"""
 
     def _get_last_weights(self):
         """ Deserialize the last rebalance weights"""
-        last_obs = self.get_last_observation()
 
-        if last_obs is None:
+        unique_identifier_range_map = {a: {"start_date": d} for a, d in self.get_update_statistics().asset_time_statistics.items() }
+        last_obs = self.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map)
+
+        if last_obs is None or last_obs.empty:
             return None
 
         last_weights = {}
