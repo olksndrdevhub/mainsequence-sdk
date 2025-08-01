@@ -688,9 +688,6 @@ class IndexAsset(Asset):
 class PortfolioIndexAsset(IndexAsset):
     can_trade:bool=False
     reference_portfolio : "Portfolio"
-    execution_venue: "ExecutionVenue"= Field(
-        default_factory=lambda: ExecutionVenue(**CONSTANTS.VENUE_MAIN_SEQUENCE_PORTFOLIOS)
-    )
 
     @property
     def reference_portfolio_details_url(self):
@@ -1216,7 +1213,6 @@ class PortfolioMixin:
     local_time_serie: Optional['LocalTimeSerie']
     signal_local_time_serie: Optional['LocalTimeSerie']
     follow_account_rebalance: bool = False
-    required_venues: List[Union[int, 'ExecutionVenue']]
     build_purpose: str
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
