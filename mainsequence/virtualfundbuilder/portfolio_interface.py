@@ -19,14 +19,12 @@ class PortfolioInterface():
     directly with a full tree update.
     """
     def __init__(self, portfolio_config_template: dict,
-                 build_purpose=CONSTANTS.PORTFOLIO_BUILD_FOR_BACKTEST,
                  configuration_name: str=None):
         """
         Initializes the portfolio strategy with the necessary configurations.
         """
         if configuration_name:
             self.check_valid_configuration_name(configuration_name)
-        self.build_purpose = build_purpose
         self.portfolio_config_template = portfolio_config_template
         self.portfolio_config = configuration_sanitizer(portfolio_config_template)
         self.configuration_name = configuration_name
@@ -71,7 +69,7 @@ class PortfolioInterface():
 
         portfolio_ts = self.portfolio_strategy_time_serie
 
-        def build_markets_portfolio(ts, build_purpose, portfolio_tags):
+        def build_markets_portfolio(ts, portfolio_tags):
             # when is live target portfolio
             signal_weights_ts = ts.signal_weights
 
@@ -79,7 +77,6 @@ class PortfolioInterface():
             standard_kwargs = dict(local_time_serie_id=ts.local_time_serie.id,
                                    is_active=True,
                                    signal_local_time_serie_id=signal_weights_ts.local_time_serie.id,
-                                   build_purpose=build_purpose,
                                    )
 
             user_kwargs = self.portfolio_markets_config.model_dump()
@@ -112,7 +109,7 @@ class PortfolioInterface():
 
             return target_portfolio, index_asset
 
-        target_portfolio, index_asset = build_markets_portfolio(portfolio_ts, build_purpose=self.build_purpose,
+        target_portfolio, index_asset = build_markets_portfolio(portfolio_ts,
                                                                portfolio_tags=portfolio_tags)
 
         self.index_asset = index_asset

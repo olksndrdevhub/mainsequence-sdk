@@ -8,7 +8,8 @@ from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_inter
 dotenv.load_dotenv('../.env.dev')
 
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
-portfolio = PortfolioInterface.load_from_configuration("market_cap_vol_control")
+portfolio = PortfolioInterface.load_from_configuration(configuration_name=None,
+                                                       config_file="/home/jose/code/MainSequenceClientSide/mainsequence-sdk/examples/configurations/market_cap_vol_control.yaml")
 
 # SessionDataSource.set_local_db()
 res = portfolio.run(add_portfolio_to_markets_backend=True)

@@ -1211,17 +1211,15 @@ class PortfolioAbout(TypedDict):
 
 class PortfolioMixin:
     id: Optional[int] = None
-    portfolio_name: str = Field(..., max_length=255)
-    portfolio_ticker: str = Field(..., max_length=150)
     is_active: bool = False
     local_time_serie: Optional['LocalTimeSerie']
     signal_local_time_serie: Optional['LocalTimeSerie']
     follow_account_rebalance: bool = False
-    build_purpose: str
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
     tags: Optional[List['PortfolioTags']] = None
     calendar: Optional['Calendar']
+    index_asset:AssetMixin
 
     def pretty_print(self) -> str:
         def format_field(name, value):
@@ -1241,7 +1239,6 @@ class PortfolioMixin:
     def create_from_time_series(
             cls,
             portfolio_name: str,
-            build_purpose: str,
             local_time_serie_id: int,
             signal_local_time_serie_id: int,
             is_active: bool,
@@ -1256,7 +1253,6 @@ class PortfolioMixin:
         # Build the payload with the required arguments.
         payload_data = {
             "portfolio_name": portfolio_name,
-            "build_purpose": build_purpose,
             "is_active": is_active,
             "local_time_serie_id": local_time_serie_id,
             "signal_local_time_serie_id": signal_local_time_serie_id,
@@ -1275,6 +1271,13 @@ class PortfolioMixin:
         response = r.json()
 
         return cls(**response["portfolio"]), PortfolioIndexAsset(**response["portfolio_index_asset"])
+
+    @property
+    def portfolio_name(self) -> str:
+        return ""
+    @property
+    def portfolio_ticker(self)->str:
+        return ""
 
     def add_venue(self, venue_id) -> None:
         url = f"{self.get_object_url()}/{self.id}/add_venue/"
