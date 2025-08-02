@@ -16,7 +16,7 @@ top_100_cryptos=AssetCategory.get(unique_identifier="top_100_crypto_market_cap")
 spot_assets = Asset.filter(id__in=top_100_cryptos.assets)
 # get them through main sequence figi class and exchange
 binance_currency_pairs = AssetCurrencyPair.filter(
-    base_asset__main_sequence_share_class__in=[a.main_sequence_share_class for a in   spot_assets],
+    base_asset__asset_ticker_group_id__in=[a.asset_ticker_group_id for a in   spot_assets],
     execution_venue__symbol=MARKETS_CONSTANTS.BINANCE_EV_SYMBOL,
     quote_asset__ticker="USDT",
     include_base_quote_detail=False

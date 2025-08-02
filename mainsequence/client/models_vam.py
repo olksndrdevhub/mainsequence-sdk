@@ -170,7 +170,7 @@ class AssetSnapshot(BaseObjectOrm, BasePydanticModel):
         None,
         description="Exchange/market MIC code (e.g. XNYS, XNAS) or composite code"
     )
-    main_sequence_share_class: Optional[constr(max_length=12)] = Field(
+    asset_ticker_group_id: Optional[constr(max_length=12)] = Field(
         None,
         description="Highest aggregation level for share class grouping"
     )
@@ -215,10 +215,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         description="High-level sector classification (e.g. 'Equity', 'Corporate Bond') as per FIGI"
     )
 
-    real_figi: bool = Field(
-        default=False,
-        description="FIGI identifier is real (default: False)"
-    )
+
     is_custom_by_organization: bool = Field(
         default=False,
         description="Flag indicating if this asset was custom-created by the organization"
@@ -246,8 +243,8 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         return self.current_snapshot.exchange_code
 
     @property
-    def main_sequence_share_class(self):
-        return self.current_snapshot.main_sequence_share_class
+    def asset_ticker_group_id(self):
+        return self.current_snapshot.asset_ticker_group_id
 
     @classmethod
     def _translate_query_params(cls, query_params: Dict[str, Any]):
@@ -255,7 +252,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
             "ticker": "current_snapshot__ticker",
             "name": "current_snapshot__name",
             "exchange_code": "current_snapshot__exchange_code",
-            "main_sequence_share_class": "current_snapshot__main_sequence_share_class"
+            "asset_ticker_group_id": "current_snapshot__asset_ticker_group_id"
         }
 
         translated_params = {}

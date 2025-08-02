@@ -1170,33 +1170,33 @@ class WrapperTimeSerie(TimeSerie):
             ]
 
             # get correct target assets based on the share classes
-            main_sequence_share_classes = [a.main_sequence_share_class for a in assets]
+            asset_ticker_group_ides = [a.asset_ticker_group_id for a in assets]
             asset_query = dict(
-                main_sequence_share_class__in=main_sequence_share_classes
+                asset_ticker_group_id__in=asset_ticker_group_ides
             )
             if not pd.isna(target_exchange_code):
                 asset_query["exchange_code"] = target_exchange_code
 
             target_assets = Asset.filter(**asset_query)
 
-            target_asset_unique_ids = [a.main_sequence_share_class for a in target_assets]
-            if len(main_sequence_share_classes) > len(target_asset_unique_ids):
-                self.logger.warning(f"Not all assets were found in backend for translation table: {set(main_sequence_share_classes) - set(target_asset_unique_ids)}")
+            target_asset_unique_ids = [a.asset_ticker_group_id for a in target_assets]
+            if len(asset_ticker_group_ides) > len(target_asset_unique_ids):
+                self.logger.warning(f"Not all assets were found in backend for translation table: {set(asset_ticker_group_ides) - set(target_asset_unique_ids)}")
 
-            if len(main_sequence_share_classes) < len(target_asset_unique_ids):
-                self.logger.warning(f"Too many assets were found in backend for translation table: {set(target_asset_unique_ids) - set(main_sequence_share_classes)}")
+            if len(asset_ticker_group_ides) < len(target_asset_unique_ids):
+                self.logger.warning(f"Too many assets were found in backend for translation table: {set(target_asset_unique_ids) - set(asset_ticker_group_ides)}")
 
             # create the source-target mapping
             source_asset_share_class_map = {}
             for a in source_assets:
-                if a.main_sequence_share_class in source_asset_share_class_map:
-                    raise ValueError(f"Share class {a.main_sequence_share_class} cannot be duplicated")
-                source_asset_share_class_map[a.main_sequence_share_class] = a.unique_identifier
+                if a.asset_ticker_group_id in source_asset_share_class_map:
+                    raise ValueError(f"Share class {a.asset_ticker_group_id} cannot be duplicated")
+                source_asset_share_class_map[a.asset_ticker_group_id] = a.unique_identifier
 
             source_target_map = {}
             for a in target_assets:
-                main_sequence_share_class = a.main_sequence_share_class
-                source_unique_identifier = source_asset_share_class_map[main_sequence_share_class]
+                asset_ticker_group_id = a.asset_ticker_group_id
+                source_unique_identifier = source_asset_share_class_map[asset_ticker_group_id]
                 source_target_map[source_unique_identifier] = a.unique_identifier
 
             target_source_map = {v: k for k, v in source_target_map.items()}

@@ -193,13 +193,13 @@ class MarketCap(WeightsBase, TimeSerie):
         # Start Loop on unique identifier
 
         ms_asset_list = Asset.filter_with_asset_class(exchange_code=None,
-                                                      main_sequence_share_class__in=[
-                                                          a.main_sequence_share_class
+                                                      asset_ticker_group_id__in=[
+                                                          a.asset_ticker_group_id
                                                           for a in
                                                           update_statistics.asset_list])
 
-        ms_asset_list={a.main_sequence_share_class:a for a in ms_asset_list}
-        asset_list_to_share_class = {a.main_sequence_share_class:a for a in update_statistics.asset_list}
+        ms_asset_list={a.asset_ticker_group_id:a for a in ms_asset_list}
+        asset_list_to_share_class = {a.asset_ticker_group_id:a for a in update_statistics.asset_list}
 
         market_cap_uid_range_map = {ms_asset.get_spot_reference_asset_unique_identifier():
                                       unique_identifier_range_market_cap_map[asset_list_to_share_class[ms_share_class].unique_identifier]

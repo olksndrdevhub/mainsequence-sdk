@@ -42,7 +42,7 @@ AccountPortfolioHistoricalPositions,AccountPortfolioPosition,
 
 execution_venue = ExecutionVenue.get(symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV)
 cash_asset=Asset.get(ticker="MXN",execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                            real_figi=True,security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_CURNCY,
+                      security_market_sector=MARKETS_CONSTANTS.FIGI_MARKET_SECTOR_CURNCY,
                             security_type=MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_2_SPOT
                             )
 
