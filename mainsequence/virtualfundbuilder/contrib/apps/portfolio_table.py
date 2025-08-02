@@ -20,7 +20,7 @@ PortfolioNameEnum = Enum(
     "PortfolioEnum",
     {
         p.portfolio_name: p.portfolio_ticker
-        for p in Portfolio.filter(is_asset_only=False, local_time_serie__isnull=False)
+        for p in Portfolio.filter(local_time_serie__isnull=False)
     },
     type=str,
 )

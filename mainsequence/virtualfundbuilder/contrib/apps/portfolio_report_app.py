@@ -19,7 +19,7 @@ logger = get_vfb_logger()
 
 PortfolioNameEnum = Enum(
     "PortfolioEnum",
-    {portfolio.portfolio_name: portfolio.portfolio_ticker for portfolio in Portfolio.filter(is_asset_only=False, local_time_serie__isnull=False)},
+    {portfolio.portfolio_name: portfolio.portfolio_ticker for portfolio in Portfolio.filter(local_time_serie__isnull=False)},
     type=str,
 )
 class PortfolioReportConfiguration(BaseModel):
