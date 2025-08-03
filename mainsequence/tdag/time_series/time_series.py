@@ -1071,7 +1071,6 @@ class WrapperTimeSerie(TimeSerie):
                 metadata = ms_client.DynamicTableMetaData.get(identifier=table_identifier)
 
             except DoesNotExist as e:
-                logger.exception(f"HistoricalBarsSource does not exist for {table_identifier}")
                 raise e
             api_ts = APITimeSerie(
                 data_source_id=metadata.data_source.id,
