@@ -629,7 +629,7 @@ class InterpolatedPrices(TimeSerie):
         """
         unique_identifier_range_map = update_statistics.get_update_range_map_great_or_equal()
 
-        raw_data_df = self.bars_ts.get_ranged_data_per_asset(unique_identifier_range_map=unique_identifier_range_map)
+        raw_data_df = self.bars_ts.get_ranged_data_per_asset(range_descriptor=unique_identifier_range_map)
 
         if raw_data_df.empty == True:
             self.logger.info("New new data to interpolate")
