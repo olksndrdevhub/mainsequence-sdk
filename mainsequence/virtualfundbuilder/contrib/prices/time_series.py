@@ -627,14 +627,9 @@ class InterpolatedPrices(TimeSerie):
         """
         Main method to get upsampled data for prices.
         """
-        unique_identifier_range_map = {
-            unique_identifier: {
-                "start_date": last_update,
-                "start_date_operand": '>=',
-            } for unique_identifier, last_update in update_statistics.items()
-        }
+        unique_identifier_range_map = update_statistics.get_update_range_map_great_or_equal()
 
-        raw_data_df = self.bars_ts.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map)
+        raw_data_df = self.bars_ts.get_ranged_data_per_asset(unique_identifier_range_map=unique_identifier_range_map)
 
         if raw_data_df.empty == True:
             self.logger.info("New new data to interpolate")
