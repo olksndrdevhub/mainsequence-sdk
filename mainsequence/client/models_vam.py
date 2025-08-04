@@ -1274,10 +1274,11 @@ class PortfolioMixin:
 
     @property
     def portfolio_name(self) -> str:
-        return ""
+        return self.index_asset.name
+
     @property
     def portfolio_ticker(self)->str:
-        return ""
+        return self.index_asset.ticker
 
     def add_venue(self, venue_id) -> None:
         url = f"{self.get_object_url()}/{self.id}/add_venue/"
