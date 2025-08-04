@@ -123,7 +123,7 @@ class TimeSeriesOGM:
         self.verify_exist(target_path=target_path)
         return target_path
 
-    def get_ts_pickle_path(self, local_hash_id: str):
-        return os.path.join(f"{self.pickle_storage_path}", f"{local_hash_id}.pickle")
+    def get_ts_pickle_path(self, update_hash: str):
+        return os.path.join(f"{self.pickle_storage_path}", f"{update_hash}.pickle")
 
 ogm = TimeSeriesOGM()

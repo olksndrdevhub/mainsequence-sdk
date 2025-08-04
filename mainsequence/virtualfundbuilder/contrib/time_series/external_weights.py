@@ -4,7 +4,7 @@ from typing import Optional, List, Union
 
 import pandas as pd
 
-from mainsequence.tdag.time_series import TimeSerie
+from mainsequence.tdag.data_nodes import DataNode
 from mainsequence.client import  Asset, AssetCategory
 
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
@@ -14,7 +14,7 @@ import pandas.api.types as ptypes
 
 
 @register_signal_class(register_in_agent=False)
-class ExternalWeights(WeightsBase, TimeSerie):
+class ExternalWeights(WeightsBase, DataNode):
     def __init__(
             self,
             artifact_name: str,

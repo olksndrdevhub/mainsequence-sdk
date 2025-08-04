@@ -44,7 +44,7 @@ def example_data(assets):
 
     api_ts = APITimeSerie(
         data_source_id=hbs.related_local_time_serie.data_source_id,
-        local_hash_id=hbs.related_local_time_serie.local_hash_id
+        update_hash=hbs.related_local_time_serie.update_hash
     )
 
     # This returns a DataFrame, indexed by (time_index, unique_identifier)

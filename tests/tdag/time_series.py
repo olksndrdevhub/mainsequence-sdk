@@ -1,10 +1,10 @@
 import pytz
 
-from mainsequence.tdag import TimeSerie,  ModelList
+from mainsequence.tdag import DataNode,  ModelList
 import pandas as pd
 import datetime
 
-class TestFeature2(TimeSerie):
+class TestFeature2(DataNode):
     def __init__(self, asset_list: ModelList, other_config: str, *args, **kwargs):
         self.asset_list = asset_list
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
@@ -18,7 +18,7 @@ class TestFeature2(TimeSerie):
         data = data.set_index("unique_identifier", append=True)
         return data
 
-class TestFeature(TimeSerie):
+class TestFeature(DataNode):
     def __init__(self, asset_list: ModelList,other_config:str, *args, **kwargs):
         self.asset_list = asset_list
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]

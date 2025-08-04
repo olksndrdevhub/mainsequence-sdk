@@ -104,7 +104,7 @@ class PortfolioInterface():
             else:
                 # patch timeserie of portfolio to guaranteed recreation
                 target_portfolio.patch(**standard_kwargs)
-                self.logger.debug(f"Target portfolio {target_portfolio.portfolio_ticker} for local time serie {ts.local_time_serie.local_hash_id} already exists in Backend")
+                self.logger.debug(f"Target portfolio {target_portfolio.portfolio_ticker} for local time serie {ts.local_time_serie.update_hash} already exists in Backend")
                 index_asset = PortfolioIndexAsset.get(reference_portfolio__id=target_portfolio.id)
 
             return target_portfolio, index_asset

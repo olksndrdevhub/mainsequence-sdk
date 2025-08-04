@@ -1,4 +1,4 @@
-from mainsequence.tdag.time_series import TimeSerie
+from mainsequence.tdag.data_nodes import DataNode
 from datetime import datetime
 import pytz
 import pandas as pd
@@ -6,7 +6,7 @@ from typing import Union
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase,  register_signal_class
 
 @register_signal_class(register_in_agent=True)
-class MockSignal(WeightsBase, TimeSerie):
+class MockSignal(WeightsBase, DataNode):
     """
     Mock Signal to test strategies. Creates a signal with long/short of ETH and BTC in frequency.
     """

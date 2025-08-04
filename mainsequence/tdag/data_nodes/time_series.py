@@ -25,7 +25,7 @@ from structlog.stdlib import BoundLogger
 
 from mainsequence.logconf import logger
 
-from mainsequence.tdag.time_series.persist_managers import PersistManager, APIPersistManager
+from mainsequence.tdag.data_nodes.persist_managers import PersistManager, APIPersistManager
 from mainsequence.client.models_tdag import (DataSource,
                                              UpdateStatistics, UniqueIdentifierRangeMap, ColumnMetaData,      )
 
@@ -40,8 +40,8 @@ from mainsequence.client import LocalTimeSerie,  CONSTANTS, \
 from functools import wraps
 
 import mainsequence.client as ms_client
-import mainsequence.tdag.time_series.run_operations as run_operations
-import mainsequence.tdag.time_series.build_operations as build_operations
+import mainsequence.tdag.data_nodes.run_operations as run_operations
+import mainsequence.tdag.data_nodes.build_operations as build_operations
 
 
 
@@ -111,7 +111,7 @@ class DataAccessMixin:
         return repr
 
     def get_pickle_path_from_time_serie(self) -> str:
-        path = build_operations.get_pickle_path(local_hash_id=self.local_hash_id,
+        path = build_operations.get_pickle_path(update_hash=self.update_hash,
                                data_source_id=self.data_source_id,
                                is_api=self.is_api
                                )
@@ -119,7 +119,7 @@ class DataAccessMixin:
 
     def persist_to_pickle(self, overwrite: bool = False) -> Tuple[str, str]:
         """
-        Persists the TimeSerie object to a pickle file using an atomic write.
+        Persists the DataNode object to a pickle file using an atomic write.
 
         Uses a single method to determine the pickle path and dispatches to
         type-specific logic only where necessary.
@@ -133,9 +133,9 @@ class DataAccessMixin:
         # 1. Common Logic: Determine the pickle path for both types
         path = self.get_pickle_path_from_time_serie()
 
-        # 2. Type-Specific Logic: Run pre-dump actions only for standard TimeSerie
+        # 2. Type-Specific Logic: Run pre-dump actions only for standard DataNode
         if not self.is_api:
-            self.logger.debug(f"Patching source code and git hash for {self.hash_id}")
+            self.logger.debug(f"Patching source code and git hash for {self.storage_hash}")
             self.local_persist_manager.update_git_and_code_in_backend(time_serie_class=self.__class__)
             # Prepare for pickling by removing the unpicklable ThreadLock
             self._local_persist_manager = None
@@ -184,7 +184,7 @@ class DataAccessMixin:
 
 
     def get_logger_context_variables(self) -> Dict[str, Any]:
-        return dict(local_hash_id=self.local_hash_id,
+        return dict(update_hash=self.update_hash,
                     local_hash_id_data_source=self.data_source_id,
                     api_time_series=self.__class__.__name__ == "APITimeSerie")
 
@@ -192,8 +192,8 @@ class DataAccessMixin:
     def logger(self) -> logging.Logger:
         """Gets a logger instance with bound context variables."""
         # import structlog.contextvars as cvars
-        # cvars.bind_contextvars(local_hash_id=self.local_hash_id,
-        #                      local_hash_id_data_source=self.data_source_id,
+        # cvars.bind_contextvars(update_hash=self.update_hash,
+        #                      update_hash=self.data_source_id,
         #                      api_time_series=True,)
         global logger
         if hasattr(self, "_logger") == False:
@@ -226,7 +226,7 @@ class DataAccessMixin:
         unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
     ) -> pd.DataFrame:
         """
-        Retrieve rows from this TimeSerie whose `time_index` (and optional `unique_identifier`) fall within the specified date ranges.
+        Retrieve rows from this DataNode whose `time_index` (and optional `unique_identifier`) fall within the specified date ranges.
 
         **Note:** If `unique_identifier_range_map` is provided, **all** other filters
         (`start_date`, `end_date`, `unique_identifier_list`, `great_or_equal`, `less_or_equal`)
@@ -324,7 +324,7 @@ class APITimeSerie(DataAccessMixin):
     @classmethod
     def build_from_local_time_serie(cls, source_table: "LocalTimeSerie") -> "APITimeSerie":
         return cls(data_source_id=source_table.data_source.id,
-                   source_table_hash_id=source_table.hash_id
+                   storage_hash=source_table.storage_hash
                    )
 
     @classmethod
@@ -333,12 +333,12 @@ class APITimeSerie(DataAccessMixin):
         table = ms_client.DynamicTableMetaData.get(identifier=identifier)
         ts = cls(
             data_source_id=table.data_source.id,
-            source_table_hash_id=table.hash_id
+            storage_hash=table.storage_hash
         )
         return ts
 
     def __init__(self,
-                 data_source_id: int, source_table_hash_id: str,
+                 data_source_id: int, storage_hash: str,
                  data_source_local_lake: Optional[DataSource] = None):
         """
         Initializes an APITimeSerie.
@@ -353,7 +353,7 @@ class APITimeSerie(DataAccessMixin):
 
         assert isinstance(data_source_id, int)
         self.data_source_id = data_source_id
-        self.source_table_hash_id = source_table_hash_id
+        self.storage_hash = storage_hash
         self.data_source = data_source_local_lake
         self._local_persist_manager: APIPersistManager = None
 
@@ -362,11 +362,11 @@ class APITimeSerie(DataAccessMixin):
         return True
 
     @staticmethod
-    def _get_local_hash_id(hash_id):
-        return "API_"+f"{hash_id}"
+    def _get_update_hash(storage_hash):
+        return "API_"+f"{storage_hash}"
     @property
-    def local_hash_id(self):
-        return  self._get_local_hash_id(hash_id=self.source_table_hash_id)
+    def update_hash(self):
+        return  self._get_update_hash(storage_hash=self.storage_hash)
 
     def __getstate__(self) -> Dict[str, Any]:
         """Prepares the state for pickling."""
@@ -424,7 +424,7 @@ class APITimeSerie(DataAccessMixin):
 
 
     def _get_update_statistics(self, asset_symbols: List[str],
-                              remote_table_hash_id: str, time_serie: "TimeSerie" #necessary for uatomated methods
+                              remote_table_hash_id: str, time_serie: "DataNode" #necessary for uatomated methods
                               ) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
         """
         Gets update statistics for the time series.
@@ -462,7 +462,7 @@ class APITimeSerie(DataAccessMixin):
             A tuple containing the last update time for the table and a dictionary of last update times per asset.
         """
         last_update_in_table, last_update_per_asset = self._get_update_statistics(
-            remote_table_hash_id=self.remote_table_hashed_name,
+            storage_hash=self.storage_hash,
             asset_symbols=asset_symbols, time_serie=self)
         return UpdateStatistics(
             max_time_index_value=last_update_in_table,
@@ -494,9 +494,9 @@ class APITimeSerie(DataAccessMixin):
 
 
 
-class TimeSerie(DataAccessMixin,ABC):
+class DataNode(DataAccessMixin,ABC):
     """
-    Base TimeSerie class
+    Base DataNode class
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
 
@@ -524,19 +524,19 @@ class TimeSerie(DataAccessMixin,ABC):
             *args,
             **kwargs):
         """
-        Initializes the TimeSerie object with the provided metadata and configurations. For extension of the method
+        Initializes the DataNode object with the provided metadata and configurations. For extension of the method
 
         This method sets up the time series object, loading the necessary configurations
         and metadata.
 
-        Each TimeSerie instance will create a table in the Main Sequence Data Engine by uniquely hashing
+        Each DataNode instance will create a table in the Main Sequence Data Engine by uniquely hashing
         the arguments with exception of:
 
         - init_meta
         - build_meta_data
         - local_kwargs_to_ignore
 
-        Each TimeSerie instance will create a local_hash_id and a LocalTimeSerie instance in the Data Engine by uniquely hashing
+        Each DataNode instance will create a update_hash and a LocalTimeSerie instance in the Data Engine by uniquely hashing
         the same arguments as the table but excluding the arguments inside local_kwargs_to_ignore
 
 
@@ -575,7 +575,7 @@ class TimeSerie(DataAccessMixin,ABC):
 
     def __init_subclass__(cls, **kwargs):
         """
-        This special method is called when TimeSerie is subclassed.
+        This special method is called when DataNode is subclassed.
         It automatically wraps the subclass's __init__ method to add post-init routines.
         """
         super().__init_subclass__(**kwargs)
@@ -607,7 +607,7 @@ class TimeSerie(DataAccessMixin,ABC):
 
             # 7. Final setup
             self.set_data_source()
-            logger.bind(local_hash_id=self.hashed_name)
+            logger.bind(update_hash=self.update_hash)
 
 
             self.run_after_post_init_routines()
@@ -650,7 +650,7 @@ class TimeSerie(DataAccessMixin,ABC):
         """
         patch_build = os.environ.get("PATCH_BUILD_CONFIGURATION", "false").lower() in ["true", "1"]
         if patch_build:
-            self.logger.warning(f"Patching build configuration for {self.hash_id}")
+            self.logger.warning(f"Patching build configuration for {self.storage_hash}")
 
             # Ensure dependencies are initialized
             self.local_persist_manager
@@ -672,18 +672,12 @@ class TimeSerie(DataAccessMixin,ABC):
     @property
     def is_api(self):
         return False
-    @property
-    def hash_id(self) -> str:
-        """The remote table hash name."""
-        return self.remote_table_hashed_name
+
 
     @property
     def data_source_id(self) -> int:
         return self.data_source.id
 
-    @property
-    def local_hash_id(self) -> str:
-        return self.hashed_name
 
     @property
     def local_time_serie(self) -> LocalTimeSerie:
@@ -700,8 +694,8 @@ class TimeSerie(DataAccessMixin,ABC):
     @property
     def local_persist_manager(self) -> PersistManager:
         if self._local_persist_manager is None:
-            self.logger.debug(f"Setting local persist manager for {self.hash_id}")
-            self._set_local_persist_manager(local_hash_id=self.local_hash_id,
+            self.logger.debug(f"Setting local persist manager for {self.storage_hash}")
+            self._set_local_persist_manager(update_hash=self.update_hash,
                                             )
         return self._local_persist_manager
     @property
@@ -718,7 +712,7 @@ class TimeSerie(DataAccessMixin,ABC):
                                 graph_depth_limit: int = 1000,
                                 graph_depth: int = 0) -> None:
         """
-        Sets the state of the TimeSerie after loading from pickle, including sessions.
+        Sets the state of the DataNode after loading from pickle, including sessions.
 
         Args:
             include_vam_client_objects: Whether to include VAM client objects.
@@ -740,7 +734,7 @@ class TimeSerie(DataAccessMixin,ABC):
         # to guranteed a proper patch in the back-end
         if graph_depth <= graph_depth_limit and self.data_source.related_resource_class_type:
             self._set_local_persist_manager(
-                local_hash_id=self.local_hash_id,
+                update_hash=self.update_hash,
                 local_metadata=None,
             )
 
@@ -794,7 +788,7 @@ class TimeSerie(DataAccessMixin,ABC):
             properties.pop(n, None)
 
         return properties
-    def _set_local_persist_manager(self, local_hash_id: str,
+    def _set_local_persist_manager(self, update_hash: str,
                                   local_metadata: Union[None, dict] = None,
 
                                   ) -> None:
@@ -804,15 +798,15 @@ class TimeSerie(DataAccessMixin,ABC):
         exist or is incomplete, it sets up the initial configuration and builds the update details.
 
         Args:
-           hashed_name : str
+           update_hash : str
                The local hash ID for the time series.
-           remote_table_hashed_name : str
+           storage_hash : str
                The remote table hash name for the time series.
            local_metadata : Union[None, dict], optional
                Local metadata for the time series, if available.
         """
         self._local_persist_manager = PersistManager.get_from_data_type(
-            local_hash_id=local_hash_id,
+            update_hash=update_hash,
             class_name=self.__class__.__name__,
             local_metadata=local_metadata,
             data_source=self.data_source
@@ -837,14 +831,14 @@ class TimeSerie(DataAccessMixin,ABC):
         Verifies and builds remote objects by calling the persistence layer.
         This logic is now correctly located within the BuildManager.
         """
-        # Use self.owner to get properties from the TimeSerie instance
+        # Use self.owner to get properties from the DataNode instance
         owner_class = self.__class__
         time_serie_source_code_git_hash = build_operations.get_time_serie_source_code_git_hash(owner_class)
         time_serie_source_code = build_operations.get_time_serie_source_code(owner_class)
 
         # The call to the low-level persist manager is encapsulated here
         self.local_persist_manager.local_persist_exist_set_config(
-            remote_table_hashed_name=self.remote_table_hashed_name,
+            storage_hash=self.storage_hash,
             local_configuration=self.local_initial_configuration,
             remote_configuration=self.remote_initial_configuration,
             remote_build_metadata=self.remote_build_metadata,
@@ -976,7 +970,7 @@ class TimeSerie(DataAccessMixin,ABC):
 
     def get_asset_list(self) -> Optional[List["Asset"]]:
         """
-        Provide the list of assets that this TimeSerie should include when updating.
+        Provide the list of assets that this DataNode should include when updating.
 
         By default, this method returns `self.asset_list` if defined.
         Subclasses _must_ override this method when no `asset_list` attribute was set
@@ -985,7 +979,7 @@ class TimeSerie(DataAccessMixin,ABC):
         Use Case:
           - For category-based series, return all Asset unique_identifiers in a given category
             (e.g., `AssetCategory(unique_identifier="investable_assets")`), so that only those
-            assets are updated in this TimeSerie.
+            assets are updated in this DataNode.
 
         Returns
         -------
@@ -1003,19 +997,19 @@ class TimeSerie(DataAccessMixin,ABC):
         pass
 
     @abstractmethod
-    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
         """
         Subclasses must implement this method to explicitly declare their upstream dependencies.
 
         Returns:
-            A dictionary where keys are descriptive names and values are the TimeSerie dependency instances.
+            A dictionary where keys are descriptive names and values are the DataNode dependency instances.
         """
         raise NotImplementedError
 
     @abstractmethod
     def update(self, update_statistics: UpdateStatistics) -> pd.DataFrame:
         """
-        Fetch and ingest only the new rows for this TimeSerie based on prior update checkpoints.
+        Fetch and ingest only the new rows for this DataNode based on prior update checkpoints.
 
         UpdateStatistics provides the last-ingested positions:
           - For a single-index series (time_index only), `update_statistics.max_time` is either:
@@ -1050,19 +1044,19 @@ class TimeSerie(DataAccessMixin,ABC):
 
 
 
-class WrapperTimeSerie(TimeSerie):
-    """A wrapper class for managing multiple TimeSerie objects."""
+class WrapperTimeSerie(DataNode):
+    """A wrapper class for managing multiple DataNode objects."""
 
     def __init__(self, translation_table: AssetTranslationTable, *args, **kwargs):
         """
         Initialize the WrapperTimeSerie.
 
         Args:
-            time_series_dict: Dictionary of TimeSerie objects.
+            time_series_dict: Dictionary of DataNode objects.
         """
         super().__init__(*args, **kwargs)
 
-        def get_time_serie_from_markets_unique_id(table_identifier: str) -> TimeSerie:
+        def get_time_serie_from_markets_unique_id(table_identifier: str) -> DataNode:
             """
             Returns the appropriate bar time series based on the asset list and source.
             """
@@ -1074,7 +1068,7 @@ class WrapperTimeSerie(TimeSerie):
                 raise e
             api_ts = APITimeSerie(
                 data_source_id=metadata.data_source.id,
-                source_table_hash_id=metadata.hash_id
+                source_table_hash_id=metadata.storage_hash
             )
             return api_ts
 
@@ -1088,7 +1082,7 @@ class WrapperTimeSerie(TimeSerie):
 
         self.translation_table = translation_table
 
-    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
         return self.api_ts_map
 
     def get_ranged_data_per_asset(self, range_descriptor: Optional[UniqueIdentifierRangeMap]) -> pd.DataFrame:
@@ -1158,7 +1152,7 @@ class WrapperTimeSerie(TimeSerie):
 
         data_df = []
         for (mkt_ts_id, target_exchange_code), group_df in grouped:
-            # get the correct TimeSerie instance from our pre-built map
+            # get the correct DataNode instance from our pre-built map
             api_ts = self.api_ts_map[mkt_ts_id]
 
             # figure out which assets belong to this group
@@ -1245,5 +1239,5 @@ class WrapperTimeSerie(TimeSerie):
         pass
 
 
-build_operations.serialize_argument.register(TimeSerie, build_operations._serialize_timeserie)
+build_operations.serialize_argument.register(DataNode, build_operations._serialize_timeserie)
 build_operations.serialize_argument.register(APITimeSerie, build_operations._serialize_api_timeserie)

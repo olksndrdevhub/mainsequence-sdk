@@ -1,10 +1,10 @@
 """
 ================================================================================
-Instructions for Implementing a `mainsequence.tdag.TimeSerie` Subclass
+Instructions for Implementing a `mainsequence.tdag.DataNode` Subclass
 ================================================================================
 
 This file serves as a reference for creating custom time series. To create a new,
-functioning time series, you must subclass `TimeSerie` and implement its abstract
+functioning time series, you must subclass `DataNode` and implement its abstract
 methods.
 
 ---
@@ -28,7 +28,7 @@ The constructor defines the unique identity of the time series and its dependenc
 
 -   **Uniqueness**: The arguments passed to `__init__` are hashed to create a unique ID.
     Instantiating a class with the same arguments will always result in the same time series object.
--   **Dependencies**: To declare a dependency on another `TimeSerie`, you **MUST** instantiate it
+-   **Dependencies**: To declare a dependency on another `DataNode`, you **MUST** instantiate it
     within `__init__` and assign it to an instance attribute (e.g., `self.my_dependency = OtherTimeSerie()`).
     The framework will **automatically scan all instance attributes** to find these dependencies
     and build the execution graph.
@@ -97,7 +97,7 @@ import json
 # Imports should be at the top of the file
 import numpy as np
 np.NaN = np.nan # Fix for a pandas-ta compatibility issue
-from mainsequence.tdag import TimeSerie,APITimeSerie, WrapperTimeSerie
+from mainsequence.tdag import DataNode,APITimeSerie, WrapperTimeSerie
 from mainsequence.client.models_tdag import UpdateStatistics, ColumnMetaData
 import mainsequence.client as ms_client
 from typing import Union, Optional, List, Dict, Any
@@ -113,7 +113,7 @@ TEST_TRANSLATION_TABLE_UID="test_translation_table"
 
 class SimulatedPricesManager:
 
-    def __init__(self,owner:TimeSerie):
+    def __init__(self,owner:DataNode):
         self.owner = owner
 
     @staticmethod
@@ -220,14 +220,14 @@ class SimulatedPricesManager:
                             ]
         return columns_metadata
 
-class SingleIndexTS(TimeSerie):
+class SingleIndexTS(DataNode):
     """
        A simple time series with a single index, generating random numbers daily.
        This serves as a basic, non-asset-based example.
        """
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
 
-    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
         pass
     def update(self, update_statistics: ms_client.UpdateStatistics):
         today_utc = datetime.datetime.now(tz=pytz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -251,7 +251,7 @@ class SingleIndexTS(TimeSerie):
 
     def get_column_metadata(self):
         """
-        Add MetaData information to the TimeSerie Table
+        Add MetaData information to the DataNode Table
         Returns:
 
         """
@@ -284,7 +284,7 @@ class SingleIndexTS(TimeSerie):
 
 
 
-class SimulatedPrices(TimeSerie):
+class SimulatedPrices(DataNode):
     """
     Simulates price updates for a specific list of assets provided at initialization.
     """
@@ -306,7 +306,7 @@ class SimulatedPrices(TimeSerie):
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
         pass
 
     def update(self,update_statistics:ms_client.UpdateStatistics):
@@ -315,7 +315,7 @@ class SimulatedPrices(TimeSerie):
         return df
     def get_column_metadata(self):
         """
-        Add MetaData information to the TimeSerie Table
+        Add MetaData information to the DataNode Table
         Returns:
 
         """
@@ -346,11 +346,11 @@ class SimulatedPrices(TimeSerie):
 
         return mts
 
-class CategorySimulatedPrices(TimeSerie):
+class CategorySimulatedPrices(DataNode):
     """
         Simulates price updates for all assets belonging to a specified category.
         This demonstrates using a hook (`get_asset_list`) to dynamically define the asset universe.
-        It also shows a dependency on another TimeSerie (`SingleIndexTS`).
+        It also shows a dependency on another DataNode (`SingleIndexTS`).
         """
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
 
@@ -372,7 +372,7 @@ class CategorySimulatedPrices(TimeSerie):
 
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
         return {"simple_ts":self.simple_ts}
 
     def get_asset_list(self):
@@ -397,7 +397,7 @@ class CategorySimulatedPrices(TimeSerie):
 
     def get_column_metadata(self):
         """
-        Add MetaData information to the TimeSerie Table
+        Add MetaData information to the DataNode Table
         Returns:
 
         """
@@ -461,7 +461,7 @@ class CategorySimulatedPrices(TimeSerie):
 # Mocking UpdateStatistics and Running the Test
 
 
-class TAFeature(TimeSerie):
+class TAFeature(DataNode):
     """
        A derived time series that calculates a technical analysis feature from another price series.
        """
@@ -491,7 +491,7 @@ class TAFeature(TimeSerie):
                                                  *args, **kwargs)
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
         return {
             "prices_time_serie": self.prices_time_serie,
 
@@ -548,7 +548,7 @@ class TAFeature(TimeSerie):
 
         # --- Step 2: Fetch Data From Dependency ---
         # This is a key pattern for derived features. We use a data access method from the base
-        # TimeSerie class (via the DataAccessMixin) to query our dependency.
+        # DataNode class (via the DataAccessMixin) to query our dependency.
         #
         # `get_ranged_data_per_asset` is highly efficient because it takes a dictionary
         # that specifies a *different* start date for each asset, allowing us to get all
@@ -648,8 +648,8 @@ class ElasticNetConfiguration(ModelConfiguration):
 
 
 def _prepare_model_data(
-        feature_ts: TimeSerie,
-        prices_ts: TimeSerie,
+        feature_ts: DataNode,
+        prices_ts: DataNode,
         update_statistics: UpdateStatistics
 ) -> pd.DataFrame:
     """
@@ -707,9 +707,9 @@ def _prepare_model_data(
     # Join features + target and drop rows with missing values
     return feats_wide.join(returns, how="inner").dropna()
 
-class ModelTrainTimeSerie(TimeSerie):
+class ModelTrainTimeSerie(DataNode):
     """
-    TimeSerie dedicated solely to retraining the model at the configured frequency.
+    DataNode dedicated solely to retraining the model at the configured frequency.
 
     Dependencies:
       - TAFeature
@@ -744,7 +744,7 @@ class ModelTrainTimeSerie(TimeSerie):
 
         super().__init__( *args, **kwargs)
 
-    def dependencies(self) -> Dict[str, TimeSerie]:
+    def dependencies(self) -> Dict[str, DataNode]:
         return {
             "feature_ts": self.feature_ts,
             "prices_ts": self.prices_ts,
@@ -831,7 +831,7 @@ class ModelTrainTimeSerie(TimeSerie):
             description="Model coefficients retrained at specified frequency"
         )
 
-class RollingModelPrediction(TimeSerie):
+class RollingModelPrediction(DataNode):
     """
     Predicts the next-day return via a rolling ElasticNet regression on TA features.
 
@@ -877,12 +877,12 @@ class RollingModelPrediction(TimeSerie):
             **kwargs
         )
 
-        #even more prices from a TimeSerie not in the project using APITimeSerie
+        #even more prices from a DataNode not in the project using APITimeSerie
 
         self.external_prices=APITimeSerie.build_from_identifier(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES)
         translation_table=ms_client.AssetTranslationTable.get(unique_identifier=TEST_TRANSLATION_TABLE_UID)
         self.translated_prices_ts=WrapperTimeSerie(translation_table=translation_table)
-        # retrainer TimeSerie
+        # retrainer DataNode
         self.model_train_ts = ModelTrainTimeSerie(
             asset_list=asset_list,
             ta_feature_config=ta_feature_config,
@@ -894,7 +894,7 @@ class RollingModelPrediction(TimeSerie):
 
         super().__init__( *args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
         return {
             "prices_ts": self.prices_ts,
             "feature_ts": self.feature_ts,
@@ -975,7 +975,7 @@ class RollingModelPrediction(TimeSerie):
             description="Next-day return via rolling ElasticNet on TA indicators"
         )
 
-class LivePrediction(TimeSerie):
+class LivePrediction(DataNode):
     def __init__(
             self,
             asset_list: List[ms_client.Asset],
@@ -1005,13 +1005,13 @@ class LivePrediction(TimeSerie):
             **kwargs
         )
 
-        # even more prices from a TimeSerie not in the project using APITimeSerie
+        # even more prices from a DataNode not in the project using APITimeSerie
 
         self.external_prices = APITimeSerie.build_from_identifier(
             identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES)
         translation_table = ms_client.AssetTranslationTable.get(unique_identifier=TEST_TRANSLATION_TABLE_UID)
         self.translated_prices_ts = WrapperTimeSerie(translation_table=translation_table)
-        # retrainer TimeSerie
+        # retrainer DataNode
         self.model_train_ts = ModelTrainTimeSerie(
             asset_list=asset_list,
             ta_feature_config=ta_feature_config,
@@ -1023,7 +1023,7 @@ class LivePrediction(TimeSerie):
 
         super().__init__( *args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
         return {
             "prices_ts": self.prices_ts,
             "feature_ts": self.feature_ts,
@@ -1043,7 +1043,7 @@ class LivePrediction(TimeSerie):
         """
         return pd.DataFrame()
 
-class WorkflowManager(TimeSerie):
+class WorkflowManager(DataNode):
     def __init__(
             self,
             asset_list: List[ms_client.Asset],
@@ -1073,7 +1073,7 @@ class WorkflowManager(TimeSerie):
 
         super().__init__(*args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
         return {"prediction_back_test":self.prediction_back_test,
                 "live_back_test":self.live_back_test
                 }

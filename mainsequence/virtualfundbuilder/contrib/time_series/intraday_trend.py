@@ -8,12 +8,12 @@ import pytz
 from mainsequence.virtualfundbuilder import TIMEDELTA
 from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_interpolated_prices_timeseries
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
-from mainsequence.tdag.time_series import TimeSerie
+from mainsequence.tdag.data_nodes import DataNode
 
 import pandas_market_calendars as mcal
 
 @register_signal_class(register_in_agent=True)
-class IntradayTrend(WeightsBase, TimeSerie):
+class IntradayTrend(WeightsBase, DataNode):
 
     def __init__(
             self,

@@ -1,7 +1,7 @@
 import ast
 import inspect
 
-from mainsequence.tdag.time_series import TimeSerie
+from mainsequence.tdag.data_nodes import DataNode
 from datetime import datetime, timedelta
 import numpy as np
 import pytz
@@ -156,7 +156,7 @@ def register_signal_class(name=None, register_in_agent=True):
 
 class SignalWeightsFactory(BaseFactory):
     @staticmethod
-    def get_signal_weights_strategy(signal_weights_name) -> TimeSerie:
+    def get_signal_weights_strategy(signal_weights_name) -> DataNode:
         """
         Creates an instance of the appropriate SignalWeights class based on the provided name.
         """

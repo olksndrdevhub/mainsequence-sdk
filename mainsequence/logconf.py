@@ -37,7 +37,7 @@ class CustomConsoleRenderer(ConsoleRenderer):
         filename = event_dict.pop('filename', None)
         func_name = event_dict.pop('func_name', None)
         # application_name = event_dict.pop('application_name', None)
-        # local_hash_id=event_dict.pop('local_hash_id', "")
+        # update_hash=event_dict.pop('update_hash', "")
         # Call the parent renderer
         rendered = super().__call__(logger, name, event_dict)
         # Append the call site information to the rendered output

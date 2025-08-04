@@ -2,7 +2,7 @@ import copy
 import os
 
 from mainsequence.client import  UpdateStatistics, AssetCategory, Asset
-from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie
+from mainsequence.tdag.data_nodes import DataNode, WrapperTimeSerie
 from datetime import datetime
 import numpy as np
 import pytz
@@ -55,7 +55,7 @@ def translate_to_pandas_freq(custom_freq):
     return f"{number}{pandas_freq}"
 
 
-class PortfolioStrategy(TimeSerie):
+class PortfolioStrategy(DataNode):
     """
     Manages the rebalancing of asset weights within a portfolio over time, considering transaction fees
     and rebalancing strategies. Calculates portfolio values and returns while accounting for execution-specific fees.
@@ -184,7 +184,7 @@ class PortfolioStrategy(TimeSerie):
             new_index = pd.date_range(start=start_date, end=end_date, freq=freq)
         return new_index, freq
 
-    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
         return {
             "bars_ts": self.bars_ts,
             "signal_weights": self.signal_weights
@@ -400,7 +400,7 @@ rebalance details:"""
             )
 
         if len(raw_prices) == 0:
-            self.logger.info(f"No prices data in index interpolation for node {bars_ts.hash_id}")
+            self.logger.info(f"No prices data in index interpolation for node {bars_ts.storage_hash}")
             return pd.DataFrame(), pd.DataFrame()
 
         raw_prices.sort_values("time_index", inplace=True)
@@ -511,7 +511,7 @@ rebalance details:"""
     def get_table_metadata(self,update_statistics:ms_client.UpdateStatistics) ->Optional[ms_client.TableMetaData]:
 
 
-        asset=ms_client.PortfolioIndexAsset.get_or_none(reference_portfolio__local_time_serie=self.local_time_serie.local_hash_id)
+        asset=ms_client.PortfolioIndexAsset.get_or_none(reference_portfolio__local_time_serie=self.local_time_serie.update_hash)
         if asset is not None:
             identifier = asset.unique_identifier
             return ms_client.TableMetaData(
