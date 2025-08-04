@@ -1,7 +1,7 @@
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioConfiguration,PortfolioInterface
 from mainsequence.client import AssetCategory,Asset,AssetCurrencyPair
 from mainsequence.client import MARKETS_CONSTANTS
-from mainsequence.virtualfundbuilder.contrib.time_series import AssetMistMatch
+from mainsequence.virtualfundbuilder.contrib.data_nodes import AssetMistMatch
 import yaml
 import tempfile
 import os

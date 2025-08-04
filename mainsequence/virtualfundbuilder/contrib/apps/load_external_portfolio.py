@@ -1,7 +1,7 @@
 import pandas as pd
 
 from mainsequence.client import Asset, AssetCategory, CONSTANTS
-from mainsequence.virtualfundbuilder.contrib.prices.time_series import ExternalPrices
+from mainsequence.virtualfundbuilder.contrib.prices.data_nodes import ExternalPrices
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 

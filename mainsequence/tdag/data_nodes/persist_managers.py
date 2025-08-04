@@ -77,7 +77,7 @@ class APIPersistManager:
     It handles asynchronous fetching of metadata to avoid blocking operations.
     """
 
-    def __init__(self, data_source_id: int, source_table_hash_id: str):
+    def __init__(self, data_source_id: int, storage_hash: str):
         """
         Initializes the APIPersistManager.
 
@@ -86,9 +86,9 @@ class APIPersistManager:
             update_hash: The local hash identifier for the time series.
         """
         self.data_source_id: int = data_source_id
-        self.source_table_hash_id: str = source_table_hash_id
+        self.storage_hash: str = storage_hash
 
-        logger.debug(f"Initializing Time Serie {self.source_table_hash_id}  as APIDataNode")
+        logger.debug(f"Initializing Time Serie {self.storage_hash}  as APIDataNode")
 
         # Create a Future to hold the local metadata when ready.
         self._metadata_future = Future()
@@ -96,7 +96,7 @@ class APIPersistManager:
         future_registry.add_future(self._metadata_future)
         # Launch the REST request in a separate, non-daemon thread.
         thread = threading.Thread(target=self._init_metadata,
-                                  name=f"ApiMetaDataThread-{self.source_table_hash_id}",
+                                  name=f"ApiMetaDataThread-{self.storage_hash}",
                                   daemon=False)
         thread.start()
 

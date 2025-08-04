@@ -6,7 +6,7 @@ import yaml
 import re
 
 from .config_handling import configuration_sanitizer
-from .time_series import PortfolioStrategy
+from .data_nodes import PortfolioStrategy
 from mainsequence.client import Asset, AssetFutureUSDM, MARKETS_CONSTANTS as CONSTANTS, Portfolio, PortfolioIndexAsset
 
 from .models import PortfolioConfiguration

@@ -1,5 +1,5 @@
 
-from .data_nodes import (DataNode, WrapperTimeSerie ,
+from .data_nodes import (DataNode, WrapperDataNode ,
                           APIDataNode,)
 
 

@@ -3,7 +3,7 @@
 import dotenv
 
 from mainsequence.client import SessionDataSource, Asset
-from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_interpolated_prices_timeseries
+from mainsequence.virtualfundbuilder.contrib.prices.data_nodes import get_interpolated_prices_timeseries
 
 dotenv.load_dotenv('../.env.dev')
 

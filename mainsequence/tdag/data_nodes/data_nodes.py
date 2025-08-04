@@ -383,7 +383,7 @@ class APIDataNode(DataAccessMixin):
         """Gets the local persistence manager, initializing it if necessary."""
         if self._local_persist_manager is None:
             self._set_local_persist_manager()
-            self.logger.debug(f"Setting local persist manager for {self.source_table_hash_id}")
+            self.logger.debug(f"Setting local persist manager for {self.storage_hash}")
         return self._local_persist_manager
 
     def set_relation_tree(self) -> None:
@@ -417,10 +417,10 @@ class APIDataNode(DataAccessMixin):
 
     def _set_local_persist_manager(self) -> None:
         self._verify_local_data_source()
-        self._local_persist_manager = APIPersistManager(source_table_hash_id=self.source_table_hash_id, data_source_id=self.data_source_id)
+        self._local_persist_manager = APIPersistManager(storage_hash=self.storage_hash, data_source_id=self.data_source_id)
         metadata = self._local_persist_manager.metadata
 
-        assert metadata is not None, f"Verify that the table {self.source_table_hash_id} exists "
+        assert metadata is not None, f"Verify that the table {self.storage_hash} exists "
 
 
     def _get_update_statistics(self, asset_symbols: List[str],
@@ -1042,12 +1042,12 @@ class DataNode(DataAccessMixin,ABC):
 
 
 
-class WrapperTimeSerie(DataNode):
+class WrapperDataNode(DataNode):
     """A wrapper class for managing multiple DataNode objects."""
 
     def __init__(self, translation_table: AssetTranslationTable, *args, **kwargs):
         """
-        Initialize the WrapperTimeSerie.
+        Initialize the WrapperDataNode.
 
         Args:
             time_series_dict: Dictionary of DataNode objects.
@@ -1066,7 +1066,7 @@ class WrapperTimeSerie(DataNode):
                 raise e
             api_ts = APIDataNode(
                 data_source_id=metadata.data_source.id,
-                source_table_hash_id=metadata.storage_hash
+                storage_hash=metadata.storage_hash
             )
             return api_ts
 

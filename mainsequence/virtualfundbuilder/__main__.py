@@ -107,7 +107,7 @@ def get_pod_configuration():
     project_path = os.getenv("VFB_PROJECT_PATH")
 
     # Gather all submodules in time_series
-    time_series_package = f"{project_library}.time_series"
+    time_series_package = f"{project_library}.data_nodes"
     time_series_modules = get_py_modules(os.path.join(project_path, "time_series"))
 
     # Gather all submodules in rebalance_strategies
