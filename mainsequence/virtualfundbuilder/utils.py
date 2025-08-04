@@ -8,7 +8,7 @@ from pydantic.fields import PydanticUndefined, FieldInfo
 
 import pandas as pd
 from mainsequence.client import CONSTANTS, Asset
-from mainsequence.tdag.time_series import  TimeSerie
+from mainsequence.tdag.data_nodes import  DataNode
 import numpy as np
 from tqdm import tqdm
 from numpy.linalg import LinAlgError

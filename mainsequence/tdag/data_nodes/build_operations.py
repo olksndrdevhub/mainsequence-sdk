@@ -47,20 +47,20 @@ def serialize_argument(value: Any, pickle_ts: bool) -> Any:
     return value
 
 
-def _serialize_timeserie(value: "TimeSerie", pickle_ts: bool = False) -> Dict[str, Any]:
-    """Serialization logic for TimeSerie objects."""
-    print(f"Serializing TimeSerie: {value.local_hash_id}")
+def _serialize_timeserie(value: "DataNode", pickle_ts: bool = False) -> Dict[str, Any]:
+    """Serialization logic for DataNode objects."""
+    print(f"Serializing DataNode: {value.update_hash}")
     # This logic can be expanded, for example, to handle pickling.
     if pickle_ts:
         # Placeholder for actual pickling logic
-        return {"is_time_serie_pickled": True, "local_hash_id": value.local_hash_id, "data": "pickled_data_placeholder"}
-    return {"is_time_serie_instance": True, "local_hash_id": value.local_hash_id}
+        return {"is_time_serie_pickled": True, "update_hash": value.update_hash, "data": "pickled_data_placeholder"}
+    return {"is_time_serie_instance": True, "update_hash": value.update_hash}
 
 def _serialize_api_timeserie(value, pickle_ts: bool):
     if pickle_ts:
         new_value = {"is_api_time_serie_pickled": True}
         value.persist_to_pickle() # Assumes this method exists
-        new_value["local_hash_id"] = value.local_hash_id
+        new_value["update_hash"] = value.update_hash
         new_value['data_source_id'] = value.data_source_id
         return new_value
     return value
@@ -204,7 +204,7 @@ def prepare_config_kwargs(kwargs: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[
 
 
 def verify_backend_git_hash_with_pickle(local_persist_manager:PersistManager,
-                                        time_serie_class: "TimeSerie") -> None:
+                                        time_serie_class: "DataNode") -> None:
     """Verifies if the git hash in the backend matches the one from the pickled object."""
     if local_persist_manager.metadata is not None:
         load_git_hash = get_time_serie_source_code_git_hash(time_serie_class)
@@ -213,11 +213,11 @@ def verify_backend_git_hash_with_pickle(local_persist_manager:PersistManager,
         if load_git_hash != persisted_pickle_hash:
             local_persist_manager.logger.warning(
                 f"{bcolors.WARNING}Source code does not match with pickle rebuilding{bcolors.ENDC}")
-            pickle_path = get_pickle_path(local_hash_id=local_persist_manager.local_hash_id,
+            pickle_path = get_pickle_path(update_hash=local_persist_manager.update_hash,
                                           data_source_id=local_persist_manager.data_source.id, )
             flush_pickle(pickle_path)
 
-            rebuild_time_serie = rebuild_from_configuration(local_hash_id=local_persist_manager.local_hash_id,
+            rebuild_time_serie = rebuild_from_configuration(update_hash=local_persist_manager.update_hash,
                                                             data_source=local_persist_manager.data_source,
                                                             )
             rebuild_time_serie.persist_to_pickle()
@@ -287,7 +287,7 @@ class Serializer:
 
     def serialize_init_kwargs(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Serializes __init__ keyword arguments for a TimeSerie.
+        Serializes __init__ keyword arguments for a DataNode.
         This maps to your original `serialize_init_kwargs`.
         """
         return self._serialize_dict(kwargs=kwargs, pickle_ts=False)
@@ -361,12 +361,12 @@ class PickleRebuilder(BaseRebuilder):
             "orm_class": self._handle_orm_model,
             "__type__": self._handle_complex_type,
         }
-    def _handle_pickled_timeserie(self, value: Dict, **state_kwargs) -> "TimeSerie":
+    def _handle_pickled_timeserie(self, value: Dict, **state_kwargs) -> "DataNode":
         """Handles 'is_time_serie_pickled' markers."""
         import cloudpickle
-        # Note: You need to make TimeSerie available here
+        # Note: You need to make DataNode available here
         full_path = get_pickle_path(
-            local_hash_id=value['local_hash_id'],
+            update_hash=value['update_hash'],
             data_source_id=value['data_source_id']
         )
         with open(full_path, 'rb') as handle:
@@ -392,7 +392,7 @@ class PickleRebuilder(BaseRebuilder):
         import cloudpickle
         # Note: You need to make APITimeSerie available here
         full_path = get_pickle_path(
-            local_hash_id=value['local_hash_id'],
+            update_hash=value['update_hash'],
             data_source_id=value['data_source_id'],is_api=True,
         )
         with open(full_path, 'rb') as handle:
@@ -462,7 +462,7 @@ class DeserializerManager:
 
         Args:
             config: The configuration dictionary.
-            time_serie_class_name: The name of the TimeSerie class.
+            time_serie_class_name: The name of the DataNode class.
 
         Returns:
             The rebuilt configuration dictionary.
@@ -486,8 +486,8 @@ class TimeSerieConfig:
     init_meta: Any
     remote_build_metadata: Any
     local_kwargs_to_ignore: Optional[List[str]]
-    hashed_name: str
-    remote_table_hashed_name: str
+    update_hash: str
+    storage_hash: str
     local_initial_configuration: Dict[str, Any]
     remote_initial_configuration: Dict[str, Any]
 
@@ -510,7 +510,7 @@ def create_config(ts_class_name: str,  kwargs: Dict[str, Any]):
         dict_to_hash['local_kwargs_to_ignore'] = local_kwargs_to_ignore
 
     # 4. Generate the hashes
-    local_ts_hash, remote_table_hash = hash_signature(dict_to_hash)
+    update_hash, storage_hash = hash_signature(dict_to_hash)
 
     # 5. Create the remote configuration by removing ignored keys
     remote_config = copy.deepcopy(dict_to_hash)
@@ -526,8 +526,8 @@ def create_config(ts_class_name: str,  kwargs: Dict[str, Any]):
         init_meta=meta_kwargs["init_meta"],
         remote_build_metadata=meta_kwargs["build_meta_data"],
         local_kwargs_to_ignore=local_kwargs_to_ignore,
-        hashed_name=f"{ts_class_name}_{local_ts_hash}".lower(),
-        remote_table_hashed_name=f"{ts_class_name}_{remote_table_hash}".lower(),
+        update_hash=f"{ts_class_name}_{update_hash}".lower(),
+        storage_hash=f"{ts_class_name}_{storage_hash}".lower(),
         local_initial_configuration=dict_to_hash,
         remote_initial_configuration=remote_config,
     )
@@ -543,15 +543,15 @@ def flush_pickle(pickle_path) -> None:
 # In class BuildManager:
 
 @tracer.start_as_current_span("TS: load_from_pickle")
-def load_from_pickle(pickle_path: str) -> "TimeSerie":
+def load_from_pickle(pickle_path: str) -> "DataNode":
     """
-    Loads a TimeSerie object from a pickle file, handling both standard and API types.
+    Loads a DataNode object from a pickle file, handling both standard and API types.
 
     Args:
         pickle_path: The path to the pickle file.
 
     Returns:
-        The loaded TimeSerie object.
+        The loaded DataNode object.
     """
     import cloudpickle
     from pathlib import Path
@@ -584,10 +584,10 @@ def load_from_pickle(pickle_path: str) -> "TimeSerie":
 
 
 
-def get_pickle_path(local_hash_id: str, data_source_id: int, is_api=False) -> str:
+def get_pickle_path(update_hash: str, data_source_id: int, is_api=False) -> str:
     if is_api:
-        return  os.path.join(ogm.pickle_storage_path, str(data_source_id), f"{API_TS_PICKLE_PREFIFX}{local_hash_id}.pickle")
-    return os.path.join(ogm.pickle_storage_path, str(data_source_id), f"{local_hash_id}.pickle")
+        return  os.path.join(ogm.pickle_storage_path, str(data_source_id), f"{API_TS_PICKLE_PREFIFX}{update_hash}.pickle")
+    return os.path.join(ogm.pickle_storage_path, str(data_source_id), f"{update_hash}.pickle")
 
 def load_data_source_from_pickle( pickle_path: str) -> Any:
     data_path = Path(pickle_path).parent / "data_source.pickle"
@@ -595,55 +595,55 @@ def load_data_source_from_pickle( pickle_path: str) -> Any:
         data_source = cloudpickle.load(handle)
     return data_source
 
-def rebuild_and_set_from_local_hash_id( local_hash_id: int, data_source_id: int, set_dependencies_df: bool = False,
-                                       graph_depth_limit: int = 1) -> Tuple["TimeSerie", str]:
+def rebuild_and_set_from_local_hash_id( update_hash: int, data_source_id: int, set_dependencies_df: bool = False,
+                                       graph_depth_limit: int = 1) -> Tuple["DataNode", str]:
     """
-    Rebuilds a TimeSerie from its local hash ID and pickles it if it doesn't exist.
+    Rebuilds a DataNode from its local hash ID and pickles it if it doesn't exist.
 
     Args:
-        local_hash_id: The local hash ID of the TimeSerie.
+        update_hash: The local hash ID of the DataNode.
         data_source_id: The data source ID.
         set_dependencies_df: Whether to set the dependencies DataFrame.
         graph_depth_limit: The depth limit for graph traversal.
 
     Returns:
-        A tuple containing the TimeSerie object and the path to its pickle file.
+        A tuple containing the DataNode object and the path to its pickle file.
     """
-    pickle_path = get_pickle_path(local_hash_id=local_hash_id,
+    pickle_path = get_pickle_path(update_hash=update_hash,
                                       data_source_id=data_source_id,
                                       )
     if os.path.isfile(pickle_path) == False or os.stat(pickle_path).st_size == 0:
         # rebuild time serie and pickle
         ts = rebuild_from_configuration(
-            local_hash_id=local_hash_id,
+            update_hash=update_hash,
             data_source=data_source_id,
         )
         if set_dependencies_df == True:
             ts.set_relation_tree()
 
         ts.persist_to_pickle()
-        ts.logger.info(f"ts {local_hash_id} pickled ")
+        ts.logger.info(f"ts {update_hash} pickled ")
 
     ts = load_and_set_from_pickle(
         pickle_path=pickle_path,
         graph_depth_limit=graph_depth_limit,
     )
-    ts.logger.debug(f"ts {local_hash_id} loaded from pickle ")
+    ts.logger.debug(f"ts {update_hash} loaded from pickle ")
     return ts, pickle_path
 
 
 
 
-def load_and_set_from_pickle( pickle_path: str, graph_depth_limit: int = 1) -> "TimeSerie":
+def load_and_set_from_pickle( pickle_path: str, graph_depth_limit: int = 1) -> "DataNode":
     """
-    Loads a TimeSerie from a pickle file and sets its state.
+    Loads a DataNode from a pickle file and sets its state.
 
     Args:
         pickle_path: The path to the pickle file.
         graph_depth_limit: The depth limit for setting the state.
 
     Returns:
-        The loaded and configured TimeSerie object.
+        The loaded and configured DataNode object.
     """
     ts = load_from_pickle(pickle_path)
     ts._set_state_with_sessions(
@@ -653,32 +653,32 @@ def load_and_set_from_pickle( pickle_path: str, graph_depth_limit: int = 1) -> "
     return ts
 
 @tracer.start_as_current_span("TS: Rebuild From Configuration")
-def rebuild_from_configuration( local_hash_id: str,
-                               data_source: Union[int, object]) -> "TimeSerie":
+def rebuild_from_configuration( update_hash: str,
+                               data_source: Union[int, object]) -> "DataNode":
     """
-    Rebuilds a TimeSerie instance from its configuration.
+    Rebuilds a DataNode instance from its configuration.
 
     Args:
-        local_hash_id: The local hash ID of the TimeSerie.
+        update_hash: The local hash ID of the DataNode.
         data_source: The data source ID or object.
 
     Returns:
-        The rebuilt TimeSerie instance.
+        The rebuilt DataNode instance.
     """
     import importlib
 
-    tracer_instrumentator.append_attribute_to_current_span("local_hash_id", local_hash_id)
+    tracer_instrumentator.append_attribute_to_current_span("update_hash", update_hash)
 
     if isinstance(data_source, int):
         pickle_path = get_pickle_path(data_source_id=data_source,
-                                          local_hash_id=local_hash_id)
+                                          update_hash=update_hash)
         if os.path.isfile(pickle_path) == False:
             data_source = ms_client.DynamicTableDataSource.get(pk=data_source)
             data_source.persist_to_pickle(data_source_pickle_path(data_source.id))
 
         data_source = load_data_source_from_pickle(pickle_path=pickle_path)
 
-    persist_manager = PersistManager.get_from_data_type(local_hash_id=local_hash_id,
+    persist_manager = PersistManager.get_from_data_type(update_hash=update_hash,
                                                         data_source=data_source,
                                                         )
     try:
@@ -705,8 +705,8 @@ def rebuild_from_configuration( local_hash_id: str,
 
 
 
-def load_and_set_from_hash_id( local_hash_id: int, data_source_id: int) -> "TimeSerie":
-    path = get_pickle_path(local_hash_id=local_hash_id ,data_source_id=data_source_id)
+def load_and_set_from_hash_id( update_hash: int, data_source_id: int) -> "DataNode":
+    path = get_pickle_path(update_hash=update_hash ,data_source_id=data_source_id)
     ts = load_and_set_from_pickle(pickle_path=path)
     return ts
 

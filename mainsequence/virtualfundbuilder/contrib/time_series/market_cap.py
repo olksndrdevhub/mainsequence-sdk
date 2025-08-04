@@ -1,4 +1,4 @@
-from mainsequence.tdag.time_series import TimeSerie, APITimeSerie, WrapperTimeSerie
+from mainsequence.tdag.data_nodes import DataNode, APITimeSerie, WrapperTimeSerie
 from mainsequence.client import CONSTANTS, Asset, AssetTranslationTable, AssetTranslationRule, AssetFilter, DoesNotExist
 
 from datetime import datetime, timedelta, tzinfo
@@ -7,7 +7,7 @@ from typing import Optional, List, Union, Dict
 import pandas as pd
 import pytz
 
-from mainsequence.tdag.time_series import TimeSerie
+from mainsequence.tdag.data_nodes import DataNode
 from mainsequence.client import CONSTANTS, Asset, AssetCategory
 
 from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
@@ -22,7 +22,7 @@ class SymbolWeight(VFBConfigBaseModel):
     weight: float
 
 @register_signal_class(register_in_agent=True)
-class FixedWeights(WeightsBase, TimeSerie):
+class FixedWeights(WeightsBase, DataNode):
 
     def __init__(self, asset_symbol_weights: List[SymbolWeight], *args, **kwargs):
         """
@@ -80,7 +80,7 @@ class VolatilityControlConfiguration(BaseModel):
 
 
 @register_signal_class(register_in_agent=True)
-class MarketCap(WeightsBase, TimeSerie):
+class MarketCap(WeightsBase, DataNode):
     def __init__(self,
                  volatility_control_configuration: Optional[VolatilityControlConfiguration],
                  minimum_atvr_ratio: float = .1,
@@ -117,7 +117,7 @@ class MarketCap(WeightsBase, TimeSerie):
     def maximum_forward_fill(self):
         return timedelta(days=1) - TIMEDELTA
 
-    def dependencies(self) -> Dict[str, Union["TimeSerie", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
         return {"historical_market_cap_ts": self.historical_market_cap_ts}
 
     def get_explanation(self):

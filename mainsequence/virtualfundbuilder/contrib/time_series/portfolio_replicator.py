@@ -13,7 +13,7 @@ from mainsequence.virtualfundbuilder import TIMEDELTA
 from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_interpolated_prices_timeseries
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
 from mainsequence.virtualfundbuilder.models import VFBConfigBaseModel
-from mainsequence.tdag.time_series import TimeSerie
+from mainsequence.tdag.data_nodes import DataNode
 
 
 class TrackingStrategy(Enum):
@@ -142,7 +142,7 @@ def rolling_elastic_net(y, X, window, alpha=1.0, l1_ratio=0.5):
     return np.array(betas)
 
 @register_signal_class(register_in_agent=True)
-class ETFReplicator(WeightsBase, TimeSerie):
+class ETFReplicator(WeightsBase, DataNode):
     def __init__(
         self,
         symbol_to_replicate: str,

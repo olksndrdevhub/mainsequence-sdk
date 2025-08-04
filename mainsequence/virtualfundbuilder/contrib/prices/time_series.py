@@ -7,14 +7,14 @@ import numpy as np
 import datetime
 import pandas_market_calendars as mcal
 
-from mainsequence.tdag.time_series import TimeSerie, WrapperTimeSerie, APITimeSerie
+from mainsequence.tdag.data_nodes import DataNode, WrapperTimeSerie, APITimeSerie
 from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
                                   UpdateStatistics, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
                                  )
 from mainsequence.client import MARKETS_CONSTANTS, ExecutionVenue
 from mainsequence.client import  DoesNotExist, Asset
-from mainsequence.tdag.time_series.time_series import WrapperTimeSerie
-from mainsequence.tdag.time_series.utils import (
+from mainsequence.tdag.data_nodes.time_series import WrapperTimeSerie
+from mainsequence.tdag.data_nodes.utils import (
     string_frequency_to_minutes,
     string_freq_to_time_delta,
 )
@@ -460,7 +460,7 @@ def interpolate_intraday_bars(
     return interpolated_data
 
 
-class InterpolatedPrices(TimeSerie):
+class InterpolatedPrices(DataNode):
     """
     Handles interpolated prices for assets.
     """
@@ -688,7 +688,7 @@ class InterpolatedPrices(TimeSerie):
         prices = prices[['open_time', 'open', 'high', 'low', 'close', 'volume', 'trade_count', 'vwap', 'interpolated']]
         return prices
 
-class ExternalPrices(TimeSerie):
+class ExternalPrices(DataNode):
 
     def __init__(
             self,

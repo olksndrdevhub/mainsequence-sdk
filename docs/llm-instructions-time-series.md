@@ -1,12 +1,12 @@
 from mainsequence.tdag import APITimeSerie
 
-## TimeSerie Implementation Guidelines  
+## DataNode Implementation Guidelines  
 *Main Sequence Platform*
 
-These guidelines cover the essential configuration and best-practice patterns for extending the `TimeSerie` class on the Main Sequence platform.
+These guidelines cover the essential configuration and best-practice patterns for extending the `DataNode` class on the Main Sequence platform.
 
 > **Tip — docstrings first**  
-> Always check the most recent `TimeSerie` source for updated docstrings.  
+> Always check the most recent `DataNode` source for updated docstrings.  
 > If they differ from this document, treat the source code as the single source of truth.
 
 
@@ -22,25 +22,25 @@ These guidelines cover the essential configuration and best-practice patterns fo
 
 **Best practices**
 
-* Decorate the constructor with `@TimeSerie._post_init_routines`.
+* Decorate the constructor with `@DataNode._post_init_routines`.
 * Accept only these argument types: `str`, `int`, `list`, Pydantic model, or a list of Pydantic models.
-* Instantiate any dependent `TimeSerie` objects inside the constructor.
+* Instantiate any dependent `DataNode` objects inside the constructor.
 * If the series receives a `ModelList` argument such as `asset_list`, add its name to `local_kwargs_to_ignore`.
 * `TimeSeries` can have direct dependencies which are initialized directly in the construction with its imported class or `APITimeSeries` which should be also initialized in the construction but are initialized only with `local_hash_id` and `data_source_id`
 * You may override the class constant `OFFSET_START` to set the earliest
    permitted timestamp.
 
-##### Example of A `TimeSerie` direct dependency
+##### Example of A `DataNode` direct dependency
 ```python
-from mainsequence.tdag import TimeSerie
-class PriceSerie(TimeSerie):
-    @TimeSerie._post_init_routines
+from mainsequence.tdag import DataNode
+class PriceSerie(DataNode):
+    @DataNode._post_init_routines
     def __init__(self, arg1: str, *args, **kwargs):
         self.arg1 = arg1
         super().__init__(*args, **kwargs)
 
-class ReturnSerie(TimeSerie):
-    @TimeSerie._post_init_routines
+class ReturnSerie(DataNode):
+    @DataNode._post_init_routines
     def __init__(self, arg1: str, *args, **kwargs):
         self.price_serie = PriceSerie(arg1=arg1, *args, **kwargs)
         super().__init__(*args, **kwargs)
@@ -48,8 +48,8 @@ class ReturnSerie(TimeSerie):
 ##### Example of A `APITimeSerie` direct dependency
 ```python
 from mainsequence.tdag import APITimeSerie
-class ReturnSerie(TimeSerie):
-    @TimeSerie._post_init_routines
+class ReturnSerie(DataNode):
+    @DataNode._post_init_routines
     def __init__(self, arg1: str, *args, **kwargs):
         self.price_serie = APITimeSerie(data_source_id=1,local_hash_id="local_hash_id_ghjkdf8347y5342")
         super().__init__(*args, **kwargs)
@@ -69,14 +69,14 @@ def __init__(
         **kwargs
 ):
     """
-    Create a TimeSerie instance and provision its storage in the Main Sequence Data Engine.
+    Create a DataNode instance and provision its storage in the Main Sequence Data Engine.
 
     This initializer prepares all metadata and configuration for a new time series, then:
       1. Computes a unique table identifier by hashing all arguments **except**
          `init_meta`, `build_meta_data`, and `local_kwargs_to_ignore`.
       2. Computes a separate `local_hash_id` (and corresponding LocalTimeSerie) by
          hashing the same inputs, but omitting any keys listed in `local_kwargs_to_ignore`.
-      3. Applies any `@TimeSerie._post_init_routines` decorators after setup.
+      3. Applies any `@DataNode._post_init_routines` decorators after setup.
 
     Argument types must be one of:
       - `str`, `int`, `list`,
@@ -139,7 +139,7 @@ class DateInfo(TypedDict, total=False):
 
 UniqueIdentifierRangeMap = Dict[str, DateInfo]
 
-class TimeSerie:
+class DataNode:
             def get_df_between_dates(
             self,
             start_date: Union[datetime.datetime, None] = None,
@@ -150,7 +150,7 @@ class TimeSerie:
             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
     ) -> pd.DataFrame:
         """
-        Retrieve rows from this TimeSerie whose `time_index` (and optional `unique_identifier`) fall within the specified date ranges.
+        Retrieve rows from this DataNode whose `time_index` (and optional `unique_identifier`) fall within the specified date ranges.
 
         **Note:** If `unique_identifier_range_map` is provided, **all** other filters
         (`start_date`, `end_date`, `unique_identifier_list`, `great_or_equal`, `less_or_equal`)
@@ -207,7 +207,7 @@ class TimeSerie:
 
     def update(self, update_statistics: DataUpdates) -> pd.DataFrame:
         """
-        Fetch and ingest only the new rows for this TimeSerie based on prior update checkpoints.
+        Fetch and ingest only the new rows for this DataNode based on prior update checkpoints.
 
         DataUpdates provides the last-ingested positions:
           - For a single-index series (time_index only), `update_statistics.max_time` is either:
@@ -311,7 +311,7 @@ Implement this method **only** when both conditions hold:
     def get_asset_list(self) -> Optional[List["Asset"]]:
 
         """
-        Provide the list of assets that this TimeSerie should include when updating.
+        Provide the list of assets that this DataNode should include when updating.
 
         By default, this method returns `self.asset_list` if defined.
         Subclasses _must_ override this method when no `asset_list` attribute was set
@@ -320,7 +320,7 @@ Implement this method **only** when both conditions hold:
         Use Case:
           - For category-based series, return all Asset unique_identifiers in a given category
             (e.g., `AssetCategory(unique_identifier="investable_assets")`), so that only those
-            assets are updated in this TimeSerie.
+            assets are updated in this DataNode.
 
         Returns
         -------
@@ -336,11 +336,11 @@ Implement this method **only** when both conditions hold:
 
 ## 3  Creating a `MarketTimeSerie`
 
-A **`MarketTimeSerie`** is a registry entry that exposes a `TimeSerie` in the
+A **`MarketTimeSerie`** is a registry entry that exposes a `DataNode` in the
 Markets catalogue with a clean, user-friendly identifier.  
 Create (or update) one whenever **either** of the following is true:
 
-* The `TimeSerie` has an `asset_list` and should be easy to discover in the
+* The `DataNode` has an `asset_list` and should be easy to discover in the
   Markets UI / API.
 * The series is macro-level (factor, index, benchmark, etc.) and benefits from a
   human-readable name.
@@ -353,8 +353,8 @@ which executes immediately after each successful `update()`.
 
 ```python
 import mainsequence.client as ms_client
-from mainsequence.tdag import TimeSerie
-class YourTimeSerie(TimeSerie):
+from mainsequence.tdag import DataNode
+class YourTimeSerie(DataNode):
     ...
 
     def _run_post_update_routines(
@@ -364,7 +364,7 @@ class YourTimeSerie(TimeSerie):
     ) -> None:
         """
         Register—or refresh—a MarketsTimeSeriesDetails record so this
-        TimeSerie is discoverable in the Markets platform.
+        DataNode is discoverable in the Markets platform.
         """
         if error_on_last_update:      # Skip registration if the update failed
             return
@@ -379,7 +379,7 @@ class YourTimeSerie(TimeSerie):
         try:
             mts = ms_client.MarketsTimeSeriesDetails.get(unique_identifier=UNIQUE_ID)
 
-            # Re-link if this TimeSerie was rebuilt and now has a new LocalTimeSerie
+            # Re-link if this DataNode was rebuilt and now has a new LocalTimeSerie
             if mts.related_local_time_serie.id != self.local_time_serie.id:
                 mts.patch(related_local_time_serie__id=self.local_time_serie.id)
 

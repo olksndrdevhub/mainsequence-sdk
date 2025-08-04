@@ -26,7 +26,7 @@ from mainsequence.instrumentation import (
 from mainsequence.instrumentation.utils import Status, StatusCode
 
 # TDAG Core Components and Helpers
-from mainsequence.tdag.time_series import build_operations
+from mainsequence.tdag.data_nodes import build_operations
 
 
 
@@ -39,11 +39,11 @@ class DependencyUpdateError(Exception):
 
 class UpdateRunner:
     """
-       Orchestrates the entire update process for a TimeSerie instance.
+       Orchestrates the entire update process for a DataNode instance.
        It handles scheduling, dependency resolution, execution, and error handling.
        """
 
-    def __init__(self, time_serie: "TimeSerie", debug_mode: bool = False, force_update: bool = False,
+    def __init__(self, time_serie: "DataNode", debug_mode: bool = False, force_update: bool = False,
                  update_tree: bool = True, update_only_tree: bool = False,
                  remote_scheduler: Optional[ms_client.Scheduler] = None):
         self.ts = time_serie
@@ -75,7 +75,7 @@ class UpdateRunner:
 
     def _pre_update_routines(self, local_metadata: Optional[dict] = None) -> Tuple[Dict[int,ms_client.LocalTimeSerie], Any]:
         """
-        Prepares the TimeSerie and its dependencies for an update by fetching the
+        Prepares the DataNode and its dependencies for an update by fetching the
         latest metadata for the entire dependency graph.
 
         Args:
@@ -150,7 +150,7 @@ class UpdateRunner:
         return local_metadatas
 
     def _start_update(self, local_time_series_map: Dict, use_state_for_update: bool):
-        """Orchestrates a single TimeSerie update, including pre/post routines."""
+        """Orchestrates a single DataNode update, including pre/post routines."""
         historical_update = self.ts.local_persist_manager.local_metadata.set_start_of_execution(
             active_update_scheduler_id=self.scheduler.id
         )
@@ -161,7 +161,7 @@ class UpdateRunner:
         # Ensure metadata is fully loaded with relationship details before proceeding.
         self.ts.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True)
 
-        # The TimeSerie defines how to scope its statistics
+        # The DataNode defines how to scope its statistics
         update_statistics = self.ts._set_update_statistics(update_statistics)
 
         error_on_last_update = False
@@ -202,7 +202,7 @@ class UpdateRunner:
         Performs a series of critical checks on the DataFrame before persistence.
 
         Args:
-            df: The DataFrame returned from the TimeSerie's update method.
+            df: The DataFrame returned from the DataNode's update method.
 
         Raises:
             AssertionError or Exception if any validation check fails.
@@ -251,7 +251,7 @@ class UpdateRunner:
                 self.logger.info(f'Calculating update for {self.ts}...')
 
             try:
-                # Call the business logic defined on the TimeSerie class
+                # Call the business logic defined on the DataNode class
                 temp_df = self.ts.update(update_statistics)
 
                 if temp_df is None:
@@ -342,23 +342,23 @@ class UpdateRunner:
         self.logger.debug(f'Dependency tree evaluation complete for {self.ts}.')
 
 
-    def _get_update_map(self,declared_dependencies: Dict[str, 'TimeSerie'],
+    def _get_update_map(self,declared_dependencies: Dict[str, 'DataNode'],
                        logger: object,
                        dependecy_map: Optional[Dict] = None) -> Dict[
         Tuple[str, int], Dict[str, Any]]:
         """
-        Obtains all TimeSerie objects in the dependency graph by recursively
+        Obtains all DataNode objects in the dependency graph by recursively
         calling the dependencies() method.
 
         This approach is more robust than introspecting class members as it relies
         on an explicit declaration of dependencies.
 
         Args:
-            time_serie_instance: The TimeSerie instance from which to start the dependency traversal.
+            time_serie_instance: The DataNode instance from which to start the dependency traversal.
             dependecy_map: An optional dictionary to store the dependency map, used for recursion.
 
         Returns:
-            A dictionary mapping (local_hash_id, data_source_id) to TimeSerie info.
+            A dictionary mapping (update_hash, data_source_id) to DataNode info.
         """
         # Initialize the map on the first call
         if dependecy_map is None:
@@ -367,7 +367,7 @@ class UpdateRunner:
         # Get the explicitly declared dependencies, just like set_relation_tree
 
         for name, dependency_ts in declared_dependencies.items():
-            key = (dependency_ts.local_hash_id, dependency_ts.data_source_id)
+            key = (dependency_ts.update_hash, dependency_ts.data_source_id)
 
             # If we have already processed this node, skip it to prevent infinite loops
             if key in dependecy_map:
@@ -408,19 +408,19 @@ class UpdateRunner:
 
 
             for _, ts_row in sorted_deps.iterrows():
-                key = (ts_row["local_hash_id"], ts_row["data_source_id"])
+                key = (ts_row["update_hash"], ts_row["data_source_id"])
                 ts_to_update = None
                 try:
                     if key in update_map:
                         ts_to_update = update_map[key]["ts"]
                     else:
                         # If not in the map, it must be rebuilt from storage
-                        ts_to_update, _ = build_operations.rebuild_and_set_from_local_hash_id(
-                            local_hash_id=key[0], data_source_id=key[1]
+                        ts_to_update, _ = build_operations.rebuild_and_set_from_update_hash(
+                            update_hash=key[0], data_source_id=key[1]
                         )
 
                     if ts_to_update:
-                        self.logger.debug(f"Running debug update for dependency: {ts_to_update.local_hash_id}")
+                        self.logger.debug(f"Running debug update for dependency: {ts_to_update.update_hash}")
                         # Each dependency gets its own clean runner
                         dep_runner = UpdateRunner(
                             time_serie=ts_to_update,
@@ -473,12 +473,12 @@ class UpdateRunner:
 
             self.ts.verify_and_build_remote_objects()#needed to start sch
             self._setup_scheduler()
-            cvars.bind_contextvars(scheduler_name=self.scheduler.name, head_local_ts_hash_id=self.ts.local_hash_id)
+            cvars.bind_contextvars(scheduler_name=self.scheduler.name, head_local_ts_hash_id=self.ts.update_hash)
 
             # 2. Start the main execution block with tracing
-            with tracer.start_as_current_span(f"Scheduler Head Update: {self.ts.local_hash_id}") as span:
-                span.set_attribute("time_serie_local_hash_id", self.ts.local_hash_id)
-                span.set_attribute("remote_table_hashed_name", self.ts.remote_table_hashed_name)
+            with tracer.start_as_current_span(f"Scheduler Head Update: {self.ts.update_hash}") as span:
+                span.set_attribute("time_serie_update_hash", self.ts.update_hash)
+                span.set_attribute("storage_hash", self.ts.storage_hash)
                 span.set_attribute("head_scheduler", self.scheduler.name)
 
                 # 3. Prepare the execution environment (Ray actors, dependency metadata)
@@ -510,7 +510,7 @@ class UpdateRunner:
             if self.remote_scheduler is None and self.scheduler:
                 self.scheduler.stop_heart_beat()
 
-            # Clean up temporary attributes on the TimeSerie instance
+            # Clean up temporary attributes on the DataNode instance
             if hasattr(self.ts, 'update_tracker'):
                 del self.ts.update_tracker
 

@@ -1097,85 +1097,85 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode">
 <span class="md-ellipsis">
-      TimeSerie
+      DataNode
     </span>
 </a>
-<nav aria-label="TimeSerie" class="md-nav">
+<nav aria-label="DataNode" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie.hash_id">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.hash_id">
 <span class="md-ellipsis">
       hash_id
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie.__init__">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.__init__">
 <span class="md-ellipsis">
       __init__
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie.get_html_description">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.get_html_description">
 <span class="md-ellipsis">
       get_html_description
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie.get_time_serie_source_code_git_hash">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.get_time_serie_source_code_git_hash">
 <span class="md-ellipsis">
       get_time_serie_source_code_git_hash
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie.patch_build_configuration">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.patch_build_configuration">
 <span class="md-ellipsis">
       patch_build_configuration
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie.pre_update_setting_routines">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.pre_update_setting_routines">
 <span class="md-ellipsis">
       pre_update_setting_routines
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie.run">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.run">
 <span class="md-ellipsis">
       run
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie.set_data_source">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.set_data_source">
 <span class="md-ellipsis">
       set_data_source
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie.set_dependencies_df">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.set_dependencies_df">
 <span class="md-ellipsis">
       set_dependencies_df
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie.set_update_statistics">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.set_update_statistics">
 <span class="md-ellipsis">
       set_update_statistics
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.TimeSerie.update">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.update">
 <span class="md-ellipsis">
       update
     </span>
@@ -1631,7 +1631,7 @@ Args:
 <code class="highlight language-python"><span class="n">get_df_between_dates</span><span class="p">(</span><span class="n">start_date</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end_date</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">unique_identifier_list</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">great_or_equal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">less_or_equal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">unique_identifier_range_map</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 </h5>
 <div class="doc doc-contents">
-<p>Retrieve rows from this TimeSerie whose <code>time_index</code> (and optional <code>unique_identifier</code>) fall within the specified date ranges.</p>
+<p>Retrieve rows from this DataNode whose <code>time_index</code> (and optional <code>unique_identifier</code>) fall within the specified date ranges.</p>
 <p><strong>Note:</strong> If <code>unique_identifier_range_map</code> is provided, <strong>all</strong> other filters
 (<code>start_date</code>, <code>end_date</code>, <code>unique_identifier_list</code>, <code>great_or_equal</code>, <code>less_or_equal</code>)
 are ignored, and only the per-identifier ranges in <code>unique_identifier_range_map</code> apply.</p>
@@ -1889,16 +1889,16 @@ Dicts are allowed to have timeseries.
 </div>
 </div>
 <div class="doc doc-object doc-class">
-<h4 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie">
-<code>TimeSerie</code>
+<h4 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode">
+<code>DataNode</code>
 </h4>
 <div class="doc doc-contents">
 <p class="doc doc-class-bases">
               Bases: <code><span title="mainsequence.tdag.time_series.time_series.CommonMethodsMixin">CommonMethodsMixin</span></code>, <code><a class="autorefs autorefs-internal" href="#mainsequence.tdag.time_series.time_series.DataPersistanceMethods" title="mainsequence.tdag.time_series.time_series.DataPersistanceMethods">DataPersistanceMethods</a></code>, <code><a class="autorefs autorefs-internal" href="#mainsequence.tdag.time_series.time_series.GraphNodeMethods" title="mainsequence.tdag.time_series.time_series.GraphNodeMethods">GraphNodeMethods</a></code>, <code><a class="autorefs autorefs-internal" href="#mainsequence.tdag.time_series.time_series.TimeSerieRebuildMethods" title="mainsequence.tdag.time_series.time_series.TimeSerieRebuildMethods">TimeSerieRebuildMethods</a></code></p>
-<p>Base TimeSerie class</p>
+<p>Base DataNode class</p>
 <div class="doc doc-children">
 <div class="doc doc-object doc-attribute">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie.hash_id">
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.hash_id">
 <code class="highlight language-python"><span class="n">hash_id</span></code>
 <span class="doc doc-labels">
 <small class="doc doc-label doc-label-property"><code>property</code></small>
@@ -1909,22 +1909,22 @@ Dicts are allowed to have timeseries.
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie.__init__">
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.__init__">
 <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">init_meta</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">build_meta_data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">local_kwargs_to_ignore</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 </h5>
 <div class="doc doc-contents">
-<p>Initializes the TimeSerie object with the provided metadata and configurations. For extension of the method
-the method should always be decorated by TimeSerie._post_init_routines</p>
+<p>Initializes the DataNode object with the provided metadata and configurations. For extension of the method
+the method should always be decorated by DataNode._post_init_routines</p>
 <p>This method sets up the time series object, loading the necessary configurations
 and metadata.</p>
-<p>Each TimeSerie instance will create a table in the Main Sequence Data Engine by uniquely hashing
+<p>Each DataNode instance will create a table in the Main Sequence Data Engine by uniquely hashing
 the arguments with exception of:</p>
 <ul>
 <li>init_meta</li>
 <li>build_meta_data</li>
 <li>local_kwargs_to_ignore</li>
 </ul>
-<p>Each TimeSerie instance will create a local_hash_id and a LocalTimeSerie instance in the Data Engine by uniquely hashing
+<p>Each DataNode instance will create a local_hash_id and a LocalTimeSerie instance in the Data Engine by uniquely hashing
 the same arguments as the table but excluding the arguments inside local_kwargs_to_ignore</p>
 <p>allowed type of arguments can only be str,list, int or  Pydantic objects inlcuding lists of Pydantic Objects.</p>
 <p>The OFFSET_START property can be overridend and markts the minimum date value where the table will insert data</p>
@@ -2024,7 +2024,7 @@ the same arguments as the table but excluding the arguments inside local_kwargs_
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie.get_html_description">
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.get_html_description">
 <code class="highlight language-python"><span class="n">get_html_description</span><span class="p">()</span></code>
 </h5>
 <div class="doc doc-contents">
@@ -2033,7 +2033,7 @@ Returns:</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie.get_time_serie_source_code_git_hash">
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.get_time_serie_source_code_git_hash">
 <code class="highlight language-python"><span class="n">get_time_serie_source_code_git_hash</span><span class="p">(</span><span class="n">TimeSerieClass</span><span class="p">)</span></code>
 <span class="doc doc-labels">
 <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
@@ -2044,7 +2044,7 @@ Returns:</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie.patch_build_configuration">
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.patch_build_configuration">
 <code class="highlight language-python"><span class="n">patch_build_configuration</span><span class="p">()</span></code>
 </h5>
 <div class="doc doc-contents">
@@ -2053,7 +2053,7 @@ update the models on all the tree</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie.pre_update_setting_routines">
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.pre_update_setting_routines">
 <code class="highlight language-python"><span class="n">pre_update_setting_routines</span><span class="p">(</span><span class="n">scheduler</span><span class="p">,</span> <span class="n">set_time_serie_queue_status</span><span class="p">,</span> <span class="n">update_tree</span><span class="p">,</span> <span class="n">metadata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">local_metadata</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 </h5>
 <div class="doc doc-contents">
@@ -2061,7 +2061,7 @@ update the models on all the tree</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie.run">
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.run">
 <code class="highlight language-python"><span class="n">run</span><span class="p">(</span><span class="n">debug_mode</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">update_tree</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">force_update</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">update_only_tree</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">remote_scheduler</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 </h5>
 <div class="doc doc-contents">
@@ -2074,7 +2074,7 @@ update the models on all the tree</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie.set_data_source">
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.set_data_source">
 <code class="highlight language-python"><span class="n">set_data_source</span><span class="p">(</span><span class="n">data_source</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 </h5>
 <div class="doc doc-contents">
@@ -2082,7 +2082,7 @@ update the models on all the tree</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie.set_dependencies_df">
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.set_dependencies_df">
 <code class="highlight language-python"><span class="n">set_dependencies_df</span><span class="p">()</span></code>
 </h5>
 <div class="doc doc-contents">
@@ -2090,7 +2090,7 @@ update the models on all the tree</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie.set_update_statistics">
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.set_update_statistics">
 <code class="highlight language-python"><span class="n">set_update_statistics</span><span class="p">(</span><span class="n">update_statistics</span><span class="p">)</span></code>
 </h5>
 <div class="doc doc-contents">
@@ -2101,11 +2101,11 @@ the method will filter using asset_list if the attribute exists as well as the i
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerie.update">
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.update">
 <code class="highlight language-python"><span class="n">update</span><span class="p">(</span><span class="n">update_statistics</span><span class="p">)</span></code>
 </h5>
 <div class="doc doc-contents">
-<p>Fetch and ingest only the new rows for this TimeSerie based on prior update checkpoints.</p>
+<p>Fetch and ingest only the new rows for this DataNode based on prior update checkpoints.</p>
 <p>DataUpdates provides the last-ingested positions:
   - For a single-index series (time_index only), <code>update_statistics.max_time</code> is either:
       - None: no prior data—fetch all available rows.
@@ -2221,7 +2221,7 @@ the method will filter using asset_list if the attribute exists as well as the i
 </h5>
 <div class="doc doc-contents">
 <p>:param serie_data_folder:</p>
-<p>:return: TimeSerie</p>
+<p>:return: DataNode</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
@@ -2341,8 +2341,8 @@ method only
 </h4>
 <div class="doc doc-contents">
 <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" href="#mainsequence.tdag.time_series.time_series.TimeSerie" title="mainsequence.tdag.time_series.time_series.TimeSerie">TimeSerie</a></code></p>
-<p>A wrapper class for managing multiple TimeSerie objects.</p>
+              Bases: <code><a class="autorefs autorefs-internal" href="#mainsequence.tdag.time_series.time_series.DataNode" title="mainsequence.tdag.time_series.time_series.DataNode">DataNode</a></code></p>
+<p>A wrapper class for managing multiple DataNode objects.</p>
 <div class="doc doc-children">
 <div class="doc doc-object doc-function">
 <h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.WrapperTimeSerie.__init__">
@@ -2351,7 +2351,7 @@ method only
 <div class="doc doc-contents">
 <p>Initialize the WrapperTimeSerie.</p>
 <p>Args:
-    time_series_dict: Dictionary of TimeSerie objects.</p>
+    time_series_dict: Dictionary of DataNode objects.</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
@@ -2359,7 +2359,7 @@ method only
 <code class="highlight language-python"><span class="n">children_is_updating</span><span class="p">()</span></code>
 </h5>
 <div class="doc doc-contents">
-<p>Check if any wrapped TimeSerie is currently updating.</p>
+<p>Check if any wrapped DataNode is currently updating.</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
@@ -2373,7 +2373,7 @@ method only
     great_or_equal: Whether to include the target value (True) or not (False).
     thread: Whether to use threading for parallel processing.</p>
 <p>Returns:
-    A dictionary with TimeSerie keys and their corresponding DataFrames or error messages.</p>
+    A dictionary with DataNode keys and their corresponding DataFrames or error messages.</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
@@ -2383,7 +2383,7 @@ method only
 <div class="doc doc-contents">
 <p>Get all wrapped TimeSeries, including nested ones.</p>
 <p>Returns:
-    A list of all wrapped TimeSerie objects, including those nested in other WrapperTimeSeries.</p>
+    A list of all wrapped DataNode objects, including those nested in other WrapperTimeSeries.</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">

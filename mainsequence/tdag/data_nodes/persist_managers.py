@@ -20,12 +20,12 @@ from mainsequence.instrumentation import tracer, tracer_instrumentator
 import inspect
 import hashlib
 
-def get_time_serie_source_code(TimeSerieClass: "TimeSerie") -> str:
+def get_data_node_source_code(DataNodeClass: "DataNode") -> str:
     """
-    Gets the source code of a TimeSerie class.
+    Gets the source code of a DataNode class.
 
     Args:
-        TimeSerieClass: The class to get the source code for.
+        DataNodeClass: The class to get the source code for.
 
     Returns:
         The source code as a string.
@@ -33,7 +33,7 @@ def get_time_serie_source_code(TimeSerieClass: "TimeSerie") -> str:
     global logger
     try:
         # First try the standard approach.
-        source = inspect.getsource(TimeSerieClass)
+        source = inspect.getsource(DataNodeClass)
         if source.strip():
             return source
     except Exception:
@@ -45,26 +45,26 @@ def get_time_serie_source_code(TimeSerieClass: "TimeSerie") -> str:
     if ip is not None:
         # Retrieve the full history as a single string.
         history = "\n".join(code for _, _, code in ip.history_manager.get_range())
-        marker = f"class {TimeSerieClass.__name__}"
+        marker = f"class {DataNodeClass.__name__}"
         idx = history.find(marker)
         if idx != -1:
             return history[idx:]
     return "Source code unavailable."
 
-def get_time_serie_source_code_git_hash(TimeSerieClass: "TimeSerie") -> str:
+def get_time_serie_source_code_git_hash(DataNodeClass: "DataNode") -> str:
     """
-    Hashes the source code of a TimeSerie class using SHA-1 (Git style).
+    Hashes the source code of a DataNode class using SHA-1 (Git style).
 
     Args:
-        TimeSerieClass: The class to hash.
+        DataNodeClass: The class to hash.
 
     Returns:
         The Git-style hash of the source code.
     """
-    time_serie_class_source_code = get_time_serie_source_code(TimeSerieClass)
+    data_node_class_source_code = get_data_node_source_code(DataNodeClass)
     # Prepare the content for Git-style hashing
     # Git hashing format: "blob <size_of_content>\0<content>"
-    content = f"blob {len(time_serie_class_source_code)}\0{time_serie_class_source_code}"
+    content = f"blob {len(data_node_class_source_code)}\0{data_node_class_source_code}"
     # Compute the SHA-1 hash (Git hash)
     hash_object = hashlib.sha1(content.encode('utf-8'))
     git_hash = hash_object.hexdigest()
@@ -83,7 +83,7 @@ class APIPersistManager:
 
         Args:
             data_source_id: The ID of the data source.
-            local_hash_id: The local hash identifier for the time series.
+            update_hash: The local hash identifier for the time series.
         """
         self.data_source_id: int = data_source_id
         self.source_table_hash_id: str = source_table_hash_id
@@ -115,7 +115,7 @@ class APIPersistManager:
         Sets the result or exception on the future object.
         """
         try:
-            result = DynamicTableMetaData.get_or_none(hash_id=self.source_table_hash_id,
+            result = DynamicTableMetaData.get_or_none(storage_hash=self.storage_hash,
                                                 data_source__id=self.data_source_id,
                                                 include_relations_detail=True
             )
@@ -151,7 +151,7 @@ class APIPersistManager:
 class PersistManager:
     def __init__(self,
                  data_source: DynamicTableDataSource,
-                 local_hash_id: str,
+                 update_hash: str,
                  description: Optional[str] = None,
                  class_name: Optional[str] = None,
                  metadata: Optional[Dict] = None,
@@ -162,16 +162,16 @@ class PersistManager:
 
         Args:
             data_source: The data source for the time series.
-            local_hash_id: The local hash identifier for the time series.
+            update_hash: The local hash identifier for the time series.
             description: An optional description for the time series.
-            class_name: The name of the TimeSerie class.
+            class_name: The name of the DataNode class.
             metadata: Optional remote metadata dictionary.
             local_metadata: Optional local metadata object.
         """
         self.data_source: DynamicTableDataSource = data_source
-        self.local_hash_id: str = local_hash_id
+        self.update_hash: str = update_hash
         if local_metadata is not None and metadata is None:
-            # query remote hash_id
+            # query remote storage_hash
             metadata = local_metadata.remote_table
         self.description: Optional[str] = description
         self.logger = logger
@@ -185,7 +185,7 @@ class PersistManager:
         self._local_metadata_lock = threading.Lock()
         self._metadata_cached: Optional[DynamicTableMetaData] = None
 
-        if self.local_hash_id is not None:
+        if self.update_hash is not None:
             self.synchronize_metadata(local_metadata=local_metadata)
 
     def synchronize_metadata(self, local_metadata: Optional[LocalTimeSerie]) -> None:
@@ -292,12 +292,12 @@ class PersistManager:
             """Perform the REST request asynchronously."""
             try:
                 result = LocalTimeSerie.get_or_none(
-                    local_hash_id=self.local_hash_id,
+                    update_hash=self.update_hash,
                     remote_table__data_source__id=self.data_source.id,
                     include_relations_detail=include_relations_detail
                 )
                 if result is None:
-                    self.logger.warning(f"TimeSeries {self.local_hash_id} with data source {self.data_source.id} not found in backend")
+                    self.logger.warning(f"TimeSeries {self.update_hash} with data source {self.data_source.id} not found in backend")
                 new_future.set_result(result)
             except Exception as exc:
                 new_future.set_exception(exc)
@@ -306,19 +306,19 @@ class PersistManager:
                 future_registry.remove_future(new_future)
 
         thread = threading.Thread(target=_get_or_none_local_metadata,
-                                  name=f"LocalMetadataThreadPM-{self.local_hash_id}",
+                                  name=f"LocalMetadataThreadPM-{self.update_hash}",
                                   daemon=False)
         thread.start()
 
 
 
-    def depends_on_connect(self, new_ts: "TimeSerie", is_api: bool) -> None:
+    def depends_on_connect(self, new_ts: "DataNode", is_api: bool) -> None:
         """
         Connects a time series as a relationship in the DB.
 
         Args:
-            new_ts: The target TimeSerie to connect to.
-            is_api: True if the target is an APITimeSerie.
+            new_ts: The target DataNode to connect to.
+            is_api: True if the target is an APIDataNode
         """
         if not is_api:
             self.local_metadata.depends_on_connect(
@@ -343,7 +343,7 @@ class PersistManager:
         """
         from IPython.core.display import display, HTML, Javascript
 
-        response = ms_client.TimeSerieLocalUpdate.get_mermaid_dependency_diagram(local_hash_id=self.local_hash_id,
+        response = ms_client.TimeSerieLocalUpdate.get_mermaid_dependency_diagram(update_hash=self.update_hash,
                                                                        data_source_id=self.data_source.id
                                                                        )
         from IPython.core.display import display, HTML, Javascript
@@ -509,7 +509,7 @@ class PersistManager:
                       build_configuration=remote_configuration, )
 
 
-        local_metadata_kwargs = dict(local_hash_id=self.local_hash_id,
+        local_metadata_kwargs = dict(update_hash=self.update_hash,
                                build_configuration=local_configuration,
                               )
 
@@ -536,7 +536,7 @@ class PersistManager:
 
         thread = threading.Thread(
             target=_patch_build_configuration,
-            name=f"PatchBuildConfigThread-{self.local_hash_id}",
+            name=f"PatchBuildConfigThread-{self.update_hash}",
             daemon=False
         )
         thread.start()
@@ -546,7 +546,7 @@ class PersistManager:
 
     def local_persist_exist_set_config(
             self,
-            remote_table_hashed_name: str,
+            storage_hash: str,
             local_configuration: dict,
             remote_configuration: dict,
             data_source: DynamicTableDataSource,
@@ -556,14 +556,14 @@ class PersistManager:
     ) -> None:
         """
         Ensures local and remote persistence objects exist and sets their configurations.
-        This runs on TimeSerie initialization.
+        This runs on DataNode initialization.
         """
         remote_build_configuration = None
         if hasattr(self, "remote_build_configuration"):
             remote_build_configuration = self.remote_build_configuration
 
         if remote_build_configuration is None:
-            logger.debug(f"remote table {remote_table_hashed_name} does not exist creating")
+            logger.debug(f"remote table {storage_hash} does not exist creating")
             #create remote table
 
             try:
@@ -571,7 +571,7 @@ class PersistManager:
                 # table may not exist but
                 remote_build_metadata = remote_configuration["build_meta_data"] if "build_meta_data" in remote_configuration.keys() else {}
                 remote_configuration.pop("build_meta_data", None)
-                kwargs = dict(hash_id=remote_table_hashed_name,
+                kwargs = dict(storage_hash=storage_hash,
                               time_serie_source_code_git_hash=time_serie_source_code_git_hash,
                               time_serie_source_code=time_serie_source_code,
                               build_configuration=remote_configuration,
@@ -580,18 +580,18 @@ class PersistManager:
 
 
                 dtd_metadata = DynamicTableMetaData.get_or_create(**kwargs)
-                remote_table_hash_id = dtd_metadata.hash_id
+                storage_hash = dtd_metadata.storage_hash
             except Exception as e:
-                self.logger.exception(f"{remote_table_hashed_name} Could not set meta data in DB for P")
+                self.logger.exception(f"{storage_hash} Could not set meta data in DB for P")
                 raise e
         else:
             self.set_local_metadata_lazy(force_registry=True, include_relations_detail=True)
-            remote_table_hash_id = self.metadata.hash_id
+            storage_hash = self.metadata.storage_hash
 
-        local_table_exist = self._verify_local_ts_exists(remote_table_hash_id=remote_table_hash_id, local_configuration=local_configuration)
+        local_table_exist = self._verify_local_ts_exists(storage_hash=storage_hash, local_configuration=local_configuration)
 
 
-    def _verify_local_ts_exists(self, remote_table_hash_id: str,
+    def _verify_local_ts_exists(self, storage_hash: str,
                                 local_configuration: Optional[Dict] = None) -> None:
         """
         Verifies that the local time series exists in the ORM, creating it if necessary.
@@ -601,15 +601,15 @@ class PersistManager:
             local_build_configuration, local_build_metadata = self.local_build_configuration, self.local_build_metadata
         if local_build_configuration is None:
 
-            logger.debug(f"local_metadata {self.local_hash_id} does not exist creating")
-            local_update = LocalTimeSerie.get_or_none(local_hash_id=self.local_hash_id,
+            logger.debug(f"local_metadata {self.update_hash} does not exist creating")
+            local_update = LocalTimeSerie.get_or_none(update_hash=self.update_hash,
                                                        remote_table__data_source__id=self.data_source.id)
             if local_update is None:
                 local_build_metadata = local_configuration[
                     "build_meta_data"] if "build_meta_data" in local_configuration.keys() else {}
                 local_configuration.pop("build_meta_data", None)
                 metadata_kwargs = dict(
-                    local_hash_id=self.local_hash_id,
+                    update_hash=self.update_hash,
                     build_configuration=local_configuration,
                     remote_table__hash_id=remote_table_hash_id,
                     data_source_id=self.data_source.id
@@ -658,7 +658,7 @@ class PersistManager:
 
         thread = threading.Thread(
             target=_update_task,
-            name=f"BuildUpdateDetailsThread-{self.local_hash_id}",
+            name=f"BuildUpdateDetailsThread-{self.update_hash}",
             daemon=False
         )
         thread.start()
@@ -740,7 +740,7 @@ class PersistManager:
         if self.data_source.related_resource.class_type == "duck_db":
             from mainsequence.client.data_sources_interfaces.duckdb import DuckDBInterface
             db_interface = DuckDBInterface()
-            db_interface.drop_table(self.metadata.hash_id)
+            db_interface.drop_table(self.metadata.storage_hash)
 
         self.metadata.delete()
 
@@ -806,7 +806,7 @@ class PersistManager:
 
 class TimeScaleLocalPersistManager(PersistManager):
     """
-    Main Controler to interacti with TimeSerie ORM
+    Main Controler to interacti with backend
     """
     def get_table_schema(self,table_name):
         return self.metadata["sourcetableconfiguration"]["column_dtypes_map"]

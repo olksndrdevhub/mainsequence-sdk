@@ -176,7 +176,7 @@ class ColumnMetaData(BasePydanticModel):
 
 class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     id: Optional[int] = Field(None, description="Primary key, auto-incremented ID")
-    local_hash_id: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
+    update_hash: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
     remote_table: Union[int, "DynamicTableMetaData"]
     build_configuration: Dict[str, Any] = Field(..., description="Configuration in JSON format")
     build_meta_data: Optional[Dict[str, Any]] = Field(None, description="Optional YAML metadata")
@@ -232,7 +232,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload, time_out=timeout)
         if r.status_code != 200:
             raise Exception(f"{r.text}")
-        all_metadatas = {m["local_hash_id"]: m for m in r.json()}
+        all_metadatas = {m["update_hash"]: m for m in r.json()}
         return all_metadatas
 
     def set_start_of_execution(self, **kwargs):
@@ -327,7 +327,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             raise SourceTableConfigurationDoesNotExist
 
         if r.status_code != 200:
-            raise Exception(f"{metadata['local_hash_id']}{r.text}")
+            raise Exception(f"{metadata['update_hash']}{r.text}")
         return r
 
     def set_last_update_index_time_from_update_stats(
@@ -350,7 +350,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             raise SourceTableConfigurationDoesNotExist
 
         if r.status_code != 200:
-            raise Exception(f"{self.local_hash_id}{r.text}")
+            raise Exception(f"{self.update_hash}{r.text}")
         return LocalTimeSerie(**r.json())
 
     @classmethod
@@ -364,9 +364,9 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             raise Exception(f"Error in request {r.url} {r.text}")
 
     @classmethod
-    def get_mermaid_dependency_diagram(cls, local_hash_id, data_source_id, desc=True, timeout=None) -> dict:
+    def get_mermaid_dependency_diagram(cls, update_hash, data_source_id, desc=True, timeout=None) -> dict:
         s = cls.build_session()
-        url = cls.get_object_url("TimeSerie") + f"/{local_hash_id}/dependencies_graph_mermaid?desc={desc}&data_source_id={data_source_id}"
+        url = cls.get_object_url("DataNode") + f"/{update_hash}/dependencies_graph_mermaid?desc={desc}&data_source_id={data_source_id}"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url,
                          time_out=timeout)
         if r.status_code != 200:
@@ -385,9 +385,9 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         return depth_df
 
     @classmethod
-    def get_upstream_nodes(cls, hash_id, data_source_id, timeout=None):
+    def get_upstream_nodes(cls, storage_hash, data_source_id, timeout=None):
         s = cls.build_session()
-        url = cls.get_object_url("TimeSerie") + f"/{hash_id}/get_upstream_nodes?data_source_id={data_source_id}"
+        url = cls.get_object_url("DataNode") + f"/{storage_hash}/get_upstream_nodes?data_source_id={data_source_id}"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url, time_out=timeout)
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
@@ -397,7 +397,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
     @classmethod
     def create(cls, timeout=None, *args, **kwargs):
-        url = cls.get_object_url("TimeSerie") + "/"
+        url = cls.get_object_url("DataNode") + "/"
         payload = {"json": serialize_to_json(kwargs)}
         s = cls.build_session()
         r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload, time_out=timeout)
@@ -536,7 +536,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             update_priority_dict
     ):
         """
-        {'local_hash_id__in': [{'local_hash_id': 'alpacaequitybarstest_97018e7280c1bad321b3f4153cc7e986', 'data_source_id': 1},
+        {'local_hash_id__in': [{'update_hash': 'alpacaequitybarstest_97018e7280c1bad321b3f4153cc7e986', 'data_source_id': 1},
         :param local_hash_id__in:
         :param multi_index_asset_symbols_filter:
         :param update_details_kwargs:
@@ -713,7 +713,7 @@ class TableMetaData(BaseModel):
 
 class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     id: int = Field(None, description="Primary key, auto-incremented ID")
-    hash_id: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
+    storage_hash: str = Field(..., max_length=63, description="Max length of PostgreSQL table name")
     table_name: Optional[str] = Field(None, max_length=63, description="Max length of PostgreSQL table name")
     creation_date: datetime.datetime = Field(..., description="Creation timestamp")
     created_by_user: Optional[int] = Field(None, description="Foreign key reference to User")
@@ -756,8 +756,8 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
         return self.__class__(**r.json())
 
     @classmethod
-    def patch_by_hash(cls, hash_id: str, *args, **kwargs):
-        metadata = cls.get(hash_id=hash_id)
+    def patch_by_hash(cls, storage_hash: str, *args, **kwargs):
+        metadata = cls.get(storage_hash=storage_hash)
         metadata.patch(*args, **kwargs)
 
     @classmethod
@@ -1659,7 +1659,7 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             )
         if len(df) == 0:
             logger.warning(
-                f"No data returned from remote API for {local_metadata.local_hash_id}"
+                f"No data returned from remote API for {local_metadata.update_hash}"
             )
             return df
 
@@ -1813,7 +1813,7 @@ class TimeScaleDB(DataSource):
             self,
             asset_ranges_map: dict,
             metadata: dict,
-            local_hash_id: str,
+            update_hash: str,
             has_direct_connection: bool
     ):
         table_name = metadata.table_name
@@ -1829,7 +1829,7 @@ class TimeScaleDB(DataSource):
             )
         else:
             df = LocalTimeSerie.get_data_between_dates_from_api(
-                local_hash_id=local_hash_id,
+                update_hash=update_hash,
                 data_source_id=self.id,
                 start_date=None,
                 end_date=None,
@@ -1868,7 +1868,7 @@ class TimeScaleDB(DataSource):
         if len(df) == 0:
             if logger:
                 logger.warning(
-                    f"No data returned from remote API for {local_metadata.local_hash_id}"
+                    f"No data returned from remote API for {local_metadata.update_hash}"
                 )
             return df
 
