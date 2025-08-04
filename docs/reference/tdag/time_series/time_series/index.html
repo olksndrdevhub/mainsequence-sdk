@@ -1105,9 +1105,9 @@
 <nav aria-label="DataNode" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.hash_id">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.storage_hash">
 <span class="md-ellipsis">
-      hash_id
+      storage_hash
     </span>
 </a>
 </li>
@@ -1126,9 +1126,9 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.get_time_serie_source_code_git_hash">
+<a class="md-nav__link" href="#mainsequence.tdag.time_series.time_series.DataNode.get_data_node_source_code_git_hash">
 <span class="md-ellipsis">
-      get_time_serie_source_code_git_hash
+      get_data_node_source_code_git_hash
     </span>
 </a>
 </li>
@@ -1352,7 +1352,7 @@
 <div class="doc doc-children">
 <div class="doc doc-object doc-function">
 <h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.APITimeSerie.__init__">
-<code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">data_source_id</span><span class="p">,</span> <span class="n">local_hash_id</span><span class="p">,</span> <span class="n">data_source_local_lake</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">data_source_id</span><span class="p">,</span> <span class="n">update_hash</span><span class="p">,</span> <span class="n">data_source_local_lake</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 </h5>
 <div class="doc doc-contents">
 <p>A time serie is uniquely identified in tdag by  data_source_id and table_name
@@ -1898,8 +1898,8 @@ Dicts are allowed to have timeseries.
 <p>Base DataNode class</p>
 <div class="doc doc-children">
 <div class="doc doc-object doc-attribute">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.hash_id">
-<code class="highlight language-python"><span class="n">hash_id</span></code>
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.storage_hash">
+<code class="highlight language-python"><span class="n">storage_hash</span></code>
 <span class="doc doc-labels">
 <small class="doc doc-label doc-label-property"><code>property</code></small>
 </span>
@@ -1924,7 +1924,7 @@ the arguments with exception of:</p>
 <li>build_meta_data</li>
 <li>local_kwargs_to_ignore</li>
 </ul>
-<p>Each DataNode instance will create a local_hash_id and a LocalTimeSerie instance in the Data Engine by uniquely hashing
+<p>Each DataNode instance will create a update_hash and a LocalTimeSerie instance in the Data Engine by uniquely hashing
 the same arguments as the table but excluding the arguments inside local_kwargs_to_ignore</p>
 <p>allowed type of arguments can only be str,list, int or  Pydantic objects inlcuding lists of Pydantic Objects.</p>
 <p>The OFFSET_START property can be overridend and markts the minimum date value where the table will insert data</p>
@@ -2033,8 +2033,8 @@ Returns:</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.get_time_serie_source_code_git_hash">
-<code class="highlight language-python"><span class="n">get_time_serie_source_code_git_hash</span><span class="p">(</span><span class="n">TimeSerieClass</span><span class="p">)</span></code>
+<h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.DataNode.get_data_node_source_code_git_hash">
+<code class="highlight language-python"><span class="n">get_data_node_source_code_git_hash</span><span class="p">(</span><span class="n">TimeSerieClass</span><span class="p">)</span></code>
 <span class="doc doc-labels">
 <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
 </span>
@@ -2214,7 +2214,7 @@ the method will filter using asset_list if the attribute exists as well as the i
 </div>
 <div class="doc doc-object doc-function">
 <h5 class="doc doc-heading" id="mainsequence.tdag.time_series.time_series.TimeSerieRebuildMethods.rebuild_from_configuration">
-<code class="highlight language-python"><span class="n">rebuild_from_configuration</span><span class="p">(</span><span class="n">local_hash_id</span><span class="p">,</span> <span class="n">data_source</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">rebuild_from_configuration</span><span class="p">(</span><span class="n">update_hash</span><span class="p">,</span> <span class="n">data_source</span><span class="p">)</span></code>
 <span class="doc doc-labels">
 <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
 </span>

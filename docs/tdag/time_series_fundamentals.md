@@ -23,7 +23,7 @@ flowchart TD
     end
 
     subgraph ORM["TDAG ORM"]
-        LocalTimeSerie["LocalTimeSerie (local_hash_id)"]  -->|View of Table| DynamicTable["DynamicTable (hash_id)"]
+        LocalTimeSerie["LocalTimeSerie (update_hash)"]  -->|View of Table| DynamicTable["DynamicTable (storage_hash)"]
     end
 
     DataNode -->|Updates| DataRepositories
@@ -46,9 +46,9 @@ def __init__(self, *args, **kwargs):
 
 The constructor arguments create two essential hashes that facilitate efficient management of data and updates:
 
-- **`hash_id`**: Used to uniquely identify data repositories linked to a specific `DataNode`. This ensures different configurations or datasets are appropriately separated or merged based on their content rather than their names alone.
+- **`storage_hash`**: Used to uniquely identify data repositories linked to a specific `DataNode`. This ensures different configurations or datasets are appropriately separated or merged based on their content rather than their names alone.
 
-- **`local_hash_id`**: Used to uniquely identify the specific update processes. It enables TDAG to recognize distinct update routines and manage their internal state independently, crucial for parallel updates or workflows that reuse identical data structures with different update logic.
+- **`update_hash`**: Used to uniquely identify the specific update processes. It enables TDAG to recognize distinct update routines and manage their internal state independently, crucial for parallel updates or workflows that reuse identical data structures with different update logic.
 
 ### Special Constructor Arguments
 
@@ -56,7 +56,7 @@ Some arguments are explicitly excluded from hashing:
 
 - **`init_meta`**: Arbitrary metadata used during initialization for convenience and clarity. **excluded from hashing**
 - **`build_meta_data`**: Metadata recoverable anytime and editable from the GUI; useful for dynamic or interactive data handling. **excluded from hashing**
-- **`local_kwargs_to_ignore`**: Arguments excluded from the `hash_id` calculation but included in `local_hash_id`, allowing flexibility in differentiating between datasets and update processes.
+- **`local_kwargs_to_ignore`**: Arguments excluded from the `storage_hash` calculation but included in `update_hash`, allowing flexibility in differentiating between datasets and update processes.
 
 ### Post Init Decorator Usage
 

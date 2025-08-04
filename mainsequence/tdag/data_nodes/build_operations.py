@@ -207,7 +207,7 @@ def verify_backend_git_hash_with_pickle(local_persist_manager:PersistManager,
                                         time_serie_class: "DataNode") -> None:
     """Verifies if the git hash in the backend matches the one from the pickled object."""
     if local_persist_manager.metadata is not None:
-        load_git_hash = get_time_serie_source_code_git_hash(time_serie_class)
+        load_git_hash = get_data_node_source_code_git_hash(time_serie_class)
 
         persisted_pickle_hash = local_persist_manager.metadata.time_serie_source_code_git_hash
         if load_git_hash != persisted_pickle_hash:

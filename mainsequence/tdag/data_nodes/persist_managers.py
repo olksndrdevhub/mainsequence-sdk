@@ -611,7 +611,7 @@ class PersistManager:
                 metadata_kwargs = dict(
                     update_hash=self.update_hash,
                     build_configuration=local_configuration,
-                    remote_table__hash_id=remote_table_hash_id,
+                    remote_table__hash_id=storage_hash,
                     data_source_id=self.data_source.id
                 )
 
@@ -800,8 +800,8 @@ class PersistManager:
     def update_git_and_code_in_backend(self,time_serie_class) -> None:
         """Updates the source code and git hash information in the backend."""
         self.update_source_informmation(
-            git_hash_id=get_time_serie_source_code_git_hash(time_serie_class),
-            source_code=get_time_serie_source_code(time_serie_class),
+            git_hash_id=get_data_node_source_code_git_hash(time_serie_class),
+            source_code=get_data_node_source_code(time_serie_class),
         )
 
 class TimeScaleLocalPersistManager(PersistManager):

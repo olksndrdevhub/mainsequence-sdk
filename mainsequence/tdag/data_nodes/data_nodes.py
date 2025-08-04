@@ -345,7 +345,7 @@ class APIDataNode(DataAccessMixin):
 
         Args:
             data_source_id: The ID of the data source.
-            local_hash_id: The local hash ID of the time series.
+            update_hash: The local hash ID of the time series.
             data_source_local_lake: Optional local data source for the lake.
         """
         if data_source_local_lake is not None:
@@ -424,7 +424,7 @@ class APIDataNode(DataAccessMixin):
 
 
     def _get_update_statistics(self, asset_symbols: List[str],
-                              remote_table_hash_id: str, time_serie: "DataNode" #necessary for uatomated methods
+                              storage_hash: str, time_serie: "DataNode" #necessary for uatomated methods
                               ) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
         """
         Gets update statistics for the time series.
@@ -687,9 +687,7 @@ class DataNode(DataAccessMixin,ABC):
     @property
     def metadata(self) -> "DynamicTableMetaData":
         return self.local_persist_manager.metadata
-    @property
-    def table(self)->"DynamicTableMetaData":
-        return self.local_persist_manager.metadata
+
 
     @property
     def local_persist_manager(self) -> PersistManager:
@@ -833,8 +831,8 @@ class DataNode(DataAccessMixin,ABC):
         """
         # Use self.owner to get properties from the DataNode instance
         owner_class = self.__class__
-        time_serie_source_code_git_hash = build_operations.get_time_serie_source_code_git_hash(owner_class)
-        time_serie_source_code = build_operations.get_time_serie_source_code(owner_class)
+        time_serie_source_code_git_hash = build_operations.get_data_node_source_code_git_hash(owner_class)
+        time_serie_source_code = build_operations.get_data_node_source_code(owner_class)
 
         # The call to the low-level persist manager is encapsulated here
         self.local_persist_manager.local_persist_exist_set_config(

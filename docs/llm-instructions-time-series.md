@@ -26,7 +26,7 @@ These guidelines cover the essential configuration and best-practice patterns fo
 * Accept only these argument types: `str`, `int`, `list`, Pydantic model, or a list of Pydantic models.
 * Instantiate any dependent `DataNode` objects inside the constructor.
 * If the series receives a `ModelList` argument such as `asset_list`, add its name to `local_kwargs_to_ignore`.
-* `TimeSeries` can have direct dependencies which are initialized directly in the construction with its imported class or `APITimeSeries` which should be also initialized in the construction but are initialized only with `local_hash_id` and `data_source_id`
+* `TimeSeries` can have direct dependencies which are initialized directly in the construction with its imported class or `APITimeSeries` which should be also initialized in the construction but are initialized only with `update_hash` and `data_source_id`
 * You may override the class constant `OFFSET_START` to set the earliest
    permitted timestamp.
 
@@ -51,7 +51,7 @@ from mainsequence.tdag import APITimeSerie
 class ReturnSerie(DataNode):
     @DataNode._post_init_routines
     def __init__(self, arg1: str, *args, **kwargs):
-        self.price_serie = APITimeSerie(data_source_id=1,local_hash_id="local_hash_id_ghjkdf8347y5342")
+        self.price_serie = APITimeSerie(data_source_id=1,update_hash="local_hash_id_ghjkdf8347y5342")
         super().__init__(*args, **kwargs)
 ```
 
@@ -74,7 +74,7 @@ def __init__(
     This initializer prepares all metadata and configuration for a new time series, then:
       1. Computes a unique table identifier by hashing all arguments **except**
          `init_meta`, `build_meta_data`, and `local_kwargs_to_ignore`.
-      2. Computes a separate `local_hash_id` (and corresponding LocalTimeSerie) by
+      2. Computes a separate `update_hash` (and corresponding LocalTimeSerie) by
          hashing the same inputs, but omitting any keys listed in `local_kwargs_to_ignore`.
       3. Applies any `@DataNode._post_init_routines` decorators after setup.
 
@@ -92,7 +92,7 @@ def __init__(
     build_meta_data : dict, optional
         Metadata recorded during the build process (e.g. version, source tags).
     local_kwargs_to_ignore : list of str, optional
-        Names of keyword args that should be excluded when computing `local_hash_id`.
+        Names of keyword args that should be excluded when computing `update_hash`.
     *args
         Positional arguments used to further parameterize the series.
     **kwargs
