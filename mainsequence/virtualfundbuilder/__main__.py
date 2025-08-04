@@ -146,7 +146,13 @@ def get_pod_configuration():
     python_file_path = Path(temp_dir) / "load_pod_configuration.py"
     with open(python_file_path, "w", encoding="utf-8") as f:
         f.write(TMP_SCRIPT)
-    runpy.run_path(str(python_file_path), run_name="__main__")
+    try:
+        runpy.run_path(str(python_file_path), run_name="__main__")
+    except Exception:
+        from mainsequence.virtualfundbuilder.utils import get_vfb_logger
+        logger = get_vfb_logger()
+        logger.exception("--- ERROR: Failed to import one or more project modules. ---")
+        raise
 
 def import_project_configuration():
     from mainsequence.client import ProjectConfiguration, Job
