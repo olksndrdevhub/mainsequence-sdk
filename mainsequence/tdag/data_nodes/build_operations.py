@@ -20,7 +20,7 @@ from pathlib import Path
 from mainsequence.instrumentation import tracer, tracer_instrumentator
 from mainsequence.tdag.config import API_TS_PICKLE_PREFIFX
 import mainsequence.client as ms_client
-from .persist_managers import PersistManager, get_time_serie_source_code,get_time_serie_source_code_git_hash
+from .persist_managers import PersistManager, get_data_node_source_code,get_data_node_source_code_git_hash
 from mainsequence.tdag.config import (
     ogm
 )

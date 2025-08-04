@@ -51,7 +51,7 @@ def get_data_node_source_code(DataNodeClass: "DataNode") -> str:
             return history[idx:]
     return "Source code unavailable."
 
-def get_time_serie_source_code_git_hash(DataNodeClass: "DataNode") -> str:
+def get_data_node_source_code_git_hash(DataNodeClass: "DataNode") -> str:
     """
     Hashes the source code of a DataNode class using SHA-1 (Git style).
 
