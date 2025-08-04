@@ -16,6 +16,7 @@ from typing import Dict, Any
 import inspect
 import importlib
 from structlog.threadlocal import wrap_dict
+import sys
 
 def ensure_dir(file_path):
     directory = os.path.dirname(file_path)
@@ -259,3 +260,25 @@ def load_structlog_bound_logger(dump: Dict[str, Any]) -> BoundLogger:
     return base.bind(**bound_context)
 
 logger = build_application_logger()
+
+# create a new system exection hook to also log terminating exceptions
+original_hook = sys.excepthook
+
+def handle_exception(exc_type, exc_value, exc_traceback):
+    """
+    A custom exception handler that logs any uncaught exception.
+    """
+    if issubclass(exc_type, KeyboardInterrupt):
+        # Let the user interrupt the program without a traceback
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    # Log the exception using our configured logger
+    logger.error(
+        "Uncaught exception",
+        exc_info=(exc_type, exc_value, exc_traceback)
+    )
+    # Also call the original hook to print the traceback to the console
+    original_hook(exc_type, exc_value, exc_traceback)
+
+sys.excepthook = handle_exception
