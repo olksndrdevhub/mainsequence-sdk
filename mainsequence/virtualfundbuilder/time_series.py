@@ -7,7 +7,7 @@ from datetime import datetime
 import numpy as np
 import pytz
 import pandas as pd
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple, Union, Optional
 
 from .models import PortfolioBuildConfiguration
 from mainsequence.virtualfundbuilder.contrib.prices.time_series import get_interpolated_prices_timeseries
@@ -16,6 +16,8 @@ import json
 
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import SignalWeightsFactory
 from tqdm import tqdm
+
+from .. import client as ms_client
 
 
 def translate_to_pandas_freq(custom_freq):
@@ -504,6 +506,19 @@ rebalance details:"""
 
         self.logger.info(f"{len(portfolio)} new portfolio values have been calculated.")
         return portfolio
+
+
+    def get_table_metadata(self,update_statistics:ms_client.UpdateStatistics) ->Optional[ms_client.TableMetaData]:
+
+
+        asset=ms_client.PortfolioIndexAsset.get_or_none(reference_portfolio__local_time_serie=self.local_time_serie.local_hash_id)
+        if asset is not None:
+            identifier = asset.unique_identifier
+            return ms_client.TableMetaData(
+                identifier=identifier,
+                description="Daily Market Cap Data From Coingecko",
+                data_frequency_id=ms_client.DataFrequency.one_d,
+            )
 
     def _resample_portfolio_with_calendar(self, portfolio: pd.DataFrame) -> pd.DataFrame:
 

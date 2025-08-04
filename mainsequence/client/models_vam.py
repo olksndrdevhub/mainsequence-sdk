@@ -692,7 +692,7 @@ class Asset(AssetMixin, BaseObjectOrm):
 
 class PortfolioIndexAsset(Asset):
     can_trade:bool=False
-    reference_portfolio : "Portfolio"
+    reference_portfolio : Union["Portfolio",int]
 
     @property
     def reference_portfolio_details_url(self):
@@ -1219,7 +1219,7 @@ class PortfolioMixin:
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
     tags: Optional[List['PortfolioTags']] = None
     calendar: Optional['Calendar']
-    index_asset:AssetMixin
+    index_asset:PortfolioIndexAsset
 
     def pretty_print(self) -> str:
         def format_field(name, value):
@@ -1274,11 +1274,10 @@ class PortfolioMixin:
 
     @property
     def portfolio_name(self) -> str:
-        return self.index_asset.name
-
+        return self.index_asset.portfolio_name.name
     @property
     def portfolio_ticker(self)->str:
-        return self.index_asset.ticker
+        return self.index_asset.portfolio_name.ticker
 
     def add_venue(self, venue_id) -> None:
         url = f"{self.get_object_url()}/{self.id}/add_venue/"
