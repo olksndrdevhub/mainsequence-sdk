@@ -691,7 +691,6 @@ class Asset(AssetMixin, BaseObjectOrm):
         return r.json()
 
 class PortfolioIndexAsset(Asset):
-    can_trade:bool=False
     reference_portfolio : Union["Portfolio",int]
 
     @property
@@ -1274,10 +1273,10 @@ class PortfolioMixin:
 
     @property
     def portfolio_name(self) -> str:
-        return self.index_asset.portfolio_name.name
+        return self.index_asset.current_snapshot.name
     @property
     def portfolio_ticker(self)->str:
-        return self.index_asset.portfolio_name.ticker
+        return self.index_asset.current_snapshot.ticker
 
     def add_venue(self, venue_id) -> None:
         url = f"{self.get_object_url()}/{self.id}/add_venue/"
