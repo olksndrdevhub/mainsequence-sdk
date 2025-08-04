@@ -1,4 +1,4 @@
-from mainsequence.tdag.data_nodes import DataNode, APITimeSerie, WrapperTimeSerie
+from mainsequence.tdag.data_nodes import DataNode, APIDataNode, WrapperTimeSerie
 from mainsequence.client import CONSTANTS, Asset, AssetTranslationTable, AssetTranslationRule, AssetFilter, DoesNotExist
 
 from datetime import datetime, timedelta, tzinfo
@@ -117,7 +117,7 @@ class MarketCap(WeightsBase, DataNode):
     def maximum_forward_fill(self):
         return timedelta(days=1) - TIMEDELTA
 
-    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         return {"historical_market_cap_ts": self.historical_market_cap_ts}
 
     def get_explanation(self):

@@ -12,7 +12,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 
-from mainsequence.tdag import APITimeSerie
+from mainsequence.tdag import APIDataNode
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 
 from pydantic import BaseModel
@@ -42,7 +42,7 @@ def example_data(assets):
         logger.exception(f"HistoricalBarsSource does not exist for {market_time_serie_unique_identifier}")
         raise e
 
-    api_ts = APITimeSerie(
+    api_ts = APIDataNode(
         data_source_id=hbs.related_local_time_serie.data_source_id,
         update_hash=hbs.related_local_time_serie.update_hash
     )

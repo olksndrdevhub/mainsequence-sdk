@@ -387,10 +387,10 @@ class PickleRebuilder(BaseRebuilder):
 
         rebuilt_value = self.rebuild(value["serialized_model"], **state_kwargs)
         return PydanticClass(**rebuilt_value)
-    def _handle_api_timeserie(self, value: Dict, **state_kwargs) -> "APITimeSerie":
+    def _handle_api_timeserie(self, value: Dict, **state_kwargs) -> "APIDataNode":
         """Handles 'is_api_time_serie_pickled' markers."""
         import cloudpickle
-        # Note: You need to make APITimeSerie available here
+        # Note: You need to make APIDataNode available here
         full_path = get_pickle_path(
             update_hash=value['update_hash'],
             data_source_id=value['data_source_id'],is_api=True,

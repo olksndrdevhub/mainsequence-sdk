@@ -1,6 +1,6 @@
 
-from .time_series import (DataNode, WrapperTimeSerie ,
-                          APITimeSerie,)
+from .data_nodes import (DataNode, WrapperTimeSerie ,
+                          APIDataNode,)
 
 
 

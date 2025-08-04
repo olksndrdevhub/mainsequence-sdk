@@ -184,7 +184,7 @@ class PortfolioStrategy(DataNode):
             new_index = pd.date_range(start=start_date, end=end_date, freq=freq)
         return new_index, freq
 
-    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         return {
             "bars_ts": self.bars_ts,
             "signal_weights": self.signal_weights

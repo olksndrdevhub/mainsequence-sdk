@@ -186,7 +186,7 @@ class DataAccessMixin:
     def get_logger_context_variables(self) -> Dict[str, Any]:
         return dict(update_hash=self.update_hash,
                     local_hash_id_data_source=self.data_source_id,
-                    api_time_series=self.__class__.__name__ == "APITimeSerie")
+                    api_time_series=self.__class__.__name__ == "APIDataNode")
 
     @property
     def logger(self) -> logging.Logger:
@@ -318,17 +318,17 @@ class DataAccessMixin:
 
 
 
-class APITimeSerie(DataAccessMixin):
+class APIDataNode(DataAccessMixin):
 
 
     @classmethod
-    def build_from_local_time_serie(cls, source_table: "LocalTimeSerie") -> "APITimeSerie":
+    def build_from_local_time_serie(cls, source_table: "LocalTimeSerie") -> "APIDataNode":
         return cls(data_source_id=source_table.data_source.id,
                    storage_hash=source_table.storage_hash
                    )
 
     @classmethod
-    def build_from_identifier(cls, identifier: str) -> "APITimeSerie":
+    def build_from_identifier(cls, identifier: str) -> "APIDataNode":
 
         table = ms_client.DynamicTableMetaData.get(identifier=identifier)
         ts = cls(
@@ -341,7 +341,7 @@ class APITimeSerie(DataAccessMixin):
                  data_source_id: int, storage_hash: str,
                  data_source_local_lake: Optional[DataSource] = None):
         """
-        Initializes an APITimeSerie.
+        Initializes an APIDataNode.
 
         Args:
             data_source_id: The ID of the data source.
@@ -371,7 +371,7 @@ class APITimeSerie(DataAccessMixin):
     def __getstate__(self) -> Dict[str, Any]:
         """Prepares the state for pickling."""
         state = self.__dict__.copy()
-        # Remove unpicklable/transient state specific to APITimeSerie
+        # Remove unpicklable/transient state specific to APIDataNode
         names_to_remove = [
             "_local_persist_manager", # APIPersistManager instance
         ]
@@ -997,7 +997,7 @@ class DataNode(DataAccessMixin,ABC):
         pass
 
     @abstractmethod
-    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         """
         Subclasses must implement this method to explicitly declare their upstream dependencies.
 
@@ -1066,7 +1066,7 @@ class WrapperTimeSerie(DataNode):
 
             except DoesNotExist as e:
                 raise e
-            api_ts = APITimeSerie(
+            api_ts = APIDataNode(
                 data_source_id=metadata.data_source.id,
                 source_table_hash_id=metadata.storage_hash
             )
@@ -1082,7 +1082,7 @@ class WrapperTimeSerie(DataNode):
 
         self.translation_table = translation_table
 
-    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         return self.api_ts_map
 
     def get_ranged_data_per_asset(self, range_descriptor: Optional[UniqueIdentifierRangeMap]) -> pd.DataFrame:
@@ -1240,4 +1240,4 @@ class WrapperTimeSerie(DataNode):
 
 
 build_operations.serialize_argument.register(DataNode, build_operations._serialize_timeserie)
-build_operations.serialize_argument.register(APITimeSerie, build_operations._serialize_api_timeserie)
+build_operations.serialize_argument.register(APIDataNode, build_operations._serialize_api_timeserie)

@@ -88,7 +88,7 @@ class APIPersistManager:
         self.data_source_id: int = data_source_id
         self.source_table_hash_id: str = source_table_hash_id
 
-        logger.debug(f"Initializing Time Serie {self.source_table_hash_id}  as APITimeSerie")
+        logger.debug(f"Initializing Time Serie {self.source_table_hash_id}  as APIDataNode")
 
         # Create a Future to hold the local metadata when ready.
         self._metadata_future = Future()
