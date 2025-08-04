@@ -129,7 +129,7 @@ def build_application_logger(
             "plain": {
                 "()": structlog.stdlib.ProcessorFormatter,
                 "processor":OTelJSONRenderer(),#structlog.processors.JSONRenderer(),
-                "foreign_pre_chain": pre_chain + [structlog.processors.format_exc_info],
+                "foreign_pre_chain": pre_chain,
             },
             "colored": {
                 "()": structlog.stdlib.ProcessorFormatter,
@@ -165,7 +165,7 @@ def build_application_logger(
             ),
             timestamper,
             structlog.processors.StackInfoRenderer(),
-            # structlog.processors.format_exc_info, #suggested to remove for pretty exceptions
+            structlog.processors.format_exc_info, # suggested to remove for pretty exceptions
             add_structlog_event_to_record,  # Add this processor before wrap_for_formatter
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
 

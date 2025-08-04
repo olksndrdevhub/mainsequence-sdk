@@ -97,7 +97,7 @@ import json
 # Imports should be at the top of the file
 import numpy as np
 np.NaN = np.nan # Fix for a pandas-ta compatibility issue
-from mainsequence.tdag import DataNode,APITimeSerie, WrapperTimeSerie
+from mainsequence.tdag import DataNode, WrapperTimeSerie, APIDataNode
 from mainsequence.client.models_tdag import UpdateStatistics, ColumnMetaData
 import mainsequence.client as ms_client
 from typing import Union, Optional, List, Dict, Any
@@ -227,7 +227,7 @@ class SingleIndexTS(DataNode):
        """
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
 
-    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         pass
     def update(self, update_statistics: ms_client.UpdateStatistics):
         today_utc = datetime.datetime.now(tz=pytz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -306,7 +306,7 @@ class SimulatedPrices(DataNode):
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         pass
 
     def update(self,update_statistics:ms_client.UpdateStatistics):
@@ -372,7 +372,7 @@ class CategorySimulatedPrices(DataNode):
 
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         return {"simple_ts":self.simple_ts}
 
     def get_asset_list(self):
@@ -491,7 +491,7 @@ class TAFeature(DataNode):
                                                  *args, **kwargs)
         super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         return {
             "prices_time_serie": self.prices_time_serie,
 
@@ -877,9 +877,9 @@ class RollingModelPrediction(DataNode):
             **kwargs
         )
 
-        #even more prices from a DataNode not in the project using APITimeSerie
+        #even more prices from a DataNode not in the project using APIDataNode
 
-        self.external_prices=APITimeSerie.build_from_identifier(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES)
+        self.external_prices = APIDataNode.build_from_identifier(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES)
         translation_table=ms_client.AssetTranslationTable.get(unique_identifier=TEST_TRANSLATION_TABLE_UID)
         self.translated_prices_ts=WrapperTimeSerie(translation_table=translation_table)
         # retrainer DataNode
@@ -894,7 +894,7 @@ class RollingModelPrediction(DataNode):
 
         super().__init__( *args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         return {
             "prices_ts": self.prices_ts,
             "feature_ts": self.feature_ts,
@@ -1005,9 +1005,9 @@ class LivePrediction(DataNode):
             **kwargs
         )
 
-        # even more prices from a DataNode not in the project using APITimeSerie
+        # even more prices from a DataNode not in the project using APIDataNode
 
-        self.external_prices = APITimeSerie.build_from_identifier(
+        self.external_prices = APIDataNode.build_from_identifier(
             identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES)
         translation_table = ms_client.AssetTranslationTable.get(unique_identifier=TEST_TRANSLATION_TABLE_UID)
         self.translated_prices_ts = WrapperTimeSerie(translation_table=translation_table)
@@ -1023,7 +1023,7 @@ class LivePrediction(DataNode):
 
         super().__init__( *args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         return {
             "prices_ts": self.prices_ts,
             "feature_ts": self.feature_ts,
@@ -1073,7 +1073,7 @@ class WorkflowManager(DataNode):
 
         super().__init__(*args, **kwargs)
 
-    def dependencies(self) -> Dict[str, Union["DataNode", "APITimeSerie"]]:
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         return {"prediction_back_test":self.prediction_back_test,
                 "live_back_test":self.live_back_test
                 }

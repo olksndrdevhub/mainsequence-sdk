@@ -13,7 +13,6 @@ from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTi
                                  )
 from mainsequence.client import MARKETS_CONSTANTS, ExecutionVenue
 from mainsequence.client import  DoesNotExist, Asset
-from mainsequence.tdag.data_nodes.time_series import WrapperTimeSerie
 from mainsequence.tdag.data_nodes.utils import (
     string_frequency_to_minutes,
     string_freq_to_time_delta,
