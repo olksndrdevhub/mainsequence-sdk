@@ -516,7 +516,7 @@ rebalance details:"""
             identifier = asset.unique_identifier
             return ms_client.TableMetaData(
                 identifier=identifier,
-                description="Daily Market Cap Data From Coingecko",
+                description=f"Portfolio strategy for asset {asset.unique_identifier}",
                 data_frequency_id=ms_client.DataFrequency.one_d,
             )
 
