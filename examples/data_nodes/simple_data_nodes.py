@@ -4,6 +4,8 @@ These data nodes do not serve any practical purpose but only exemplify creation 
 
 
 """
+from typing import Dict, Union
+
 import pandas as pd
 
 from mainsequence.client import UpdateStatistics
@@ -27,15 +29,22 @@ class DailyRandomNumber(DataNode):
         """Draw daily samples from N(mean, std) since last run (UTC days)."""
         today = pd.Timestamp.now("UTC").normalize()
         last = self.update_statistics.max_time_index_value
-        idx = pd.date_range((last + pd.Timedelta(days=1)) if last else today, today, freq="D", tz="UTC")
-        return (
-            pd.DataFrame(
-                {"random_number": np.random.normal(self.mean, self.std, len(idx))},
-                index=idx,
-            )
-            .rename_axis("time_index")
+        if last is not None and last >= today:
+            return pd.DataFrame()
+        return pd.DataFrame(
+            {"random_number": [np.random.normal(self.mean, self.std)]},
+            index=pd.DatetimeIndex([today], name="time_index", tz="UTC"),
         )
 
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
+        return {}
 
+
+
+def build_test_time_series():
+    daily_node = DailyRandomNumber(mean=0.0, std=1.0)
+
+
+    daily_node.run(debug_mode=True, force_update=True)
 
 

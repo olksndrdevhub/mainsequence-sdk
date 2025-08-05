@@ -572,6 +572,7 @@ class DataNode(DataAccessMixin,ABC):
         self._local_persist_manager: Optional[PersistManager] = None
 
         self._scheduler_tree_connected = False
+        self.update_statistics=None
 
     def __init_subclass__(cls, **kwargs):
         """
@@ -942,7 +943,7 @@ class DataNode(DataAccessMixin,ABC):
         """
         return 0
 
-    def get_table_metadata(self,update_statistics:ms_client.UpdateStatistics)->Optional[ms_client.TableMetaData]:
+    def get_table_metadata(self,)->Optional[ms_client.TableMetaData]:
         """Provides the metadata configuration for a market time series.
 
          """

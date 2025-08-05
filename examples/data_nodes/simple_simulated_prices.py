@@ -46,7 +46,7 @@ are returned in this method will be included in the creation of the dependecy ch
 This is the core method containing the business logic for generating data.
 
 -   **Purpose**: **MUST** be implemented. Its job is to fetch, calculate, or generate new data points.
--   **Input (`update_statistics`)**: This object tells you the timestamp of the last successful
+-   **self.update_statistics: This object tells you the timestamp of the last successful
     update for each asset, allowing you to fetch data incrementally.
     -   **Asset Universe**: When looping through assets, you **MUST** iterate over `update_statistics.asset_list`.
         This ensures consistency with the assets prepared for the current run.
@@ -750,12 +750,12 @@ class ModelTrainTimeSerie(DataNode):
             "prices_ts": self.prices_ts,
         }
 
-    def update(self, update_statistics: UpdateStatistics) -> pd.DataFrame:
+    def update(self, ) -> pd.DataFrame:
         """
         Retrain once per retrain_frequency.  Returns a DataFrame of
         model coefficients + intercept for each asset at the retrain timestamp.
         """
-        data = _prepare_model_data(self.feature_ts, self.prices_ts, update_statistics)
+        data = _prepare_model_data(self.feature_ts, self.prices_ts, self.update_statistics)
         if data.empty:
             return pd.DataFrame()
 
@@ -765,7 +765,7 @@ class ModelTrainTimeSerie(DataNode):
         records= []
         for uid, grp in data.groupby(level="unique_identifier"):
 
-            last_retrain = update_statistics.get_last_update_index_2d(uid)
+            last_retrain = self.update_statistics.get_last_update_index_2d(uid)
             if (now-last_retrain).days < self.retrain_config_days:
                 continue
 
@@ -824,7 +824,7 @@ class ModelTrainTimeSerie(DataNode):
         return 1
 
 
-    def get_table_metadata(self, update_statistics: UpdateStatistics) -> ms_client.TableMetaData:
+    def get_table_metadata(self, ) -> ms_client.TableMetaData:
         return ms_client.TableMetaData(
             identifier="model_retrain",
             data_frequency_id=None,
@@ -904,13 +904,13 @@ class RollingModelPrediction(DataNode):
         }
 
 
-    def update(self, update_statistics: UpdateStatistics) -> pd.DataFrame:
+    def update(self, ) -> pd.DataFrame:
         """
         For each asset, fits a rolling-window ElasticNet to predict the return
         from today to tomorrow. X = today's TA features; y = tomorrow's 1d return.
         """
         # Build range descriptors from the earliest needed date
-        data = _prepare_model_data(self.feature_ts, self.prices_ts, update_statistics)
+        data = _prepare_model_data(self.feature_ts, self.prices_ts, self.update_statistics)
         if data.empty:
             return pd.DataFrame()
 
@@ -968,7 +968,7 @@ class RollingModelPrediction(DataNode):
             )
         ]
 
-    def get_table_metadata(self, update_statistics: UpdateStatistics) -> ms_client.TableMetaData:
+    def get_table_metadata(self, ) -> ms_client.TableMetaData:
         return ms_client.TableMetaData(
             identifier="next_day_elastic_net",
             data_frequency_id=ms_client.DataFrequency.one_d,

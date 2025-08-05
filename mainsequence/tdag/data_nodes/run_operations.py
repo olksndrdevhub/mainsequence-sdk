@@ -162,14 +162,13 @@ class UpdateRunner:
         self.ts.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True)
 
         # The DataNode defines how to scope its statistics
-        update_statistics = self.ts._set_update_statistics(update_statistics)
+        self.ts._set_update_statistics(update_statistics)
 
         error_on_last_update = False
         try:
             if must_update:
                 self.logger.info(f"Update required for {self.ts}.")
                 self._update_local(
-                    update_statistics=update_statistics,
                     local_time_series_map=local_time_series_map,
                     overwrite_latest_value=historical_update.last_time_index_value,
                     use_state_for_update=use_state_for_update
@@ -224,7 +223,6 @@ class UpdateRunner:
     @tracer.start_as_current_span("UpdateRunner._update_local")
     def _update_local(
             self,
-            update_statistics: ms_client.UpdateStatistics,
             local_time_series_map: Dict[int, Any],
             overwrite_latest_value: Optional[datetime.datetime],
             use_state_for_update: bool,
@@ -245,7 +243,7 @@ class UpdateRunner:
 
             # 👇 THIS IS THE CORRECTED LOGIC
             # Add specific log message for the initial run
-            if not update_statistics:
+            if not self.update_statistics:
                 self.logger.info(f"Performing first-time update for {self.ts}...")
             else:
                 self.logger.info(f'Calculating update for {self.ts}...')
@@ -264,7 +262,7 @@ class UpdateRunner:
 
                 # In a normal run, filter out data we already have.
                 if overwrite_latest_value is None:
-                    temp_df = update_statistics.filter_df_by_latest_value(temp_df)
+                    temp_df = self.update_statistics.filter_df_by_latest_value(temp_df)
 
                 # If filtering left nothing, we're done.
                 if temp_df.empty:
