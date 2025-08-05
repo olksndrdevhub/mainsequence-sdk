@@ -328,6 +328,15 @@ class APIDataNode(DataAccessMixin):
                    )
 
     @classmethod
+    def build_from_table_id(cls, table_id: str) -> "APIDataNode":
+        table = ms_client.DynamicTableMetaData.get(id=table_id)
+        ts = cls(
+            data_source_id=table.data_source.id,
+            storage_hash=table.storage_hash
+        )
+        return ts
+
+    @classmethod
     def build_from_identifier(cls, identifier: str) -> "APIDataNode":
 
         table = ms_client.DynamicTableMetaData.get(identifier=identifier)
