@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     vim \
     ca-certificates \
     rsync && \
+    chromium && \
     rm -rf /var/lib/apt/lists/*
 
 
