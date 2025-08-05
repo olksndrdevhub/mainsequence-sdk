@@ -219,7 +219,10 @@ class SentimentReport(BaseApp):
             title=f"{chart_title} News Sentiment Over Time",
             xaxis_title="Date", yaxis_title="Sentiment Count", legend_title="Sentiment",
             width=850, height=450, margin=dict(l=40, r=40, t=60, b=40),
-            xaxis=dict(tickformat="%Y-%m-%d")
+            xaxis=dict(
+                type='date',
+                tickformat="%Y-%m-%d"
+            )
         )
 
         buf = BytesIO()
