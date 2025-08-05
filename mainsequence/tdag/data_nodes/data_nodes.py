@@ -875,9 +875,19 @@ class DataNode(DataAccessMixin,ABC):
     def _set_update_statistics(self,
                               update_statistics: UpdateStatistics) -> UpdateStatistics:
         """
+         UpdateStatistics provides the last-ingested positions:
+          - For a single-index series (time_index only), `update_statistics.max_time` is either:
+              - None: no prior data—fetch all available rows.
+              - a datetime: fetch rows where `time_index > max_time`.
+          - For a dual-index series (time_index, unique_identifier), `update_statistics.max_time_per_id` is either:
+              - None: single-index behavior applies.
+              - dict[str, datetime]: for each `unique_identifier` (matching `Asset.unique_identifier`), fetch rows where
+                `time_index > max_time_per_id[unique_identifier]`.
+
         Default method to narrow down update statistics un local time series,
         the method will filter using asset_list if the attribute exists as well as the init fallback date
         :param update_statistics:
+
         :return:
         """
         # Filter update_statistics to include only assets in self.asset_list.
@@ -888,12 +898,14 @@ class DataNode(DataAccessMixin,ABC):
         update_statistics = update_statistics.update_assets(
             asset_list, init_fallback_date=self.OFFSET_START
         )
-        return update_statistics
+
+        self.update_statistics = update_statistics
+
 
     def get_update_statistics(self):
         update_statistics = self.local_persist_manager.get_update_statistics_for_table()
-        update_statistics = self._set_update_statistics(update_statistics)
-        return update_statistics
+        self._set_update_statistics(update_statistics)
+        return self.update_statistics
 
 
     # --- Public API ---
@@ -1005,18 +1017,11 @@ class DataNode(DataAccessMixin,ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, update_statistics: UpdateStatistics) -> pd.DataFrame:
+    def update(self) -> pd.DataFrame:
         """
         Fetch and ingest only the new rows for this DataNode based on prior update checkpoints.
 
-        UpdateStatistics provides the last-ingested positions:
-          - For a single-index series (time_index only), `update_statistics.max_time` is either:
-              - None: no prior data—fetch all available rows.
-              - a datetime: fetch rows where `time_index > max_time`.
-          - For a dual-index series (time_index, unique_identifier), `update_statistics.max_time_per_id` is either:
-              - None: single-index behavior applies.
-              - dict[str, datetime]: for each `unique_identifier` (matching `Asset.unique_identifier`), fetch rows where
-                `time_index > max_time_per_id[unique_identifier]`.
+
 
         Requirements:
           - `time_index` **must** be a `datetime.datetime` instance with UTC timezone.
