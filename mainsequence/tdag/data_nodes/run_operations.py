@@ -243,7 +243,7 @@ class UpdateRunner:
 
             # 👇 THIS IS THE CORRECTED LOGIC
             # Add specific log message for the initial run
-            if not self.update_statistics:
+            if not self.ts.update_statistics:
                 self.logger.info(f"Performing first-time update for {self.ts}...")
             else:
                 self.logger.info(f'Calculating update for {self.ts}...')
@@ -262,7 +262,7 @@ class UpdateRunner:
 
                 # In a normal run, filter out data we already have.
                 if overwrite_latest_value is None:
-                    temp_df = self.update_statistics.filter_df_by_latest_value(temp_df)
+                    temp_df = self.ts.update_statistics.filter_df_by_latest_value(temp_df)
 
                 # If filtering left nothing, we're done.
                 if temp_df.empty:
