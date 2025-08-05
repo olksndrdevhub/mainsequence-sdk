@@ -725,11 +725,8 @@ class PersistManager:
         if not (self.metadata):
             self.logger.warning("metadata not set")
             return
-        if not self.metadata.sourcetableconfiguration:
-            self.logger.warning("sourcetableconfiguration not set")
-            return
-        # 1. Get the user-defined metadata configuration for the time series.
 
+        # 1. Get the user-defined metadata configuration for the time series.
         if table_metadata is None:
             return
 
