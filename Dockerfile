@@ -14,19 +14,18 @@ RUN apt-get update && apt-get install -y \
     rsync && \
     rm -rf /var/lib/apt/lists/*
 
-# install chromium
-RUN apt-get install -y \
-    gnupg \
+# Install Google Chrome
+RUN apt-get update && apt-get install -y \
     wget --no-install-recommends && \
-    # Add Google's official GPG key
-    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome-keyring.gpg && \
+    # Add Google's signing key using the older (but still functional) apt-key method
+    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
     # Set up the repository
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
     # Update apt and install google-chrome-stable
     apt-get update && \
     apt-get install -y google-chrome-stable --no-install-recommends && \
+    # Clean up
     rm -rf /var/lib/apt/lists/*
-
 
 
 # Set up user environment
