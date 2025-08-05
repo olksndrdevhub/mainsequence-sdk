@@ -62,7 +62,7 @@ RUN pip install --no-cache-dir jupyterlab
 RUN pip install --no-cache-dir ipywidgets
 
 # Now install your requirements purely with pip in this venv
-RUN pip install --no-cache-dir ${CODE_DIR}/mainsequence-sdk
+RUN pip install --no-cache-dir git+https://github.com/mainsequence-sdk/mainsequence-sdk
 RUN pip freeze > ${CODE_DIR}/mainsequence-sdk/requirements.txt
 RUN pip uninstall -y mainsequence
 # We can probably optimize to preinstall mainsequence, there seems to be some issue
