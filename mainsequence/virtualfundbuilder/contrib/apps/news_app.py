@@ -198,19 +198,21 @@ class SentimentReport(BaseApp):
             logger.info(f"    No data to plot for '{chart_title}'. Skipping chart generation.")
             return None
 
+        x_axis_data = df_sentiment.index.to_pydatetime()
+
         fig = go.Figure()
         fig.add_trace(go.Scatter(
-            x=df_sentiment.index, y=df_sentiment["positive"],
+            x=x_axis_data, y=df_sentiment["positive"],
             mode="lines+markers", name="Positive",
             line=dict(color="green"), marker=dict(size=5))
         )
         fig.add_trace(go.Scatter(
-            x=df_sentiment.index, y=df_sentiment["negative"],
+            x=x_axis_data, y=df_sentiment["negative"],
             mode="lines+markers", name="Negative",
             line=dict(color="red"), marker=dict(size=5))
         )
         fig.add_trace(go.Scatter(
-            x=df_sentiment.index, y=df_sentiment["neutral"],
+            x=x_axis_data, y=df_sentiment["neutral"],
             mode="lines+markers", name="Neutral",
             line=dict(color="gray", dash="dash"), marker=dict(size=5))
         )
@@ -219,7 +221,10 @@ class SentimentReport(BaseApp):
             title=f"{chart_title} News Sentiment Over Time",
             xaxis_title="Date", yaxis_title="Sentiment Count", legend_title="Sentiment",
             width=850, height=450, margin=dict(l=40, r=40, t=60, b=40),
-            xaxis=dict(tickformat="%Y-%m-%d")
+            xaxis=dict(
+                type='date',
+                tickformat="%Y-%m-%d"
+            )
         )
 
         buf = BytesIO()
