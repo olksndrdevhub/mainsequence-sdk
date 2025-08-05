@@ -1002,7 +1002,7 @@ class DataNode(DataAccessMixin,ABC):
 
         return None
 
-    def run_post_update_routines(self, error_on_last_update: bool, update_statistics: UpdateStatistics) -> None:
+    def run_post_update_routines(self, error_on_last_update: bool, ) -> None:
         """ Should be overwritten by subclass """
         pass
 
