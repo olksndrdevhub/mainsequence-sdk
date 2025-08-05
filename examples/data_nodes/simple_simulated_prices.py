@@ -1081,7 +1081,7 @@ def test_simulated_prices():
     from mainsequence.client import Asset
     from mainsequence.client import MARKETS_CONSTANTS
 
-    assets = Asset.filter(       ticker__in=["NVDA", "APPL"], )
+    assets = Asset.filter(ticker__in=["NVDA", "APPL"], )
     ts = SimulatedPrices(asset_list=assets)
     ts_2=CategorySimulatedPrices(asset_category_id="external_magnificent_7")
 

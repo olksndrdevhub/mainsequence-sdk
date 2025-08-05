@@ -182,7 +182,7 @@ def prepare_config_kwargs(kwargs: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[
     Returns:
         A tuple of (core_kwargs, meta_kwargs).
     """
-    meta_keys = ["init_meta", "build_meta_data", "local_kwargs_to_ignore"]
+    meta_keys = ["init_meta", "build_meta_data",]
     meta_kwargs = {}
 
     for key in meta_keys:
@@ -240,11 +240,11 @@ def hash_signature(dictionary: Dict[str, Any]) -> Tuple[str, str]:
     local_ts_dict_to_hash["project_id"] = POD_PROJECT.id
 
     # Handle remote hash filtering internally
-    if "local_kwargs_to_ignore" in local_ts_dict_to_hash:
-        keys_to_ignore = sorted(local_ts_dict_to_hash['local_kwargs_to_ignore'])
+    if "arguments_to_ignore_from_storage_hash" in local_ts_dict_to_hash:
+        keys_to_ignore = sorted(local_ts_dict_to_hash['arguments_to_ignore_from_storage_hash'])
         for k in keys_to_ignore:
             remote_ts_in_db_hash.pop(k, None)
-        remote_ts_in_db_hash.pop("local_kwargs_to_ignore", None)
+        remote_ts_in_db_hash.pop("arguments_to_ignore_from_storage_hash", None)
 
     # Encode and hash both versions
     encoded_local = json.dumps(local_ts_dict_to_hash, sort_keys=True).encode()
@@ -515,10 +515,7 @@ def create_config(ts_class_name: str,
 
     # 5. Create the remote configuration by removing ignored keys
     remote_config = copy.deepcopy(dict_to_hash)
-    # if 'local_kwargs_to_ignore' in remote_config:
-    #     for k in remote_config['local_kwargs_to_ignore']:
-    #         remote_config.pop(k, None)
-    #     remote_config.pop('local_kwargs_to_ignore', None)
+
 
 
 

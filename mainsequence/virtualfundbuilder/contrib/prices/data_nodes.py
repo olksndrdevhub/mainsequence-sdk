@@ -464,7 +464,7 @@ class InterpolatedPrices(DataNode):
     Handles interpolated prices for assets.
     """
     OFFSET_START = datetime.datetime(2017, 7, 20).replace(tzinfo=pytz.utc)
-
+    _ARGS_IGNORE_IN_STORAGE_HASH=["asset_category_unique_id","asset_list"]
     def __init__(
             self,
 
@@ -474,7 +474,6 @@ class InterpolatedPrices(DataNode):
             upsample_frequency_id: Optional[str] = None,
             asset_list: List = None, # todo change for asset_filter when asset filter has all the characteristics
             translation_table_unique_id: Optional[str] = None,
-            local_kwargs_to_ignore: List[str] = ["asset_category_unique_id","asset_list"],
             *args,
             **kwargs
     ):
@@ -507,7 +506,7 @@ class InterpolatedPrices(DataNode):
         translation_table = AssetTranslationTable.get(unique_identifier=translation_table_unique_id)
 
         self.bars_ts = WrapperDataNode(translation_table=translation_table)
-        super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
     def dependencies(self):

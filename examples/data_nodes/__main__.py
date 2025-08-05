@@ -17,7 +17,7 @@ def main():
 
     if args.command == "simulated_prices":
         test_simulated_prices()
-    elif args.command == "test_time_series":
+    elif args.command == "random_data_nodes":
         build_test_time_series()
 
 
