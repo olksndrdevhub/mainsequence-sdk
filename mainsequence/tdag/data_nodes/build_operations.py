@@ -485,13 +485,14 @@ class TimeSerieConfig:
     """A container for all computed configuration attributes."""
     init_meta: Any
     remote_build_metadata: Any
-    local_kwargs_to_ignore: Optional[List[str]]
     update_hash: str
     storage_hash: str
     local_initial_configuration: Dict[str, Any]
     remote_initial_configuration: Dict[str, Any]
 
-def create_config(ts_class_name: str,  kwargs: Dict[str, Any]):
+def create_config(ts_class_name: str,
+                  arguments_to_ignore_from_storage_hash: List[str],
+                  kwargs: Dict[str, Any]):
     """
     Creates the configuration and hashes using the original hash_signature logic.
     """
@@ -505,9 +506,9 @@ def create_config(ts_class_name: str,  kwargs: Dict[str, Any]):
 
     # 3. Prepare the dictionary for hashing
     dict_to_hash = copy.deepcopy(serialized_core_kwargs)
-    local_kwargs_to_ignore = meta_kwargs.get("local_kwargs_to_ignore")
-    if local_kwargs_to_ignore:
-        dict_to_hash['local_kwargs_to_ignore'] = local_kwargs_to_ignore
+
+
+    dict_to_hash['arguments_to_ignore_from_storage_hash'] = arguments_to_ignore_from_storage_hash
 
     # 4. Generate the hashes
     update_hash, storage_hash = hash_signature(dict_to_hash)
@@ -525,7 +526,6 @@ def create_config(ts_class_name: str,  kwargs: Dict[str, Any]):
     return TimeSerieConfig(
         init_meta=meta_kwargs["init_meta"],
         remote_build_metadata=meta_kwargs["build_meta_data"],
-        local_kwargs_to_ignore=local_kwargs_to_ignore,
         update_hash=f"{ts_class_name}_{update_hash}".lower(),
         storage_hash=f"{ts_class_name}_{storage_hash}".lower(),
         local_initial_configuration=dict_to_hash,

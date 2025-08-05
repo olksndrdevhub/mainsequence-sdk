@@ -508,6 +508,7 @@ class DataNode(DataAccessMixin,ABC):
     Base DataNode class
     """
     OFFSET_START = datetime.datetime(2018, 1, 1, tzinfo=pytz.utc)
+    _ARGS_IGNORE_IN_STORAGE_HASH = []
 
 
     # --- Dunder & Serialization Methods ---
@@ -529,7 +530,6 @@ class DataNode(DataAccessMixin,ABC):
             self,
             init_meta: Optional[build_operations.TimeSerieInitMeta] = None,
             build_meta_data: Union[dict, None] = None,
-            local_kwargs_to_ignore: Union[List[str], None] = None,
             *args,
             **kwargs):
         """
@@ -543,10 +543,9 @@ class DataNode(DataAccessMixin,ABC):
 
         - init_meta
         - build_meta_data
-        - local_kwargs_to_ignore
 
         Each DataNode instance will create a update_hash and a LocalTimeSerie instance in the Data Engine by uniquely hashing
-        the same arguments as the table but excluding the arguments inside local_kwargs_to_ignore
+        the same arguments as the table but excluding the arguments inside _LOCAL_KWARGS_TO_IGNORE
 
 
         allowed type of arguments can only be str,list, int or  Pydantic objects inlcuding lists of Pydantic Objects.
@@ -559,8 +558,6 @@ class DataNode(DataAccessMixin,ABC):
             Metadata for initializing the time series instance.
         build_meta_data : dict, optional
             Metadata related to the building process of the time series.
-        local_kwargs_to_ignore : list, optional
-            List of keyword arguments to ignore during configuration.
         *args : tuple
             Additional arguments.
         **kwargs : dict
@@ -574,7 +571,6 @@ class DataNode(DataAccessMixin,ABC):
         self.build_meta_data.setdefault("initialize_with_default_partitions", True)
 
         self.build_meta_data = build_meta_data
-        self.local_kwargs_to_ignore = local_kwargs_to_ignore
 
         self.pre_load_routines_run = False
         self._data_source: Optional[DynamicTableDataSource] = None # is set later
@@ -613,7 +609,8 @@ class DataNode(DataAccessMixin,ABC):
             # 3. Run the post-initialization routines
             logger.info(f"Running post-init routines for {self.__class__.__name__}")
 
-            self._initialize_configuration(init_kwargs=final_kwargs)
+            self._initialize_configuration(init_kwargs=final_kwargs,
+                                           )
 
             # 7. Final setup
             self.set_data_source()
@@ -646,6 +643,7 @@ class DataNode(DataAccessMixin,ABC):
         }
 
         config = build_operations.create_config(
+            arguments_to_ignore_from_storage_hash=self._ARGS_IGNORE_IN_STORAGE_HASH,
             kwargs=init_kwargs,
             ts_class_name=self.__class__.__name__
         )

@@ -32,10 +32,11 @@ The constructor defines the unique identity of the time series and its dependenc
     within `__init__` and assign it to an instance attribute (e.g., `self.my_dependency = OtherTimeSerie()`).
     The framework will **automatically scan all instance attributes** to find these dependencies
     and build the execution graph.
+-  `_ARGS_IGNORE_IN_STORAGE_HASH`: A list of argument names to exclude from the *local* hash and set as a class property.
 -   **Special Arguments**: The following arguments are special and are **NOT** included in the hash:
     - `init_meta`: For temporary, runtime-only options.
     - `build_meta_data`: For controlling backend table creation.
-    - `local_kwargs_to_ignore`: A list of argument names to exclude from the *local* hash.
+
 
 ---
 ### 3. The `dependencies` Method (Required)
@@ -289,14 +290,10 @@ class SimulatedPrices(DataNode):
     Simulates price updates for a specific list of assets provided at initialization.
     """
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
-
+    _ARGS_IGNORE_IN_STORAGE_HASH = ["asset_list"]
     def __init__(self, asset_list: List,
-                 local_kwargs_to_ignore=["asset_list"],
-
                  *args, **kwargs):
         """
-        Initialize the SimpleCryptoFeature time series.
-
         Args:
             asset_list (ModelList): List of asset objects.
             *args: Additional positional arguments.
@@ -304,7 +301,7 @@ class SimulatedPrices(DataNode):
         """
         self.asset_list = asset_list
         self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
-        super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         pass
@@ -313,6 +310,8 @@ class SimulatedPrices(DataNode):
         update_manager=SimulatedPricesManager(self)
         df=update_manager.update(update_statistics)
         return df
+
+
     def get_column_metadata(self):
         """
         Add MetaData information to the DataNode Table
@@ -353,9 +352,8 @@ class CategorySimulatedPrices(DataNode):
         It also shows a dependency on another DataNode (`SingleIndexTS`).
         """
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
-
+    _ARGS_IGNORE_IN_STORAGE_HASH = ["asset_category_id"]
     def __init__(self, asset_category_id:str,
-                 local_kwargs_to_ignore=["asset_category_id"],
                  *args, **kwargs):
         """
         Initialize the SimpleCryptoFeature time series.
@@ -370,7 +368,7 @@ class CategorySimulatedPrices(DataNode):
         #this time serie has a dependency to include dependencies is just enough to declared them in the init method
         self.simple_ts=SingleIndexTS()
 
-        super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         return {"simple_ts":self.simple_ts}
@@ -465,9 +463,8 @@ class TAFeature(DataNode):
     """
        A derived time series that calculates a technical analysis feature from another price series.
        """
-
+    _ARGS_IGNORE_IN_STORAGE_HASH = ["asset_list", "ta_feature_config"]
     def __init__(self, asset_list: List[ms_client.Asset], ta_feature_config:List[dict],
-                 local_kwargs_to_ignore=["asset_list","ta_feature_config"],
                  *args, **kwargs):
         """
         Initialize the TA feature time series.
@@ -489,7 +486,7 @@ class TAFeature(DataNode):
 
         self.prices_time_serie = SimulatedPrices(asset_list=asset_list,
                                                  *args, **kwargs)
-        super().__init__(local_kwargs_to_ignore=local_kwargs_to_ignore,*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         return {
@@ -845,8 +842,7 @@ class RollingModelPrediction(DataNode):
                            for the TA indicator (e.g. {"kind":"SMA","length":14}).
         elastic_net_config: Dict of parameters to pass into sklearn.linear_model.ElasticNet.
         window_size: Number of past observations to use in each rolling regression.
-        local_kwargs_to_ignore: Names of init kwargs to exclude from the unique ID hash.
-    """
+g    """
 
     def __init__(
         self,
@@ -1085,11 +1081,7 @@ def test_simulated_prices():
     from mainsequence.client import Asset
     from mainsequence.client import MARKETS_CONSTANTS
 
-    assets = Asset.filter(
-        ticker__in=["NVDA", "APPL"],
-
-        execution_venue__symbol=MARKETS_CONSTANTS.MAIN_SEQUENCE_EV
-    )
+    assets = Asset.filter(       ticker__in=["NVDA", "APPL"], )
     ts = SimulatedPrices(asset_list=assets)
     ts_2=CategorySimulatedPrices(asset_category_id="external_magnificent_7")
 
