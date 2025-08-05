@@ -14,6 +14,16 @@ RUN apt-get update && apt-get install -y \
     rsync && \
     rm -rf /var/lib/apt/lists/*
 
+# Install Google Chrome directly using wget and dpkg to bypass all apt key issues
+RUN apt-get update && apt-get install -y \
+    wget \
+    --no-install-recommends && \
+    wget -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    dpkg -i /tmp/google-chrome-stable_current_amd64.deb || apt-get -f install -y && \
+    rm -f /tmp/google-chrome-stable_current_amd64.deb && \
+    rm -rf /var/lib/apt/lists/*
+
+
 
 # Set up user environment
 ENV HOME_DIR=/home/${NB_USER}
