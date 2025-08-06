@@ -1089,6 +1089,8 @@ def test_features_from_prices_local_storage():
                    )
 
 
+    a=5
+
 
 
 def test_simulated_prices():
