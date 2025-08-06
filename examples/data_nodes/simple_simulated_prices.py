@@ -462,7 +462,7 @@ class CategorySimulatedPrices(DataNode):
 # Mocking UpdateStatistics and Running the Test
 
 
-class TAFeature(DataNode):
+class FeatureStoreTA(DataNode):
     """
        A derived time series that calculates a technical analysis feature from another price series.
        """
@@ -733,7 +733,7 @@ class ModelTrainTimeSerie(DataNode):
         self.retrain_config_days = retrain_config_days
 
         # downstream TS for features & prices
-        self.feature_ts = TAFeature(asset_list=asset_list, ta_feature_config=ta_feature_config, *args, **kwargs)
+        self.feature_ts = FeatureStoreTA(asset_list=asset_list, ta_feature_config=ta_feature_config, *args, **kwargs)
         self.prices_ts  = SimulatedPrices(asset_list=asset_list, *args, **kwargs)
 
         super().__init__( *args, **kwargs)
@@ -858,7 +858,7 @@ g    """
         self.window_size = window_size
 
         # Declare dependencies by instantiating them as attributes
-        self.feature_ts = TAFeature(
+        self.feature_ts = FeatureStoreTA(
             asset_list=asset_list,
             ta_feature_config=ta_feature_config,
             *args,
@@ -986,7 +986,7 @@ class LivePrediction(DataNode):
         self.window_size = window_size
 
         # Declare dependencies by instantiating them as attributes
-        self.feature_ts = TAFeature(
+        self.feature_ts = FeatureStoreTA(
             asset_list=asset_list,
             ta_feature_config=ta_feature_config,
             *args,
@@ -1078,10 +1078,8 @@ def test_features_from_prices_local_storage():
     from mainsequence.client import Asset
     from mainsequence.client import MARKETS_CONSTANTS
     ms_client.SessionDataSource.set_local_db()
-
-
     assets = Asset.filter(ticker__in=["NVDA", "JPM"] )
-    ts = TAFeature(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=28),
+    ts = FeatureStoreTA(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=28),
                                                          dict(kind="SMA", length=21),
                                                          dict(kind="RSI", length=21)
                                                          ]
