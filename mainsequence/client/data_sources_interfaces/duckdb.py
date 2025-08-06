@@ -27,8 +27,7 @@ class DuckDBInterface:
     Persist/serve (time_index, unique_identifier, …) DataFrames in a DuckDB file.
     """
 
-    def __init__(self, db_path: Optional[str | Path] = None,
-                 ):
+    def __init__(self, db_path: Optional[str | Path] = None):
         """
         Initializes the interface with the path to the DuckDB database file.
 
@@ -39,7 +38,6 @@ class DuckDBInterface:
                                              in the current directory if the variable is not set.
         """
         from mainsequence.tdag.config import TDAG_DATA_PATH
-        logger.warning("PASS THE RIGHT FREQUENCY")
         # ── choose default & normalise to string ───────────────────────────
         default_path = os.getenv(
             "DUCKDB_PATH",
