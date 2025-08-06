@@ -909,13 +909,6 @@ class DataNode(DataAccessMixin,ABC):
 
         self.update_statistics = update_statistics
 
-
-    def get_update_statistics(self):
-        update_statistics = self.local_persist_manager.get_update_statistics_for_table()
-        self._set_update_statistics(update_statistics)
-        return self.update_statistics
-
-
     # --- Public API ---
     
     def run(
@@ -928,7 +921,7 @@ class DataNode(DataAccessMixin,ABC):
             remote_scheduler: Union[object, None] = None
     ):
 
-        update_runner=run_operations.UpdateRunner(time_serie=self,
+        update_runner = run_operations.UpdateRunner(time_serie=self,
                      debug_mode=debug_mode,
                      force_update=force_update,
                      update_tree=update_tree,
