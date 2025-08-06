@@ -252,8 +252,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
         result = r.json()
         if result["last_time_index_value"] is not None:
-            result["last_time_index_value"] = datetime.datetime.fromtimestamp(result["last_time_index_value"]).replace(
-                tzinfo=pytz.utc)
+            datetime.datetime.fromtimestamp(result["last_time_index_value"], tz=pytz.utc)
 
         if result['asset_time_statistics'] is not None:
             result['asset_time_statistics'] = _recurse_to_datetime(
