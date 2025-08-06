@@ -73,7 +73,7 @@ class PortfolioInterface():
             # when is live target portfolio
             signal_weights_ts = ts.signal_weights
 
-            #timeseries can be running in local lake so need to request the id
+            # timeseries can be running in local lake so need to request the id
             standard_kwargs = dict(local_time_serie_id=ts.local_time_serie.id,
                                    is_active=True,
                                    signal_local_time_serie_id=signal_weights_ts.local_time_serie.id,
@@ -87,7 +87,7 @@ class PortfolioInterface():
                                                         "calendar"]
 
             if portfolio_tags is not None:
-                standard_kwargs["tags"]=portfolio_tags
+                standard_kwargs["tags"] = portfolio_tags
                 # front end details
             standard_kwargs["target_portfolio_about"] = {
                 "description": ts.get_portfolio_about_text(),
@@ -109,8 +109,7 @@ class PortfolioInterface():
 
             return target_portfolio, index_asset
 
-        target_portfolio, index_asset = build_markets_portfolio(portfolio_ts,
-                                                               portfolio_tags=portfolio_tags)
+        target_portfolio, index_asset = build_markets_portfolio(portfolio_ts, portfolio_tags=portfolio_tags)
 
         self.index_asset = index_asset
         self.target_portfolio = target_portfolio
