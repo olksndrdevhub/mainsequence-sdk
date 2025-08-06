@@ -10,7 +10,7 @@ def main():
     )
     parser.add_argument(
         "command",
-        choices=["simulated_prices", "random_data_nodes"],
+        choices=["simulated_prices", "random_data_nodes","duck_features"],
         help="Function to run: choose 'simulated_prices' or 'random_data_nodes'"
     )
     args = parser.parse_args()
