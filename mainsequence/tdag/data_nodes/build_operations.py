@@ -592,7 +592,7 @@ def load_data_source_from_pickle( pickle_path: str) -> Any:
         data_source = cloudpickle.load(handle)
     return data_source
 
-def rebuild_and_set_from_local_hash_id( update_hash: int, data_source_id: int, set_dependencies_df: bool = False,
+def rebuild_and_set_from_update_hash( update_hash: int, data_source_id: int, set_dependencies_df: bool = False,
                                        graph_depth_limit: int = 1) -> Tuple["DataNode", str]:
     """
     Rebuilds a DataNode from its local hash ID and pickles it if it doesn't exist.

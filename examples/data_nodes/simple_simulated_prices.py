@@ -269,7 +269,7 @@ class SingleIndexTS(DataNode):
         return columns_metadata
 
 
-    def get_table_metadata(self,update_statistics:ms_client.UpdateStatistics)->ms_client.TableMetaData:
+    def get_table_metadata(self)->ms_client.TableMetaData:
         """
 
 
@@ -306,9 +306,9 @@ class SimulatedPrices(DataNode):
     def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         pass
 
-    def update(self,update_statistics:ms_client.UpdateStatistics):
+    def update(self):
         update_manager=SimulatedPricesManager(self)
-        df=update_manager.update(update_statistics)
+        df=update_manager.update(self.update_statistics)
         return df
 
 
@@ -331,7 +331,7 @@ class SimulatedPrices(DataNode):
                             ]
         return columns_metadata
 
-    def get_table_metadata(self,update_statistics:UpdateStatistics)->ms_client.TableMetaData:
+    def get_table_metadata(self)->ms_client.TableMetaData:
         """
         REturns the market time serie unique identifier, assets to append , or asset to overwrite
         Returns:
@@ -379,17 +379,17 @@ class CategorySimulatedPrices(DataNode):
         asset_category=ms_client.AssetCategory.get(unique_identifier=self.asset_category_id)
         asset_list=ms_client.Asset.filter(id__in=asset_category.assets)
         return asset_list
-    def update(self,update_statistics:ms_client.UpdateStatistics):
+    def update(self):
         """
               Simulates prices and then adds a random number from its dependency,
               demonstrating how to combine data from multiple sources.
               """
         update_manager=SimulatedPricesManager(self)
-        data=update_manager.update(update_statistics)
+        data=update_manager.update(self.update_statistics)
         if data.empty:
             return pd.DataFrame()
         #an example of a dependencies calls
-        historical_random_data=self.simple_ts.get_df_between_dates(start_date=update_statistics.max_time_index_value)
+        historical_random_data=self.simple_ts.get_df_between_dates(start_date=self.update_statistics.max_time_index_value)
         number=historical_random_data["random_number"].iloc[-1]
         return data+number
 
@@ -411,7 +411,7 @@ class CategorySimulatedPrices(DataNode):
                             ]
         return columns_metadata
 
-    def get_table_metadata(self,update_statistics)->ms_client.TableMetaData:
+    def get_table_metadata(self)->ms_client.TableMetaData:
         """
 
         """
@@ -423,7 +423,7 @@ class CategorySimulatedPrices(DataNode):
 
         return meta
 
-    def run_post_update_routines(self, error_on_last_update: bool, update_statistics: UpdateStatistics) -> None:
+    def run_post_update_routines(self, error_on_last_update: bool) -> None:
         """
         In this example we will use the post init routines to build an  Asset Translation Table that points
         prices to this prices
@@ -494,7 +494,7 @@ class TAFeature(DataNode):
 
         }
 
-    def update(self, update_statistics: UpdateStatistics) -> pd.DataFrame:
+    def update(self) -> pd.DataFrame:
         """
         [Core Logic] Calculates a technical analysis feature based on a dependent price series.
 
@@ -507,9 +507,7 @@ class TAFeature(DataNode):
         3.  **Calculate and reshape**: It transforms the data, applies the specified TA
             indicator, and formats the result into the required long-format DataFrame.
 
-        Args:
-            update_statistics: An object containing the last update timestamp for each asset.
-                               This is used to calculate the precise data range needed.
+
 
         Returns:
             A DataFrame with a ("time_index", "unique_identifier") multi-index and a
@@ -520,7 +518,7 @@ class TAFeature(DataNode):
         import pytz
         #when using more than 2 indices in a multiindex table it is extremely importnat to make all the filters
         #accross all levels to keep consistency in the update
-        update_statistics.filter_assets_by_level(
+        self.update_statistics.filter_assets_by_level(
                                                  level=2,
                                                  filters=[json.dumps(c) for c in self.ta_feature_config])
 
@@ -530,10 +528,10 @@ class TAFeature(DataNode):
         rolling_window = datetime.timedelta(days=np.max([a["length"] for a in self.ta_feature_config]).item()+1)  #Fetch the max of the required features
         asset_range_descriptor = {}
 
-        for asset in update_statistics.asset_list:
+        for asset in self.update_statistics.asset_list:
             # For each asset, find its last update time. If it's a new asset,
             # fall back to the global offset defined on the class.
-            last_update = update_statistics.get_asset_earliest_multiindex_update(asset)- SIMULATION_OFFSET_START
+            last_update = self.update_statistics.get_asset_earliest_multiindex_update(asset)- SIMULATION_OFFSET_START
 
 
             # The start date for our data request is the last update time minus the lookback window.
@@ -1083,6 +1081,13 @@ def test_simulated_prices():
 
     assets = Asset.filter(ticker__in=["NVDA", "APPL"], )
     ts = SimulatedPrices(asset_list=assets)
+    ts.run(debug_mode=True,force_update=True)
+
+    batch_2_assets= Asset.filter(ticker__in=["JPM", "GS"], )
+    ts_2 = SimulatedPrices(asset_list=batch_2_assets)
+    ts_2.run(debug_mode=True,force_update=True)
+
+
     ts_2=CategorySimulatedPrices(asset_category_id="external_magnificent_7")
 
     ts_0=SingleIndexTS()
