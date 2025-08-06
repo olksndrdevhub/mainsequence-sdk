@@ -1088,8 +1088,7 @@ def test_features_from_prices_local_storage():
                                                          ]
                    )
 
-
-    a=5
+    ts.run(debug_mode=True,force_update=True)
 
 
 
@@ -1106,45 +1105,45 @@ def test_simulated_prices():
     ts_2.run(debug_mode=True,force_update=True)
 
 
-    ts_2=CategorySimulatedPrices(asset_category_id="external_magnificent_7")
-
-    ts_0=SingleIndexTS()
-    # ts_0.run(debug_mode=True,force_update=True)
-    # ms_client.SessionDataSource.set_local_db() #run on duck
-    # ts.run(debug_mode=True,force_update=True)
-    ts_2.run(debug_mode=True,force_update=True)
-
-
-    ts = TAFeature(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=28),
-                                                         dict(kind="SMA", length=21),
-                                                         dict(kind="RSI", length=21)
-
-                                                         ]
-
-                   )
+    # ts_2=CategorySimulatedPrices(asset_category_id="external_magnificent_7")
+    #
+    # ts_0=SingleIndexTS()
+    # # ts_0.run(debug_mode=True,force_update=True)
+    # # ms_client.SessionDataSource.set_local_db() #run on duck
+    # # ts.run(debug_mode=True,force_update=True)
+    # ts_2.run(debug_mode=True,force_update=True)
+    #
+    #
+    # ts = TAFeature(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=28),
+    #                                                      dict(kind="SMA", length=21),
+    #                                                      dict(kind="RSI", length=21)
+    #
+    #                                                      ]
+    #
+    #                )
+    # # ts.run(debug_mode=True,
+    # #        update_tree=True,
+    # #        force_update=True,
+    # #        )
+    #
+    #
+    # ta_cfg = [{"kind": "RSI", "length": 21}, {"kind": "RSI", "length": 14}]
+    # en_cfg = {"alpha": 1.0, "l1_ratio": 0.5, "fit_intercept": True}
+    # window = 360  # use the last 30 days for each regression
+    #
+    # ts = WorkflowManager(
+    #     asset_list=assets,
+    #     ta_feature_config=ta_cfg,
+    #     model_config=ElasticNetConfiguration(),
+    #     window_size=window,
+    #     retrain_config_days=10
+    # )
+    #
+    #
     # ts.run(debug_mode=True,
     #        update_tree=True,
     #        force_update=True,
     #        )
-
-
-    ta_cfg = [{"kind": "RSI", "length": 21}, {"kind": "RSI", "length": 14}]
-    en_cfg = {"alpha": 1.0, "l1_ratio": 0.5, "fit_intercept": True}
-    window = 360  # use the last 30 days for each regression
-
-    ts = WorkflowManager(
-        asset_list=assets,
-        ta_feature_config=ta_cfg,
-        model_config=ElasticNetConfiguration(),
-        window_size=window,
-        retrain_config_days=10
-    )
-
-
-    ts.run(debug_mode=True,
-           update_tree=True,
-           force_update=True,
-           )
 
 
 
