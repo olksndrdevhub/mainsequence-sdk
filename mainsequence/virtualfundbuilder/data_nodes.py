@@ -120,7 +120,7 @@ class PortfolioStrategy(DataNode):
         asset_list = Asset.filter(id__in=asset_category.assets) # no need for specifics as only symbols are relevant
         return asset_list
 
-    def _calculate_start_end_dates(self, update_statistics: UpdateStatistics):
+    def _calculate_start_end_dates(self):
         """
         Calculates the start and end dates for processing based on the latest value and available data.
         The end date is calcualted to get the end dates of the prices of all assets involved, and using the earliest to ensure that all assets have prices.
@@ -132,7 +132,7 @@ class PortfolioStrategy(DataNode):
             Tuple[datetime, datetime]: A tuple containing the start date and end date for processing.
         """
         # Get last observations for each exchange
-        update_statics_from_dependencies = self.bars_ts.get_update_statistics()
+        update_statics_from_dependencies = self.bars_ts.update_statistics
         earliest_last_value = max(update_statics_from_dependencies.asset_time_statistics.values())
 
         if earliest_last_value is None:
@@ -143,7 +143,7 @@ class PortfolioStrategy(DataNode):
         end_date = earliest_last_value
 
         # Handle case when latest_value is None
-        start_date = update_statistics.max_time_index_value or self.OFFSET_START
+        start_date = self.update_statistics.max_time_index_value or self.OFFSET_START
 
         # Adjust end_date based on max time difference variable if set
         max_td_env = os.getenv("MAX_TD_FROM_LATEST_VALUE", None)
@@ -190,7 +190,7 @@ class PortfolioStrategy(DataNode):
             "signal_weights": self.signal_weights
         }
 
-    def _postprocess_weights(self, weights, update_statistics):
+    def _postprocess_weights(self, weights):
         """
         Prepares backtesting weights DataFrame for storage and sends them to VAM if applicable.
 
@@ -202,8 +202,8 @@ class PortfolioStrategy(DataNode):
             pd.DataFrame: Prepared backtesting weights.
         """
         # Filter for dates after latest_value
-        if update_statistics.is_empty() == False:
-            weights = weights[weights.index > update_statistics._max_time_in_update_statistics]
+        if self.update_statistics.is_empty() == False:
+            weights = weights[weights.index > self.update_statistics._max_time_in_update_statistics]
         if weights.empty:
             return pd.DataFrame()
 
@@ -215,12 +215,12 @@ class PortfolioStrategy(DataNode):
 
         weights = weights.dropna(subset=["weights_current"])
         # Filter again for dates after latest_value
-        if update_statistics._max_time_in_update_statistics is not None:
+        if self.update_statistics._max_time_in_update_statistics is not None:
             weights = weights[
-                weights.index.get_level_values("time_index") > update_statistics._max_time_in_update_statistics]
+                weights.index.get_level_values("time_index") > self.update_statistics._max_time_in_update_statistics]
 
         # Prepare the weights before by using the last weights used for the portfolio and the new weights
-        if update_statistics.is_empty() == False:
+        if self.update_statistics.is_empty() == False:
             last_weights = self._get_last_weights()
             weights = pd.concat([last_weights, weights], axis=0).fillna(0)
 
@@ -294,7 +294,7 @@ rebalance details:"""
 
         return portfolio_returns
 
-    def _calculate_portfolio_values(self, portfolio: pd.DataFrame, update_statistics: UpdateStatistics) -> pd.DataFrame:
+    def _calculate_portfolio_values(self, portfolio: pd.DataFrame) -> pd.DataFrame:
         """
         Calculates and applies cumulative returns to get the current portfolio values.
         For re-executions, the last portfolio values are retrieved from the database.
@@ -308,7 +308,7 @@ rebalance details:"""
         """
         last_portfolio = 1
         last_portfolio_minus_fees = 1
-        if update_statistics.is_empty() == False:
+        if self.update_statistics.is_empty() == False:
             last_obs = self.last_observation
             last_portfolio = last_obs["close"].iloc[0]
 
@@ -359,7 +359,7 @@ rebalance details:"""
     def _get_last_weights(self):
         """ Deserialize the last rebalance weights"""
 
-        unique_identifier_range_map = {a: {"start_date": d} for a, d in self.get_update_statistics().asset_time_statistics.items() }
+        unique_identifier_range_map = {a: {"start_date": d} for a, d in self.update_statistics.asset_time_statistics.items() }
         last_obs = self.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map)
 
         if last_obs is None or last_obs.empty:
@@ -419,7 +419,7 @@ rebalance details:"""
 
         return raw_prices, interpolated_prices
 
-    def update(self, update_statistics):
+    def update(self):
         """
         Updates the portfolio weights based on the latest available data.
 
@@ -430,7 +430,7 @@ rebalance details:"""
             pd.DataFrame: Updated portfolio values with and without fees and returns.
         """
         self.logger.debug("Starting update of portfolio weights.")
-        start_date, end_date = self._calculate_start_end_dates(update_statistics)
+        start_date, end_date = self._calculate_start_end_dates()
         self.logger.debug(f"Update from {start_date} to {end_date}")
 
         if start_date is None:
@@ -469,13 +469,13 @@ rebalance details:"""
                 signal_weights.columns.get_level_values("unique_identifier")
             )
         )
-        a=5
-        if update_statistics.is_empty() == False:
+
+        if self.update_statistics.is_empty() == False:
             interpolated_prices = interpolated_prices[
                 interpolated_prices.index.get_level_values(
-                    "time_index") > update_statistics._max_time_in_update_statistics
+                    "time_index") > self.update_statistics._max_time_in_update_statistics
                 ]
-            signal_weights = signal_weights[signal_weights.index > update_statistics._max_time_in_update_statistics]
+            signal_weights = signal_weights[signal_weights.index > self.update_statistics._max_time_in_update_statistics]
 
         # Calculate rebalanced weights
         weights = self.rebalancer.apply_rebalance_logic(
@@ -487,31 +487,27 @@ rebalance details:"""
             price_type=self.assets_configuration.price_type,
         )
 
-        weights = self._postprocess_weights(weights, update_statistics)
+        weights = self._postprocess_weights(weights)
         if len(weights) == 0:
             self.logger.info("No portfolio weights to update")
             return pd.DataFrame()
 
         # Calculate portfolio returns
         portfolio_returns = self._calculate_portfolio_returns(weights, raw_prices)
-        portfolio = self._calculate_portfolio_values(portfolio_returns, update_statistics)
+        portfolio = self._calculate_portfolio_values(portfolio_returns)
 
         # prepare for storage
-        if len(portfolio) > 0 and update_statistics.is_empty() == False:
-            portfolio = portfolio[portfolio.index > update_statistics.max_time_index_value]
+        if len(portfolio) > 0 and self.update_statistics.is_empty() == False:
+            portfolio = portfolio[portfolio.index > self.update_statistics.max_time_index_value]
 
         portfolio = self._add_serialized_weights(portfolio, weights)
-
         portfolio = self._resample_portfolio_with_calendar(portfolio)
-
         self.logger.info(f"{len(portfolio)} new portfolio values have been calculated.")
         return portfolio
 
 
-    def get_table_metadata(self,update_statistics:ms_client.UpdateStatistics) ->Optional[ms_client.TableMetaData]:
-
-
-        asset=ms_client.PortfolioIndexAsset.get_or_none(reference_portfolio__local_time_serie__update_hash=self.local_time_serie.update_hash)
+    def get_table_metadata(self) -> Optional[ms_client.TableMetaData]:
+        asset = ms_client.PortfolioIndexAsset.get_or_none(reference_portfolio__local_time_serie__update_hash=self.local_time_serie.update_hash)
         if asset is not None:
             identifier = asset.unique_identifier
             return ms_client.TableMetaData(
@@ -521,7 +517,6 @@ rebalance details:"""
             )
 
     def _resample_portfolio_with_calendar(self, portfolio: pd.DataFrame) -> pd.DataFrame:
-
         if len(portfolio) == 0: return portfolio
 
         calendar_schedule = self.rebalancer.calendar.schedule(portfolio.index.min(), portfolio.index.max())
@@ -532,5 +527,4 @@ rebalance details:"""
         return portfolio
 
     def portfolio_frequency_to_pandas(self):
-
         return translate_to_pandas_freq(self.portfolio_prices_frequency)

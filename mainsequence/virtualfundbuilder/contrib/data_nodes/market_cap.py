@@ -171,7 +171,7 @@ class MarketCap(WeightsBase, DataNode):
         asset_list = Asset.filter(id__in=asset_category.assets)
         return asset_list
 
-    def update(self, update_statistics: "UpdateStatistics"):
+    def update(self):
         """
         Args:
             latest_value (Union[datetime, None]): The timestamp of the most recent data point.
@@ -179,13 +179,13 @@ class MarketCap(WeightsBase, DataNode):
         Returns:
             DataFrame: A DataFrame containing updated signal weights, indexed by time and asset symbol.
         """
-        asset_list = update_statistics.asset_list
+        asset_list = self.update_statistics.asset_list
         if len(asset_list) < self.min_number_of_assets:
             raise AssetMistMatch(f"only {len(asset_list)} in asset_list minum are {self.min_number_of_assets} ")
 
         unique_identifier_range_market_cap_map = {
             a.unique_identifier: {
-                "start_date": update_statistics[a.unique_identifier],
+                "start_date": self.update_statistics[a.unique_identifier],
                 "start_date_operand": ">"
             }
             for a in asset_list
@@ -196,10 +196,10 @@ class MarketCap(WeightsBase, DataNode):
                                                       asset_ticker_group_id__in=[
                                                           a.asset_ticker_group_id
                                                           for a in
-                                                          update_statistics.asset_list])
+                                                          self.update_statistics.asset_list])
 
         ms_asset_list={a.asset_ticker_group_id:a for a in ms_asset_list}
-        asset_list_to_share_class = {a.asset_ticker_group_id:a for a in update_statistics.asset_list}
+        asset_list_to_share_class = {a.asset_ticker_group_id:a for a in self.update_statistics.asset_list}
 
         market_cap_uid_range_map = {ms_asset.get_spot_reference_asset_unique_identifier():
                                       unique_identifier_range_market_cap_map[asset_list_to_share_class[ms_share_class].unique_identifier]
