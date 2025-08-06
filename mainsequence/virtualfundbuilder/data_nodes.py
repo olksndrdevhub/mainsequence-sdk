@@ -120,7 +120,7 @@ class PortfolioStrategy(DataNode):
         asset_list = Asset.filter(id__in=asset_category.assets) # no need for specifics as only symbols are relevant
         return asset_list
 
-    def _calculate_start_end_dates(self, update_statistics: UpdateStatistics):
+    def _calculate_start_end_dates(self):
         """
         Calculates the start and end dates for processing based on the latest value and available data.
         The end date is calcualted to get the end dates of the prices of all assets involved, and using the earliest to ensure that all assets have prices.
@@ -143,7 +143,7 @@ class PortfolioStrategy(DataNode):
         end_date = earliest_last_value
 
         # Handle case when latest_value is None
-        start_date = update_statistics.max_time_index_value or self.OFFSET_START
+        start_date = self.update_statistics.max_time_index_value or self.OFFSET_START
 
         # Adjust end_date based on max time difference variable if set
         max_td_env = os.getenv("MAX_TD_FROM_LATEST_VALUE", None)
@@ -190,7 +190,7 @@ class PortfolioStrategy(DataNode):
             "signal_weights": self.signal_weights
         }
 
-    def _postprocess_weights(self, weights, update_statistics):
+    def _postprocess_weights(self, weights):
         """
         Prepares backtesting weights DataFrame for storage and sends them to VAM if applicable.
 
@@ -202,8 +202,8 @@ class PortfolioStrategy(DataNode):
             pd.DataFrame: Prepared backtesting weights.
         """
         # Filter for dates after latest_value
-        if update_statistics.is_empty() == False:
-            weights = weights[weights.index > update_statistics._max_time_in_update_statistics]
+        if self.update_statistics.is_empty() == False:
+            weights = weights[weights.index > self.update_statistics._max_time_in_update_statistics]
         if weights.empty:
             return pd.DataFrame()
 
@@ -215,12 +215,12 @@ class PortfolioStrategy(DataNode):
 
         weights = weights.dropna(subset=["weights_current"])
         # Filter again for dates after latest_value
-        if update_statistics._max_time_in_update_statistics is not None:
+        if self.update_statistics._max_time_in_update_statistics is not None:
             weights = weights[
-                weights.index.get_level_values("time_index") > update_statistics._max_time_in_update_statistics]
+                weights.index.get_level_values("time_index") > self.update_statistics._max_time_in_update_statistics]
 
         # Prepare the weights before by using the last weights used for the portfolio and the new weights
-        if update_statistics.is_empty() == False:
+        if self.update_statistics.is_empty() == False:
             last_weights = self._get_last_weights()
             weights = pd.concat([last_weights, weights], axis=0).fillna(0)
 
@@ -294,7 +294,7 @@ rebalance details:"""
 
         return portfolio_returns
 
-    def _calculate_portfolio_values(self, portfolio: pd.DataFrame, update_statistics: UpdateStatistics) -> pd.DataFrame:
+    def _calculate_portfolio_values(self, portfolio: pd.DataFrame) -> pd.DataFrame:
         """
         Calculates and applies cumulative returns to get the current portfolio values.
         For re-executions, the last portfolio values are retrieved from the database.
@@ -308,7 +308,7 @@ rebalance details:"""
         """
         last_portfolio = 1
         last_portfolio_minus_fees = 1
-        if update_statistics.is_empty() == False:
+        if self.update_statistics.is_empty() == False:
             last_obs = self.last_observation
             last_portfolio = last_obs["close"].iloc[0]
 
@@ -430,7 +430,7 @@ rebalance details:"""
             pd.DataFrame: Updated portfolio values with and without fees and returns.
         """
         self.logger.debug("Starting update of portfolio weights.")
-        start_date, end_date = self._calculate_start_end_dates(self.update_statistics)
+        start_date, end_date = self._calculate_start_end_dates()
         self.logger.debug(f"Update from {start_date} to {end_date}")
 
         if start_date is None:
