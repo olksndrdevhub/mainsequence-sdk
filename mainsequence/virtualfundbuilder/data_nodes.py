@@ -85,7 +85,6 @@ class PortfolioStrategy(DataNode):
 
         self.execution_configuration = portfolio_build_configuration.execution_configuration
         self.backtesting_weights_config = portfolio_build_configuration.backtesting_weights_configuration
-        self.valuation_asset = portfolio_build_configuration.valuation_asset
 
         self.commission_fee = self.execution_configuration.commission_fee
 

@@ -172,13 +172,11 @@ class PortfolioBuildConfiguration(VFBConfigBaseModel):
         portfolio_prices_frequency (str): Frequency to upsample portoflio. Optional.
         backtesting_weights_configuration (BacktestingWeightsConfig): Weights configuration used for backtesting.
         execution_configuration (PortfolioExecutionConfiguration): Execution settings for the portfolio.
-        valuation_asset (AssetMixin): The Asset for evaluating the portfolio.
     """
     assets_configuration: AssetsConfiguration
     portfolio_prices_frequency: Optional[str] = "1d"
     backtesting_weights_configuration: BacktestingWeightsConfig
     execution_configuration: PortfolioExecutionConfiguration
-    valuation_asset: Field(AssetMixin, portfolio_configuration_overwrite=AssetMixinOverwrite)
 
     def model_dump(self, **kwargs):
         serialized_asset_config = self.assets_configuration.model_dump(**kwargs)
@@ -186,8 +184,6 @@ class PortfolioBuildConfiguration(VFBConfigBaseModel):
         data["assets_configuration"] = serialized_asset_config
 
         data["backtesting_weights_configuration"] = self.backtesting_weights_configuration.model_dump(**kwargs)
-        data["valuation_asset"]=self.valuation_asset.to_serialized_dict()
-
         return data
 
     @root_validator(pre=True)
@@ -199,10 +195,6 @@ class PortfolioBuildConfiguration(VFBConfigBaseModel):
                 price_type=PriceTypeNames(values['assets_configuration']['price_type']),
                 prices_configuration=PricesConfiguration(
                     **values['assets_configuration']['prices_configuration'])
-            )
-        if not isinstance(values["valuation_asset"], AssetMixin):
-            values["valuation_asset"] = Asset.get(
-                unique_identifier=values["valuation_asset"]["unique_identifier"],
             )
 
         return values
@@ -259,7 +251,6 @@ class PortfolioConfiguration(VFBConfigBaseModel):
             backtesting_weights_configuration=backtesting_weights_configuration,
             execution_configuration=execution_configuration,
             portfolio_prices_frequency=portfolio_build_configuration['portfolio_prices_frequency'],
-            valuation_asset=portfolio_build_configuration["valuation_asset"]
         )
 
         portfolio_markets_configuration = PortfolioMarketsConfig(**portfolio_markets_configuration)
