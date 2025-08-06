@@ -112,6 +112,8 @@ from abc import ABC, abstractmethod
 MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES = "simulated_prices_from_category"
 TEST_TRANSLATION_TABLE_UID="test_translation_table"
 
+import base64
+
 class SimulatedPricesManager:
 
     def __init__(self,owner:DataNode):
@@ -494,6 +496,22 @@ class TAFeature(DataNode):
             "prices_time_serie": self.prices_time_serie,
 
         }
+    @staticmethod
+    def encode_col(orig_dict: str) -> str:
+        json_text = json.dumps(orig_dict, sort_keys=True)
+
+        b64 = base64.urlsafe_b64encode(json_text.encode("utf-8")).decode("ascii")
+        # strip trailing = padding (optional)
+        return "f_" + b64.rstrip("=")
+
+    @staticmethod
+    def decode_col(safe: str) -> str:
+        b64 = safe.removeprefix("f_")
+        pad = len(b64) % 4
+        if pad:
+            b64 += "=" * (4 - pad)
+        json_text = base64.urlsafe_b64decode(b64).decode("utf-8")
+        return json.loads(json_text)
 
     def update(self) -> pd.DataFrame:
         """
@@ -565,9 +583,10 @@ class TAFeature(DataNode):
         )
 
         # wide shape: (time × asset) rows × M features columns
-        features_df = pd.DataFrame(index=prices_pivot.stack(dropna=False).index)
+
         all_features=[]
         for feature_config in self.ta_feature_config:
+            features_df = pd.DataFrame(index=prices_pivot.stack(dropna=False).index)
             f_conf=copy.deepcopy(feature_config)
             feature_name=json.dumps(f_conf)
             feature_kind=f_conf["kind"].lower()
@@ -579,7 +598,7 @@ class TAFeature(DataNode):
             all_features.append(features_df)
 
         all_features=pd.concat(all_features,axis=1)
-
+        all_features.columns=[self.encode_col(c) for c in all_features.columns]
         return all_features
 
 from pydantic import BaseModel
