@@ -202,7 +202,7 @@ class PortfolioStrategy(DataNode):
         """
         # Filter for dates after latest_value
         if self.update_statistics.is_empty() == False:
-            weights = weights[weights.index > self.update_statistics._max_time_in_update_statistics]
+            weights = weights[weights.index > self.update_statistics.max_time_index_value]
         if weights.empty:
             return pd.DataFrame()
 
@@ -214,9 +214,9 @@ class PortfolioStrategy(DataNode):
 
         weights = weights.dropna(subset=["weights_current"])
         # Filter again for dates after latest_value
-        if self.update_statistics._max_time_in_update_statistics is not None:
+        if self.update_statistics.max_time_index_value is not None:
             weights = weights[
-                weights.index.get_level_values("time_index") > self.update_statistics._max_time_in_update_statistics]
+                weights.index.get_level_values("time_index") > self.update_statistics.max_time_index_value]
 
         # Prepare the weights before by using the last weights used for the portfolio and the new weights
         if self.update_statistics.is_empty() == False:
@@ -308,7 +308,7 @@ rebalance details:"""
         last_portfolio = 1
         last_portfolio_minus_fees = 1
         if self.update_statistics.is_empty() == False:
-            last_obs = self.last_observation
+            last_obs = self.get_df_between_dates(start_date=self.update_statistics.max_time_index_value)
             last_portfolio = last_obs["close"].iloc[0]
 
             # Keep only new returns
@@ -358,9 +358,7 @@ rebalance details:"""
     def _get_last_weights(self):
         """ Deserialize the last rebalance weights"""
 
-        unique_identifier_range_map = {a: {"start_date": d} for a, d in self.update_statistics.asset_time_statistics.items() }
-        last_obs = self.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map)
-
+        last_obs = self.get_df_between_dates(start_date=self.update_statistics.max_time_index_value)
         if last_obs is None or last_obs.empty:
             return None
 
@@ -472,9 +470,9 @@ rebalance details:"""
         if self.update_statistics.is_empty() == False:
             interpolated_prices = interpolated_prices[
                 interpolated_prices.index.get_level_values(
-                    "time_index") > self.update_statistics._max_time_in_update_statistics
+                    "time_index") > self.update_statistics.max_time_index_value
                 ]
-            signal_weights = signal_weights[signal_weights.index > self.update_statistics._max_time_in_update_statistics]
+            signal_weights = signal_weights[signal_weights.index > self.update_statistics.max_time_index_value]
 
         # Calculate rebalanced weights
         weights = self.rebalancer.apply_rebalance_logic(
