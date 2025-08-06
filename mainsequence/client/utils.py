@@ -10,8 +10,20 @@ import time
 import pytz
 from typing import Union, Optional
 from mainsequence.logconf import logger
+from enum import Enum
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
+
+
+class DataFrequency(str, Enum):
+    one_m = "1m"
+    five_m = "5m"
+    one_d = "1d"
+    one_w = "1w"
+    one_year = "1y"
+    one_month ="1mo"
+    one_quarter ="1q"
+
 
 def request_to_datetime(string_date: str):
     if "+" in string_date:

@@ -337,6 +337,7 @@ class SimulatedPrices(DataNode):
         Returns:
 
         """
+
         mts=ms_client.TableMetaData(identifier="simulated_prices",
                                                data_frequency_id=ms_client.DataFrequency.one_d,
                                                description="This is a simulated prices time serie from asset category",
@@ -563,8 +564,8 @@ class TAFeature(DataNode):
             .pivot(index="time_index", columns="unique_identifier", values="close")
         )
 
-
-
+        # wide shape: (time × asset) rows × M features columns
+        features_df = pd.DataFrame(index=prices_pivot.stack(dropna=False).index)
         all_features=[]
         for feature_config in self.ta_feature_config:
             f_conf=copy.deepcopy(feature_config)
@@ -572,31 +573,10 @@ class TAFeature(DataNode):
             feature_kind=feature_config["kind"].lower()
             feature_config.pop("kind")
             func = getattr(ta, feature_kind)
-            ta_results = prices_pivot.apply(lambda col: func(col, **feature_config))
+            out = prices_pivot.apply(lambda col: func(col, **feature_config))
 
-            # The result needs to be cleaned and reshaped back to the required "long" format.
-            ta_long = (
-                ta_results
-                .dropna(how="all")  # Drop rows at the start where the indicator is all NaN
-                .reset_index()
-                .melt(id_vars="time_index", var_name="unique_identifier", value_name="feature_value")
-                .dropna(subset=["feature_value"])  # Drop any remaining individual NaNs
-                .set_index(["time_index", "unique_identifier"])
-            )
-            # pull out the existing levels as arrays
-            times = ta_long.index.get_level_values('time_index')
-            assets = ta_long.index.get_level_values('unique_identifier')
-
-            # make a constant array of your feature-name
-            feat = [feature_name] * len(ta_long)
-
-            midx = pd.MultiIndex.from_arrays(
-                [times, assets, feat],
-                names=['time_index', 'unique_identifier', 'feature_name']
-            )
-            ta_long.index = midx
-
-            all_features.append(ta_long)
+            features_df[feature_name] = out.stack(dropna=False)
+            all_features.append(features_df)
 
         all_features=pd.concat(all_features,axis=0)
 
@@ -1081,7 +1061,7 @@ def test_features_from_prices_local_storage():
     ms_client.SessionDataSource.set_local_db()
 
 
-    assets = Asset.filter(ticker__in=["NVDA", "APPL"], )
+    assets = Asset.filter(ticker__in=["NVDA", "JPM"] )
     ts = TAFeature(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=28),
                                                          dict(kind="SMA", length=21),
                                                          dict(kind="RSI", length=21)
@@ -1091,6 +1071,8 @@ def test_features_from_prices_local_storage():
     ts.run(debug_mode=True,force_update=True)
 
 
+
+    a=5
 
 def test_simulated_prices():
     from mainsequence.client import Asset

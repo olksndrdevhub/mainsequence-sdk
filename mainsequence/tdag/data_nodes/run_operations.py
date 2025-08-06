@@ -186,7 +186,11 @@ class UpdateRunner:
 
             self.ts.run_post_update_routines(error_on_last_update=error_on_last_update)
             self.ts.local_persist_manager.set_column_metadata(columns_metadata=self.ts.get_column_metadata())
-            self.ts.local_persist_manager.set_table_metadata(table_metadata=self.ts.get_table_metadata())
+            table_metadata = self.ts.get_table_metadata()
+
+            if self.ts.data_source.related_resource.class_type!=ms_client.DUCK_DB:
+                self.ts.local_persist_manager.set_table_metadata(table_metadata=table_metadata)
+
 
         return error_on_last_update
 

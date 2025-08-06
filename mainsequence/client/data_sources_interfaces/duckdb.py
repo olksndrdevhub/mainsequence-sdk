@@ -7,6 +7,11 @@ import duckdb, pandas as pd
 from pathlib import Path
 import datetime
 from mainsequence.logconf import logger
+import pyarrow as pa
+import pyarrow.parquet as pq
+from ..utils import DataFrequency
+import uuid
+from pyarrow import fs
 
 def get_logger():
     global logger
@@ -22,7 +27,8 @@ class DuckDBInterface:
     Persist/serve (time_index, unique_identifier, …) DataFrames in a DuckDB file.
     """
 
-    def __init__(self, db_path: Optional[str | Path] = None):
+    def __init__(self, db_path: Optional[str | Path] = None,
+                 ):
         """
         Initializes the interface with the path to the DuckDB database file.
 
@@ -33,16 +39,37 @@ class DuckDBInterface:
                                              in the current directory if the variable is not set.
         """
         from mainsequence.tdag.config import TDAG_DATA_PATH
-        default_path = Path(os.getenv("DUCKDB_PATH", os.path.join(f"{TDAG_DATA_PATH}", "duck_db")))
-        self.db_path = Path(db_path) if db_path else default_path
-        logger.info(f"DuckDBInterface initialized with db_path: {self.db_path}")
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.warning("PASS THE RIGHT FREQUENCY")
+        # ── choose default & normalise to string ───────────────────────────
+        default_path = os.getenv(
+            "DUCKDB_PATH",
+            os.path.join(f"{TDAG_DATA_PATH}", "duck_db"),
+        )
+        db_uri = str(db_path or default_path).rstrip("/")
 
-        self.con = duckdb.connect(str(self.db_path))
-        # Sane defaults
-        self.con.execute("PRAGMA threads = 4")  # tweak to your cores
+        # ── FileSystem abstraction (works for local & S3) ──────────────────
+        self._fs, self._object_path = fs.FileSystem.from_uri(db_uri)
+
+        # ── DuckDB connection ──────────────────────────────────────────────
+        #   • local   → store meta‑data in a .duckdb file under db_uri
+        #   • remote  → in‑memory DB; still works because all user data
+        #               lives in Parquet on the object store
+        if db_uri.startswith("s3://") or db_uri.startswith("gs://"):
+            self.con = duckdb.connect(":memory:")
+            # duckdb needs the httpfs extension for S3
+            self.con.execute("INSTALL httpfs;")
+            self.con.execute("LOAD httpfs;")
+        else:
+            meta_file = Path(db_uri) / "duck_meta.duckdb"
+            meta_file.parent.mkdir(parents=True, exist_ok=True)
+            self.con = duckdb.connect(str(meta_file))
+
+        # ── sane defaults ──────────────────────────────────────────────────
+        self.con.execute("PRAGMA threads = 4")
         self.con.execute("PRAGMA enable_object_cache = true")
         self.con.execute("SET TIMEZONE = 'UTC';")
+
+        self.db_path = db_uri  # keep the fully‑qualified URI
 
     def launch_gui(self, host='localhost', port=4213, timeout=0.5):
         import duckdb
@@ -76,7 +103,9 @@ class DuckDBInterface:
     # ──────────────────────────────────────────────────────────────────────────────
     # Public API
     # ──────────────────────────────────────────────────────────────────────────────
-    def upsert(self, df: pd.DataFrame, table: str) -> None:
+    def upsert(self, df: pd.DataFrame, table: str,
+               data_frequency:DataFrequency=DataFrequency.one_m
+               ) -> None:
         """
         Idempotently writes a DataFrame into *table* using (time_index, uid) PK.
         Extra columns are added to the table automatically.
@@ -89,34 +118,86 @@ class DuckDBInterface:
             logger.warning(f"Attempted to upsert an empty DataFrame to table '{table}'. Skipping.")
             return
 
+        # —— basic hygiene ——--------------------------------------------------
         df = df.copy()
+        df["time_index"] = pd.to_datetime(df["time_index"], utc=True)
+        if "unique_identifier" not in df.columns:
+            df["unique_identifier"] = ""  # degenerate PK for daily data
+
+        # —— derive partition columns ——---------------------------------------
+        partitions = self._partition_keys(df["time_index"],data_frequency=data_frequency)
+        for col, values in partitions.items():
+            df[col] = values
+        part_cols = list(partitions)
+
         logger.debug(f"Starting upsert of {len(df)} rows into table '{table}' in {self.db_path}")
 
-        try:
-            self._ensure_table(table, df)
-            self.con.register("upd_df", df)
-            cols = ", ".join(f'"{c}"' for c in df.columns)
+        # —— de‑duplication inside *this* DataFrame ——--------------------------
+        df = (
+            df.sort_values(["unique_identifier", "time_index"])
+            .drop_duplicates(subset=["time_index", "unique_identifier"],
+                             keep="last")
+        )
+
+        # ──  Write each partition safely ─────────────────────────────────
+        for keys, sub in df.groupby(part_cols, sort=False):
+            part_path = self._partition_path(dict(zip(part_cols, keys)), table=table)
+            self._fs.create_dir(part_path, recursive=True)
+
+            # 4a) Cross-file de-dup: drop any rows already on disk
             try:
-                self.con.execute(f"""
-                    INSERT OR REPLACE INTO "{table}" ({cols})
-                    SELECT {cols} FROM upd_df
-                """)
-                logger.debug(f"Successfully upserted {len(df)} rows into table '{table}'.")
-            except duckdb.Error as e:
-                logger.error(f"Error during INSERT OR REPLACE into '{table}': {e}")
-                raise
-            finally:
-                self.con.unregister("upd_df")
-        except duckdb.Error as e:
-            logger.error(f"Failed to upsert data into table '{table}': {e}")
-            raise
-        except Exception as e:
-            logger.exception(f"An unexpected error occurred during upsert to table '{table}': {e}")
-            raise
+                existing = (
+                    self.con
+                    .execute(
+                        f"SELECT time_index, unique_identifier "
+                        f"FROM parquet_scan('{part_path}/*.parquet', hive_partitioning=TRUE)"
+                    )
+                    .fetch_df()
+                )
+            except Exception:
+                existing = pd.DataFrame(columns=["time_index", "unique_identifier"])
+
+            if not existing.empty:
+                merged = sub.merge(
+                    existing,
+                    on=["time_index", "unique_identifier"],
+                    how="left",
+                    indicator=True
+                )
+                sub = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
+            if sub.empty:
+                continue  # nothing new here
+
+            # 4b) Atomic write: tmp → final
+            ts = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+            final_name = f"part-{ts}-{uuid.uuid4().hex}.parquet"
+            tmp_name = final_name + ".tmp"
+
+            tmp_path = f"{part_path}/{tmp_name}"
+            final_path = f"{part_path}/{final_name}"
+
+            # Sort for zone-maps, convert to Arrow
+            sub = sub.sort_values(["unique_identifier", "time_index"])
+            table_arrow = pa.Table.from_pandas(sub, preserve_index=False)
+
+            # Write to *.tmp
+            pq.write_table(
+                table_arrow,
+                where=tmp_path,
+                row_group_size=512_000,
+                compression="zstd",
+                filesystem=self._fs,
+            )
+            # Rename into place (tmp → .parquet)
+            self._fs.move(tmp_path, final_path)
+
+        # ──  Refresh view ────────────────────────────────────────────────
+        self._ensure_view(df,table=table)
+
 
     def read(
             self,
-            table: str,
+            table: str,data_frequency:DataFrequency=DataFrequency.one_m,
             *,
             start: Optional[datetime.datetime] = None,
             end: Optional[datetime.datetime] = None,
@@ -211,9 +292,16 @@ class DuckDBInterface:
         logger.debug(f"Executing read query: {query} with params: {params}")
 
         try:
-            table_exists_result = self.con.execute(
-                "SELECT table_name FROM duckdb_tables WHERE table_name = ?", [table]
-            ).fetchone()
+            table_exists_result = self.con.execute("""
+                                                            SELECT COUNT(*) 
+                                                              FROM information_schema.tables
+                                                             WHERE table_schema='main' AND table_name = ?
+                                                            UNION ALL
+                                                            SELECT COUNT(*) 
+                                                              FROM information_schema.views
+                                                             WHERE table_schema='main' AND table_name = ?
+                                                        """, [table, table]).fetchone()[0] > 0
+
             if table_exists_result is None:
                 logger.warning(f"Table '{table}' does not exist in {self.db_path}. Returning empty DataFrame.")
                 return pd.DataFrame()
@@ -222,13 +310,15 @@ class DuckDBInterface:
 
             if not df.empty:
                 schema = self.con.execute(f'PRAGMA table_info("{table}")').fetchall()
-                type_map = {name: self._duck_to_pandas(duck_type)
-                            for name, duck_type, nullable, pk, default, primary_key_pos in schema
-                            if name in df.columns}
+                type_map = {
+                    name: self._duck_to_pandas(duck_type, data_frequency=data_frequency)
+                    for cid, name, duck_type, notnull, default, pk in schema
+                    if name in df.columns
+                }
                 for col, target_type in type_map.items():
                     try:
                         if target_type == "datetime64[ns, UTC]":
-                            df[col] = pd.to_datetime(df[col], errors='coerce').dt.tz_localize('UTC')
+                            df[col] = pd.to_datetime(df[col], errors='coerce').dt.tz_convert('UTC')
                         elif target_type == "datetime64[ns]":
                             df[col] = pd.to_datetime(df[col], errors='coerce')
                         else:
@@ -254,94 +344,100 @@ class DuckDBInterface:
             logger.exception(f"An unexpected error occurred during read from table '{table}': {e}")
             raise
 
-
     def drop_table(self, table: str) -> None:
         """
-        Drops the specified table from the database.
+        Drops the specified table and corresponding view from the database.
 
         Args:
-            table (str): The name of the table to drop.
+            table (str): The name of the table/view to drop.
         """
-        logger.debug(f"Attempting to drop table '{table}' from {self.db_path}")
+        logger.debug(f"Attempting to drop table and view '{table}' from {self.db_path}")
         try:
-            # Use IF EXISTS to avoid error if table is already gone
-            self.con.execute(f'DROP TABLE IF EXISTS "{table}"')
-            logger.debug(f"Successfully dropped table '{table}' (if it existed).")
-        except duckdb.Error as e:
-            logger.error(f"Failed to drop table '{table}': {e}")
-            raise # Re-raise the error after logging
-        except Exception as e:
-            logger.exception(f"An unexpected error occurred while dropping table '{table}': {e}")
-            raise
+            # Drop the view first (if it exists)
+            self.con.execute(f'DROP VIEW IF EXISTS "{table}"')
+            logger.debug(f"Dropped view '{table}' (if it existed).")
 
+            # Then drop the table (if it exists)
+            self.con.execute(f'DROP TABLE IF EXISTS "{table}"')
+            logger.debug(f"Dropped table '{table}' (if it existed).")
+
+        except duckdb.Error as e:
+            logger.error(f"Failed to drop table/view '{table}': {e}")
+            raise
+        except Exception as e:
+            logger.exception(f"An unexpected error occurred while dropping table/view '{table}': {e}")
+            raise
 
     def list_tables(self) -> List[str]:
         """
-        Lists all user-defined tables in the main schema of the database.
-
-        Returns:
-            List[str]: A list of table names. Returns an empty list if the
-                       database file does not exist or on error.
+        Returns names of all tables and views in the main schema.
         """
-        logger.debug(f"Attempting to list tables in {self.db_path}")
-        tables = []
         try:
-            # Query duckdb_tables information schema view for user tables
-            results = self.con.execute(
-                "SELECT table_name FROM duckdb_tables WHERE schema_name = 'main' ORDER BY table_name"
-            ).fetchall()
-            tables = [row[0] for row in results]
-            logger.debug(f"Found {len(tables)} tables: {tables}")
-        except duckdb.IOException as e:
-             # Specific case where the file didn't exist and couldn't be created/opened
-             logger.error(f"Could not list tables, IO error connecting to {self.db_path}: {e}")
-             return [] # Return empty list if DB file is inaccessible
+            rows = self.con.execute("SHOW TABLES").fetchall()
+            return [r[0] for r in rows]
         except duckdb.Error as e:
-            logger.error(f"Failed to list tables in {self.db_path}: {e}")
-            return [] # Return empty list on other DB errors
-        except Exception as e:
-            logger.exception(f"An unexpected error occurred while listing tables in {self.db_path}: {e}")
-            return [] # Return empty list on unexpected errors
-
-        return tables
+            logger.error(f"Error listing tables/views in {self.db_path}: {e}")
+            return []
 
 
     # ──────────────────────────────────────────────────────────────────────────────
     # Private helpers
     # ──────────────────────────────────────────────────────────────────────────────
-    def _ensure_table(self, table: str, df: pd.DataFrame) -> None:
-        """
-        Creates the table if absent, or adds any still‑missing columns.
-        """
-        # 1) Create‑if‑missing with the two key columns
-        if "unique_identifier" in df.columns:
-            create_cmd = f"""
-                CREATE TABLE IF NOT EXISTS "{table}" (
-                time_index        TIMESTAMPTZ   NOT NULL,
-                unique_identifier VARCHAR   NOT NULL,
-                PRIMARY KEY (time_index, unique_identifier)
-            )"""
-        else:
-            create_cmd = f"""
-                CREATE TABLE IF NOT EXISTS "{table}" (
-                time_index        TIMESTAMPTZ   NOT NULL,
-                PRIMARY KEY (time_index)
-            )"""
 
-        self.con.execute(create_cmd)
-
-        # 2) Add new columns on the fly
-        existing_cols = {
-            r[1] for r in self.con.execute(f"""
-                PRAGMA table_info('{table}')
-            """).fetchall()
-        }
+    def _ensure_view(self, df: pd.DataFrame, table: str) -> None:
+        """
+        CREATE OR REPLACE a view named `table` that:
+          * reads all Parquet under self.db_path/table/**
+          * hides partition columns (year, month, day)
+          * locks column dtypes by explicit CASTs
+        """
+        partition_cols = {"year", "month", "day"}
+        select_exprs = []
         for col, dtype in df.dtypes.items():
-            if col in existing_cols:
+            if col in partition_cols:
                 continue
             duck_type = self._pandas_to_duck(dtype)
-            self.con.execute(f'ALTER TABLE "{table}" ADD COLUMN {col} {duck_type}')
+            select_exprs.append(f"CAST({col} AS {duck_type}) AS {col}")
 
+        star = ",\n       ".join(select_exprs) or "*"
+        file_glob = f"{self.db_path}/{table}/**/*.parquet"
+        ddl = f"""
+        CREATE OR REPLACE VIEW "{table}" AS
+        SELECT {star}
+        FROM parquet_scan('{file_glob}', hive_partitioning=TRUE)
+        """
+
+        # Execute DDL in an explicit transaction
+        self._execute_transaction(ddl)
+
+    def _partition_path(self, keys: dict,table:str) -> str:
+        parts = [f"{k}={int(v):02d}" if k != "year" else f"{k}={int(v):04d}"
+                 for k, v in keys.items()]
+        return f"{self.db_path}/{table}/" + "/".join(parts)
+
+    def _partition_keys(self, ts: pd.Series,data_frequency:DataFrequency) -> dict:
+        """Return a dict of partition column → Series."""
+        keys = {"year": ts.dt.year, "month": ts.dt.month}
+        if data_frequency == "minute":
+            keys["day"] = ts.dt.day
+        return keys
+
+    def _execute_transaction(self, sql: str) -> None:
+        """
+        Run a single-statement SQL in a BEGIN/COMMIT block,
+        rolling back on any failure.
+        """
+        try:
+            self.con.execute("BEGIN TRANSACTION;")
+            self.con.execute(sql)
+            self.con.execute("COMMIT;")
+        except Exception:
+            # best-effort rollback (if inside a failed transaction)
+            try:
+                self.con.execute("ROLLBACK;")
+            except Exception:
+                pass
+            raise
     @staticmethod
     def _pandas_to_duck(dtype) -> str:
         """
@@ -359,7 +455,7 @@ class DuckDBInterface:
         return "VARCHAR"
 
     @staticmethod
-    def _duck_to_pandas(duck_type: str):
+    def _duck_to_pandas(duck_type: str,data_frequency:DataFrequency):
         """
         Minimal DuckDB → pandas dtype mapping.
         Returns the dtype object (preferred) so that
@@ -369,7 +465,12 @@ class DuckDBInterface:
         dt = duck_type.upper()
 
         # --- datetimes ------------------------------------------------------
-        if dt in ("TIMESTAMPTZ", "TIMESTAMP", "DATETIME"):
+        if dt in ("TIMESTAMPTZ", "TIMESTAMP WITH TIME ZONE"):
+            # keep the UTC tz-awareness
+            return "datetime64[ns, UTC]"
+
+
+        if dt in ("TIMESTAMP", "DATETIME",):
             # keep timezone if present; duckdb returns tz‑aware objects already,
             # so no explicit 'UTC' suffix is needed here.
             return "datetime64[ns]"
@@ -391,4 +492,57 @@ class DuckDBInterface:
         # --- everything else ------------------------------------------------
         return pd.StringDtype()              # pandas‘ native nullable string
 
+        # ─────────────────────────────────────────────────────────────────────── #
+        # 3. OVERNIGHT DEDUP & COMPACTION                                        #
+        # ─────────────────────────────────────────────────────────────────────── #
+        def overnight_dedup(self, table: str, date: Optional[datetime.date] = None) -> None:
+            """
+            Keep only the newest row per (time_index, unique_identifier)
+            for each partition, coalesce small files into one Parquet file.
 
+            Run this once a day during low‑traffic hours.
+            """
+            # --- select partitions to touch ------------------------------------
+            base = f"{self.db_path}/{table}"
+            selector = fs.FileSelector(base, recursive=True)
+            dirs = {info.path.rpartition("/")[0] for info in self._fs.get_file_info(selector)
+                    if info.type == fs.FileType.File
+                    and info.path.endswith(".parquet")}
+
+            if date:
+                y, m, d = date.year, date.month, date.day
+                dirs = {p for p in dirs if
+                        f"year={y:04d}" in p and f"month={m:02d}" in p
+                        and (data_frequency != "minute" or f"day={d:02d}" in p)}
+
+            for part_path in sorted(dirs):
+                tmp_file = f"{part_path}/compact-{uuid.uuid4().hex}.parquet"
+
+                # DuckDB SQL: window‑deduplicate & write in one shot
+                copy_sql = f"""
+                COPY (
+                  SELECT *
+                  FROM (
+                    SELECT *,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY time_index, unique_identifier
+                               ORDER BY _file_path DESC
+                           ) AS rn
+                    FROM parquet_scan('{part_path}/*.parquet',
+                                      hive_partitioning=TRUE,
+                                      filename=true)       -- exposes _file_path
+                  )
+                  WHERE rn = 1
+                )
+                TO '{tmp_file}'
+                (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 512000)
+                """
+                self.con.execute(copy_sql)
+
+                # remove old fragments & leave only the compacted file
+                for info in self._fs.get_file_info(fs.FileSelector(part_path)):
+                    if info.type == fs.FileType.File and info.path != tmp_file:
+                        self._fs.delete_file(info.path)
+
+                # Optionally rename to a deterministic name; here we just keep tmp_file
+                logger.info(f"Compacted + de‑duplicated partition {part_path}")

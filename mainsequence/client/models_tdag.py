@@ -5,7 +5,7 @@ import yaml
 from .base import BasePydanticModel, BaseObjectOrm, TDAG_ENDPOINT
 from .data_sources_interfaces.duckdb import DuckDBInterface
 from .utils import (is_process_running, get_network_ip,
-                    TDAG_CONSTANTS,
+                    TDAG_CONSTANTS,DataFrequency,
                     DATE_FORMAT, AuthLoaders, make_request, set_types_in_table, request_to_datetime, serialize_to_json, bios_uuid)
 import copy
 import datetime
@@ -27,7 +27,6 @@ import gzip
 import base64
 import numpy as np
 import concurrent.futures
-from enum import IntEnum, Enum
 
 
 _default_data_source = None  # Module-level cache
@@ -40,7 +39,7 @@ loaders = AuthLoaders()
 
 # Global executor (or you could define one on your class)
 _executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
-
+DUCK_DB="duck_db"
 
 class AlreadyExist(Exception):
     pass
@@ -697,14 +696,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             time.sleep(time_to_wait)
 
 
-class DataFrequency(str, Enum):
-    one_m = "1m"
-    five_m = "5m"
-    one_d = "1d"
-    one_w = "1w"
-    one_year = "1y"
-    one_month ="1mo"
-    one_quarter ="1q"
+
 
 class TableMetaData(BaseModel):
     identifier: str = None
@@ -809,7 +801,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             related_resource=data_source.id,
         )
         if (isinstance(self.data_source, int) and self.data_source.id == duckdb_dynamic_data_source.id) or \
-                (not isinstance(self.data_source, int) and self.data_source.related_resource.class_type == "duck_db"):
+                (not isinstance(self.data_source, int) and self.data_source.related_resource.class_type == DUCK_DB):
             db_interface = DuckDBInterface()
             db_interface.drop_table(self.table_name)
 
@@ -1586,7 +1578,7 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             grouped_dates: dict,
     ):
 
-        if self.class_type == "duck_db":
+        if self.class_type == DUCK_DB:
             DuckDBInterface().upsert(
                 df=serialized_data_frame,
                 table=local_metadata.remote_table.table_name
@@ -1633,7 +1625,7 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
     ) -> pd.DataFrame:
 
-        if self.class_type == "duck_db":
+        if self.class_type == DUCK_DB:
             db_interface = DuckDBInterface()
             table_name = local_metadata.remote_table.table_name
 
@@ -2029,6 +2021,7 @@ class PodDataSource:
         remote_tables = DynamicTableMetaData.filter(data_source__id=duckdb_dynamic_data_source.id, list_tables=True)
         remote_table_names = [t.table_name for t in remote_tables]
         from mainsequence.client.data_sources_interfaces.duckdb import DuckDBInterface
+        from mainsequence.client.utils import DataFrequency
         db_interface=DuckDBInterface()
         local_table_names = db_interface.list_tables()
 
@@ -2050,14 +2043,14 @@ class PodDataSource:
 
         physical_ds = self.data_source.related_resource
         banner = (
-            f"\n{'-' * 80}\n"
-            f"LOCAL data source SET: {physical_ds.display_name}  (engine={physical_ds.class_type})\n"
-            f"\nTo launch the GUI, run these commands in your Python environment:\n"
-            f"  import duckdb\n"
-            f"  conn = duckdb.connect('{db_interface.db_path}')\n"
-            f"  conn.execute(\"LOAD ui;\")         # Loads the UI extension\n"
-            f"  conn.execute(\"CALL start_ui();\")  # Starts the server and opens the browser\n"
-            f"{'-' * 80}\n"
+                "─" * 40 + "\n"
+                           f"LOCAL: {physical_ds.display_name} (engine={physical_ds.class_type})\n\n"
+                           "import duckdb, pathlib\n"
+                           f"path = pathlib.Path('{db_interface.db_path}') / 'duck_meta.duckdb'\n"
+                           "conn = duckdb.connect(':memory:')\n"
+                           "conn.execute(f\"ATTACH '{path}' AS ro (READ_ONLY)\")\n"
+                           "conn.execute('INSTALL ui; LOAD ui; CALL start_ui();')\n"
+                + "─" * 40
         )
         logger.info(banner)
 
