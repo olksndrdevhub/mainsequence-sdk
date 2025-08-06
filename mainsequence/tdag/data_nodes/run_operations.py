@@ -142,11 +142,7 @@ class UpdateRunner:
         return local_metadatas_map, state_data
 
     def _setup_execution_environment(self) -> Dict[int, ms_client.LocalTimeSerie]:
-
-
         local_metadatas, state_data = self._pre_update_routines()
-
-
         return local_metadatas
 
     def _start_update(self, local_time_series_map: Dict, use_state_for_update: bool):
@@ -188,10 +184,9 @@ class UpdateRunner:
             # Always set last relations details after the run completes.
             self.ts.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True)
 
-            self.ts.run_post_update_routines(error_on_last_update=error_on_last_update,
-                                             )
+            self.ts.run_post_update_routines(error_on_last_update=error_on_last_update)
             self.ts.local_persist_manager.set_column_metadata(columns_metadata=self.ts.get_column_metadata())
-            self.ts.local_persist_manager.set_table_metadata( table_metadata=self.ts.get_table_metadata())
+            self.ts.local_persist_manager.set_table_metadata(table_metadata=self.ts.get_table_metadata())
 
         return error_on_last_update
 
@@ -230,7 +225,6 @@ class UpdateRunner:
         Calculates, validates, and persists the data update for the time series.
         """
         # 1. Handle dependency tree update first
-
         if self.update_tree:
             self._verify_tree_is_updated(local_time_series_map, use_state_for_update)
             if self.update_only_tree:
@@ -401,8 +395,6 @@ class UpdateRunner:
             priority_df = dependencies_df[dependencies_df["update_priority"] == priority]
             # Sort by number of upstreams to potentially optimize within a priority level
             sorted_deps = priority_df.sort_values("number_of_upstreams", ascending=False)
-
-
 
             for _, ts_row in sorted_deps.iterrows():
                 key = (ts_row["update_hash"], ts_row["data_source_id"])

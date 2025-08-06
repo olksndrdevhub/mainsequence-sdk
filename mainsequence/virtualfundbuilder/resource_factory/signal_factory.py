@@ -29,9 +29,7 @@ class WeightsBase(BaseResource):
         Attributes:
             assets_configuration (AssetsConfiguration): Configuration details for signal assets.
         """
-        
         self.assets_configuration = signal_assets_configuration
-
         super().__init__()
 
     def get_explanation(self):

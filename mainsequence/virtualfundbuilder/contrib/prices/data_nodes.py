@@ -464,15 +464,14 @@ class InterpolatedPrices(DataNode):
     Handles interpolated prices for assets.
     """
     OFFSET_START = datetime.datetime(2017, 7, 20).replace(tzinfo=pytz.utc)
-    _ARGS_IGNORE_IN_STORAGE_HASH=["asset_category_unique_id","asset_list"]
+    _ARGS_IGNORE_IN_STORAGE_HASH=["asset_category_unique_id", "asset_list"]
     def __init__(
             self,
-
             bar_frequency_id: str,
             intraday_bar_interpolation_rule: str,
             asset_category_unique_id: Optional[str] = None,
             upsample_frequency_id: Optional[str] = None,
-            asset_list: List = None, # todo change for asset_filter when asset filter has all the characteristics
+            asset_list: List = None,
             translation_table_unique_id: Optional[str] = None,
             *args,
             **kwargs
@@ -531,7 +530,6 @@ class InterpolatedPrices(DataNode):
     def _transform_raw_data_to_upsampled_df(
             self,
             raw_data_df: pd.DataFrame,
-            update_statistics: UpdateStatistics,
     ) -> pd.DataFrame:
         """
         Transforms raw data into an upsampled dataframe.
@@ -539,7 +537,7 @@ class InterpolatedPrices(DataNode):
         upsampled_df = []
 
         # TODO this should be a helper function
-        unique_identifier_range_map = {a: {"start_date": d} for a, d in update_statistics.asset_time_statistics.items() }
+        unique_identifier_range_map = {a: {"start_date": d} for a, d in self.update_statistics.asset_time_statistics.items() }
         full_last_observation = self.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map)
         last_observation_map = {}
 
@@ -618,25 +616,18 @@ class InterpolatedPrices(DataNode):
 
         return upsampled_df
 
-    def get_upsampled_data(
-            self,
-            update_statistics: UpdateStatistics,
-    ) -> pd.DataFrame:
+    def get_upsampled_data(self) -> pd.DataFrame:
         """
         Main method to get upsampled data for prices.
         """
-        unique_identifier_range_map = update_statistics.get_update_range_map_great_or_equal()
+        unique_identifier_range_map = self.update_statistics.get_update_range_map_great_or_equal()
 
         raw_data_df = self.bars_ts.get_ranged_data_per_asset(range_descriptor=unique_identifier_range_map)
-
-        if raw_data_df.empty == True:
-            self.logger.info("New new data to interpolate")
+        if raw_data_df.empty:
+            self.logger.info("No new data to interpolate")
             return pd.DataFrame()
 
-        upsampled_df = self._transform_raw_data_to_upsampled_df(
-            raw_data_df.reset_index(["unique_identifier"]),
-            update_statistics
-        )
+        upsampled_df = self._transform_raw_data_to_upsampled_df(raw_data_df.reset_index(["unique_identifier"]))
         return upsampled_df
 
     def get_asset_list(self):
@@ -651,25 +642,19 @@ class InterpolatedPrices(DataNode):
         self.asset_calendar_map = {a.unique_identifier: a.get_calendar() for a in asset_list}
         return asset_list
 
-    def update(
-            self,
-            update_statistics: UpdateStatistics
-    ) -> pd.DataFrame:
+    def update(self) -> pd.DataFrame:
         """
         Updates the series from the source based on the latest value.
         """
-        prices = self.get_upsampled_data(
-            update_statistics=update_statistics,
-        )
-
-        if prices.shape[0]==0:
+        prices = self.get_upsampled_data()
+        if prices.shape[0] == 0:
             return pd.DataFrame()
 
-        if update_statistics.is_empty() == False:
+        if self.update_statistics.is_empty() == False:
             TARGET_COLS = ['open', 'close', 'high', 'low', 'volume', 'open_time']
             assert prices[[c for c in prices.columns if c in TARGET_COLS]].isnull().sum().sum() == 0
 
-        prices = update_statistics.filter_df_by_latest_value(prices)
+        prices = self.update_statistics.filter_df_by_latest_value(prices)
 
         duplicates_exist = prices.reset_index().duplicated(subset=["time_index", "unique_identifier"]).any()
         if duplicates_exist:
@@ -709,10 +694,7 @@ class ExternalPrices(DataNode):
         asset_list = Asset.filter(id__in=asset_category.assets)
         return asset_list
 
-    def update(
-            self,
-            update_statistics: UpdateStatistics
-    ) -> pd.DataFrame:
+    def update(self) -> pd.DataFrame:
         from mainsequence.client.models_tdag import Artifact
         source_artifact = Artifact.get(bucket__name=self.bucket_name, name=self.artifact_name)
         prices_source = pd.read_csv(source_artifact.content)
@@ -728,11 +710,11 @@ class ExternalPrices(DataNode):
         )
 
         # convert figis in source data
-        for asset in update_statistics.asset_list:
+        for asset in self.update_statistics.asset_list:
             prices_source.loc[prices_source["figi"] == asset.figi, "unique_identifier"] = asset.unique_identifier
 
         prices_source.set_index(["time_index", "unique_identifier"], inplace=True)
-        prices = update_statistics.filter_df_by_latest_value(prices_source)
+        prices = self.update_statistics.filter_df_by_latest_value(prices_source)
 
         prices = prices.rename(columns={"price": "open"})[["open"]]
         return prices

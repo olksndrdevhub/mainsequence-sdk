@@ -321,18 +321,12 @@ class PersistManager:
             is_api: True if the target is an APIDataNode
         """
         if not is_api:
-            self.local_metadata.depends_on_connect(
-                                       target_time_serie_id=new_ts.local_time_serie.id
-                                        )
+            self.local_metadata.depends_on_connect(target_time_serie_id=new_ts.local_time_serie.id)
         else:
             try:
-
-                self.local_metadata.depends_on_connect_to_api_table(
-                    target_table_id=new_ts.local_persist_manager.metadata.id
-                )
+                self.local_metadata.depends_on_connect_to_api_table(target_table_id=new_ts.local_persist_manager.metadata.id)
             except Exception as exc:
                 raise exc
-
 
     def display_mermaid_dependency_diagram(self) -> str:
         """
