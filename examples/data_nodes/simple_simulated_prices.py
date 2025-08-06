@@ -1075,6 +1075,22 @@ class WorkflowManager(DataNode):
         pass
 
 
+def test_features_from_prices_local_storage():
+    from mainsequence.client import Asset
+    from mainsequence.client import MARKETS_CONSTANTS
+    ms_client.SessionDataSource.set_local_db()
+
+
+    assets = Asset.filter(ticker__in=["NVDA", "APPL"], )
+    ts = TAFeature(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=28),
+                                                         dict(kind="SMA", length=21),
+                                                         dict(kind="RSI", length=21)
+                                                         ]
+                   )
+
+
+
+
 def test_simulated_prices():
     from mainsequence.client import Asset
     from mainsequence.client import MARKETS_CONSTANTS
