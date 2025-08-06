@@ -570,15 +570,15 @@ class TAFeature(DataNode):
         for feature_config in self.ta_feature_config:
             f_conf=copy.deepcopy(feature_config)
             feature_name=json.dumps(f_conf)
-            feature_kind=feature_config["kind"].lower()
-            feature_config.pop("kind")
+            feature_kind=f_conf["kind"].lower()
+            f_conf.pop("kind")
             func = getattr(ta, feature_kind)
             out = prices_pivot.apply(lambda col: func(col, **feature_config))
 
             features_df[feature_name] = out.stack(dropna=False)
             all_features.append(features_df)
 
-        all_features=pd.concat(all_features,axis=0)
+        all_features=pd.concat(all_features,axis=1)
 
         return all_features
 

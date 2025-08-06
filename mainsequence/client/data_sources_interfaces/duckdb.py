@@ -187,6 +187,13 @@ class DuckDBInterface:
                 row_group_size=512_000,
                 compression="zstd",
                 filesystem=self._fs,
+
+                version="2.6",  # enable the Parquet logical type TIMESTAMP_NANOS
+                coerce_timestamps=None,  # don’t downcast; let 2.6 write native ns
+                allow_truncated_timestamps=False,  # fail if you ever would lose precision
+
+                # (optional) for maximum compatibility via INT96:
+                # use_deprecated_int96_timestamps=True,
             )
             # Rename into place (tmp → .parquet)
             self._fs.move(tmp_path, final_path)
@@ -318,7 +325,13 @@ class DuckDBInterface:
                 for col, target_type in type_map.items():
                     try:
                         if target_type == "datetime64[ns, UTC]":
-                            df[col] = pd.to_datetime(df[col], errors='coerce').dt.tz_convert('UTC')
+                            arr =df[col].values
+                            arr_ns = arr.astype("datetime64[ns]")
+                            df[col] =pd.Series(
+                                    pd.DatetimeIndex(arr_ns, tz="UTC"),
+                                    index=df.index,
+                                    name=col,
+                                )
                         elif target_type == "datetime64[ns]":
                             df[col] = pd.to_datetime(df[col], errors='coerce')
                         else:

@@ -213,11 +213,13 @@ class UpdateRunner:
             raise TypeError(f"Time index must be datetime64[ns, UTC], but found {time_index.dtype}")
 
         # Check for forbidden data types and enforce lowercase columns
-        for col, dtype in df.dtypes.items():
-            if not isinstance(col, str) or not col.islower():
-                raise ValueError(f"Column name '{col}' must be a lowercase string.")
-            if "datetime64" in str(dtype):
-                raise TypeError(f"Column '{col}' has a forbidden datetime64 dtype.")
+        if self.ts.data_source.related_resource.class_type!=ms_client.DUCK_DB:
+
+            for col, dtype in df.dtypes.items():
+                if not isinstance(col, str) or not col.islower():
+                    raise ValueError(f"Column name '{col}' must be a lowercase string.")
+                if "datetime64" in str(dtype):
+                    raise TypeError(f"Column '{col}' has a forbidden datetime64 dtype.")
     @tracer.start_as_current_span("UpdateRunner._update_local")
     def _update_local(
             self,
