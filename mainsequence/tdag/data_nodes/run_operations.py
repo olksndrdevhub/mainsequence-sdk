@@ -392,17 +392,31 @@ class UpdateRunner:
             # Sort by number of upstreams to potentially optimize within a priority level
             sorted_deps = priority_df.sort_values("number_of_upstreams", ascending=False)
 
+
+            #time_series_updated=[]
+            #
+
+
             for _, ts_row in sorted_deps.iterrows():
                 key = (ts_row["update_hash"], ts_row["data_source_id"])
                 ts_to_update = None
                 try:
                     if key in update_map:
                         ts_to_update = update_map[key]["ts"]
+
+                        # deps=ts_to_update.get_dependencies()
+                        # for k,v in deps.items():
+                        #     if v.local_time_serie.id in time_series_updated:
+                        #         deps[k].update_statis()
+
                     else:
                         # If not in the map, it must be rebuilt from storage
                         ts_to_update, _ = build_operations.rebuild_and_set_from_update_hash(
                             update_hash=key[0], data_source_id=key[1]
                         )
+
+
+
 
                     if ts_to_update:
                         self.logger.debug(f"Running debug update for dependency: {ts_to_update.update_hash}")
@@ -419,6 +433,9 @@ class UpdateRunner:
                         dep_runner._start_update(
                             use_state_for_update=False,
                         )
+
+
+
                 except Exception as e:
                     self.logger.exception(f"Failed to update dependency {key[0]}")
                     raise e  # Re-raise to halt the entire process on failure
