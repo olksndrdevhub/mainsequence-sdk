@@ -145,7 +145,7 @@ class UpdateRunner:
         local_metadatas, state_data = self._pre_update_routines()
         return local_metadatas
 
-    def _start_update(self, local_time_series_map: Dict, use_state_for_update: bool):
+    def _start_update(self, use_state_for_update: bool):
         """Orchestrates a single DataNode update, including pre/post routines."""
         historical_update = self.ts.local_persist_manager.local_metadata.set_start_of_execution(
             active_update_scheduler_id=self.scheduler.id
@@ -153,7 +153,6 @@ class UpdateRunner:
         update_statistics = historical_update.update_statistics
         must_update = historical_update.must_update or self.force_update
 
-        # 👇 THIS IS THE ADDED LINE
         # Ensure metadata is fully loaded with relationship details before proceeding.
         self.ts.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True)
 
@@ -165,7 +164,6 @@ class UpdateRunner:
             if must_update:
                 self.logger.info(f"Update required for {self.ts}.")
                 self._update_local(
-                    local_time_series_map=local_time_series_map,
                     overwrite_latest_value=historical_update.last_time_index_value,
                     use_state_for_update=use_state_for_update
                 )
@@ -180,7 +178,6 @@ class UpdateRunner:
                 error_on_update=error_on_last_update
             )
 
-            # 👇 IT IS ALSO IMPORTANT TO RE-SYNC AT THE END
             # Always set last relations details after the run completes.
             self.ts.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True)
 
@@ -223,7 +220,6 @@ class UpdateRunner:
     @tracer.start_as_current_span("UpdateRunner._update_local")
     def _update_local(
             self,
-            local_time_series_map: Dict[int, Any],
             overwrite_latest_value: Optional[datetime.datetime],
             use_state_for_update: bool,
     ) -> Optional[bool]:
@@ -232,7 +228,7 @@ class UpdateRunner:
         """
         # 1. Handle dependency tree update first
         if self.update_tree:
-            self._verify_tree_is_updated(local_time_series_map, use_state_for_update)
+            self._verify_tree_is_updated(use_state_for_update)
             if self.update_only_tree:
                 self.logger.info(f'Dependency tree for {self.ts} updated. Halting run as requested.')
                 return None
@@ -240,7 +236,6 @@ class UpdateRunner:
         # 2. Execute the core data calculation
         with tracer.start_as_current_span("Update Calculation") as update_span:
 
-            # 👇 THIS IS THE CORRECTED LOGIC
             # Add specific log message for the initial run
             if not self.ts.update_statistics:
                 self.logger.info(f"Performing first-time update for {self.ts}...")
@@ -289,7 +284,6 @@ class UpdateRunner:
     @tracer.start_as_current_span("UpdateRunner._verify_tree_is_updated")
     def _verify_tree_is_updated(
             self,
-            local_time_series_map: Dict[int, Any],
             use_state_for_update: bool,
     ) -> None:
         """
@@ -300,7 +294,6 @@ class UpdateRunner:
         parallel (production) helper method.
 
         Args:
-            local_time_series_map: A map of local time series objects in the tree.
             use_state_for_update: If True, uses the current state for the update.
         """
         # 1. Ensure the dependency graph is built in the backend
@@ -331,10 +324,9 @@ class UpdateRunner:
         if dependencies_df.empty:
             return
         if self.debug_mode:
-            self._execute_sequential_debug_update(dependencies_df, update_map,
-                                                  local_time_series_map)
+            self._execute_sequential_debug_update(dependencies_df, update_map,)
         else:
-            self._execute_parallel_distributed_update(dependencies_df, local_time_series_map)
+            self._execute_parallel_distributed_update(dependencies_df)
 
         self.logger.debug(f'Dependency tree evaluation complete for {self.ts}.')
 
@@ -389,13 +381,11 @@ class UpdateRunner:
             self,
             dependencies_df: pd.DataFrame,
             update_map: Dict[Tuple[str, int], Dict],
-            local_time_series_map:Dict[int, ms_client.LocalTimeSerie]
     ) -> None:
         """Runs dependency updates sequentially in the same process for debugging."""
         self.logger.info("Executing dependency updates in sequential debug mode.")
         # Sort by priority to respect the DAG execution order
         sorted_priorities = sorted(dependencies_df["update_priority"].unique())
-
 
         for priority in sorted_priorities:
             priority_df = dependencies_df[dependencies_df["update_priority"] == priority]
@@ -427,7 +417,6 @@ class UpdateRunner:
                         dep_runner._setup_scheduler()
 
                         dep_runner._start_update(
-                            local_time_series_map=local_time_series_map,
                             use_state_for_update=False,
                         )
                 except Exception as e:
@@ -441,7 +430,6 @@ class UpdateRunner:
     def _execute_parallel_distributed_update(
             self,
             dependencies_df: pd.DataFrame,
-            local_time_series_map: Dict[int, "LocalTimeSerie"]
     ) -> None:
         """
 
@@ -477,7 +465,7 @@ class UpdateRunner:
                 span.set_attribute("head_scheduler", self.scheduler.name)
 
                 # 3. Prepare the execution environment (Ray actors, dependency metadata)
-                local_time_series_map = self._setup_execution_environment()
+                _ = self._setup_execution_environment()
                 self.logger.debug("Execution environment and dependency metadata are set.")
 
                 # 4. Wait for the scheduled update time, if not forcing an immediate run
@@ -486,7 +474,6 @@ class UpdateRunner:
 
                 # 5. Trigger the core update process
                 self._start_update(
-                    local_time_series_map=local_time_series_map,
                     use_state_for_update=True
                 )
 
@@ -508,7 +495,6 @@ class UpdateRunner:
             # Clean up temporary attributes on the DataNode instance
             if hasattr(self.ts, 'update_tracker'):
                 del self.ts.update_tracker
-
 
             gc.collect()
 
