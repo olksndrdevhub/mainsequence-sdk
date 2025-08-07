@@ -621,74 +621,6 @@ class Asset(AssetMixin, BaseObjectOrm):
 
         return PortfolioIndexAsset(**r.json())
 
-    @classmethod
-    def register_figi_as_asset_in_main_sequence_venue(cls, figi, timeout=None)->"Asset":
-        url = f"{cls.get_object_url()}/register_figi_as_asset_in_main_sequence_venue/"
-        payload = {"json": {"figi": figi}}
-        r = make_request(
-            s=cls.build_session(),
-            loaders=cls.LOADERS,
-            r_type="POST",
-            url=url,
-            payload=payload,time_out=timeout
-        )
-        if r.status_code not in [200, 201]:
-            raise Exception(f"Error appending creating: {r.text}")
-        return cls(**r.json())
-
-    @classmethod
-    def get_or_register_figi_from_isin_as_asset_in_main_sequence_venue(cls,isin,exchange_code, timeout=None)->"Asset":
-        url = f"{cls.get_object_url()}/get_or_register_figi_from_isin_as_asset_in_main_sequence_venue/"
-        payload = {"json": {"isin": isin,"exchange_code":exchange_code}}
-        r = make_request(
-            s=cls.build_session(),
-            loaders=cls.LOADERS,
-            r_type="POST",
-            url=url,
-            payload=payload, time_out=timeout
-        )
-        if r.status_code not in [200, 201]:
-            raise Exception(f"Error appending creating: {r.text}")
-        return cls(**r.json())
-
-    @classmethod
-    def get_or_register_custom_asset_in_main_sequence_venue(cls, name,ticker,security_type,security_type_2,
-                                                            security_market_sector,isin,exchange_code,
-                                                            timeout=None)->"Asset":
-        url = f"{cls.get_object_url()}/get_or_register_custom_asset_in_main_sequence_venue/"
-        payload = {"json": {"name":name,
-                            "ticker":ticker,
-                            "security_type":security_type,
-                            "security_type_2":security_type_2,
-                            "security_market_sector":security_market_sector,
-                            "isin":isin,
-                            "exchange_code":exchange_code,}}
-        r = make_request(
-            s=cls.build_session(),
-            loaders=cls.LOADERS,
-            r_type="POST",
-            url=url,
-            payload=payload, time_out=timeout
-        )
-        if r.status_code not in [200, 201]:
-            raise Exception(f"Error appending creating: {r.text}")
-        return cls(**r.json())
-
-    @classmethod
-    def batch_get_or_register_custom_assets(cls,asset_list:List["Asset"],timeout=None)->List[int]:
-        url = f"{cls.get_object_url()}/batch_get_or_register_custom_assets/"
-        payload = {"json": {"asset_list": asset_list,
-                           }}
-        r = make_request(
-            s=cls.build_session(),
-            loaders=cls.LOADERS,
-            r_type="POST",
-            url=url,
-            payload=payload, time_out=timeout
-        )
-        if r.status_code not in [200, 201]:
-            raise Exception(f"Error appending creating: {r.text}")
-        return r.json()
 
 class PortfolioIndexAsset(Asset):
     reference_portfolio : Union["Portfolio",int]
@@ -749,7 +681,7 @@ class AccountExecutionConfiguration(BasePydanticModel):
 class AccountPortfolioPosition(BasePydanticModel):
     id: Optional[int]
     parent_positions: Optional[int]
-    target_portfolio: int
+    target_asset: int
     weight_notional_exposure: Optional[float]=0.0
     constant_notional_exposure: Optional[float]=0.0
     single_asset_quantity: Optional[float]=0.0
@@ -780,17 +712,9 @@ class AccountMixin(BasePydanticModel):
     execution_venue: Union["ExecutionVenue",int]
     account_is_active: bool
     account_name: Optional[str] = None
-    cash_asset: Asset
     is_paper: bool
     account_target_portfolio: AccountPortfolio
     latest_holdings: Union["AccountLatestHoldings",None]=None
-
-    @property
-    def account_target_portfolio(self):
-        return self.accounttargetportfolio
-
-
-
 
 
     def build_rebalance(
@@ -1033,7 +957,7 @@ class AccountHistoricalHoldingsMixin:
 
     is_trade_snapshot: bool = Field(default=False)
     target_trade_time: Optional[datetime.datetime] = None
-    related_expected_asset_exposure_df: Optional[Dict[str, Any]] = None
+    related_expected_asset_exposure_df: Optional[List[Dict[str, Any]]] = None
 
     holdings: List[AccountPositionDetail]
 
@@ -1242,7 +1166,6 @@ class PortfolioMixin:
             signal_local_time_serie_id: int,
             is_active: bool,
             calendar_name: str,
-            tracking_funds_expected_exposure_from_latest_holdings: bool,
             target_portfolio_about: PortfolioAbout,
             backtest_table_price_column_name: str,
             tags: Optional[list] = None,
@@ -1257,7 +1180,6 @@ class PortfolioMixin:
             "signal_local_time_serie_id": signal_local_time_serie_id,
             # Using the same ID for local_signal_time_serie_id as specified.
             "calendar_name": calendar_name,
-            "tracking_funds_expected_exposure_from_latest_holdings": tracking_funds_expected_exposure_from_latest_holdings,
             "target_portfolio_about": target_portfolio_about,
             "backtest_table_price_column_name": backtest_table_price_column_name,
             "tags": tags,
