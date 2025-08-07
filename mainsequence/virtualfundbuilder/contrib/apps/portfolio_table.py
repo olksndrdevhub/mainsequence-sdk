@@ -16,12 +16,9 @@ from mainsequence.virtualfundbuilder.resource_factory.app_factory import (
 
 logger = get_vfb_logger()
 
-PortfolioNameEnum = Enum(
+PortfolioIdEnum = Enum(
     "PortfolioEnum",
-    {
-        p.portfolio_name: p.portfolio_ticker
-        for p in Portfolio.filter(local_time_serie__isnull=False)
-    },
+    {portfolio.index_asset.name: portfolio.id for portfolio in Portfolio.filter(local_time_serie__isnull=False)},
     type=str,
 )
 
@@ -32,7 +29,7 @@ class ReportType(Enum):
 class PortfolioTableConfiguration(BaseModel):
     report_title: str = "Portfolio Table"
     report_type: ReportType = ReportType.FIXED_INCOME
-    portfolio_tickers: List[PortfolioNameEnum]
+    portfolio_ids: List[PortfolioIdEnum]
     report_days: int = 365 * 5
 
 @register_app()
@@ -101,6 +98,7 @@ class PortfolioTable(HtmlApp):
 
 if __name__ == "__main__":
     cfg = PortfolioTableConfiguration(
-        report_type=ReportType.LIQUIDITY
+        report_type=ReportType.LIQUIDITY,
+        portfolio_ids=[list(PortfolioIdEnum)[0].value]
     )
     PortfolioTable(cfg).run()

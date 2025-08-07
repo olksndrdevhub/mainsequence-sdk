@@ -17,14 +17,14 @@ import plotly.graph_objects as go
 
 logger = get_vfb_logger()
 
-PortfolioNameEnum = Enum(
+PortfolioIdEnum = Enum(
     "PortfolioEnum",
-    {portfolio.portfolio_name: portfolio.portfolio_ticker for portfolio in Portfolio.filter(local_time_serie__isnull=False)},
+    {portfolio.index_asset.name: portfolio.id for portfolio in Portfolio.filter(local_time_serie__isnull=False)},
     type=str,
 )
 class PortfolioReportConfiguration(BaseModel):
     report_title: str = "Portfolio Report"
-    portfolio_tickers: List[PortfolioNameEnum]
+    portfolio_ids: List[PortfolioIdEnum]
     report_days: int = 365 * 5
 
 @register_app()
@@ -44,25 +44,25 @@ class PortfolioReport(HtmlApp):
         all_dates = pd.Index([])
 
         portfolio_data_map = {}
-        for ticker in self.configuration.portfolio_tickers:
+        for portfolio_id in self.configuration.portfolio_ids:
             try:
-                portfolio = Portfolio.get(portfolio_ticker=ticker)
+                portfolio = Portfolio.get(id=portfolio_id)
                 data = portfolio.local_time_serie.get_data_between_dates_from_api()
                 data['time_index'] = pd.to_datetime(data['time_index'])
                 report_data = data[data['time_index'] >= start_date].copy().sort_values('time_index')
 
                 if not report_data.empty:
-                    portfolio_data_map[ticker] = report_data
+                    portfolio_data_map[portfolio_id] = report_data
                     all_dates = all_dates.union(report_data['time_index'])
 
             except Exception as e:
-                logger.error(f"Could not process portfolio {ticker}. Error: {e}")
+                logger.error(f"Could not process portfolio {portfolio_id}. Error: {e}")
 
         # Second loop: process and normalize data
-        for ticker in self.configuration.portfolio_tickers:
-            if ticker in portfolio_data_map:
-                report_data = portfolio_data_map[ticker]
-                portfolio = Portfolio.get(portfolio_ticker=ticker)
+        for portfolio_id in self.configuration.portfolio_ids:
+            if portfolio_id in portfolio_data_map:
+                report_data = portfolio_data_map[portfolio_id]
+                portfolio = Portfolio.get(id=portfolio_id)
 
                 # Reindex to common date range and forward-fill missing values
                 processed_data = report_data.set_index('time_index').reindex(all_dates).ffill().reset_index()
@@ -93,5 +93,7 @@ class PortfolioReport(HtmlApp):
         return html_chart
 
 if __name__ == "__main__":
-    configuration = PortfolioReportConfiguration()
+    configuration = PortfolioReportConfiguration(
+        portfolio_ids=[list(PortfolioIdEnum)[0].value]
+    )
     PortfolioReport(configuration).run()

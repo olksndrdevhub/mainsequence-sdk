@@ -1142,7 +1142,7 @@ class PortfolioMixin:
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
     tags: Optional[List['PortfolioTags']] = None
     calendar: Optional['Calendar']
-    index_asset:PortfolioIndexAsset
+    index_asset: PortfolioIndexAsset
 
     def pretty_print(self) -> str:
         def format_field(name, value):
