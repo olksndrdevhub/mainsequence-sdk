@@ -32,4 +32,3 @@ portfolio_markets_configuration:
     description: >
       Portfolio tracking the Magnificent Seven stocks weighted by daily news sentiment score.
       Sentiment is aggregated over the past 7 days (default lookback).
-  tracking_funds_expected_exposure_from_latest_holdings: false

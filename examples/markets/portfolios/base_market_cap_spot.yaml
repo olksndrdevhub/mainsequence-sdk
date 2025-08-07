@@ -35,6 +35,5 @@ portfolio_markets_configuration:
   front_end_details:
     description: "This is about this portfolios"
   portfolio_name: Thematic CATEGORY_ID |  CATEGORY_SOURCE
-  tracking_funds_expected_exposure_from_latest_holdings : False
   builds_from_target_positions: True
   follow_account_rebalance: True

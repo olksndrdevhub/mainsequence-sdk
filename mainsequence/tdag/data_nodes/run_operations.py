@@ -387,15 +387,14 @@ class UpdateRunner:
         # Sort by priority to respect the DAG execution order
         sorted_priorities = sorted(dependencies_df["update_priority"].unique())
 
+        def refresh_update_statistics_of_deps(ts):
+            for _, ts_dep in ts.dependencies().items():
+                ts_dep.update_statistics = ts_dep.local_persist_manager.get_update_statistics_for_table()
+
         for priority in sorted_priorities:
             priority_df = dependencies_df[dependencies_df["update_priority"] == priority]
             # Sort by number of upstreams to potentially optimize within a priority level
             sorted_deps = priority_df.sort_values("number_of_upstreams", ascending=False)
-
-
-            #time_series_updated=[]
-            #
-
 
             for _, ts_row in sorted_deps.iterrows():
                 key = (ts_row["update_hash"], ts_row["data_source_id"])
@@ -404,19 +403,14 @@ class UpdateRunner:
                     if key in update_map:
                         ts_to_update = update_map[key]["ts"]
 
-                        # deps=ts_to_update.get_dependencies()
-                        # for k,v in deps.items():
-                        #     if v.local_time_serie.id in time_series_updated:
-                        #         deps[k].update_statis()
+                        # update the update_statistics of the dependencies
+                        refresh_update_statistics_of_deps(ts_to_update)
 
                     else:
                         # If not in the map, it must be rebuilt from storage
                         ts_to_update, _ = build_operations.rebuild_and_set_from_update_hash(
                             update_hash=key[0], data_source_id=key[1]
                         )
-
-
-
 
                     if ts_to_update:
                         self.logger.debug(f"Running debug update for dependency: {ts_to_update.update_hash}")
@@ -433,12 +427,12 @@ class UpdateRunner:
                         dep_runner._start_update(
                             use_state_for_update=False,
                         )
-
-
-
                 except Exception as e:
                     self.logger.exception(f"Failed to update dependency {key[0]}")
                     raise e  # Re-raise to halt the entire process on failure
+
+        # refresh update statistics of direct dependencies
+        refresh_update_statistics_of_deps(self.ts)
 
     # This code is a method within the UpdateRunner class.
     # Assumes 'ms_client', 'tracer_instrumentator', and 'DependencyUpdateError' are imported.

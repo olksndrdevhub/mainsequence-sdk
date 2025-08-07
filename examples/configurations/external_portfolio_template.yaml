@@ -30,4 +30,3 @@ portfolio_markets_configuration:
   portfolio_name: ""
   front_end_details:
     description: "This is about this portfolios"
-  tracking_funds_expected_exposure_from_latest_holdings: false
