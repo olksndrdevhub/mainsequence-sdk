@@ -5,6 +5,8 @@ from examples.data_nodes.simple_data_nodes import build_test_time_series
 
 
 def main():
+
+
     parser = argparse.ArgumentParser(
         description="Run data node functions: simulated prices or test time series."
     )
