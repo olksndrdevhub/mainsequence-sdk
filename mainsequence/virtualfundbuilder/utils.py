@@ -22,6 +22,9 @@ from enum import Enum
 from pydantic import BaseModel
 import yaml
 from mainsequence.logconf import logger
+import inspect
+from typing import Any, Dict, List, Optional, Type, Union
+from pydantic import BaseModel, Field, create_model
 
 def get_vfb_logger():
     global logger
@@ -370,7 +373,6 @@ def parse_object_signature(base_object: Any, use_examples_for_default: Optional[
     return documentation_dict
 
 
-
 def object_signature_to_markdown(root_dict, level=1, elements_to_exclude=None, children_to_exclude=None):
     """
     Convert a nested dictionary structure into a markdown formatted string.
@@ -593,3 +595,264 @@ def is_jupyter_environment():
         return "ipykernel" in str(get_ipython())
     except ImportError:
         return False
+
+
+
+
+def type_to_json_schema(py_type: Type, definitions: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Recursively converts a Python type annotation to a JSON schema dictionary.
+    Handles Pydantic models, Enums, Lists, Unions, and basic types.
+
+    Args:
+        py_type: The Python type to convert.
+        definitions: A dict to store schemas of nested models, used for $defs.
+
+    Returns:
+        A dictionary representing the JSON schema for the given type.
+    """
+    origin = get_origin(py_type)
+    args = get_args(py_type)
+
+    # Handle Optional[T] by making the inner type nullable
+    if origin is Union and len(args) == 2 and type(None) in args:
+        non_none_type = args[0] if args[1] is type(None) else args[1]
+        schema = type_to_json_schema(non_none_type, definitions)
+        # Add null type to anyOf or create a new anyOf
+        if "anyOf" in schema:
+            if not any(sub.get("type") == "null" for sub in schema["anyOf"]):
+                schema["anyOf"].append({"type": "null"})
+        else:
+            schema = {"anyOf": [schema, {"type": "null"}]}
+        return schema
+
+    if origin is Union:
+        return {"anyOf": [type_to_json_schema(arg, definitions) for arg in args]}
+    if origin in (list, List):
+        item_schema = type_to_json_schema(args[0], definitions) if args else {}
+        return {"type": "array", "items": item_schema}
+    if origin in (dict, Dict):
+        value_schema = type_to_json_schema(args[1], definitions) if len(args) > 1 else {}
+        return {"type": "object", "additionalProperties": value_schema}
+
+    # Handle Pydantic Models by creating a reference
+    if inspect.isclass(py_type) and issubclass(py_type, BaseModel):
+        model_name = py_type.__name__
+        if model_name not in definitions:
+            definitions[model_name] = {}  # Placeholder to break recursion
+            model_schema = py_type.model_json_schema(ref_template="#/$defs/{model}")
+            if "$defs" in model_schema:
+                for def_name, def_schema in model_schema.pop("$defs").items():
+                    if def_name not in definitions:
+                        definitions[def_name] = def_schema
+            definitions[model_name] = model_schema
+        return {"$ref": f"#/$defs/{model_name}"}
+
+    # Handle Enums
+    if inspect.isclass(py_type) and issubclass(py_type, Enum):
+        return {"type": "string", "enum": [e.value for e in py_type]}
+
+    # Handle basic types
+    type_map = {str: "string", int: "integer", float: "number", bool: "boolean"}
+    if py_type in type_map:
+        return {"type": type_map[py_type]}
+    if py_type is Any:
+        return {}  # Any type, no constraint
+
+    # Fallback for unknown types
+    return {"type": "string", "description": f"Unrecognized type: {getattr(py_type, '__name__', str(py_type))}"}
+
+
+def create_schema_from_signature(func: callable) -> Dict[str, Any]:
+    """
+    Parses a function's signature (like __init__) and creates a JSON schema.
+
+    Args:
+        func: The function or method to parse.
+
+    Returns:
+        A dictionary representing the JSON schema of the function's signature.
+    """
+    try:
+        signature = inspect.signature(func)
+        type_hints = get_type_hints(func)
+    except (TypeError, NameError): # Handles cases where hints can't be resolved
+        return {}
+
+    parsed_doc = docstring_parser.parse(func.__doc__ or "")
+    arg_descriptions = {p.arg_name: p.description for p in parsed_doc.params}
+
+    properties = {}
+    required = []
+    definitions = {}  # For nested models
+
+    for name, param in signature.parameters.items():
+        if name in ('self', 'cls', 'args', 'kwargs'):
+            continue
+
+        param_type = type_hints.get(name, Any)
+        prop_schema = type_to_json_schema(param_type, definitions)
+        prop_schema['title'] = name.replace('_', ' ').title()
+
+        if name in arg_descriptions:
+            prop_schema['description'] = arg_descriptions[name]
+
+        if param.default is inspect.Parameter.empty:
+            required.append(name)
+        else:
+            default_value = param.default
+            try:
+                # Ensure default is JSON serializable
+                json.dumps(default_value)
+                prop_schema['default'] = default_value
+            except TypeError:
+                 if isinstance(default_value, Enum):
+                     prop_schema['default'] = default_value.value
+                 else:
+                     # Fallback for non-serializable defaults
+                     prop_schema['default'] = str(default_value)
+
+        properties[name] = prop_schema
+
+    schema = {
+        "title": getattr(func, '__name__', 'Schema'),
+        "type": "object",
+        "properties": properties,
+    }
+    if required:
+        schema["required"] = required
+    if definitions:
+        schema["$defs"] = definitions
+
+    return schema
+
+# Maps JSON schema types to Python types
+JSON_TYPE_TO_PYTHON_TYPE: Dict[str, Type] = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "object": dict,
+    "array": list,
+    "null": type(None),
+}
+
+# Maps JSON schema constraints to Pydantic Field arguments
+CONSTRAINT_MAPPING: Dict[str, str] = {
+    "minLength": "min_length",
+    "maxLength": "max_length",
+    "pattern": "pattern",
+    "minimum": "ge",
+    "maximum": "le",
+    "exclusiveMinimum": "gt",
+    "exclusiveMaximum": "lt",
+    "multipleOf": "multiple_of",
+    "minItems": "min_length",
+    "maxItems": "max_length",
+}
+
+
+def create_model_from_schema(
+        schema: Dict[str, Any], model_name: Optional[str] = None
+) -> Type[BaseModel]:
+    """
+    Dynamically creates a Pydantic model from a JSON schema dictionary.
+    This version handles dependencies in any order within the '$defs' section.
+    """
+    created_models: Dict[str, Type[BaseModel]] = {}
+
+    def _get_field_info(field_schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Extracts Pydantic Field parameters from a JSON schema property."""
+        field_params = {}
+        if "default" in field_schema:
+            field_params["default"] = field_schema["default"]
+        if "description" in field_schema:
+            field_params["description"] = field_schema["description"]
+        for json_key, pydantic_key in CONSTRAINT_MAPPING.items():
+            if json_key in field_schema:
+                field_params[pydantic_key] = field_schema[json_key]
+        return field_params
+
+    def _resolve_type_from_schema(field_schema: Dict[str, Any]) -> Any:
+        """Recursively resolves the Python type for a given schema definition."""
+        if "$ref" in field_schema:
+            model_ref_name = field_schema["$ref"].split('/')[-1]
+            # This will raise a KeyError if the dependency is not yet created,
+            # which is caught by the multi-pass logic below.
+            return created_models[model_ref_name]
+
+        if "anyOf" in field_schema:
+            types = [_resolve_type_from_schema(s) for s in field_schema["anyOf"]]
+            non_none_types = [t for t in types if t is not type(None)]
+            if not non_none_types:
+                return type(None)
+            final_type = Union[tuple(non_none_types)] if len(non_none_types) > 1 else non_none_types[0]
+            return Optional[final_type] if type(None) in types else final_type
+
+        json_type = field_schema.get("type")
+        if isinstance(json_type, list):
+            return _resolve_type_from_schema({"anyOf": [{"type": t} for t in json_type]})
+
+        if json_type == "object":
+            properties = field_schema.get("properties")
+            if properties:
+                nested_model_name = field_schema.get("title", f"NestedModel{len(created_models)}")
+                # Recursively call the main creation logic for inline nested objects
+                return _create_model_from_schema(field_schema, nested_model_name)
+            add_props = field_schema.get("additionalProperties")
+            return Dict[str, _resolve_type_from_schema(add_props)] if isinstance(add_props, dict) else Dict[str, Any]
+
+        if json_type == "array":
+            items = field_schema.get("items", {})
+            return List[_resolve_type_from_schema(items)] if items else List[Any]
+
+        return JSON_TYPE_TO_PYTHON_TYPE.get(json_type, Any)
+
+    def _create_model_from_schema(sub_schema: Dict[str, Any], name: str) -> Type[BaseModel]:
+        """The core recursive model creation function for a single model."""
+        if name in created_models:
+            return created_models[name]
+
+        fields = {}
+        required_fields = set(sub_schema.get("required", []))
+        for field_name, field_schema in sub_schema.get("properties", {}).items():
+            field_type = _resolve_type_from_schema(field_schema)
+            field_params = _get_field_info(field_schema)
+
+            field_definition: Any
+            if "default" in field_params:
+                default_value = field_params.pop("default")
+                field_definition = Field(default=default_value, **field_params)
+            elif field_name in required_fields:
+                field_definition = Field(**field_params)
+            else:
+                field_definition = Field(default=None, **field_params)
+            fields[field_name] = (field_type, field_definition)
+
+        model = create_model(name, **fields, __base__=BaseModel, __doc__=sub_schema.get("description"))
+        created_models[name] = model
+        return model
+
+    definitions = schema.get("$defs", {})
+    processing_queue = list(definitions.keys())
+    max_passes = len(processing_queue) + 1  # Failsafe for circular dependencies
+    passes = 0
+
+    while processing_queue and passes < max_passes:
+        passes += 1
+        deferred = []
+        for def_name in processing_queue:
+            try:
+                _create_model_from_schema(definitions[def_name], def_name)
+            except KeyError:
+                # This model depends on another one not yet created, defer it.
+                deferred.append(def_name)
+
+        if len(deferred) == len(processing_queue):
+            raise RuntimeError(f"Could not resolve model dependencies in $defs. Unresolved: {deferred}")
+
+        processing_queue = deferred
+
+    # After the loop, all definitions are created. Now create the main model.
+    final_model_name = model_name or schema.get("title", "DynamicModel")
+    return _create_model_from_schema(schema, final_model_name)

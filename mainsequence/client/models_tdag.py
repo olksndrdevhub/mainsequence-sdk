@@ -1879,8 +1879,8 @@ class DynamicResource(BasePydanticModel, BaseObjectOrm):
     name: str
     type: str
     object_signature : dict
-    markdown_documentation : str
-    default_yaml: str
+    markdown_documentation : Optional[str]
+    default_yaml: Optional[str]
     attributes: Optional[dict]
 
     created_at:datetime.datetime
