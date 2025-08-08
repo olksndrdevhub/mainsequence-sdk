@@ -383,18 +383,35 @@ class BaseObjectOrm:
             raise Exception(r.text)
 
     @classmethod
-    def patch_by_id(cls, instance_id, *args, **kwargs):
+    def patch_by_id(cls, instance_id, *args, _into=None, **kwargs):
         base_url = cls.get_object_url()
         url = f"{base_url}/{instance_id}/"
         data = cls.serialize_for_json(kwargs)
         payload = {"json": data}
-        r = make_request(s=cls.build_session(), loaders=cls.LOADERS, r_type="PATCH", url=url, payload=payload)
+
+        r = make_request(
+            s=cls.build_session(),
+            loaders=cls.LOADERS,
+            r_type="PATCH",
+            url=url,
+            payload=payload,
+        )
         if r.status_code != 200:
             raise Exception(r.text)
-        return cls(**r.json())
+
+        body = r.json()
+
+        # If an instance was provided, update it in place
+        if _into is not None:
+            for k, v in body.items():
+                setattr(_into, k, v)
+            return _into
+
+        # Otherwise keep existing behavior: return a new instance
+        return cls(**body)
 
     def patch(self, *args, **kwargs):
-        return self.__class__.patch_by_id(self.id, *args, **kwargs)
+        return type(self).patch_by_id(self.id, _into=self, **kwargs)
 
     def delete(self, *args, **kwargs):
         return self.__class__.destroy_by_id(self.id)

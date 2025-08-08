@@ -92,13 +92,7 @@ class UpdateRunner:
 
         # The `load_dependencies` logic is now integrated here.
         if self.ts.dependencies_df is None:
-            depth_df = self.ts.local_persist_manager.get_all_dependencies_update_priority()
-            self.ts.depth_df = depth_df
-            if not depth_df.empty:
-                self.ts.dependencies_df = depth_df[
-                    depth_df["local_time_serie_id"] != self.ts.local_time_serie.id].copy()
-            else:
-                self.ts.dependencies_df = pd.DataFrame()
+            self.ts.set_dependencies_df()
 
         # 2. Connect the dependency tree to the scheduler if it hasn't been already.
         if not self.ts._scheduler_tree_connected and self.update_tree:
@@ -297,14 +291,27 @@ class UpdateRunner:
             use_state_for_update: If True, uses the current state for the update.
         """
         # 1. Ensure the dependency graph is built in the backend
-        if not self.ts.local_persist_manager.is_local_relation_tree_set():
+        declared_dependencies = self.ts.dependencies() or {}
+        deps_ids=[d.local_time_serie.id  if d.local_time_serie is not None else None  for d in declared_dependencies.values()]
+
+        # 2. Get the list of dependencies to update
+        dependencies_df = self.ts.dependencies_df
+
+        if any([a is None for a in deps_ids]) or any([d not in dependencies_df["local_time_serie_id"] for d in deps_ids]):
+            #Datanode not update set
+            self.ts.local_persist_manager.local_metadata.patch(ogm_dependencies_linked=False)
+
+
+        if not self.ts.local_persist_manager.local_metadata.ogm_dependencies_linked:
             self.logger.info("Dependency tree not set. Building now...")
             start_time = time.time()
             self.ts.set_relation_tree()
             self.logger.debug(f"Tree build took {time.time() - start_time:.2f}s.")
+            self.ts.set_dependencies_df()
+            dependencies_df = self.ts.dependencies_df
 
-        # 2. Get the list of dependencies to update
-        dependencies_df = self.ts.dependencies_df
+
+
         if dependencies_df.empty:
             self.logger.debug("No dependencies to update.")
             return
@@ -312,10 +319,11 @@ class UpdateRunner:
         # 3. Build a map of dependency instances if needed for debug mode
         update_map = {}
         if self.debug_mode and use_state_for_update:
-            declared_dependencies = self.ts.dependencies() or {}
             update_map = self._get_update_map(declared_dependencies,
                                               logger=self.logger
                                               )
+
+
 
         # 4. Delegate to the appropriate execution method
         self.logger.info(f"Starting update for {len(dependencies_df)} dependencies...")
