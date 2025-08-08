@@ -72,13 +72,6 @@ def configuration_sanitizer(configuration: dict) -> PortfolioConfiguration:
             "Missing 'signal_weights_configuration' in 'backtesting_weights_configuration'"
         )
 
-    portfolio_markets_config = configuration['portfolio_markets_configuration']
-
-    if "tracking_funds_expected_exposure_from_latest_holdings" not in portfolio_markets_config:
-        raise Exception(
-            "Missing 'tracking_funds_expected_exposure_from_latest_holdings' in portfolio_markets_config"
-        )
-
     if "signal_assets_configuration" not in portfolio_build_config['backtesting_weights_configuration']['signal_weights_configuration']:
         raise Exception(
             "Missing 'signal_weights_configuration' in 'backtesting_weights_configuration'"

@@ -311,13 +311,6 @@ class DataAccessMixin:
         return self.local_persist_manager.filter_by_assets_ranges(asset_ranges_map)
 
 
-
-
-
-
-
-
-
 class APIDataNode(DataAccessMixin):
 
 
@@ -365,6 +358,7 @@ class APIDataNode(DataAccessMixin):
         self.storage_hash = storage_hash
         self.data_source = data_source_local_lake
         self._local_persist_manager: APIPersistManager = None
+        self.update_statistics = None
 
     @property
     def is_api(self):
