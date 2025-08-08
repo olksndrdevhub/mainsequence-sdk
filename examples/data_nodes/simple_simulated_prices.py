@@ -23,35 +23,50 @@ All generated code MUST adhere to the following quality standards:
     long, complex methods into smaller, private helper methods where appropriate.
 
 ---
+
 ### 2. The `__init__` Method
 The constructor defines the unique identity of the time series and its dependencies.
 
 -   **Uniqueness**: The arguments passed to `__init__` are hashed to create a unique ID.
     Instantiating a class with the same arguments will always result in the same time series object.
--   **Dependencies**: To declare a dependency on another `DataNode`, you **MUST** instantiate it
-    within `__init__` and assign it to an instance attribute (e.g., `self.my_dependency = OtherTimeSerie()`).
-    The framework will **automatically scan all instance attributes** to find these dependencies
-    and build the execution graph.
--  `_ARGS_IGNORE_IN_STORAGE_HASH`: A list of argument names to exclude from the *local* hash and set as a class property.
+
+
+
 -   **Special Arguments**: The following arguments are special and are **NOT** included in the hash:
     - `init_meta`: For temporary, runtime-only options.
     - `build_meta_data`: For controlling backend table creation.
 
 
+
+
 ---
+
+
+###
+-  `_ARGS_IGNORE_IN_STORAGE_HASH`: A list of argument names to exclude from the *update* hash and set as a class property.
+It is important to have in mind that each instance of the constructor of a DataNode will create unique storage_hash
+and a unique update_hash arguments in _ARGS_IGNORE_IN_STORAGE_HASH will be ignored in the creation of storage_hash
+
+---
+
 ### 3. The `dependencies` Method (Required)
-This method is the core method to build a DAG for dependencies between TimeSeries. Only the TimeSeries that
-are returned in this method will be included in the creation of the dependecy chart
+This method is the core method to build a DAG for dependencies between DataNodes. Only the DataNodes that
+are returned in this method will be included in the creation of the dependecy graph
+def dependencies()-> Dict[str, Union["DataNode", "APIDataNode"]]:
+    return {"prices_time_serie":self.prices_time_serie}
 
 ### 4. The `update` Method (Required)
 This is the core method containing the business logic for generating data.
 
 -   **Purpose**: **MUST** be implemented. Its job is to fetch, calculate, or generate new data points.
--   **self.update_statistics: This object tells you the timestamp of the last successful
-    update for each asset, allowing you to fetch data incrementally.
-    -   **Asset Universe**: When looping through assets, you **MUST** iterate over `update_statistics.asset_list`.
-        This ensures consistency with the assets prepared for the current run.
-    -   **Timestamps**: Use `update_statistics[unique_id]` to get the latest timestamp for a specific asset.
+-   **self.update_statistics: This object contstains information about the state of the storage that will be updated
+    in the method
+    -self.update_statistics.asset_list contains the list of all the assets to be included in this update round if it is a
+    2d multiindex
+    self.update_statistics.asset_time_statistics has the last value updated in a nested index format when the storage is
+    multiindex. For example if the storage is a 2d index [time_index,"unique_identifier"] then asset_time_statistics will be
+    dict{str:datetimte.datetime} where{asset.unique_identifier:datetime.datetime}. if the index has more than 2 dimensions
+    then asset_time_statistics will be dict[str,[dict[str,datetimte.datetime]]]
 
 -   **DataFrame Requirements**: The method **MUST** return a pandas DataFrame that adheres to the
     following strict format:
@@ -67,8 +82,6 @@ This is the core method containing the business logic for generating data.
          update_statistics.filter_assets_by_level(
                                                  level=2,
                                                  filters=[json.dumps(c) for c in self.ta_feature_config])
-
-
 
 
 ---
@@ -144,7 +157,7 @@ class SimulatedPricesManager:
         except (KeyError, IndexError):
             # KeyError if unique_id not present, IndexError if slice is empty
             return fallback
-    def update(self, update_statistics: UpdateStatistics)->pd.DataFrame:
+    def update(self)->pd.DataFrame:
         """
         Mocks price updates for assets with stochastic lognormal returns.
 
@@ -165,7 +178,7 @@ class SimulatedPricesManager:
         sigma = 0.01  # volatility component for lognormal returns
 
         df_list = []
-
+        update_statistics=self.update_statistics
         # Get the latest historical observations; assumed to be a DataFrame with a multi-index:
         # (time_index, unique_identifier) and a column "close" for the last observed price.
         range_descriptor=update_statistics.get_update_range_map_great_or_equal()
@@ -232,9 +245,9 @@ class SingleIndexTS(DataNode):
 
     def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
         pass
-    def update(self, update_statistics: ms_client.UpdateStatistics):
+    def update(self):
         today_utc = datetime.datetime.now(tz=pytz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-
+        update_statistics=self.update_statistics
         if update_statistics.max_time_index_value is None:
             start_date = self.OFFSET_START
         else:
