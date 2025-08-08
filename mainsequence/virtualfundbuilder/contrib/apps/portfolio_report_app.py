@@ -17,14 +17,11 @@ import plotly.graph_objects as go
 
 logger = get_vfb_logger()
 
-PortfolioIdEnum = Enum(
-    "PortfolioEnum",
-    {portfolio.index_asset.name: portfolio.id for portfolio in Portfolio.filter(local_time_serie__isnull=False)},
-    type=str,
-)
+portfolio_ids = [portfolio.id for portfolio in Portfolio.filter(local_time_serie__isnull=False)]
+
 class PortfolioReportConfiguration(BaseModel):
     report_title: str = "Portfolio Report"
-    portfolio_ids: List[PortfolioIdEnum]
+    portfolio_ids: List[int] = portfolio_ids
     report_days: int = 365 * 5
 
 @register_app()
@@ -94,6 +91,6 @@ class PortfolioReport(HtmlApp):
 
 if __name__ == "__main__":
     configuration = PortfolioReportConfiguration(
-        portfolio_ids=[list(PortfolioIdEnum)[0].value]
+        portfolio_ids=portfolio_ids[:1]
     )
     PortfolioReport(configuration).run()
