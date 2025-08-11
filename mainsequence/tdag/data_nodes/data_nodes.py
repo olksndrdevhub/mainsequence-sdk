@@ -878,7 +878,7 @@ class DataNode(DataAccessMixin,ABC):
         self.depth_df = depth_df
         if not depth_df.empty:
             self.dependencies_df = depth_df[
-                depth_df["local_time_serie_id"] != self.ts.local_time_serie.id].copy()
+                depth_df["local_time_serie_id"] != self.local_time_serie.id].copy()
         else:
             self.dependencies_df = pd.DataFrame()
     def _set_update_statistics(self,

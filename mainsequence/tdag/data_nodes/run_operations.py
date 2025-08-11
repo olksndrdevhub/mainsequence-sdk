@@ -297,12 +297,12 @@ class UpdateRunner:
         # 2. Get the list of dependencies to update
         dependencies_df = self.ts.dependencies_df
 
-        if any([a is None for a in deps_ids]) or any([d not in dependencies_df["local_time_serie_id"] for d in deps_ids]):
+        if any([a is None for a in deps_ids]) or any([d not in dependencies_df["local_time_serie_id"].to_list() for d in deps_ids]):
             #Datanode not update set
             self.ts.local_persist_manager.local_metadata.patch(ogm_dependencies_linked=False)
 
 
-        if not self.ts.local_persist_manager.local_metadata.ogm_dependencies_linked:
+        if self.ts.local_persist_manager.local_metadata.ogm_dependencies_linked==False:
             self.logger.info("Dependency tree not set. Building now...")
             start_time = time.time()
             self.ts.set_relation_tree()
