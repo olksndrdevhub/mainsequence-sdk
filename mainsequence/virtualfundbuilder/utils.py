@@ -1,4 +1,5 @@
 import copy
+import enum
 import inspect
 import json
 import logging
@@ -788,6 +789,15 @@ def create_model_from_schema(
                 return type(None)
             final_type = Union[tuple(non_none_types)] if len(non_none_types) > 1 else non_none_types[0]
             return Optional[final_type] if type(None) in types else final_type
+
+        if "enum" in field_schema:
+            # If a field has an 'enum' constraint, create a dynamic Enum class for it.
+            # This allows Pydantic to perform validation against the allowed values.
+            enum_name = field_schema.get("title", f"DynamicEnum_{hash(tuple(sorted(field_schema['enum'])))}")
+            # The names of the enum members must be valid Python identifiers,
+            # while the values are what Pydantic validates against.
+            members = {str(v): v for v in field_schema["enum"]}
+            return enum.Enum(enum_name, members)
 
         json_type = field_schema.get("type")
         if isinstance(json_type, list):

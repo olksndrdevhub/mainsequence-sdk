@@ -7,6 +7,7 @@ from threading import Thread
 import yaml
 
 from mainsequence.client.models_tdag import DynamicResource
+from mainsequence.tdag import DataNode
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger, parse_object_signature, build_markdown, object_signature_to_yaml, \
     create_schema_from_signature, create_model_from_schema
 from typing import get_type_hints, List, Optional, Union
@@ -197,7 +198,8 @@ def send_resource_to_backend(resource_class, attributes: Optional[dict] = None):
 
     # Iterate MRO in reverse. Child properties will correctly override parent properties.
     for parent_class in reversed(resource_class.__mro__):
-        if parent_class is object or not hasattr(parent_class, '__init__'):
+        if parent_class is object or not hasattr(parent_class, '__init__') \
+        or parent_class is DataNode:
             continue
 
         # Generate schema only for the __init__ defined on the specific class
