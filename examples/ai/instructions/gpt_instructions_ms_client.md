@@ -10,7 +10,7 @@ This section covers how to find, register, and categorize assets.
 
 #### **Querying Assets**
 
-To find existing assets, use the `ms_client.Asset.filter()` method. You can filter by any attribute of the `Asset` model, such as `ticker`, `execution_venue__symbol`, or `security_type`.
+To find existing assets, use the `ms_client.Asset.filter()` method. You can filter by any attribute of the `Asset` model, such as `ticker`, or `security_type`.
 
 * **Method:** `ms_client.Asset.filter(**kwargs)`
 * **Example:** Find all assets with tickers 'BTCUSDT' or 'ETHUSDT' on the Binance execution venue.
@@ -19,7 +19,6 @@ To find existing assets, use the `ms_client.Asset.filter()` method. You can filt
 
     crypto_assets = ms_client.Asset.filter(
         ticker__in=["BTCUSDT", "ETHUSDT"],
-        execution_venue__symbol=ms_client.MARKETS_CONSTANTS.BINANCE_EV_SYMBOL
     )
 
     for asset in crypto_assets:
@@ -60,8 +59,8 @@ Group assets into categories for easier management and analysis.
     import mainsequence.client as ms_client
 
     # Prerequisite: Get the IDs of the assets you want to categorize.
-    btc_asset = ms_client.Asset.get(ticker="BTCUSDT", execution_venue__symbol=ms_client.MARKETS_CONSTANTS.BINANCE_EV_SYMBOL)
-    eth_asset = ms_client.Asset.get(ticker="ETHUSDT", execution_venue__symbol=ms_client.MARKETS_CONSTANTS.BINANCE_EV_SYMBOL)
+    btc_asset = ms_client.Asset.get(ticker="BTCUSDT", exchange_code=ms_client.MARKETS_CONSTANTS.BINANCE_EV_SYMBOL)
+    eth_asset = ms_client.Asset.get(ticker="ETHUSDT", exchange_code=ms_client.MARKETS_CONSTANTS.BINANCE_EV_SYMBOL)
     asset_ids = [btc_asset.id, eth_asset.id]
 
     fav_crypto_category = ms_client.AssetCategory.get_or_create(
