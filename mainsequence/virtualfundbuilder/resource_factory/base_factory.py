@@ -9,7 +9,7 @@ import yaml
 from mainsequence.client.models_tdag import DynamicResource
 from mainsequence.tdag import DataNode
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger, parse_object_signature, build_markdown, object_signature_to_yaml, \
-    create_schema_from_signature, create_model_from_schema
+    create_schema_from_signature
 from typing import get_type_hints, List, Optional, Union
 from pydantic import BaseModel
 from enum import Enum
@@ -230,12 +230,6 @@ def send_resource_to_backend(resource_class, attributes: Optional[dict] = None):
         object_signature=final_json_schema,
         attributes=attributes,
     )
-
-    try:
-        # TODO could probably be removed
-        create_model_from_schema(final_json_schema)
-    except Exception as e:
-        print(e)
 
     logger.debug(f"Sending resource '{resource_class.__name__}' to backend.")
 
