@@ -873,7 +873,14 @@ class DataNode(DataAccessMixin,ABC):
         self.local_persist_manager.set_ogm_dependencies_linked()
 
 
-
+    def set_dependencies_df(self):
+        depth_df = self.local_persist_manager.get_all_dependencies_update_priority()
+        self.depth_df = depth_df
+        if not depth_df.empty:
+            self.dependencies_df = depth_df[
+                depth_df["local_time_serie_id"] != self.local_time_serie.id].copy()
+        else:
+            self.dependencies_df = pd.DataFrame()
     def _set_update_statistics(self,
                               update_statistics: UpdateStatistics) -> UpdateStatistics:
         """
