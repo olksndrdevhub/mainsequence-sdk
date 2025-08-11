@@ -10,21 +10,14 @@ import yaml
 from mainsequence.virtualfundbuilder.enums import ResourceType
 from mainsequence.virtualfundbuilder.portfolio_interface import PortfolioInterface
 from mainsequence.virtualfundbuilder.utils import is_jupyter_environment
-from .resource_factory.base_factory import send_default_configuration, send_resource_to_backend
+from .resource_factory.base_factory import send_resource_to_backend
 from .utils import logger
 
 
 class TDAGAgent:
-    backend_registered = False
 
     def __init__(self):
         self.logger = logger
-
-        # initialize default state once
-        if not self.backend_registered:
-            send_default_configuration()
-            self.backend_registered = True
-
         self.logger.info("Setup TDAG Agent successfull")
 
     def query_agent(self, query):
