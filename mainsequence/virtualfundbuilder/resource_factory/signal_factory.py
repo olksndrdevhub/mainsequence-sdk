@@ -55,7 +55,7 @@ class WeightsBase(BaseResource):
         # if we need more data before to interpolate first value of new_index
         if len(weights) == 0: # or (weights.index.get_level_values("time_index").min() > new_index.min()):
 
-            unique_identifier_range_map = {a: {"start_date": d} for a, d in self.get_update_statistics().asset_time_statistics.items()}
+            unique_identifier_range_map = {a: {"start_date": d} for a, d in self.update_statistics.asset_time_statistics.items()}
             last_observation = self.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map)
             if last_observation is None or last_observation.empty:
                 return pd.DataFrame()

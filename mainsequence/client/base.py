@@ -401,13 +401,31 @@ class BaseObjectOrm:
 
         body = r.json()
 
+        def recursive_update(obj, update_dict):
+            for k, v in update_dict.items():
+                # Get the existing nested object, defaulting to None if it doesn't exist
+                nested_obj = getattr(obj, k, None)
+
+                # Only recurse if the update value is a dict AND the existing
+                # attribute is an instance of a Pydantic model.
+                if isinstance(v, dict) and isinstance(nested_obj, BaseModel):
+                    recursive_update(nested_obj, v)
+                else:
+                    # Otherwise, just set the value directly.
+                    try:
+                        setattr(obj, k, v)
+                    except Exception as e:
+                        print(e)
+
+            return obj
+
         # If an instance was provided, update it in place
         if _into is not None:
-            for k, v in body.items():
-                setattr(_into, k, v)
+            print(_into, body)
+            recursive_update(_into, body)
             return _into
 
-        # Otherwise keep existing behavior: return a new instance
+        # Otherwise return a new instance
         return cls(**body)
 
     def patch(self, *args, **kwargs):
