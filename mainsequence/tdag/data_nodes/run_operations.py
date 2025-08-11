@@ -156,13 +156,13 @@ class UpdateRunner:
         error_on_last_update = False
         try:
             if must_update:
-                self.logger.info(f"Update required for {self.ts}.")
+                self.logger.debug(f"Update required for {self.ts}.")
                 self._update_local(
                     overwrite_latest_value=historical_update.last_time_index_value,
                     use_state_for_update=use_state_for_update
                 )
             else:
-                self.logger.info(f"Already up-to-date. Skipping update for {self.ts}.")
+                self.logger.debug(f"Already up-to-date. Skipping update for {self.ts}.")
         except Exception as e:
             error_on_last_update = True
             raise e
@@ -232,9 +232,9 @@ class UpdateRunner:
 
             # Add specific log message for the initial run
             if not self.ts.update_statistics:
-                self.logger.info(f"Performing first-time update for {self.ts}...")
+                self.logger.debug(f"Performing first-time update for {self.ts}...")
             else:
-                self.logger.info(f'Calculating update for {self.ts}...')
+                self.logger.debug(f'Calculating update for {self.ts}...')
 
             try:
                 # Call the business logic defined on the DataNode class
@@ -326,7 +326,7 @@ class UpdateRunner:
 
 
         # 4. Delegate to the appropriate execution method
-        self.logger.info(f"Starting update for {len(dependencies_df)} dependencies...")
+        self.logger.debug(f"Starting update for {len(dependencies_df)} dependencies...")
 
         dependencies_df = dependencies_df[dependencies_df["source_class_name"] != "WrapperDataNode"]
         if dependencies_df.empty:
