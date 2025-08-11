@@ -8,8 +8,7 @@ import yaml
 
 from mainsequence.client.models_tdag import DynamicResource
 from mainsequence.tdag import DataNode
-from mainsequence.virtualfundbuilder.utils import get_vfb_logger, parse_object_signature, build_markdown, object_signature_to_yaml, \
-    create_schema_from_signature
+from mainsequence.virtualfundbuilder.utils import get_vfb_logger, create_schema_from_signature
 from typing import get_type_hints, List, Optional, Union
 from pydantic import BaseModel
 from enum import Enum
@@ -167,25 +166,6 @@ class BaseFactory:
             except Exception as e:
                 logger.warning(f"Error reading code in strategy {filename}: {e}")
 
-def send_default_configuration():
-    # TODO should be a tool
-    from mainsequence.virtualfundbuilder.utils import _convert_unknown_to_string, get_default_documentation
-    from mainsequence.client.models_tdag import register_default_configuration
-
-    default_config_dict = get_default_documentation()
-    payload = {
-        "default_config_dict": default_config_dict,
-    }
-
-    logger.debug(f"Send default documentation to Backend")
-    payload = json.loads(json.dumps(payload, default=_convert_unknown_to_string))
-    headers = {"Content-Type": "application/json"}
-    try:
-        response = register_default_configuration(json_payload=payload)
-        if response.status_code not in [200, 201]:
-            print(response.text)
-    except Exception as e:
-        logger.warning("Could register strategy to TSORM", e)
 
 def send_resource_to_backend(resource_class, attributes: Optional[dict] = None):
     """

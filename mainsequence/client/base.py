@@ -421,7 +421,6 @@ class BaseObjectOrm:
 
         # If an instance was provided, update it in place
         if _into is not None:
-            print(_into, body)
             recursive_update(_into, body)
             return _into
 
