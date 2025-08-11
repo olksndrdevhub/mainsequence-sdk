@@ -1,4 +1,5 @@
 import copy
+import enum
 import inspect
 import json
 import logging
@@ -22,6 +23,9 @@ from enum import Enum
 from pydantic import BaseModel
 import yaml
 from mainsequence.logconf import logger
+import inspect
+from typing import Any, Dict, List, Optional, Type, Union
+from pydantic import BaseModel, Field, create_model
 
 def get_vfb_logger():
     global logger
@@ -370,7 +374,6 @@ def parse_object_signature(base_object: Any, use_examples_for_default: Optional[
     return documentation_dict
 
 
-
 def object_signature_to_markdown(root_dict, level=1, elements_to_exclude=None, children_to_exclude=None):
     """
     Convert a nested dictionary structure into a markdown formatted string.
@@ -593,3 +596,133 @@ def is_jupyter_environment():
         return "ipykernel" in str(get_ipython())
     except ImportError:
         return False
+
+
+
+
+def type_to_json_schema(py_type: Type, definitions: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Recursively converts a Python type annotation to a JSON schema dictionary.
+    Handles Pydantic models, Enums, Lists, Unions, and basic types.
+
+    Args:
+        py_type: The Python type to convert.
+        definitions: A dict to store schemas of nested models, used for $defs.
+
+    Returns:
+        A dictionary representing the JSON schema for the given type.
+    """
+    origin = get_origin(py_type)
+    args = get_args(py_type)
+
+    # Handle Optional[T] by making the inner type nullable
+    if origin is Union and len(args) == 2 and type(None) in args:
+        non_none_type = args[0] if args[1] is type(None) else args[1]
+        schema = type_to_json_schema(non_none_type, definitions)
+        # Add null type to anyOf or create a new anyOf
+        if "anyOf" in schema:
+            if not any(sub.get("type") == "null" for sub in schema["anyOf"]):
+                schema["anyOf"].append({"type": "null"})
+        else:
+            schema = {"anyOf": [schema, {"type": "null"}]}
+        return schema
+
+    if origin is Union:
+        return {"anyOf": [type_to_json_schema(arg, definitions) for arg in args]}
+    if origin in (list, List):
+        item_schema = type_to_json_schema(args[0], definitions) if args else {}
+        return {"type": "array", "items": item_schema}
+    if origin in (dict, Dict):
+        value_schema = type_to_json_schema(args[1], definitions) if len(args) > 1 else {}
+        return {"type": "object", "additionalProperties": value_schema}
+
+    # Handle Pydantic Models by creating a reference
+    if inspect.isclass(py_type) and issubclass(py_type, BaseModel):
+        model_name = py_type.__name__
+        if model_name not in definitions:
+            definitions[model_name] = {}  # Placeholder to break recursion
+            model_schema = py_type.model_json_schema(ref_template="#/$defs/{model}")
+            if "$defs" in model_schema:
+                for def_name, def_schema in model_schema.pop("$defs").items():
+                    if def_name not in definitions:
+                        definitions[def_name] = def_schema
+            definitions[model_name] = model_schema
+        return {"$ref": f"#/$defs/{model_name}"}
+
+    # Handle Enums
+    if inspect.isclass(py_type) and issubclass(py_type, Enum):
+        return {"type": "string", "enum": [e.value for e in py_type]}
+
+    # Handle basic types
+    type_map = {str: "string", int: "integer", float: "number", bool: "boolean"}
+    if py_type in type_map:
+        return {"type": type_map[py_type]}
+    if py_type is Any:
+        return {}  # Any type, no constraint
+
+    # Fallback for unknown types
+    return {"type": "string", "description": f"Unrecognized type: {getattr(py_type, '__name__', str(py_type))}"}
+
+
+def create_schema_from_signature(func: callable) -> Dict[str, Any]:
+    """
+    Parses a function's signature (like __init__) and creates a JSON schema.
+
+    Args:
+        func: The function or method to parse.
+
+    Returns:
+        A dictionary representing the JSON schema of the function's signature.
+    """
+    try:
+        signature = inspect.signature(func)
+        type_hints = get_type_hints(func)
+    except (TypeError, NameError): # Handles cases where hints can't be resolved
+        return {}
+
+    parsed_doc = docstring_parser.parse(func.__doc__ or "")
+    arg_descriptions = {p.arg_name: p.description for p in parsed_doc.params}
+
+    properties = {}
+    required = []
+    definitions = {}  # For nested models
+
+    for name, param in signature.parameters.items():
+        if name in ('self', 'cls', 'args', 'kwargs'):
+            continue
+
+        param_type = type_hints.get(name, Any)
+        prop_schema = type_to_json_schema(param_type, definitions)
+        prop_schema['title'] = name.replace('_', ' ').title()
+
+        if name in arg_descriptions:
+            prop_schema['description'] = arg_descriptions[name]
+
+        if param.default is inspect.Parameter.empty:
+            required.append(name)
+        else:
+            default_value = param.default
+            try:
+                # Ensure default is JSON serializable
+                json.dumps(default_value)
+                prop_schema['default'] = default_value
+            except TypeError:
+                 if isinstance(default_value, Enum):
+                     prop_schema['default'] = default_value.value
+                 else:
+                     # Fallback for non-serializable defaults
+                     prop_schema['default'] = str(default_value)
+
+        properties[name] = prop_schema
+
+    schema = {
+        "title": getattr(func, '__name__', 'Schema'),
+        "type": "object",
+        "properties": properties,
+    }
+    if required:
+        schema["required"] = required
+    if definitions:
+        schema["$defs"] = definitions
+
+    return schema
