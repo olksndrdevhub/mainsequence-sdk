@@ -72,7 +72,7 @@ def _(value: BaseModel, pickle_ts: bool = False) -> Dict[str, Any]:
     # Recursively call serialize_argument on each value in the model's dictionary.
     serialized_model = {k: serialize_argument(v, pickle_ts) for k, v in value.model_dump().items()}
 
-    ignore_from_storage_hash=[k for k,v in value.model_fields.items() if v.json_schema_extra.get("ignore_from_storage_hash",False)==True]
+    ignore_from_storage_hash = [k for k,v in value.model_fields.items() if v.json_schema_extra and v.json_schema_extra.get("ignore_from_storage_hash",False)==True]
 
     return {"pydantic_model_import_path": import_path, "serialized_model": serialized_model,
             "ignore_from_storage_hash":ignore_from_storage_hash

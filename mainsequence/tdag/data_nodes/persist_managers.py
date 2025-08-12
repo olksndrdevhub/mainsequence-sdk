@@ -134,6 +134,8 @@ class APIPersistManager:
             A pandas DataFrame with the requested data.
         """
         filtered_data = self.metadata.get_data_between_dates_from_api(*args, **kwargs)
+        if filtered_data.empty:
+            return filtered_data
 
         # fix types
         stc = self.metadata.sourcetableconfiguration
