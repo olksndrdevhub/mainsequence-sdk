@@ -841,10 +841,10 @@ class DataNode(DataAccessMixin,ABC):
             storage_hash=self.storage_hash,
             local_configuration=self.local_initial_configuration,
             remote_configuration=self.remote_initial_configuration,
-            remote_build_metadata=self.remote_build_metadata,
             time_serie_source_code_git_hash=time_serie_source_code_git_hash,
             time_serie_source_code=time_serie_source_code,
             data_source=self.data_source,
+            build_configuration_json_schema=self.build_configuration_json_schema,
         )
     def set_relation_tree(self):
 
