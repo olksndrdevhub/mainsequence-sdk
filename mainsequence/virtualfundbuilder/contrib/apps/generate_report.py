@@ -148,8 +148,8 @@ class ExampleReportApp(BaseApp):
     3) Optionally export the HTML to PDF using WeasyPrint.
     """
     configuration_class = ExampleReportConfig
-    def __init__(self, configuration: ExampleReportConfig):
-        self.configuration = configuration
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         category = AssetCategory.get(unique_identifier=self.configuration.asset_category_unique_identifier)
         self.assets = category.get_assets()

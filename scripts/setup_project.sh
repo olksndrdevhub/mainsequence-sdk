@@ -92,7 +92,7 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   echo "Copying Files from mainsequence-sdk"
   cp -a "/opt/code/mainsequence-sdk/examples/getting_started/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"
   cp -a "/opt/code/mainsequence-sdk/requirements.txt" "${ROOT_PROJECT_PATH}/requirements.txt" || echo "WARNING: Copy requirements step failed!"
-  cp -a /opt/code/mainsequence-sdk/examples/configurations/* "$VFB_PROJECT_PATH/configurations" || echo "WARNING: Copy configurations step failed!"
+  cp -a /opt/code/mainsequence-sdk/examples/configurations/market_cap.yaml "$VFB_PROJECT_PATH/configurations" || echo "WARNING: Copy configurations step failed!"
 
   echo "Adding/Updating .gitignore..."
   echo ".ipynb_checkpoints" > "$ROOT_PROJECT_PATH/.gitignore"
