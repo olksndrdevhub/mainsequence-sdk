@@ -329,6 +329,25 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
             print(f"{name:<{max_name_len}} | {val}")
 
     @classmethod
+    def register_asset_from_figi(cls,figi:str,timeout=None):
+        base_url = cls.get_object_url()+"/register_asset_from_figi/"
+        payload = {"json": {"figi":figi} }
+        s = cls.build_session()
+
+        r = make_request(
+            s=s,
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=base_url,
+            payload=payload,
+            time_out=timeout
+        )
+
+        if r.status_code not in [200,201]:
+            raise Exception(r.text)
+
+        return cls(**r.json())
+    @classmethod
     def filter_with_asset_class(
             cls,
             timeout=None,
