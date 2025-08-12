@@ -69,6 +69,7 @@ class UpsampleAndInterpolation:
 
         self.upsample_frequency_td = string_freq_to_time_delta(self.upsample_frequency_id)
 
+
     @staticmethod
     def upsample_bars(
             bars_df: pd.DataFrame,
@@ -149,6 +150,8 @@ class UpsampleAndInterpolation:
 
         return all_dfs
 
+    def get_string_frequency_to_minutes(self):
+        return string_frequency_to_minutes(self.bar_frequency_id)
     def get_interpolated_upsampled_bars(
             self,
             calendar: str,

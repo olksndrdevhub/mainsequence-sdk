@@ -11,6 +11,7 @@ from pydantic import FieldValidationInfo, field_validator, root_validator, Field
 from mainsequence.virtualfundbuilder.enums import (PriceTypeNames)
 
 from mainsequence.client.models_tdag import RunConfiguration
+import mainsequence.client as msc
 import yaml
 from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 from mainsequence.tdag.utils import write_yaml
@@ -79,6 +80,11 @@ class AssetsConfiguration(VFBConfigBaseModel):
     assets_category_unique_id: str
     price_type: PriceTypeNames = PriceTypeNames.CLOSE
     prices_configuration: PricesConfiguration
+
+    def get_asset_list(self):
+        asset_category=msc.AssetCategory.get(unique_identifier=self.assets_category_unique_id)
+        assets=msc.Asset.filter(id__in=asset_category.assets)
+        return assets
 
 class BacktestingWeightsConfig(VFBConfigBaseModel):
     """
