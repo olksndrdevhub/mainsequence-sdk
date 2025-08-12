@@ -150,8 +150,7 @@ class UpsampleAndInterpolation:
 
         return all_dfs
 
-    def get_string_frequency_to_minutes(self):
-        return string_frequency_to_minutes(self.bar_frequency_id)
+
     def get_interpolated_upsampled_bars(
             self,
             calendar: str,
@@ -514,6 +513,8 @@ class InterpolatedPrices(DataNode):
     def dependencies(self):
         return {"bars_ts":self.bars_ts}
 
+    def get_string_frequency_to_minutes(self):
+        return string_frequency_to_minutes(self.bar_frequency_id)
 
     def _get_required_cores(self, last_observation_map) -> int:
         """
