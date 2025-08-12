@@ -1229,7 +1229,7 @@ class UpdateStatistics(BaseModel):
         if extra_time_delta is None:
             range_map={k:DateInfo({"start_date_operand":">=","start_date":v or self._initial_fallback_date}) for k,v in self.asset_time_statistics.items()}
         else:
-            range_map = {k: DateInfo({"start_date_operand": ">=", "start_date": v+extra_time_delta or self._initial_fallback_date}) for
+            range_map = {k: DateInfo({"start_date_operand": ">=", "start_date": (v or self._initial_fallback_date)+extra_time_delta}) for
                          k, v in self.asset_time_statistics.items()}
         return range_map
 
