@@ -176,33 +176,50 @@ def send_resource_to_backend(resource_class, attributes: Optional[dict] = None):
     merged_required = set()
     merged_definitions = {}
 
-    # Iterate MRO in reverse. Child properties will correctly override parent properties.
-    for parent_class in reversed(resource_class.__mro__):
-        if parent_class is object or not hasattr(parent_class, '__init__') \
-        or parent_class is DataNode:
-            continue
+    # Special case for BaseApp subclasses
+    if hasattr(resource_class, 'configuration_class') and inspect.isclass(resource_class.configuration_class) and issubclass(resource_class.configuration_class, BaseModel):
+        # Use the schema from the configuration_class directly
+        config_schema = resource_class.configuration_class.model_json_schema(ref_template="#/$defs/{model}")
+        merged_properties = config_schema.get("properties", {})
+        merged_required = set(config_schema.get("required", []))
+        merged_definitions = config_schema.get("$defs", {})
 
-        # Generate schema only for the __init__ defined on the specific class
-        if "__init__" in parent_class.__dict__:
-            parent_schema = create_schema_from_signature(parent_class.__init__)
-            merged_properties.update(parent_schema.get("properties", {}))
-            merged_definitions.update(parent_schema.get("$defs", {}))
-            merged_required.update(parent_schema.get("required", []))
+    else:
+        # Iterate MRO in reverse. Child properties will correctly override parent properties.
+        for parent_class in reversed(resource_class.__mro__):
+            if parent_class is object or not hasattr(parent_class, '__init__') \
+            or parent_class is DataNode:
+                continue
 
-    # A field isn't required if its final version has a default value.
-    final_required = sorted([
-        field for field in merged_required
-        if field in merged_properties and 'default' not in merged_properties[field]
-    ])
+            # Generate schema only for the __init__ defined on the specific class
+            if "__init__" in parent_class.__dict__:
+                parent_schema = create_schema_from_signature(parent_class.__init__)
+                merged_properties.update(parent_schema.get("properties", {}))
+                merged_definitions.update(parent_schema.get("$defs", {}))
+                merged_required.update(parent_schema.get("required", []))
 
+        # A field isn't required if its final version has a default value.
+        final_required = sorted([
+            field for field in merged_required
+            if field in merged_properties and 'default' not in merged_properties[field]
+        ])
+
+    # Final schema assembly
     final_json_schema = {
         "title": resource_class.__name__,
         "type": "object",
         "properties": merged_properties,
         "$defs": merged_definitions
     }
-    if final_required:
-        final_json_schema["required"] = final_required
+    if merged_required:
+        schema_required = sorted(list(merged_required))
+        # Remove fields that have a default value from the required list
+        schema_required = [
+            field for field in schema_required
+            if 'default' not in merged_properties.get(field, {})
+        ]
+        if schema_required:
+            final_json_schema["required"] = schema_required
 
     resource_config = DynamicResource.create(
         name=resource_class.__name__,

@@ -15,6 +15,9 @@ logger = get_vfb_logger()
 class BaseApp(BaseResource):
     TYPE = ResourceType.APP
 
+    def __init__(self, configuration: BaseModel):
+        self.configuration = configuration
+
     def add_output(self, output: Any):
         """
         Saves the given output in the backend.

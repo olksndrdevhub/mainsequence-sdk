@@ -28,11 +28,6 @@ class PortfolioReportConfiguration(BaseModel):
 class PortfolioReport(HtmlApp):
     configuration_class = PortfolioReportConfiguration
 
-    def __init__(self, configuration: PortfolioReportConfiguration):
-        logger.info(f"Create portfolio report {configuration}")
-        self.configuration = configuration
-        super().__init__()
-
     def run(self) -> str:
         styles = StyleSettings(mode=ThemeMode.light)
         start_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=self.configuration.report_days)

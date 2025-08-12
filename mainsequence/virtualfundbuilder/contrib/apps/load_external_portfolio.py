@@ -21,9 +21,6 @@ class LoadExternalPortfolioConfig(BaseModel):
 class LoadExternalPortfolio(BaseApp):
     configuration_class = LoadExternalPortfolioConfig
 
-    def __init__(self, configuration: LoadExternalPortfolioConfig):
-        self.configuration = configuration
-
     def run(self):
 
         # get the data and store it on local storage
