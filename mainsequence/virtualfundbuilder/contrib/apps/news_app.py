@@ -45,11 +45,12 @@ class SentimentReport(BaseApp):
     """
     configuration_class = SentimentReportConfig
 
-    def __init__(self, configuration: SentimentReportConfig):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
         if not POLYGON_API_KEY:
             raise ValueError("Warning: POLYGON_API_KEY environment variable not set. Data fetching will fail.")
 
-        self.configuration = configuration
         self.tdag_agent = TDAGAgent()
 
         logger.info(f"Initializing Sentiment Report with configuration {self.configuration.model_dump()}")

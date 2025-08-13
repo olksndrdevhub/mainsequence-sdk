@@ -1,4 +1,5 @@
 import copy
+import enum
 import inspect
 import json
 import logging
@@ -22,6 +23,9 @@ from enum import Enum
 from pydantic import BaseModel
 import yaml
 from mainsequence.logconf import logger
+import inspect
+from typing import Any, Dict, List, Optional, Type, Union
+from pydantic import BaseModel, Field, create_model
 
 def get_vfb_logger():
     global logger
@@ -223,352 +227,6 @@ def parse_google_docstring(docstring):
         "raises": {exc.type_name: exc.description for exc in parsed.raises}
     }
 
-
-def get_basic_default_value(elem):
-    if elem == str:
-        return ""
-    elif elem == int:
-        return 0
-    elif elem == float:
-        return 0.0
-    elif elem == bool:
-        return False
-    elif elem == Any:
-        return None
-    else:
-        raise ValueError(f"Unsupported type: {elem}")
-
-def parse_object_signature_raw(elem, parent_description=None, attr_name=None, attr_default=None):
-    if isinstance(attr_default, Enum):
-        attr_default = attr_default.value
-
-    potential_field_info = attr_default
-    if isinstance(potential_field_info, tuple) and len(potential_field_info) > 0 and isinstance(potential_field_info[0], FieldInfo):
-        potential_field_info = potential_field_info[0]
-
-    if isinstance(potential_field_info, FieldInfo):
-        # Handle both Pydantic v1 ('extra') and v2 ('json_schema_extra') to be robust
-        extra_data = getattr(potential_field_info, 'json_schema_extra', None) or getattr(potential_field_info, 'extra', {})
-        example = extra_data.get('example')
-
-        if example is not None:
-            attr_default = example
-        elif potential_field_info.default is not PydanticUndefined:
-            attr_default = potential_field_info.default
-        else:
-            attr_default = None
-
-    element_info = {
-        "name": attr_name,
-        "type": elem,
-        "parent_description": parent_description,
-        "description": None,
-        "default": attr_default,
-        "allowed_values": None,
-        "elements": [],
-        "example": None
-    }
-
-    if get_origin(elem) == Union:
-        for arg in get_args(elem):
-            sub_elem = parse_object_signature_raw(arg, parent_description, attr_name, attr_default)
-            if sub_elem["allowed_values"]:
-                return sub_elem
-
-    elif isinstance(elem, type) and issubclass(elem, Enum):
-        element_info["allowed_values"] = [e.value for e in elem]
-        if element_info["default"] is None and element_info["allowed_values"]:
-            element_info["default"] = element_info["allowed_values"][0]
-
-    elif hasattr(elem, '__origin__') and elem.__origin__ is list:
-        element_info["name"] = None
-        if hasattr(elem, '__args__'):
-            element_info["elements"] = [
-                parse_object_signature_raw(elem.__args__[0], parent_description, attr_name, attr_default)
-            ]
-            for e in element_info["elements"]:
-                e["type"] = element_info["type"]
-
-    elif hasattr(elem, '__origin__') and elem.__origin__ is dict:
-        if hasattr(elem, '__args__'):
-            element_info["elements"] = [
-                parse_object_signature_raw(arg, parent_description, attr_name, attr_default)
-                for arg in elem.__args__
-            ]
-
-    elif elem in (str, int, float, bool, Any):
-        if element_info["default"] is None:
-            element_info["default"] = get_basic_default_value(elem)
-
-    elif isinstance(elem, type) and issubclass(elem, BaseModel):
-        doc_parsed = parse_google_docstring(elem.__doc__)
-        element_info.update({
-            "example": doc_parsed["example"],
-            "description": doc_parsed["description"]
-        })
-
-        for field_name, field_info in elem.__fields__.items():
-            element_info["elements"].append(
-                parse_object_signature_raw(
-                    field_info.annotation,
-                    doc_parsed["args_descriptions"].get(field_name),
-                    field_name,
-                    field_info.default if field_info.default is not PydanticUndefined else None
-                )
-            )
-
-    elif isinstance(elem, type):
-        doc_parsed = parse_google_docstring(elem.__doc__)
-        element_info.update({
-            "example": doc_parsed["example"],
-            "description": doc_parsed["description"]
-        })
-
-        for field_name, field_type in get_type_hints(elem).items():
-            element_info["elements"].append(
-                parse_object_signature_raw(
-                    field_type,
-                    doc_parsed["args_descriptions"].get(field_name),
-                    field_name,
-                    getattr(elem, field_name, None)
-                )
-            )
-
-    elif callable(elem):
-        doc_parsed = parse_google_docstring(elem.__doc__)
-        element_info.update({
-            "example": doc_parsed["example"],
-            "description": doc_parsed["description"]
-        })
-
-        default_values = {k: v.default for k, v in inspect.signature(elem).parameters.items() if v.default is not inspect.Parameter.empty}
-        for field_name, field_type in get_type_hints(elem).items():
-            element_info["elements"].append(
-                parse_object_signature_raw(
-                    field_type,
-                    doc_parsed["args_descriptions"].get(field_name),
-                    field_name,
-                    default_values.get(field_name)
-                )
-            )
-
-    elif isinstance(elem, FieldInfo):
-        configuration_elem = elem.json_schema_extra.get("portfolio_configuration_overwrite")
-        element_info["elements"] = parse_object_signature_raw(configuration_elem)["elements"]
-        element_info["type"] = elem.default
-
-    return element_info
-
-def parse_object_signature(base_object: Any, use_examples_for_default: Optional[list]=None, exclude_attr: Optional[list]=None ) -> dict:
-
-    signature_raw = parse_object_signature_raw(base_object)
-    documentation_dict = parse_raw_object_signature(
-        object_signature=signature_raw,
-        use_examples_for_default=use_examples_for_default,
-        exclude_attr=exclude_attr
-    )
-    return documentation_dict
-
-
-
-def object_signature_to_markdown(root_dict, level=1, elements_to_exclude=None, children_to_exclude=None):
-    """
-    Convert a nested dictionary structure into a markdown formatted string.
-
-    Args:
-    - root_dict (dict): The nested dictionary to convert.
-    - level (int): The current markdown header level.
-
-    Returns:
-    - str: The markdown formatted string.
-    """
-    elements_to_exclude = elements_to_exclude or []
-    children_to_exclude = children_to_exclude or []
-
-    def nested_dict_to_markdown(nested_dict, level):
-        if nested_dict['name'] in elements_to_exclude:
-            return ""
-
-        md_str = ""
-        indent = "#" * level + " "
-        name = nested_dict.get('name')
-
-        if name:
-            md_str += f"{indent}{name}\n\n"
-            description = nested_dict.get('description') or nested_dict.get('parent_description')
-            if description:
-                md_str += f"- **Description:** {description}\n"
-            if nested_dict.get('type'):
-                md_str += f"- **Type:** `{nested_dict['type']}`\n"
-            if nested_dict.get('example'):
-                md_str += f"- **Example:** \n```yaml\n{nested_dict['example']}\n```\n"
-            if nested_dict.get('default') is not None:
-                md_str += f"- **Default:** {nested_dict['default']}\n"
-            if nested_dict.get('allowed_values'):
-                md_str += f"- **Allowed Values:** {', '.join(map(str, nested_dict['allowed_values']))}\n"
-            md_str += "\n"
-
-        if 'elements' in nested_dict and nested_dict['elements'] and name not in children_to_exclude:
-            for element in nested_dict['elements']:
-                md_str += nested_dict_to_markdown(element, level + 1)
-
-        return md_str
-
-    return nested_dict_to_markdown(root_dict, level=level)
-
-def parse_raw_object_signature(object_signature, use_examples_for_default=None, exclude_attr=None):
-    use_examples_for_default = use_examples_for_default or []
-    exclude_attr = exclude_attr or []
-
-    def parse_elements(elements):
-        if not elements:
-            return None
-
-        # filter out elements without a name (Dict or List objects)
-        filtered_elements = []
-        for e in elements:
-            if e["name"] is not None:
-                filtered_elements.append(e)
-            else:
-                filtered_elements += e["elements"]
-
-        parsed = {}
-        for element in filtered_elements:
-            # some attributes are not supposed to be in the configuration
-            name = element['name']
-            if element['name'] in exclude_attr:
-                continue
-
-            info_dict = {
-                "info": {
-                    "description": element['description'] or element.get('parent_description'),
-                    "allowed_values": element['allowed_values'],
-                    "default": element['default'],
-                }
-            }
-
-            # special cases where we need to use examples (like asset_list)
-            if name in use_examples_for_default:
-                default = yaml.safe_load(element['example'])
-                if not default:
-                    info_dict["info"]["default"] = ""
-                else:
-                    info_dict.update(default)
-                parsed[name] = info_dict
-                continue
-            elif element['elements']:
-                elements = parse_elements(element['elements'])
-
-                if str(element["type"]).startswith("typing.List"):
-                    info_dict["typing.List"] = {}
-                    for key, item in elements.items():
-                        info_dict["typing.List"][key] = item
-                else:
-                    for key, item in elements.items():
-                        info_dict[key] = item
-
-            parsed[name] = info_dict
-        return parsed
-
-    parsed = parse_elements(object_signature['elements'])
-    if parsed is None:
-        parsed = {}
-    return parsed
-
-
-def default_config_to_dict(default_config):
-    """Convert the default configuration into a Python dictionary.
-
-    Args:
-        default_config (dict): Default configuration from the VFB tool.
-
-    Returns:
-        dict: Processed configuration dictionary.
-    """
-    def process_dict(d):
-        if not isinstance(d, dict):
-            return d
-
-        new_dict = {}
-        for key, value in d.items():
-            if key == "info" and isinstance(value, dict) and "default" in value:
-                if value["default"] is not None:
-                    return value["default"]
-            elif key == "typing.List":
-                return [process_dict(value)]
-            elif isinstance(value, dict):
-                new_dict[key] = process_dict(value)
-            else:
-                new_dict[key] = value
-
-        return new_dict
-
-    default_config = process_dict(default_config)
-    if not default_config:
-        return {}
-
-    return default_config
-
-def object_signature_to_yaml(default_config):
-    """Convert the default configuration dictionary to a YAML string.
-
-    Args:
-        default_config (dict): Default configuration from the VFB tool.
-
-    Returns:
-        str: YAML formatted string of the configuration.
-    """
-    yaml_string = yaml.dump(default_config_to_dict(default_config), default_flow_style=False)
-    return f"```yaml\n{yaml_string}\n```"
-
-
-def build_markdown(root_class, persist: bool = True, elements_to_exclude=None, children_to_exclude=None):
-    """
-    Builds standards portfolio configuration documentation
-    Returns:
-    """
-    parsed_documentation = parse_object_signature_raw(root_class)
-
-    # Iteratively go through the structure to set the signal weights names
-    for element in parsed_documentation.get('elements', []):
-        if element['name'] == 'portfolio_build_configuration':
-            for sub_element in element.get('elements', []):
-                if sub_element['name'] == 'backtesting_weights_configuration':
-                    for weight_config in sub_element.get('elements', []):
-                        if weight_config['name'] == "signal_weights_name":
-                            weight_config['default'] = "MarketCap"
-                            break
-
-    portfolio_config = object_signature_to_markdown(
-        parsed_documentation,
-        children_to_exclude=children_to_exclude,
-        elements_to_exclude=elements_to_exclude,
-    )
-
-    return portfolio_config
-
-
-def get_default_documentation(exclude_arguments=None):
-    if exclude_arguments is None:
-        exclude_arguments = [
-                "is_live"
-        ]
-    from mainsequence.virtualfundbuilder.models import PortfolioConfiguration
-    object_signature = parse_object_signature(
-        base_object=PortfolioConfiguration,
-        use_examples_for_default=[],
-        exclude_attr=exclude_arguments
-    )
-
-    default_yaml = object_signature_to_yaml(object_signature)
-
-    markdown_documentation = build_markdown(
-        elements_to_exclude=exclude_arguments,
-        root_class=PortfolioConfiguration
-    )
-
-    return {"default_config": default_yaml, "markdown": markdown_documentation, "documentation_dict": object_signature}
-
 def extract_code(output_string):
     import re
     # Use regex to find content between triple backticks
@@ -593,3 +251,131 @@ def is_jupyter_environment():
         return "ipykernel" in str(get_ipython())
     except ImportError:
         return False
+
+
+def type_to_json_schema(py_type: Type, definitions: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Recursively converts a Python type annotation to a JSON schema dictionary.
+    Handles Pydantic models, Enums, Lists, Unions, and basic types.
+
+    Args:
+        py_type: The Python type to convert.
+        definitions: A dict to store schemas of nested models, used for $defs.
+
+    Returns:
+        A dictionary representing the JSON schema for the given type.
+    """
+    origin = get_origin(py_type)
+    args = get_args(py_type)
+
+    # Handle Optional[T] by making the inner type nullable
+    if origin is Union and len(args) == 2 and type(None) in args:
+        non_none_type = args[0] if args[1] is type(None) else args[1]
+        schema = type_to_json_schema(non_none_type, definitions)
+        # Add null type to anyOf or create a new anyOf
+        if "anyOf" in schema:
+            if not any(sub.get("type") == "null" for sub in schema["anyOf"]):
+                schema["anyOf"].append({"type": "null"})
+        else:
+            schema = {"anyOf": [schema, {"type": "null"}]}
+        return schema
+
+    if origin is Union:
+        return {"anyOf": [type_to_json_schema(arg, definitions) for arg in args]}
+    if origin in (list, List):
+        item_schema = type_to_json_schema(args[0], definitions) if args else {}
+        return {"type": "array", "items": item_schema}
+    if origin in (dict, Dict):
+        value_schema = type_to_json_schema(args[1], definitions) if len(args) > 1 else {}
+        return {"type": "object", "additionalProperties": value_schema}
+
+    # Handle Pydantic Models by creating a reference
+    if inspect.isclass(py_type) and issubclass(py_type, BaseModel):
+        model_name = py_type.__name__
+        if model_name not in definitions:
+            definitions[model_name] = {}  # Placeholder to break recursion
+            model_schema = py_type.model_json_schema(ref_template="#/$defs/{model}")
+            if "$defs" in model_schema:
+                for def_name, def_schema in model_schema.pop("$defs").items():
+                    if def_name not in definitions:
+                        definitions[def_name] = def_schema
+            definitions[model_name] = model_schema
+        return {"$ref": f"#/$defs/{model_name}"}
+
+    # Handle Enums
+    if inspect.isclass(py_type) and issubclass(py_type, Enum):
+        return {"type": "string", "enum": [e.value for e in py_type]}
+
+    # Handle basic types
+    type_map = {str: "string", int: "integer", float: "number", bool: "boolean"}
+    if py_type in type_map:
+        return {"type": type_map[py_type]}
+    if py_type is Any:
+        return {}  # Any type, no constraint
+
+    # Fallback for unknown types
+    return {"type": "string", "description": f"Unrecognized type: {getattr(py_type, '__name__', str(py_type))}"}
+
+
+def create_schema_from_signature(func: callable) -> Dict[str, Any]:
+    """
+    Parses a function's signature (like __init__) and creates a JSON schema.
+
+    Args:
+        func: The function or method to parse.
+
+    Returns:
+        A dictionary representing the JSON schema of the function's signature.
+    """
+    try:
+        signature = inspect.signature(func)
+        type_hints = get_type_hints(func)
+    except (TypeError, NameError): # Handles cases where hints can't be resolved
+        return {}
+
+    parsed_doc = docstring_parser.parse(func.__doc__ or "")
+    arg_descriptions = {p.arg_name: p.description for p in parsed_doc.params}
+
+    properties = {}
+    required = []
+    definitions = {}  # For nested models
+
+    for name, param in signature.parameters.items():
+        if name in ('self', 'cls', 'args', 'kwargs'):
+            continue
+
+        param_type = type_hints.get(name, Any)
+        prop_schema = type_to_json_schema(param_type, definitions)
+        prop_schema['title'] = name.replace('_', ' ').title()
+
+        if name in arg_descriptions:
+            prop_schema['description'] = arg_descriptions[name]
+
+        if param.default is inspect.Parameter.empty:
+            required.append(name)
+        else:
+            default_value = param.default
+            try:
+                # Ensure default is JSON serializable
+                json.dumps(default_value)
+                prop_schema['default'] = default_value
+            except TypeError:
+                 if isinstance(default_value, Enum):
+                     prop_schema['default'] = default_value.value
+                 else:
+                     # Fallback for non-serializable defaults
+                     prop_schema['default'] = str(default_value)
+
+        properties[name] = prop_schema
+
+    schema = {
+        "title": getattr(func, '__name__', 'Schema'),
+        "type": "object",
+        "properties": properties,
+    }
+    if required:
+        schema["required"] = required
+    if definitions:
+        schema["$defs"] = definitions
+
+    return schema

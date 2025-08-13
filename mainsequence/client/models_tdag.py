@@ -1224,8 +1224,14 @@ class UpdateStatistics(BaseModel):
     def asset_identifier(self):
         return list(self.asset_time_statistics.keys())
 
-    def get_update_range_map_great_or_equal(self):
-        range_map={k:DateInfo({"start_date_operand":">=","start_date":v or self._initial_fallback_date}) for k,v in self.asset_time_statistics.items()}
+    def get_update_range_map_great_or_equal(self,
+                                            extra_time_delta:Optional[datetime.timedelta] = None,
+                                            ):
+        if extra_time_delta is None:
+            range_map={k:DateInfo({"start_date_operand":">=","start_date":v or self._initial_fallback_date}) for k,v in self.asset_time_statistics.items()}
+        else:
+            range_map = {k: DateInfo({"start_date_operand": ">=", "start_date": (v or self._initial_fallback_date)+extra_time_delta}) for
+                         k, v in self.asset_time_statistics.items()}
         return range_map
 
     def get_last_update_index_2d(self,uid):
@@ -1880,26 +1886,12 @@ class DynamicResource(BasePydanticModel, BaseObjectOrm):
     name: str
     type: str
     object_signature : dict
-    markdown_documentation : str
-    default_yaml: str
     attributes: Optional[dict]
 
     created_at:datetime.datetime
     updated_at:datetime.datetime
     is_production:bool
     pod: int
-
-def register_default_configuration(json_payload: dict, timeout=None):
-    url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/register_default_configuration/"
-    from requests.adapters import HTTPAdapter, Retry
-    s = requests.Session()
-    s.headers.update(loaders.auth_headers)
-    retries = Retry(total=2, backoff_factor=2)
-    s.mount('http://', HTTPAdapter(max_retries=retries))
-
-    r = make_request(s=s, r_type="POST", url=url, payload={"json": json_payload},
-                     loaders=loaders, time_out=timeout)
-    return r
 
 def create_configuration_for_strategy(json_payload: dict, timeout=None):
     url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/create_configuration_for_strategy/"

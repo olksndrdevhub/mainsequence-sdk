@@ -32,11 +32,6 @@ class PortfolioTableConfiguration(BaseModel):
 class PortfolioTable(HtmlApp):
     configuration_class = PortfolioTableConfiguration
 
-    def __init__(self, configuration: PortfolioTableConfiguration):
-        logger.info(f"Create portfolio table with configuration {configuration}")
-        self.configuration = configuration
-        super().__init__()
-
     def run(self) -> str:
         style = StyleSettings(mode=ThemeMode.light)
         shared_column_widths = [1.8, 1, 1, 1.5, 0.7, 0.8, 0.8, 0.7]

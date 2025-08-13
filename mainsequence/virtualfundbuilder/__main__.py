@@ -106,9 +106,9 @@ def get_pod_configuration():
 
     project_path = os.getenv("VFB_PROJECT_PATH")
 
-    # Gather all submodules in time_series
-    time_series_package = f"{project_library}.data_nodes"
-    time_series_modules = get_py_modules(os.path.join(project_path, "time_series"))
+    # Gather all submodules in data_nodes
+    data_nodes_package = f"{project_library}.data_nodes"
+    data_nodes_modules = get_py_modules(os.path.join(project_path, "data_nodes"))
 
     # Gather all submodules in rebalance_strategies
     rebalance_package = f"{project_library}.rebalance_strategies"
@@ -121,9 +121,9 @@ def get_pod_configuration():
     # Build the temporary Python script to import all files
     script_lines = []
 
-    script_lines.append("# -- Auto-generated imports for time_series --")
-    for mod in time_series_modules:
-        script_lines.append(f"import {time_series_package}.{mod}")
+    script_lines.append("# -- Auto-generated imports for data_nodes --")
+    for mod in data_nodes_modules:
+        script_lines.append(f"import {data_nodes_package}.{mod}")
 
     script_lines.append("# -- Auto-generated imports for rebalance_strategies --")
     for mod in rebalance_modules:

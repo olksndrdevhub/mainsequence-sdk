@@ -1,111 +1,4 @@
-"""
-================================================================================
-Instructions for Implementing a `mainsequence.tdag.DataNode` Subclass
-================================================================================
 
-This file serves as a reference for creating custom time series. To create a new,
-functioning time series, you must subclass `DataNode` and implement its abstract
-methods.
-
----
-### 1. Code Style and Documentation Requirements (IMPORTANT)
-
-All generated code MUST adhere to the following quality standards:
-
--   **Docstrings**: Every class and method **MUST** have a clear, concise docstring
-    explaining its purpose. Methods should include sections for arguments (`Args:`)
-    and return values (`Returns:`).
--   **Type Hinting**: All function and method signatures **MUST** use Python type hints
-    for all parameters and return values (e.g., `def my_method(self, assets: List[Asset]) -> pd.DataFrame:`).
--   **Inline Comments**: Complex or non-obvious lines of code **MUST** be explained with
-    inline comments (`# ...`). Explain the "why" behind the code, not just the "what".
--   **Readability**: Keep functions focused on a single responsibility. Break down
-    long, complex methods into smaller, private helper methods where appropriate.
-
----
-
-### 2. The `__init__` Method
-The constructor defines the unique identity of the time series and its dependencies.
-
--   **Uniqueness**: The arguments passed to `__init__` are hashed to create a unique ID.
-    Instantiating a class with the same arguments will always result in the same time series object.
-
-
-
--   **Special Arguments**: The following arguments are special and are **NOT** included in the hash:
-    - `init_meta`: For temporary, runtime-only options.
-    - `build_meta_data`: For controlling backend table creation.
-
-
-
-
----
-
-
-###
--  `_ARGS_IGNORE_IN_STORAGE_HASH`: A list of argument names to exclude from the *update* hash and set as a class property.
-It is important to have in mind that each instance of the constructor of a DataNode will create unique storage_hash
-and a unique update_hash arguments in _ARGS_IGNORE_IN_STORAGE_HASH will be ignored in the creation of storage_hash
-
----
-
-### 3. The `dependencies` Method (Required)
-This method is the core method to build a DAG for dependencies between DataNodes. Only the DataNodes that
-are returned in this method will be included in the creation of the dependecy graph
-def dependencies()-> Dict[str, Union["DataNode", "APIDataNode"]]:
-    return {"prices_time_serie":self.prices_time_serie}
-
-### 4. The `update` Method (Required)
-This is the core method containing the business logic for generating data.
-
--   **Purpose**: **MUST** be implemented. Its job is to fetch, calculate, or generate new data points.
--   **self.update_statistics: This object contstains information about the state of the storage that will be updated
-    in the method
-    -self.update_statistics.asset_list contains the list of all the assets to be included in this update round if it is a
-    2d multiindex
-    self.update_statistics.asset_time_statistics has the last value updated in a nested index format when the storage is
-    multiindex. For example if the storage is a 2d index [time_index,"unique_identifier"] then asset_time_statistics will be
-    dict{str:datetimte.datetime} where{asset.unique_identifier:datetime.datetime}. if the index has more than 2 dimensions
-    then asset_time_statistics will be dict[str,[dict[str,datetimte.datetime]]]
-
--   **DataFrame Requirements**: The method **MUST** return a pandas DataFrame that adheres to the
-    following strict format:
-    -   **Index**: Must be a `pandas.MultiIndex` with the names `("time_index", "unique_identifier",level_1,...,level_0)`.
-    -   **`time_index` Level**: Must contain `datetime.datetime` objects with UTC timezone (`tzinfo=pytz.utc`).
-    -   **Column Names**: All column names **MUST** be lowercase and **have a maximum length of 63 characters**.
-    -   **Column Values**: No column (other than the index) may contain Python `datetime` objects.
-        If you need to store a timestamp in a column, it **MUST** be converted to an integer
-        (e.g., a UNIX epoch timestamp).
-    -   **MultiIndex** When the index is a `pandas.MultiIndex` and has more than 2 levels ("time_index", "unique_identifier")
-        It is mandatory to run at the beggining of the update method  update_statistics.filter_assets_by_level whith
-        the extra filters for example
-         update_statistics.filter_assets_by_level(
-                                                 level=2,
-                                                 filters=[json.dumps(c) for c in self.ta_feature_config])
-
-
----
-### 5. Optional Hooks (Override as Needed)
-These methods have default behaviors but can be overridden for customization.
-
--   `get_table_metadata(self) -> Optional[ms_client.TableMetaData]`:
-    -   **Purpose**: [OPTIONAL] Implement this hook to add human identifier and description to a table.
-    -   **Returns**: A configured `ms_client.TableMetaData` object with the following key attributes:
-        -   `identifier` (str): A human-readable, public ID for your time series (e.g., "my_daily_rsi_feature"). **Must be unique across all tables**
-        -   `data_frequency_id` (ms_client.DataFrequency): The data frequency (e.g., `ms_client.DataFrequency.one_d`).
-        -   `description` (str): A user-friendly description of the table.
-
--   `get_asset_list(self) -> List[Asset]`:
-    -   **Purpose**: [OPTIONAL] Implement to dynamically define the list of assets this time series should process during an update. Useful for fetching all assets in a category.
-    -   **Returns**: A list of `Asset` objects.
-
--   `get_column_metadata(self) -> List[ColumnMetaData]`:
-    -   **Purpose**: [OPTIONAL] Implement to provide rich descriptions for your data columns. This metadata is used in documentation and user interfaces.
-    -   **Returns**: A list of `ColumnMetaData` objects.
-
--   `run_post_update_routines(self, ...)`:
-    -   **Purpose**: [OPTIONAL] Implement to run custom logic *after* an update is finished. Useful for logging, cleanup, or registering the time series in an external system.
-"""
 import json
 
 # Imports should be at the top of the file
@@ -159,14 +52,10 @@ class SimulatedPricesManager:
             return fallback
     def update(self)->pd.DataFrame:
         """
-        Mocks price updates for assets with stochastic lognormal returns.
-
-        - If update_statistics is empty, simulate data from (now - 30 days) to (now - 20 days),
-          floored to the nearest minute.
-        - Otherwise, for each unique identifier in update_statistics.update_statistics,
-          simulate new data starting one hour after its last update until yesterday at midnight (UTC),
-          using the last observed price as the starting price. The last observation is not duplicated.
-
+       Mocks price updates for assets with stochastic lognormal returns.
+       For each asset, simulate new data starting one hour after its last update
+        until yesterday at 00:00 UTC, using the last observed price as the seed.
+        The last observation is not duplicated.
         Returns:
             pd.DataFrame: A DataFrame with a multi-index (time_index, unique_identifier)
                           and a single column 'close' containing the simulated prices.
@@ -178,7 +67,7 @@ class SimulatedPricesManager:
         sigma = 0.01  # volatility component for lognormal returns
 
         df_list = []
-        update_statistics=self.update_statistics
+        update_statistics=self.owner.update_statistics
         # Get the latest historical observations; assumed to be a DataFrame with a multi-index:
         # (time_index, unique_identifier) and a column "close" for the last observed price.
         range_descriptor=update_statistics.get_update_range_map_great_or_equal()
@@ -195,14 +84,14 @@ class SimulatedPricesManager:
                 continue  # Skip if no simulation period is available.
             time_range = pd.date_range(start=start_time, end=yesterday_midnight, freq='D')
             if len(time_range) == 0:
+
                 continue
-            # Use the last observed price for the asset as the starting price.
-                # Get or fallback to initial_price
+             # Use the last observed price for the asset as the starting price (or fallback).
             last_price = self._get_last_price(
-                obs_df=last_observation,
-                unique_id=asset.unique_identifier,
-                fallback=initial_price
-            )
+            obs_df=last_observation,
+            unique_id=asset.unique_identifier,
+            fallback=initial_price
+                )
 
             random_returns = np.random.lognormal(mean=mu, sigma=sigma, size=len(time_range))
             simulated_prices = last_price * np.cumprod(random_returns)
@@ -244,7 +133,7 @@ class SingleIndexTS(DataNode):
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
 
     def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
-        pass
+        return {}
     def update(self):
         today_utc = datetime.datetime.now(tz=pytz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         update_statistics=self.update_statistics
@@ -319,11 +208,11 @@ class SimulatedPrices(DataNode):
         super().__init__(*args, **kwargs)
 
     def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
-        pass
+        return {}
 
     def update(self):
         update_manager=SimulatedPricesManager(self)
-        df=update_manager.update(self.update_statistics)
+        df=update_manager.update()
         return df
 
 
@@ -602,8 +491,7 @@ class FeatureStoreTA(DataNode):
             features_df = pd.DataFrame(index=prices_pivot.stack(dropna=False).index)
             f_conf=copy.deepcopy(feature_config)
             feature_name=json.dumps(f_conf)
-            feature_kind=f_conf["kind"].lower()
-            f_conf.pop("kind")
+            feature_kind = f_conf.pop("kind").lower()
             func = getattr(ta, feature_kind)
             out = prices_pivot.apply(lambda col: func(col, **feature_config))
 
@@ -679,22 +567,13 @@ def _prepare_model_data(
     }
 
     # Fetch raw data
-    feats_long = feature_ts.get_ranged_data_per_asset(range_descriptor=range_descriptor)
+    feats_df = feature_ts.get_ranged_data_per_asset(range_descriptor=range_descriptor)
     prices_df = prices_ts.get_ranged_data_per_asset(range_descriptor=range_descriptor)
 
-    if feats_long.empty or prices_df.empty:
+    if feats_df.empty or prices_df.empty:
         return pd.DataFrame()
 
-    # Pivot TA features into wide form
-    feats_wide = (
-        feats_long["feature_value"]
-        .reset_index()
-        .pivot(
-            index=["time_index", "unique_identifier"],
-            columns="feature_name",
-            values="feature_value"
-        )
-    )
+
 
     # Compute next-day returns
     price_ser = (
@@ -712,7 +591,7 @@ def _prepare_model_data(
     )
 
     # Join features + target and drop rows with missing values
-    return feats_wide.join(returns, how="inner").dropna()
+    return feats_df.join(returns, how="inner").dropna()
 
 class ModelTrainTimeSerie(DataNode):
     """

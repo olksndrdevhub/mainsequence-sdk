@@ -134,6 +134,8 @@ class APIPersistManager:
             A pandas DataFrame with the requested data.
         """
         filtered_data = self.metadata.get_data_between_dates_from_api(*args, **kwargs)
+        if filtered_data.empty:
+            return filtered_data
 
         # fix types
         stc = self.metadata.sourcetableconfiguration
@@ -546,7 +548,7 @@ class PersistManager:
             data_source: DynamicTableDataSource,
             time_serie_source_code_git_hash: str,
             time_serie_source_code: str,
-            remote_build_metadata: dict,
+            build_configuration_json_schema: dict,
     ) -> None:
         """
         Ensures local and remote persistence objects exist and sets their configurations.
@@ -570,7 +572,9 @@ class PersistManager:
                               time_serie_source_code=time_serie_source_code,
                               build_configuration=remote_configuration,
                               data_source=data_source.model_dump(),
-                              build_meta_data=remote_build_metadata)
+                              build_meta_data=remote_build_metadata,
+                build_configuration_json_schema=build_configuration_json_schema
+                              )
 
 
                 dtd_metadata = DynamicTableMetaData.get_or_create(**kwargs)

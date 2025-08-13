@@ -12,18 +12,41 @@ from mainsequence.client import UpdateStatistics
 from mainsequence.tdag.data_nodes import DataNode, APIDataNode
 import mainsequence.client as ms_client
 import numpy as np
+from pydantic import BaseModel,Field
+
+
+class VolatilityConfig(BaseModel):
+    center: float = Field(
+        ...,
+        title="Standard Deviation",
+        description="Standard deviation of the normal distribution (must be > 0).",
+        examples=[0.1, 1.0, 2.5],\
+        gt=0,  # constraint: strictly positive
+        le=1e6,  # example upper bound (optional)
+        multiple_of=0.0001,  # example precision step (optional)
+    )
+    skew: bool
+
+
+class RandomDataNodeConfig(BaseModel):
+    mean: float = Field(..., ignore_from_storage_hash=False, title="Mean",
+                        description="Mean for the random normal distribution generator")
+    std: VolatilityConfig = Field(VolatilityConfig(center=1, skew=True), ignore_from_storage_hash=True,
+                                  title="Vol Config",
+                                  description="Vol Configuration")
 
 
 class DailyRandomNumber(DataNode):
 
-    def __init__(self,mean:float,std:float, *args, **kwargs):
+    def __init__(self,node_configuration:RandomDataNodeConfig, *args, **kwargs):
         """
         :param mean:  the mean of the probability  distribution
         :param std: the std of the probability  distribution
         :param kwargs:
         """
-        self.mean=mean
-        self.std=std
+        self.node_configuration=node_configuration
+        self.mean=node_configuration.mean
+        self.std=node_configuration.std
         super().__init__(*args, **kwargs)
 
     def get_table_metadata(self)->ms_client.TableMetaData:
@@ -103,7 +126,7 @@ class DailyRandomAdditionAPI(DataNode):
 def build_test_time_series():
 
 
-    daily_node = DailyRandomNumber(mean=0.0, std=1.0)
+    daily_node = DailyRandomNumber(RandomDataNodeConfig(mean=0.0))
     daily_node.run(debug_mode=True, force_update=True)
 
     daily_node = DailyRandomAddition(mean=0.0, std=1.0)

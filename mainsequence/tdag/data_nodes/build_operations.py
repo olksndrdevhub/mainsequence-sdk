@@ -1,7 +1,7 @@
 
 import inspect
 import hashlib
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union,Mapping,Type
 import copy
 from pydantic import BaseModel
 import json
@@ -71,7 +71,12 @@ def _(value: BaseModel, pickle_ts: bool = False) -> Dict[str, Any]:
     import_path = {"module": value.__class__.__module__, "qualname": value.__class__.__qualname__}
     # Recursively call serialize_argument on each value in the model's dictionary.
     serialized_model = {k: serialize_argument(v, pickle_ts) for k, v in value.model_dump().items()}
-    return {"pydantic_model_import_path": import_path, "serialized_model": serialized_model}
+
+    ignore_from_storage_hash = [k for k,v in value.model_fields.items() if v.json_schema_extra and v.json_schema_extra.get("ignore_from_storage_hash",False)==True]
+
+    return {"pydantic_model_import_path": import_path, "serialized_model": serialized_model,
+            "ignore_from_storage_hash":ignore_from_storage_hash
+            }
 
 @serialize_argument.register(BaseObjectOrm)
 def _(value, pickle_ts: bool):
@@ -246,6 +251,15 @@ def hash_signature(dictionary: Dict[str, Any]) -> Tuple[str, str]:
             remote_ts_in_db_hash.pop(k, None)
         remote_ts_in_db_hash.pop("arguments_to_ignore_from_storage_hash", None)
 
+    #remove keys from pydantic objects
+    for k,val in local_ts_dict_to_hash.items():
+        if isinstance(val, dict) == False:
+            continue
+        if "pydantic_model_import_path" in val:
+            if "ignore_from_storage_hash" in val:
+                for arg in val["ignore_from_storage_hash"]:
+                    remote_ts_in_db_hash[k]["serialized_model"].pop(arg, None)
+            remote_ts_in_db_hash[k].pop("ignore_from_storage_hash")
     # Encode and hash both versions
     encoded_local = json.dumps(local_ts_dict_to_hash, sort_keys=True).encode()
     encoded_remote = json.dumps(remote_ts_in_db_hash, sort_keys=True).encode()
@@ -489,6 +503,19 @@ class TimeSerieConfig:
     storage_hash: str
     local_initial_configuration: Dict[str, Any]
     remote_initial_configuration: Dict[str, Any]
+    build_configuration_json_schema:Dict[str,Any]
+
+
+
+def extract_pydantic_fields_from_dict(d: Mapping[str, Any]) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """
+    Returns: {key: {field_name: <metadata>}} for every value in `d` that is a Pydantic model.
+    """
+    result: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    for k, v in d.items():
+        if isinstance(v, BaseModel):
+            result[k] = v.model_json_schema()
+    return result
 
 def create_config(ts_class_name: str,
                   arguments_to_ignore_from_storage_hash: List[str],
@@ -497,6 +524,9 @@ def create_config(ts_class_name: str,
     Creates the configuration and hashes using the original hash_signature logic.
     """
     global logger
+
+
+    build_configuration_json_schema=extract_pydantic_fields_from_dict(kwargs)
 
     # 1. Use the helper to separate meta args from core args.
     core_kwargs, meta_kwargs = prepare_config_kwargs(kwargs)
@@ -517,8 +547,6 @@ def create_config(ts_class_name: str,
     remote_config = copy.deepcopy(dict_to_hash)
 
 
-
-
     # 6. Return all computed values in the structured dataclass
     return TimeSerieConfig(
         init_meta=meta_kwargs["init_meta"],
@@ -527,6 +555,7 @@ def create_config(ts_class_name: str,
         storage_hash=f"{ts_class_name}_{storage_hash}".lower(),
         local_initial_configuration=dict_to_hash,
         remote_initial_configuration=remote_config,
+        build_configuration_json_schema=build_configuration_json_schema,
     )
 
 

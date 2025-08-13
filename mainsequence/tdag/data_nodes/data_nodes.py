@@ -601,7 +601,7 @@ class DataNode(DataAccessMixin,ABC):
             final_kwargs.pop('kwargs', None)  # Remove self
 
             # 3. Run the post-initialization routines
-            logger.info(f"Running post-init routines for {self.__class__.__name__}")
+            logger.debug(f"Running post-init routines for {self.__class__.__name__}")
 
             self._initialize_configuration(init_kwargs=final_kwargs,
                                            )
@@ -622,14 +622,14 @@ class DataNode(DataAccessMixin,ABC):
 
             self._patch_build_from_env()
 
-            logger.info(f"Post-init routines for {self.__class__.__name__} complete.")
+            logger.debug(f"Post-init routines for {self.__class__.__name__} complete.")
 
         # Replace the subclass's __init__ with our new wrapped version
         cls.__init__ = wrapped_init
 
     def _initialize_configuration(self, init_kwargs: dict) -> None:
         """Creates config from init args and sets them as instance attributes."""
-        logger.info(f"Creating configuration for {self.__class__.__name__}")
+        logger.debug(f"Creating configuration for {self.__class__.__name__}")
 
         init_kwargs["time_series_class_import_path"] = {
             "module": self.__class__.__module__,
@@ -841,10 +841,10 @@ class DataNode(DataAccessMixin,ABC):
             storage_hash=self.storage_hash,
             local_configuration=self.local_initial_configuration,
             remote_configuration=self.remote_initial_configuration,
-            remote_build_metadata=self.remote_build_metadata,
             time_serie_source_code_git_hash=time_serie_source_code_git_hash,
             time_serie_source_code=time_serie_source_code,
             data_source=self.data_source,
+            build_configuration_json_schema=self.build_configuration_json_schema,
         )
     def set_relation_tree(self):
 
@@ -857,7 +857,7 @@ class DataNode(DataAccessMixin,ABC):
         declared_dependencies = self.dependencies() or {}
 
         for name, dependency_ts in declared_dependencies.items():
-            self.logger.info(f"Connecting dependency '{name}'...")
+            self.logger.debug(f"Connecting dependency '{name}'...")
 
             # Ensure the dependency itself is properly initialized
             is_api = dependency_ts.is_api

@@ -4,8 +4,11 @@ import inspect
 import importlib.util
 from threading import Thread
 
+import yaml
+
 from mainsequence.client.models_tdag import DynamicResource
-from mainsequence.virtualfundbuilder.utils import get_vfb_logger, parse_object_signature, build_markdown, object_signature_to_yaml
+from mainsequence.tdag import DataNode
+from mainsequence.virtualfundbuilder.utils import get_vfb_logger, create_schema_from_signature
 from typing import get_type_hints, List, Optional, Union
 from pydantic import BaseModel
 from enum import Enum
@@ -163,74 +166,75 @@ class BaseFactory:
             except Exception as e:
                 logger.warning(f"Error reading code in strategy {filename}: {e}")
 
-def send_default_configuration():
-    # TODO should be a tool
-    from mainsequence.virtualfundbuilder.utils import _convert_unknown_to_string, get_default_documentation
-    from mainsequence.client.models_tdag import register_default_configuration
 
-    default_config_dict = get_default_documentation()
-    payload = {
-        "default_config_dict": default_config_dict,
+def send_resource_to_backend(resource_class, attributes: Optional[dict] = None):
+    """
+    Parses the __init__ signatures of the class and its parents to generate a
+    unified JSON schema and sends the resource payload to the backend.
+    """
+    merged_properties = {}
+    merged_required = set()
+    merged_definitions = {}
+
+    # Special case for BaseApp subclasses that use a configuration_class
+    if hasattr(resource_class, 'configuration_class') and inspect.isclass(resource_class.configuration_class) and issubclass(resource_class.configuration_class,
+                                                                                                                             BaseModel):
+        config_class = resource_class.configuration_class
+        config_name = config_class.__name__
+
+        # Get the full schema for the configuration class
+        config_schema = config_class.model_json_schema(ref_template="#/$defs/{model}")
+
+        # Merge any nested definitions from the config schema
+        if "$defs" in config_schema:
+            merged_definitions.update(config_schema.pop("$defs"))
+
+        # Add the configuration class's own schema to the definitions
+        merged_definitions[config_name] = config_schema
+
+        # Create a top-level "configuration" property that references the schema
+        merged_properties["configuration"] = {
+            "$ref": f"#/$defs/{config_name}",
+            "title": "Configuration"
+        }
+        # Mark the top-level "configuration" as required
+        merged_required.add("configuration")
+
+    else:
+        # Standard logic for other resource types
+        for parent_class in reversed(resource_class.__mro__):
+            if parent_class is object or not hasattr(parent_class, '__init__') or parent_class is DataNode:
+                continue
+            if "__init__" in parent_class.__dict__:
+                parent_schema = create_schema_from_signature(parent_class.__init__)
+                merged_properties.update(parent_schema.get("properties", {}))
+                merged_definitions.update(parent_schema.get("$defs", {}))
+                merged_required.update(parent_schema.get("required", []))
+
+    final_json_schema = {
+        "title": resource_class.__name__,
+        "type": "object",
+        "properties": merged_properties,
     }
+    if merged_required:
+        schema_required = sorted([
+            field for field in merged_required
+            if 'default' not in merged_properties.get(field, {})
+        ])
+        if schema_required:
+            final_json_schema["required"] = schema_required
 
-    logger.debug(f"Send default documentation to Backend")
-    payload = json.loads(json.dumps(payload, default=_convert_unknown_to_string))
-    headers = {"Content-Type": "application/json"}
-    try:
-        response = register_default_configuration(json_payload=payload)
-        if response.status_code not in [200, 201]:
-            print(response.text)
-    except Exception as e:
-        logger.warning("Could register strategy to TSORM", e)
+    if merged_definitions:
+        final_json_schema["$defs"] = merged_definitions
 
-def send_resource_to_backend(resource_class, attributes: Optional[dict]=None):
-    """
-    Helper function to send the strategy payload to the registry.
-    Parses the arguments of the classes __init__ function and the __init__ functions of the parent classes
-    """
-    # TODO exclude arguments and example arguments need to come from subclass (or not at all)
-    def _get_wrapped_or_init(resource_class):
-        """Returns the wrapped __init__ method if it exists, otherwise returns the normal __init__."""
-        init_method = resource_class.__init__
-        return getattr(init_method, '__wrapped__', init_method)
-
-    init_method = _get_wrapped_or_init(resource_class)
-
-    object_signature = parse_object_signature(init_method, use_examples_for_default=[])
-    markdown_documentation = build_markdown(
-        children_to_exclude=["front_end_details"],
-        root_class=init_method
-    )
-
-    # get the init signature form class and parent class, might need to be generalized to all parents
-    exclude_args = ["init_meta", "is_live", "build_meta_data", "local_kwargs_to_ignore"]
-    for parent_class in resource_class.__mro__[1:]:
-        init_method_parent = _get_wrapped_or_init(parent_class)
-
-        parent_object_signature = parse_object_signature(
-            init_method_parent,
-            use_examples_for_default=["is_live"],
-            exclude_attr=exclude_args
-        )
-        parent_markdown_documentation = build_markdown(
-            children_to_exclude=["front_end_details"],
-            root_class=init_method_parent,
-            elements_to_exclude=exclude_args
-        )
-        markdown_documentation += parent_markdown_documentation
-
-        for k, v in parent_object_signature.items():
-            # child values have precedence over parent values
-            if k not in object_signature: object_signature[k] = parent_object_signature[k]
-
-    default_yaml = object_signature_to_yaml(object_signature)
+    logger.debug(f"{final_json_schema=}, {resource_class=}, {resource_class.__mro__=}")
 
     resource_config = DynamicResource.create(
         name=resource_class.__name__,
         type=resource_class.TYPE.value,
-        object_signature=object_signature,
-        markdown_documentation=markdown_documentation,
-        default_yaml=default_yaml,
+        object_signature=final_json_schema,
         attributes=attributes,
     )
+
+    logger.debug(f"Sending resource '{resource_class.__name__}' to backend.")
 
