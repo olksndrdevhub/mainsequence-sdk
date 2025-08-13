@@ -473,61 +473,85 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             overwrite: bool = False,
     ):
         """
-            Sends a large DataFrame to a Django backend in multiple chunks.
-
-            :param serialized_data_frame: The DataFrame to upload.
-            :param url: The endpoint URL (e.g. https://yourapi.com/upload-chunk/).
-            :param chunk_size: Number of rows per chunk.
-            :param local_metadata: General metadata dict you want to send with each chunk.
-            :param data_source: Additional info about the source of the data.
-            :param index_names: Index columns in the DataFrame.
-            :param time_index_name: The column name used for time indexing.
-            :param overwrite: Boolean indicating whether existing data should be overwritten.
-            """
+        Sends a large DataFrame to a Django backend in multiple chunks.
+        If a chunk is too large (HTTP 413), it's automatically split in half and retried.
+        """
         s = cls.build_session()
         url = cls.get_object_url() + f"/{local_metadata.id}/insert_data_into_table/"
-        total_rows = len(serialized_data_frame)
-        total_chunks = math.ceil(total_rows / chunk_size)
-        logger.info(f"Starting upload of {total_rows} rows in {total_chunks} chunk(s).")
-        for i in range(total_chunks):
-            start_idx = i * chunk_size
-            end_idx = min((i + 1) * chunk_size, total_rows)
 
-            # Slice the DataFrame for the current chunk
-            chunk_df = serialized_data_frame.iloc[start_idx:end_idx]
+        def _send_chunk_recursively(df_chunk: pd.DataFrame, chunk_idx: int, total_chunks: int, is_sub_chunk: bool = False):
+            """
+            Internal helper to send a chunk. If it receives a 413 error, it splits
+            the chunk and calls itself on the two halves.
+            """
+            if df_chunk.empty:
+                return
 
-            # Compute grouped_dates for this chunk
-            chunk_stats, grouped_dates = get_chunk_stats(
-                chunk_df=chunk_df,
-                index_names=index_names,
-                time_index_name=time_index_name
+            part_label = f"{chunk_idx + 1}/{total_chunks}" if not is_sub_chunk else f"sub-chunk of {chunk_idx + 1}"
+
+            # Prepare the payload
+            chunk_stats, _ = get_chunk_stats(
+                chunk_df=df_chunk, index_names=index_names, time_index_name=time_index_name
             )
-
-            # Convert the chunk to JSON
-            chunk_json_str = chunk_df.to_json(orient="records", date_format="iso")
-
-            # (Optional) Compress JSON using gzip then base64-encode
+            chunk_json_str = df_chunk.to_json(orient="records", date_format="iso")
             compressed = gzip.compress(chunk_json_str.encode('utf-8'))
             compressed_b64 = base64.b64encode(compressed).decode('utf-8')
 
+            # For sub-chunks, we treat it as a new, single-chunk upload.
             payload = dict(json={
-                "data": compressed_b64,  # compressed JSON data
+                "data": compressed_b64,
                 "chunk_stats": chunk_stats,
                 "overwrite": overwrite,
-                "chunk_index": i,
-                "total_chunks": total_chunks,
+                "chunk_index": 0 if is_sub_chunk else chunk_idx,
+                "total_chunks": 1 if is_sub_chunk else total_chunks,
             })
+
             try:
                 r = make_request(s=s, loaders=None, payload=payload, r_type="POST", url=url, time_out=60 * 15)
-                if r.status_code not in [200, 204]:
-                    logger.warning(f"Error in request: {r.text}")
-                logger.info(f"Chunk {i + 1}/{total_chunks} uploaded successfully.")
-            except requests.exceptions.RequestException as e:
-                logger.exception(f"Error uploading chunk {i + 1}/{total_chunks}: {e}")
-                # Optionally, you could retry or break here
-                raise e
-            if r.status_code not in [200, 204]:
+
+                if r.status_code in [200, 204]:
+                    logger.info(f"Chunk {part_label} ({len(df_chunk)} rows) uploaded successfully.")
+                    return
+
+                if r.status_code == 413:
+                    logger.warning(
+                        f"Chunk {part_label} ({len(df_chunk)} rows) is too large (413). "
+                        f"Splitting in half and retrying as new uploads."
+                    )
+                    if len(df_chunk) <= 1:
+                        logger.error(f"A single row is too large to upload (from chunk {part_label}). Cannot split further.")
+                        raise Exception(f"A single row from chunk {part_label} is too large to upload.")
+
+                    mid_point = len(df_chunk) // 2
+                    first_half = df_chunk.iloc[:mid_point]
+                    second_half = df_chunk.iloc[mid_point:]
+
+                    # Recursively call for each half, marking them as sub-chunks.
+                    _send_chunk_recursively(first_half, chunk_idx, total_chunks, is_sub_chunk=True)
+                    _send_chunk_recursively(second_half, chunk_idx, total_chunks, is_sub_chunk=True)
+                    return
+
+                logger.warning(f"Error in request for chunk {part_label}: {r.text}")
                 raise Exception(r.text)
+
+            except requests.exceptions.RequestException as e:
+                logger.exception(f"Network error uploading chunk {part_label}: {e}")
+                raise e
+
+        total_rows = len(serialized_data_frame)
+        if total_rows == 0:
+            logger.info("DataFrame is empty, nothing to upload.")
+            return
+
+        total_chunks = math.ceil(total_rows / chunk_size) if chunk_size > 0 else 1
+        logger.info(f"Starting upload of {total_rows} rows in {total_chunks} initial chunk(s).")
+
+        for i in range(total_chunks):
+            start_idx = i * chunk_size
+            end_idx = min((i + 1) * chunk_size, total_rows)
+            chunk_df = serialized_data_frame.iloc[start_idx:end_idx]
+
+            _send_chunk_recursively(chunk_df, i, total_chunks)
 
     @classmethod
     def get_metadatas_and_set_updates(
