@@ -93,6 +93,7 @@ class HtmlApp(BaseApp):
 
     def __init__(self, *args, **kwargs):
         self.created_artifacts = []
+        super().__init__(*args, **kwargs)
 
     def _get_hash_from_configuration(self):
         try:
