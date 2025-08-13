@@ -259,7 +259,8 @@ def hash_signature(dictionary: Dict[str, Any]) -> Tuple[str, str]:
             if "ignore_from_storage_hash" in val:
                 for arg in val["ignore_from_storage_hash"]:
                     remote_ts_in_db_hash[k]["serialized_model"].pop(arg, None)
-            remote_ts_in_db_hash[k].pop("ignore_from_storage_hash")
+                if k in remote_ts_in_db_hash and "ignore_from_storage_hash" in  remote_ts_in_db_hash[k]:
+                    remote_ts_in_db_hash[k].pop("ignore_from_storage_hash")
     # Encode and hash both versions
     encoded_local = json.dumps(local_ts_dict_to_hash, sort_keys=True).encode()
     encoded_remote = json.dumps(remote_ts_in_db_hash, sort_keys=True).encode()
