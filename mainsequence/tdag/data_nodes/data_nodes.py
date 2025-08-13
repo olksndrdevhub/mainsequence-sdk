@@ -585,31 +585,55 @@ class DataNode(DataAccessMixin,ABC):
 
         @wraps(original_init)
         def wrapped_init(self, *args, **kwargs):
-            # --- This is the logic from the old decorator ---
-
             # 1. Call the original __init__ of the subclass first
             original_init(self, *args, **kwargs)
 
-            # 2. Capture all arguments passed to create the final config
-            # We inspect the original_init to find what arguments it was called with.
-            sig = inspect.signature(original_init)
-            bound_args = sig.bind(self, *args, **kwargs)
-            bound_args.apply_defaults()
-            final_kwargs = bound_args.arguments
-            final_kwargs.pop('self', None)  # Remove self
-            final_kwargs.pop('args', None)  # Remove self
-            final_kwargs.pop('kwargs', None)  # Remove self
+            # 2. Capture all arguments from __init__ methods in the MRO up to DataNode
+            final_kwargs = {}
+            mro = self.__class__.mro()
+
+            try:
+                # We want to inspect from parent to child to ensure subclass arguments override.
+                # The MRO is ordered from child to parent, so we find DataNode and reverse the part before it.
+                data_node_index = mro.index(DataNode)
+                classes_to_inspect = reversed(mro[:data_node_index])
+            except ValueError:
+                # Fallback if DataNode is not in the MRO.
+                classes_to_inspect = [self.__class__]
+
+            for cls_to_inspect in classes_to_inspect:
+                # Only inspect the __init__ defined on the class itself.
+                if '__init__' in cls_to_inspect.__dict__:
+                    sig = inspect.signature(cls_to_inspect.__init__)
+                    try:
+                        # Use bind_partial as the full set of args might not match this specific signature.
+                        bound_args = sig.bind_partial(self, *args, **kwargs)
+                        bound_args.apply_defaults()
+
+                        current_args = bound_args.arguments
+                        current_args.pop('self', None)
+
+                        # If the signature has **kwargs, it collects extraneous arguments. Unpack them.
+                        if 'kwargs' in current_args:
+                            final_kwargs.update(current_args.pop('kwargs'))
+
+                        # Update the final arguments. Overwrites parent args with child args.
+                        final_kwargs.update(current_args)
+                    except TypeError:
+                        logger.warning(f"Could not bind arguments for {cls_to_inspect.__name__}.__init__; skipping for config.")
+                        continue
+
+            # Remove `args` as it collects un-named positional arguments which are not part of the config hash.
+            final_kwargs.pop('args', None)
+
 
             # 3. Run the post-initialization routines
             logger.debug(f"Running post-init routines for {self.__class__.__name__}")
-
-            self._initialize_configuration(init_kwargs=final_kwargs,
-                                           )
+            self._initialize_configuration(init_kwargs=final_kwargs)
 
             # 7. Final setup
             self.set_data_source()
             logger.bind(update_hash=self.update_hash)
-
 
             self.run_after_post_init_routines()
 
@@ -621,7 +645,6 @@ class DataNode(DataAccessMixin,ABC):
             self.update_details_tree :Optional[Dict[str,Any]] =None
 
             self._patch_build_from_env()
-
             logger.debug(f"Post-init routines for {self.__class__.__name__} complete.")
 
         # Replace the subclass's __init__ with our new wrapped version
