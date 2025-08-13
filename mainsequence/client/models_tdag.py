@@ -109,7 +109,6 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     time_index_name: str = Field(..., max_length=100, description="Time index name")
     column_dtypes_map: Dict[str, Any] = Field(..., description="Column data types map")
     index_names: List
-    column_index_names: List
     last_time_index_value: Optional[datetime.datetime] = Field(None, description="Last time index value")
     earliest_index_value: Optional[datetime.datetime] = Field(None, description="Earliest index value")
     multi_index_stats: Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field")
@@ -600,7 +599,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                 data_frame.index.names = names
 
         time_col_loc = data_frame.index.names.index(time_index_name)
-        column_index_names = data_frame.columns.names
         index_names = data_frame.index.names
         data_frame = data_frame.reset_index()
         data_frame.columns = [str(c) for c in data_frame.columns]
@@ -609,7 +607,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
         data_frame = data_frame.replace({np.nan: None})
 
-        return data_frame, column_index_names, index_names, column_dtypes_map, time_index_name
+        return data_frame,  index_names, column_dtypes_map, time_index_name
 
     def upsert_data_into_table(
                                self,
@@ -619,7 +617,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         overwrite = True  # ALWAYS OVERWRITE
         metadata = self.remote_table
 
-        data, column_index_names, index_names, column_dtypes_map, time_index_name = self._break_pandas_dataframe(
+        data,  index_names, column_dtypes_map, time_index_name = self._break_pandas_dataframe(
             data)
 
         # overwrite data origina data frame to release memory
@@ -630,7 +628,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             column_dtypes_map=column_dtypes_map,
             index_names=index_names,
             time_index_name=time_index_name,
-            column_index_names=column_index_names, data=data,
+            data=data,
             overwrite=overwrite
         )
 
@@ -811,7 +809,6 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
                                            column_dtypes_map:dict,
                                            index_names:List[str],
                                            time_index_name,
-                                           column_index_names,
                                            data,
                                            overwrite=False
                                            ):
@@ -828,8 +825,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             List of index names.
         time_index_name : str
             Name of the time index column.
-        column_index_names : list
-            List of column index names.
+
         data : DataFrame
             The input DataFrame.
         overwrite : bool, optional
@@ -848,7 +844,6 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
                     column_dtypes_map=column_dtypes_map,
                     index_names=index_names,
                     time_index_name=time_index_name,
-                    column_index_names=column_index_names,
                     metadata_id=self.id
                 )
                 self.sourcetableconfiguration = stc
@@ -1183,11 +1178,15 @@ class UpdateStatistics(BaseModel):
     This class contains the  update details of the table in the main sequence engine
     """
     asset_time_statistics: Optional[Dict[str, Union[datetime.datetime, None,Dict]]] = None
+
     max_time_index_value: Optional[datetime.datetime] = None  # does not include fitler
     asset_list: Optional[List] = None
 
     _max_time_in_update_statistics: Optional[datetime.datetime] = None  # include filter
     _initial_fallback_date: Optional[datetime.datetime] = None
+
+    #when working with DuckDb and column based storage we want to have also stats by  column
+    multi_index_column_stats: Optional[Dict[str, Union[datetime.datetime, None, Dict]]] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -2000,6 +1999,10 @@ class PodDataSource:
             host_mac_address=host_uid
         )
         return data_source
+
+    @property
+    def is_local_duck_db(self):
+        return SessionDataSource.data_source.related_resource.class_type==DUCK_DB
 
     def set_local_db(self):
         data_source = self._get_duck_db()
