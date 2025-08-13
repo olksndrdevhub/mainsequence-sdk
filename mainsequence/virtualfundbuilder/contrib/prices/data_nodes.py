@@ -69,6 +69,7 @@ class UpsampleAndInterpolation:
 
         self.upsample_frequency_td = string_freq_to_time_delta(self.upsample_frequency_id)
 
+
     @staticmethod
     def upsample_bars(
             bars_df: pd.DataFrame,
@@ -148,6 +149,7 @@ class UpsampleAndInterpolation:
         all_dfs = all_dfs.set_index("time")
 
         return all_dfs
+
 
     def get_interpolated_upsampled_bars(
             self,
@@ -511,6 +513,8 @@ class InterpolatedPrices(DataNode):
     def dependencies(self):
         return {"bars_ts":self.bars_ts}
 
+    def get_string_frequency_to_minutes(self):
+        return string_frequency_to_minutes(self.bar_frequency_id)
 
     def _get_required_cores(self, last_observation_map) -> int:
         """
