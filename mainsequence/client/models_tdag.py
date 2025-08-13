@@ -265,6 +265,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             update_statistics=UpdateStatistics(
                 asset_time_statistics=result['asset_time_statistics'],
                 max_time_index_value=result["last_time_index_value"],
+                multi_index_column_stats=result["multi_index_column_stats"],
             ),
             must_update=result["must_update"],
             direct_dependencies_ids=result["direct_dependencies_ids"]
