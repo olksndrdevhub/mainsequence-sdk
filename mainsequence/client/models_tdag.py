@@ -116,6 +116,10 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     open_for_everyone: bool = Field(default=False, description="Whether the table configuration is open for everyone")
     columns_metadata:Optional[List[ColumnMetaData]]=None
 
+    #todo remove
+    column_index_names: Optional[list]=[None]
+
+
     def get_data_updates(self):
         max_per_asset = None
         if self.multi_index_stats is not None:
@@ -264,6 +268,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             update_statistics=UpdateStatistics(
                 asset_time_statistics=result['asset_time_statistics'],
                 max_time_index_value=result["last_time_index_value"],
+                multi_index_column_stats=result["last_time_index_value"],
             ),
             must_update=result["must_update"],
             direct_dependencies_ids=result["direct_dependencies_ids"]
