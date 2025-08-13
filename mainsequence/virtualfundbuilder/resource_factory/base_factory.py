@@ -227,8 +227,6 @@ def send_resource_to_backend(resource_class, attributes: Optional[dict] = None):
     if merged_definitions:
         final_json_schema["$defs"] = merged_definitions
 
-    logger.debug(f"{final_json_schema=}, {resource_class=}, {resource_class.__mro__=}")
-
     resource_config = DynamicResource.create(
         name=resource_class.__name__,
         type=resource_class.TYPE.value,
