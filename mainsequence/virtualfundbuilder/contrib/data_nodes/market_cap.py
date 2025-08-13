@@ -196,19 +196,21 @@ class MarketCap(WeightsBase, DataNode):
                                                       asset_ticker_group_id__in=[
                                                           a.asset_ticker_group_id
                                                           for a in
-                                                          self.update_statistics.asset_list])
+                                                          self.update_statistics.asset_list
+                                                      ])
 
-        ms_asset_list={a.asset_ticker_group_id:a for a in ms_asset_list}
+        ms_asset_list = {a.asset_ticker_group_id:a for a in ms_asset_list}
         asset_list_to_share_class = {a.asset_ticker_group_id:a for a in self.update_statistics.asset_list}
 
-        market_cap_uid_range_map = {ms_asset.get_spot_reference_asset_unique_identifier():
-                                      unique_identifier_range_market_cap_map[asset_list_to_share_class[ms_share_class].unique_identifier]
-                                       for ms_share_class,ms_asset in ms_asset_list.items()}
+        market_cap_uid_range_map = {
+            ms_asset.get_spot_reference_asset_unique_identifier(): unique_identifier_range_market_cap_map[asset_list_to_share_class[ms_share_class].unique_identifier]
+            for ms_share_class, ms_asset in ms_asset_list.items()
+        }
 
-        market_cap_uid_to_asset_uid = {ms_asset.get_spot_reference_asset_unique_identifier():
-                                      asset_list_to_share_class[ms_share_class].unique_identifier
-                                       for ms_share_class,ms_asset in ms_asset_list.items()}
-
+        market_cap_uid_to_asset_uid = {
+            ms_asset.get_spot_reference_asset_unique_identifier(): asset_list_to_share_class[ms_share_class].unique_identifier
+            for ms_share_class, ms_asset in ms_asset_list.items()
+        }
 
         mc = self.historical_market_cap_ts.get_df_between_dates(
             unique_identifier_range_map=market_cap_uid_range_map,
