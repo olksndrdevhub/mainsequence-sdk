@@ -8,7 +8,7 @@ from requests.structures import CaseInsensitiveDict
 import datetime
 import time
 import pytz
-from typing import Union, Optional
+from typing import Union, Optional, TypedDict, Dict
 from mainsequence.logconf import logger
 from enum import Enum
 
@@ -24,6 +24,13 @@ class DataFrequency(str, Enum):
     one_month ="1mo"
     one_quarter ="1q"
 
+class DateInfo(TypedDict, total=False):
+    start_date: Optional[datetime.datetime]
+    start_date_operand: Optional[str]
+    end_date: Optional[datetime.datetime]
+    end_date_operand: Optional[str]
+
+UniqueIdentifierRangeMap = Dict[str, DateInfo]
 
 def request_to_datetime(string_date: str):
     if "+" in string_date:

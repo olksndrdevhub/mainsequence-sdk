@@ -4,8 +4,8 @@ import yaml
 
 from .base import BasePydanticModel, BaseObjectOrm, TDAG_ENDPOINT
 from .data_sources_interfaces.duckdb import DuckDBInterface
-from .utils import (is_process_running, get_network_ip,
-                    TDAG_CONSTANTS,DataFrequency,
+from .utils import (is_process_running, get_network_ip,DateInfo,
+                    TDAG_CONSTANTS,DataFrequency,UniqueIdentifierRangeMap,
                     DATE_FORMAT, AuthLoaders, make_request, set_types_in_table, request_to_datetime, serialize_to_json, bios_uuid)
 import copy
 import datetime
@@ -44,13 +44,7 @@ DUCK_DB="duck_db"
 class AlreadyExist(Exception):
     pass
 
-class DateInfo(TypedDict, total=False):
-    start_date: Optional[datetime.datetime]
-    start_date_operand: Optional[str]
-    end_date: Optional[datetime.datetime]
-    end_date_operand: Optional[str]
 
-UniqueIdentifierRangeMap = Dict[str, DateInfo]
 
 def build_session(loaders):
     from requests.adapters import HTTPAdapter, Retry
@@ -112,6 +106,7 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     last_time_index_value: Optional[datetime.datetime] = Field(None, description="Last time index value")
     earliest_index_value: Optional[datetime.datetime] = Field(None, description="Earliest index value")
     multi_index_stats: Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field")
+    multi_index_column_stats:Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field column based")
     table_partition: Dict[str, Any] = Field(..., description="Table partition settings")
     open_for_everyone: bool = Field(default=False, description="Whether the table configuration is open for everyone")
     columns_metadata:Optional[List[ColumnMetaData]]=None
@@ -336,6 +331,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             self,
             last_time_index_value: float,
             max_per_asset_symbol,
+            multi_index_column_stats,
             timeout=None
     ) -> "LocalTimeSerie":
         s = self.build_session()
@@ -344,6 +340,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             "json": {
                 "last_time_index_value": last_time_index_value,
                 "max_per_asset_symbol": max_per_asset_symbol,
+                "multi_index_column_stats":multi_index_column_stats,
             }
         }
         r = make_request(s=s, loaders=self.LOADERS, payload=payload, r_type="POST", url=url, time_out=timeout)
@@ -646,6 +643,12 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             index_names=index_names,
             time_index_name=time_index_name
         )
+        multi_index_column_stats={}
+        column_names= [c for c in data.columns if c not in index_names]
+        for c in column_names:
+            multi_index_column_stats[c]=global_stats["_PER_ASSET_"]
+
+        global_stats["_PER_COLUMN_"]=multi_index_column_stats
 
         data_source.insert_data_into_table(
             serialized_data_frame=data,
@@ -674,6 +677,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         local_metadata = self.set_last_update_index_time_from_update_stats(
             max_per_asset_symbol=max_per_asset_symbol,
             last_time_index_value=last_time_index_value,
+            multi_index_column_stats=multi_index_column_stats
         )
         return local_metadata
 
@@ -866,7 +870,8 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             less_or_equal: bool=None,
             unique_identifier_list: list=None,
             columns: list=None,
-            unique_identifier_range_map: Union[None, UniqueIdentifierRangeMap]=None
+            unique_identifier_range_map: Union[None, UniqueIdentifierRangeMap]=None,
+            column_range_descriptor: Union[None, UniqueIdentifierRangeMap]=None
         ):
         """ Helper function to make a single batch request (or multiple paged requests if next_offset). """
         def fetch_one_batch(chunk_range_map):
@@ -1191,10 +1196,63 @@ class UpdateStatistics(BaseModel):
     _initial_fallback_date: Optional[datetime.datetime] = None
 
     #when working with DuckDb and column based storage we want to have also stats by  column
-    multi_index_column_stats: Optional[Dict[str, Union[datetime.datetime, None, Dict]]] = None
+    multi_index_column_stats: Optional[Dict[str, Dict[str,Dict[str,datetime.datetime]]]] = None
 
     class Config:
         arbitrary_types_allowed = True
+
+    @staticmethod
+    def _to_utc_datetime(value: Any):
+        # pandas / numpy friendly path first
+        if hasattr(value, "to_pydatetime"):  # pandas.Timestamp
+            value = value.to_pydatetime()
+        # Handle numpy.datetime64 without importing numpy explicitly
+        if type(value).__name__ == "datetime64":
+            try:
+                import pandas as pd  # only if available
+                value = pd.to_datetime(value).to_pydatetime()
+            except Exception:
+                return value
+
+        if isinstance(value, datetime.datetime):
+            return value.astimezone(datetime.timezone.utc) if value.tzinfo else value.replace(tzinfo=datetime.timezone.utc)
+
+        if isinstance(value, (int, float)):
+            v = float(value)
+            # seconds / ms / µs / ns heuristics by magnitude
+            if v > 1e17:   # ns
+                v /= 1e9
+            elif v > 1e14: # µs
+                v /= 1e6
+            elif v > 1e11: # ms
+                v /= 1e3
+            return datetime.datetime.fromtimestamp(v, tz=datetime.timezone.utc)
+
+        if isinstance(value, str):
+            s = value.strip()
+            if s.endswith("Z"):  # ISO Z suffix
+                s = s[:-1] + "+00:00"
+            try:
+                dt = datetime.datetime.fromisoformat(s)
+                return dt.astimezone(datetime.timezone.utc) if dt.tzinfo else dt.replace(tzinfo=datetime.timezone.utc)
+            except ValueError:
+                return value
+
+        return value
+
+    @classmethod
+    def _normalize_nested(cls, obj: Any):
+        if obj is None:
+            return None
+        if isinstance(obj, dict):
+            return {k: cls._normalize_nested(v) for k, v in obj.items()}
+        return cls._to_utc_datetime(obj)
+
+    @field_validator("multi_index_column_stats", mode="before")
+    @classmethod
+    def _coerce_multi_index_column_stats(cls, v):
+        # Normalize before standard parsing so ints/strings become datetimes
+        return cls._normalize_nested(v)
 
     @classmethod
     def return_empty(cls):
@@ -1227,9 +1285,41 @@ class UpdateStatistics(BaseModel):
     def asset_identifier(self):
         return list(self.asset_time_statistics.keys())
 
+
+    def get_update_range_map_great_or_equal_columnar(self,extra_time_delta:Optional[datetime.timedelta] = None,
+                                                     column_filter=[]
+                                                     ):
+        fallback={c:{a.unique_identifier:{"min":self._initial_fallback_date,
+                                                                                           "max":self._initial_fallback_date,
+                                                                                           }  for a in self.asset_list} for c in column_filter}
+
+        multi_index_column_stats=self.multi_index_column_stats or {}
+        fallback.update(multi_index_column_stats)
+
+        def _start_dt(bounds):
+            dt = (bounds or {}).get("max") or self._initial_fallback_date
+            if extra_time_delta:
+                dt = dt + extra_time_delta
+            return dt
+
+        range_map = {
+            col: {
+                asset_id: DateInfo({
+                    "start_date_operand": ">=",
+                    "start_date": _start_dt(bounds),
+                })
+                for asset_id, bounds in col_stats.items()
+            }
+            for col, col_stats in fallback.items()
+        }
+        return range_map
+
     def get_update_range_map_great_or_equal(self,
                                             extra_time_delta:Optional[datetime.timedelta] = None,
                                             ):
+
+
+
         if extra_time_delta is None:
             range_map={k:DateInfo({"start_date_operand":">=","start_date":v or self._initial_fallback_date}) for k,v in self.asset_time_statistics.items()}
         else:
@@ -1389,7 +1479,8 @@ class UpdateStatistics(BaseModel):
         du = UpdateStatistics(
             asset_time_statistics=new_update_statistics,
             max_time_index_value=self.max_time_index_value,
-            asset_list=asset_list
+            asset_list=asset_list,
+            multi_index_column_stats=self.multi_index_column_stats #todo filter by assets
         )
         du._max_time_in_asset_time_statistics = _max_time_in_asset_time_statistics
         du._initial_fallback_date=init_fallback_date
@@ -1632,6 +1723,7 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             columns: Optional[List[str]] = None,
             unique_identifier_list: Optional[List[str]] = None,
             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
+            column_range_descriptor: Optional[Dict[str,UniqueIdentifierRangeMap]] = None,
     ) -> pd.DataFrame:
 
         if self.class_type == DUCK_DB:
@@ -1646,9 +1738,11 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
                 less_or_equal=less_or_equal,
                 ids=unique_identifier_list,
                 columns=columns,
-                unique_identifier_range_map=unique_identifier_range_map # Pass range map
+                unique_identifier_range_map=unique_identifier_range_map, # Pass range map
             )
         else:
+            if column_range_descriptor is not None:
+                raise Exception("On this data source do not use column_range_descriptor")
             df = local_metadata.get_data_between_dates_from_api(
                 start_date=start_date,
                 end_date=end_date,

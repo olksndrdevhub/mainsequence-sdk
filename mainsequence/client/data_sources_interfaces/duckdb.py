@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from typing import Optional, Literal, List, Dict
+from typing import Optional, Literal, List, Dict,TypedDict
+import os, pyarrow.fs as pafs
 
 import duckdb, pandas as pd
 from pathlib import Path
@@ -21,6 +22,11 @@ def get_logger():
     return logger
 
 logger = get_logger()
+
+def _list_parquet_files(fs, dir_path: str) -> list[str]:
+    infos = fs.get_file_info(pafs.FileSelector(dir_path, recursive=False))
+    return [i.path for i in infos
+            if i.type == pafs.FileType.File and i.path.endswith(".parquet")]
 
 class DuckDBInterface:
     """
@@ -144,7 +150,7 @@ class DuckDBInterface:
 
             # 4a) Cross-file de-dup: drop any rows already on disk
             try:
-                existing = (
+                existing_keys = (
                     self.con
                     .execute(
                         f"SELECT time_index, unique_identifier "
@@ -152,54 +158,167 @@ class DuckDBInterface:
                     )
                     .fetch_df()
                 )
-            except Exception:
-                existing = pd.DataFrame(columns=["time_index", "unique_identifier"])
-
-            if not existing.empty:
-                merged = sub.merge(
-                    existing,
-                    on=["time_index", "unique_identifier"],
-                    how="left",
-                    indicator=True
+                existing_cols = set(
+                    self.con.execute(
+                        f"SELECT * FROM parquet_scan('{part_path}/*.parquet', hive_partitioning=TRUE) LIMIT 0"
+                    ).fetch_df().columns
                 )
-                sub = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
-            if sub.empty:
-                continue  # nothing new here
+            except Exception:
+                existing_keys = pd.DataFrame(columns=["time_index", "unique_identifier"])
+                existing_cols = set()
 
-            # 4b) Atomic write: tmp → final
-            ts = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
-            final_name = f"part-{ts}-{uuid.uuid4().hex}.parquet"
-            tmp_name = final_name + ".tmp"
+            overlap_exists = False
+            if not existing_keys.empty:
+                overlap =   sub[["time_index", "unique_identifier"]].merge(
+                    existing_keys,
+                    on=["time_index", "unique_identifier"],
+                    how="inner",
+                )
+                overlap_exists = not overlap.empty
 
-            tmp_path = f"{part_path}/{tmp_name}"
-            final_path = f"{part_path}/{final_name}"
+            incoming_cols = set(sub.columns)
+            required_cols_set = {"time_index", "unique_identifier", *part_cols}
+            # columns other than required
+            new_cols_present = len(incoming_cols - existing_cols - required_cols_set) > 0
 
-            # Sort for zone-maps, convert to Arrow
-            sub = sub.sort_values(["unique_identifier", "time_index"])
-            table_arrow = pa.Table.from_pandas(sub, preserve_index=False)
+            if not overlap_exists and not new_cols_present:
+                # ---------- Append-only fast path ----------
+                # Drop rows already present (pure anti-join on PK) and append the rest
+                try:
+                    if not existing_keys.empty:
+                        merged = sub.merge(
+                            existing_keys,
+                            on=["time_index", "unique_identifier"],
+                            how="left",
+                            indicator=True
+                        )
+                        sub_to_write = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
+                    else:
+                        sub_to_write = sub
 
-            # Write to *.tmp
-            pq.write_table(
-                table_arrow,
-                where=tmp_path,
-                row_group_size=512_000,
-                compression="zstd",
-                filesystem=self._fs,
+                    if sub_to_write.empty:
+                        continue
 
-                version="2.6",  # enable the Parquet logical type TIMESTAMP_NANOS
-                coerce_timestamps=None,  # don’t downcast; let 2.6 write native ns
-                allow_truncated_timestamps=False,  # fail if you ever would lose precision
+                    # Write append file atomically
+                    ts = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+                    final_name = f"part-{ts}-{uuid.uuid4().hex}.parquet"
+                    tmp_name = final_name + ".tmp"
+                    tmp_path = f"{part_path}/{tmp_name}"
+                    final_path = f"{part_path}/{final_name}"
 
-                # (optional) for maximum compatibility via INT96:
-                # use_deprecated_int96_timestamps=True,
-            )
-            # Rename into place (tmp → .parquet)
-            self._fs.move(tmp_path, final_path)
+                    sub_to_write = sub_to_write.sort_values(["unique_identifier", "time_index"])
+                    table_arrow = pa.Table.from_pandas(sub_to_write, preserve_index=False)
+
+                    pq.write_table(
+                        table_arrow,
+                        where=tmp_path,
+                        row_group_size=512_000,
+                        compression="zstd",
+                        filesystem=self._fs,
+                        version="2.6",
+                        coerce_timestamps=None,
+                        allow_truncated_timestamps=False,
+                    )
+                    self._fs.move(tmp_path, final_path)
+
+                except Exception as e:
+                    logger.exception(f"Append path failed for partition {keys}: {e}")
+                    raise
+                continue
+
+            # ---------- Rewrite path (true upsert + schema evolution) ----------
+            try:
+                try:
+                    existing_full = self.con.execute(
+                        f"SELECT * FROM parquet_scan('{part_path}/*.parquet', hive_partitioning=TRUE)"
+                    ).fetch_df()
+                except Exception:
+                    existing_full = pd.DataFrame()
+
+                # Normalize for join
+                if not existing_full.empty:
+                    existing_full["time_index"] = pd.to_datetime(existing_full["time_index"], utc=True)
+                    existing_full["year"] =  existing_full["year"].astype(str)
+                    existing_full["month"] = existing_full["month"].astype(str)
+
+                # Ensure required cols exist in both frames
+                for rc in required_cols_set:
+                    if rc not in existing_full.columns:
+                        existing_full[rc] = pd.NA
+                    if rc not in sub.columns:
+                        sub[rc] = pd.NA
+
+                # Set PK index for clean replacement
+                idx_cols = ["time_index", "unique_identifier"]
+                existing_full = existing_full.set_index(idx_cols, drop=False)
+                sub_idx = sub.set_index(idx_cols, drop=False)
+
+                # Union of columns (schema evolution)
+                all_cols = list(sorted(set(existing_full.columns) | set(sub_idx.columns)))
+                existing_full = existing_full.reindex(columns=all_cols)
+                sub_idx = sub_idx.reindex(columns=all_cols)
+
+                # Replace rows in existing with incoming sub rows (true upsert)
+                common_index=existing_full.index.union(sub_idx.index)
+                sub_idx=sub_idx.reindex(common_index)
+                existing_full=existing_full.reindex(common_index)
+                final_part = sub_idx.combine_first(existing_full)
+
+                # Sort for zone-maps and deterministic layout
+                final_part = final_part.sort_index()
+
+                # Write one new compacted file atomically
+                ts = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+                final_name = f"part-{ts}-{uuid.uuid4().hex}.parquet"
+                tmp_name = final_name + ".tmp"
+                tmp_path = f"{part_path}/{tmp_name}"
+                final_path = f"{part_path}/{final_name}"
+
+                table_arrow = pa.Table.from_pandas(final_part, preserve_index=False)
+                pq.write_table(
+                    table_arrow,
+                    where=tmp_path,
+                    row_group_size=512_000,
+                    compression="zstd",
+                    filesystem=self._fs,
+                    version="2.6",
+                    coerce_timestamps=None,
+                    allow_truncated_timestamps=False,
+                )
+                self._fs.move(tmp_path, final_path)
+
+                # Best-effort cleanup of old files (keep the new one)
+                try:
+                    for path in _list_parquet_files(self._fs, part_path):
+                        if os.path.basename(path) == final_name:
+                            continue
+                        self._fs.delete_file(path)  # not .delete(...)
+                except Exception as cleanup_e:
+                    logger.warning(f"Cleanup old parquet files failed in {part_path}: {cleanup_e}")
+
+            except Exception as e:
+                logger.exception(f"Rewrite path failed for partition {keys}: {e}")
+                raise
 
         # ──  Refresh view ────────────────────────────────────────────────
-        self._ensure_view(df,table=table)
+        self._ensure_view(table=table)
 
 
+    def table_exists(self,table):
+        table_exists_result = self.con.execute("""
+                                                                   SELECT COUNT(*) 
+                                                                     FROM information_schema.tables
+                                                                    WHERE table_schema='main' AND table_name = ?
+                                                                   UNION ALL
+                                                                   SELECT COUNT(*) 
+                                                                     FROM information_schema.views
+                                                                    WHERE table_schema='main' AND table_name = ?
+                                                               """, [table, table]).fetchone()[0] > 0
+
+        if table_exists_result is None:
+            logger.warning(f"Table '{table}' does not exist in {self.db_path}. Returning empty DataFrame.")
+            return pd.DataFrame()
+        return table_exists_result
     def read(
             self,
             table: str,data_frequency:DataFrequency=DataFrequency.one_m,
@@ -210,7 +329,8 @@ class DuckDBInterface:
             less_or_equal: bool = True,  # Changed back to boolean
             ids: Optional[List[str]] = None,
             columns: Optional[List[str]] = None,
-            unique_identifier_range_map: Optional[Dict] = None
+            unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
+            column_range_descriptor: Optional[Dict[str,UniqueIdentifierRangeMap]] = None
     ) -> pd.DataFrame:
         """
         Reads data from the specified table, with optional filtering.
@@ -246,6 +366,14 @@ class DuckDBInterface:
             f"Duck DB: Reading from table '{table}' with filters: start={start}, end={end}, "
             f"ids={ids is not None}, columns={columns}, range_map={unique_identifier_range_map is not None}"
         )
+
+
+        if columns is not None:
+            table_exists_result = self.table_exists(table)
+            df_cols = self.con.execute(f"SELECT * FROM {table} AS _q LIMIT 0").fetch_df()
+            if any([c not in  df_cols.columns for c in columns ]):
+                logger.warning(f"not all Columns '{columns}' are not present in table '{table}'. returning an empty DF")
+                return pd.DataFrame()
 
         cols_select = "*"
         if columns:
@@ -297,19 +425,7 @@ class DuckDBInterface:
         logger.debug(f"Executing read query: {query} with params: {params}")
 
         try:
-            table_exists_result = self.con.execute("""
-                                                            SELECT COUNT(*) 
-                                                              FROM information_schema.tables
-                                                             WHERE table_schema='main' AND table_name = ?
-                                                            UNION ALL
-                                                            SELECT COUNT(*) 
-                                                              FROM information_schema.views
-                                                             WHERE table_schema='main' AND table_name = ?
-                                                        """, [table, table]).fetchone()[0] > 0
-
-            if table_exists_result is None:
-                logger.warning(f"Table '{table}' does not exist in {self.db_path}. Returning empty DataFrame.")
-                return pd.DataFrame()
+            table_exists_result = self.table_exists(table)
 
             df = self.con.execute(query, params).fetch_df()
 
@@ -395,30 +511,54 @@ class DuckDBInterface:
     # Private helpers
     # ──────────────────────────────────────────────────────────────────────────────
 
-    def _ensure_view(self, df: pd.DataFrame, table: str) -> None:
+    def _ensure_view(self, table: str) -> None:
         """
         CREATE OR REPLACE a view named `table` that:
           * reads all Parquet under self.db_path/table/**
           * hides partition columns (year, month, day)
           * locks column dtypes by explicit CASTs
+        Schema is derived by unifying schemas across all partitions.
         """
         partition_cols = {"year", "month", "day"}
-        select_exprs = []
-        for col, dtype in df.dtypes.items():
-            if col in partition_cols:
-                continue
-            duck_type = self._pandas_to_duck(dtype)
-            select_exprs.append(f"CAST({col} AS {duck_type}) AS {col}")
 
-        star = ",\n       ".join(select_exprs) or "*"
+        def qident(name: str) -> str:
+            """Helper to safely quote identifiers for SQL."""
+            return '"' + str(name).replace('"', '""') + '"'
+
         file_glob = f"{self.db_path}/{table}/**/*.parquet"
+
+        # ✅ Key Change 1: Define a single, robust way to read the data.
+        # This uses union_by_name=True to handle schema differences across files.
+        read_clause = f"read_parquet('{file_glob}', union_by_name = True, hive_partitioning = TRUE)"
+
+        try:
+            # ✅ Key Change 2: Use the robust read_clause for schema discovery.
+            # This now correctly gets all columns from all partitions.
+            desc_rows = self.con.execute(f"DESCRIBE SELECT * FROM {read_clause}").fetchall()
+        except duckdb.Error as e:
+            # No files yet or glob fails — skip (keeps existing view if any)
+            logger.warning(f"_ensure_view: cannot scan files for '{table}': {e}")
+            return
+
+        # Build CAST list, dropping partition columns
+        cols = [(r[0], r[1]) for r in desc_rows if r and r[0] not in partition_cols]
+        if not cols:
+            logger.warning(f"_ensure_view: no non-partition columns for '{table}'. Skipping view refresh.")
+            return
+
+        # Build the list of columns with explicit CASTs to enforce types
+        select_exprs = [f"CAST({qident(name)} AS {coltype}) AS {qident(name)}"
+                        for name, coltype in cols]
+        select_list = ",\n       ".join(select_exprs)
+
+        # ✅ Key Change 3: Fix the DDL to be syntactically correct and use the robust read_clause.
         ddl = f"""
-        CREATE OR REPLACE VIEW "{table}" AS
-        SELECT {star}
-        FROM parquet_scan('{file_glob}', hive_partitioning=TRUE)
+        CREATE OR REPLACE VIEW {qident(table)} AS
+        SELECT
+               {select_list}
+        FROM {read_clause}
         """
 
-        # Execute DDL in an explicit transaction
         self._execute_transaction(ddl)
 
     def _partition_path(self, keys: dict,table:str) -> str:
@@ -428,9 +568,9 @@ class DuckDBInterface:
 
     def _partition_keys(self, ts: pd.Series,data_frequency:DataFrequency) -> dict:
         """Return a dict of partition column → Series."""
-        keys = {"year": ts.dt.year, "month": ts.dt.month}
+        keys = {"year": ts.dt.year.astype(str), "month": ts.dt.month.astype(str)}
         if data_frequency == "minute":
-            keys["day"] = ts.dt.day
+            keys["day"] = ts.dt.day.astype(str)
         return keys
 
     def _execute_transaction(self, sql: str) -> None:

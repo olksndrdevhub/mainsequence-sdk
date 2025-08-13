@@ -224,6 +224,7 @@ class DataAccessMixin:
         great_or_equal: bool = True,
         less_or_equal: bool = True,
         unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
+        columns:Optional[List[str]] = None
     ) -> pd.DataFrame:
         """
         Retrieve rows from this DataNode whose `time_index` (and optional `unique_identifier`) fall within the specified date ranges.
@@ -282,11 +283,16 @@ class DataAccessMixin:
             great_or_equal=great_or_equal,
             less_or_equal=less_or_equal,
             unique_identifier_range_map=unique_identifier_range_map,
+            columns=columns,
         )
 
 
 
-    def get_ranged_data_per_asset(self, range_descriptor: Optional[UniqueIdentifierRangeMap]) -> pd.DataFrame:
+
+
+    def get_ranged_data_per_asset(self, range_descriptor: Optional[UniqueIdentifierRangeMap],
+                                  columns=None,
+                                  ) -> pd.DataFrame:
         """
         Gets data based on a range descriptor.
 
@@ -296,7 +302,9 @@ class DataAccessMixin:
         Returns:
             A DataFrame with the ranged data.
         """
-        return  self.get_df_between_dates(unique_identifier_range_map=range_descriptor)
+        return  self.get_df_between_dates(unique_identifier_range_map=range_descriptor,
+                                          columns=columns,
+                                          )
 
     def filter_by_assets_ranges(self, asset_ranges_map: dict) -> pd.DataFrame:
         """
