@@ -249,7 +249,7 @@ class UpdateRunner:
                     return False
 
                 # In a normal run, filter out data we already have.
-                if overwrite_latest_value is None:
+                if overwrite_latest_value is None and ms_client.SessionDataSource.is_local_duck_db ==False:
                     temp_df = self.ts.update_statistics.filter_df_by_latest_value(temp_df)
 
                 # If filtering left nothing, we're done.
