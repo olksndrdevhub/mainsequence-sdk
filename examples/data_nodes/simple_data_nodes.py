@@ -10,7 +10,7 @@ import pandas as pd
 
 from mainsequence.client import UpdateStatistics
 from mainsequence.tdag.data_nodes import DataNode, APIDataNode
-import mainsequence.client as ms_client
+import mainsequence.client as msc
 import numpy as np
 from pydantic import BaseModel,Field
 
@@ -49,9 +49,9 @@ class DailyRandomNumber(DataNode):
         self.std=node_configuration.std
         super().__init__(*args, **kwargs)
 
-    def get_table_metadata(self)->ms_client.TableMetaData:
+    def get_table_metadata(self)->msc.TableMetaData:
         TS_ID = f"example_random_number_{self.mean}_{self.std}"
-        meta = ms_client.TableMetaData( identifier=TS_ID,
+        meta = msc.TableMetaData( identifier=TS_ID,
                                         description="Example Data Node")
 
         return meta
@@ -63,7 +63,7 @@ class DailyRandomNumber(DataNode):
         if last is not None and last >= today:
             return pd.DataFrame()
         return pd.DataFrame(
-            {"random_number": [np.random.normal(self.mean, self.std)]},
+            {"random_number": [np.random.normal(self.mean, self.std.center)]},
             index=pd.DatetimeIndex([today], name="time_index", tz="UTC"),
         )
 
@@ -75,7 +75,8 @@ class DailyRandomAddition(DataNode):
     def __init__(self,mean:float,std:float, *args, **kwargs):
         self.mean=mean
         self.std=std
-        self.daily_random_number_data_node=DailyRandomNumber(mean=0.0,std=std,*args, **kwargs)
+        self.daily_random_number_data_node=DailyRandomNumber(node_configuration=RandomDataNodeConfig(mean=0.0)
+                                                             ,*args, **kwargs)
         super().__init__(*args, **kwargs)
     def dependencies(self):
         return {"number_generator":self.daily_random_number_data_node}
@@ -126,7 +127,7 @@ class DailyRandomAdditionAPI(DataNode):
 def build_test_time_series():
 
 
-    daily_node = DailyRandomNumber(RandomDataNodeConfig(mean=0.0))
+    daily_node = DailyRandomNumber(node_configuration=RandomDataNodeConfig(mean=0.0))
     daily_node.run(debug_mode=True, force_update=True)
 
     daily_node = DailyRandomAddition(mean=0.0, std=1.0)
@@ -134,7 +135,7 @@ def build_test_time_series():
 
 
     daily_node = DailyRandomAdditionAPI(mean=0.0, std=1.0,
-                                        dependency_identifier=f"example_random_number_{0.0}_{1.0}"
+                                        dependency_identifier=f"example_random_number_0.0_center=1.0 skew=True"
                                         )
     daily_node.run(debug_mode=True, force_update=True)
 

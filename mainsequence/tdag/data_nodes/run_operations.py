@@ -292,7 +292,7 @@ class UpdateRunner:
         """
         # 1. Ensure the dependency graph is built in the backend
         declared_dependencies = self.ts.dependencies() or {}
-        deps_ids=[d.local_time_serie.id  if d.local_time_serie is not None else None  for d in declared_dependencies.values()]
+        deps_ids=[d.local_time_serie.id  if (d.is_api ==False and d.local_time_serie is not None) else None  for d in declared_dependencies.values()]
 
         # 2. Get the list of dependencies to update
         dependencies_df = self.ts.dependencies_df

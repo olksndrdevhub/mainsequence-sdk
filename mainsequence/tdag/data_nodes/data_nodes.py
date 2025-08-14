@@ -368,6 +368,12 @@ class APIDataNode(DataAccessMixin):
         self._local_persist_manager: APIPersistManager = None
         self.update_statistics = None
 
+    def __repr__(self) -> str:
+
+
+        repr = self.__class__.__name__ + f" {os.environ['TDAG_ENDPOINT']}/dynamic-table-metadatas/details/?dynamic_table_id={self.data_source_id}"
+        return repr
+
     @property
     def is_api(self):
         return True
