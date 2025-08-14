@@ -672,7 +672,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         for c in column_names:
             multi_index_column_stats[c]=global_stats["_PER_ASSET_"]
 
-        global_stats["_PER_COLUMN_"]=multi_index_column_stats
 
         data_source.insert_data_into_table(
             serialized_data_frame=data,
@@ -1620,7 +1619,7 @@ def get_chunk_stats(chunk_df, time_index_name, index_names):
             "min": chunk_df[time_index_name].min().timestamp()
         }
     }
-
+    chunk_stats["_PER_ASSET_"]={}
     grouped_dates = None
     if len(index_names) > 1:
         grouped_dates = chunk_df.groupby(index_names[1:])[
