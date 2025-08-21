@@ -250,6 +250,39 @@ class SimulatedPrices(DataNode):
 
         return mts
 
+
+class Volatility(DataNode):
+    _ARGS_IGNORE_IN_STORAGE_HASH = ["asset_list"]
+
+    def __init__(self, asset_list, rolling_window, *args, **kwargs):
+        self.asset_list = asset_list
+        self.rolling_window = rolling_window
+        self.prices = SimulatedPrices(asset_list=self.asset_list)
+        super().__init__(*args, **kwargs)
+
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
+        return {"prices": self.prices}
+
+    def get_asset_list(self):
+        return self.asset_list
+
+    def update(self):
+        prices = self.prices
+        df = prices.get_df_between_dates()
+        # Step 1: Pivot to wide
+        price_wide = df['close'].unstack(level="unique_identifier")
+
+        # Step 2: Compute percent returns
+        returns = price_wide.pct_change()
+        # Step 3: 20-period rolling volatility (non-annualized)
+        rolling_vol = returns.rolling(window=20).std()
+
+        # Step 4 (optional): Annualize if using hourly data → ~252*24 = 6048 trading hours/year
+        rolling_vol_annualized = rolling_vol * np.sqrt(6048)
+        rolling_vol_annualized=rolling_vol_annualized.unstack()
+        rolling_vol_annualized.index=rolling_vol_annualized.index.swaplevel()
+        return rolling_vol_annualized.dropna().to_frame("volatility")
+
 class CategorySimulatedPrices(DataNode):
     """
         Simulates price updates for all assets belonging to a specified category.
