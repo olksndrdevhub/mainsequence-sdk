@@ -79,7 +79,6 @@ class ETFReplicatorApp(HtmlApp):
                 x=weights_pivot.index,
                 y=weights_pivot[asset],
                 mode='lines',
-                stackgroup='one',
                 name=asset,
                 showlegend=True
             ), row=2, col=1)
@@ -152,7 +151,7 @@ class ETFReplicatorApp(HtmlApp):
 
         # reduce size of plot
         weights_pivot = weights_pivot.resample('W').last().fillna(0) # only use weekly weights
-        weights_pivot = weights_pivot.loc[:, (weights_pivot > 0.001).any(axis=0)] # filter out assets with very small weights
+        weights_pivot = weights_pivot.loc[:, (weights_pivot > 0.01).any(axis=0)] # filter out assets with very small weights
 
         return self._create_plot(df_plot_normalized, weights_pivot)
 
@@ -160,6 +159,6 @@ class ETFReplicatorApp(HtmlApp):
 if __name__ == "__main__":
     cfg = ETFReplicatorConfiguration(
         tracking_strategy_configuration=TrackingStrategyConfiguration(),
-        source_asset_category_identifier="magnificent_7" #s&p500_constitutents"
+        source_asset_category_identifier="s&p500_constitutents"
     )
     ETFReplicatorApp(cfg).run()
