@@ -102,6 +102,7 @@ class ETFReplicatorApp(HtmlApp):
 
         # Run Portfolio
         portfolio.run(add_portfolio_to_markets_backend=True)
+        self.add_output(output=portfolio.target_portfolio)
 
         # Fetch Portfolio Results in batches to avoid timeouts
         loop_start_date = portfolio.portfolio_strategy_time_serie.OFFSET_START
@@ -148,6 +149,9 @@ class ETFReplicatorApp(HtmlApp):
         weights_df["ticker"] = weights_df["unique_identifier"].map(translation_map)
 
         weights_pivot = weights_df.pivot(index='time_index', columns='ticker', values='signal_weight').fillna(0)
+
+        # reduce size of plot
+        weights_pivot = weights_pivot.resample('W').last().fillna(0) # only use weekly weights
         weights_pivot = weights_pivot.loc[:, (weights_pivot > 0.001).any(axis=0)] # filter out assets with very small weights
 
         return self._create_plot(df_plot_normalized, weights_pivot)
