@@ -146,7 +146,7 @@ def rolling_elastic_net(y, X, window, alpha=1.0, l1_ratio=0.5):
 class ETFReplicator(WeightsBase, DataNode):
     def __init__(
         self,
-        etf_to_replicate: str,
+        etf_figi: str,
         tracking_strategy_configuration: TrackingStrategyConfiguration,
         in_window: int = 60,
         tracking_strategy: TrackingStrategy = TrackingStrategy.LASSO,
@@ -157,7 +157,7 @@ class ETFReplicator(WeightsBase, DataNode):
         Initialize the ETFReplicator.
 
         Args:
-            etf_to_replicate (str): Unique Identifier of the etf to replicate.
+            etf_figi (str): Figi of the etf to replicate.
             tracking_strategy_configuration (TrackingStrategyConfiguration): Configuration parameters for the tracking strategy.
             in_window (int, optional): The size of the rolling window for regression. Defaults to 60.
             tracking_strategy (TrackingStrategy, optional): The regression strategy to use for tracking. Defaults to TrackingStrategy.LASSO.
@@ -171,7 +171,7 @@ class ETFReplicator(WeightsBase, DataNode):
         etf_assets_configuration = copy.deepcopy(self.assets_configuration)
         etf_assets_configuration.assets_category_unique_id = "etfs"
         self.etf_bars_ts = get_interpolated_prices_timeseries(etf_assets_configuration)
-        self.etf_to_replicate = etf_to_replicate
+        self.etf_figi = etf_figi
 
         self.tracking_strategy = tracking_strategy
         self.tracking_strategy_configuration = tracking_strategy_configuration
@@ -179,7 +179,7 @@ class ETFReplicator(WeightsBase, DataNode):
     def get_asset_list(self) -> Union[None, list]:
         asset_category = AssetCategory.get(unique_identifier=self.assets_configuration.assets_category_unique_id)
         self.price_assets = Asset.filter(id__in=asset_category.assets)
-        self.asset_to_replicate = Asset.get(unique_identifier=self.etf_to_replicate)
+        self.asset_to_replicate = Asset.get(unique_identifier=self.etf_figi)
         return self.price_assets + [self.asset_to_replicate]
 
     def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
@@ -190,7 +190,7 @@ class ETFReplicator(WeightsBase, DataNode):
 
     def get_explanation(self):
         info = f"""
-        <p>{self.__class__.__name__}: Signal aims to replicate {self.etf_to_replicate} using a data-driven approach.
+        <p>{self.__class__.__name__}: Signal aims to replicate {self.etf_figi} using a data-driven approach.
         This strategy will use {self.tracking_strategy} as approximation function with parameters </p>
         <code>{self.tracking_strategy_configuration}</code>
         """
@@ -201,12 +201,12 @@ class ETFReplicator(WeightsBase, DataNode):
         return pd.Timedelta(freq) - TIMEDELTA
 
     def get_tracking_weights(self, prices: pd.DataFrame) -> pd.DataFrame:
-        prices = prices[~prices[self.etf_to_replicate].isnull()]
+        prices = prices[~prices[self.etf_figi].isnull()]
         prices = prices.pct_change().iloc[1:]
         prices = prices.replace([np.inf, -np.inf], np.nan)
 
-        y = prices[self.etf_to_replicate]
-        X = prices.drop(columns=[self.etf_to_replicate])
+        y = prices[self.etf_figi]
+        X = prices.drop(columns=[self.etf_figi])
 
         if self.tracking_strategy == TrackingStrategy.ELASTIC_NET:
             betas = rolling_elastic_net(
