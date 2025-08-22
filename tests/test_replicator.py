@@ -9,7 +9,7 @@ asset_configuration = AssetsConfiguration(
 )
 
 ts = ETFReplicator(
-    etf_figi="BBG000BJ29X7", # XLF
+    etf_ticker="XLF",
     signal_assets_configuration=asset_configuration,
     tracking_strategy_configuration=TrackingStrategyConfiguration()
 )
