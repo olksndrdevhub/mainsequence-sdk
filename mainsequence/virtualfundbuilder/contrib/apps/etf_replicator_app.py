@@ -148,7 +148,7 @@ class ETFReplicatorApp(HtmlApp):
         weights_df["ticker"] = weights_df["unique_identifier"].map(translation_map)
 
         weights_pivot = weights_df.pivot(index='time_index', columns='ticker', values='signal_weight').fillna(0)
-        weights_pivot = weights_pivot.loc[:, (weights_pivot != 0).any(axis=0)]
+        weights_pivot = weights_pivot.loc[:, (weights_pivot > 0.001).any(axis=0)] # filter out assets with very small weights
 
         return self._create_plot(df_plot_normalized, weights_pivot)
 
