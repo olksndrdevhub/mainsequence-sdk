@@ -51,8 +51,21 @@ class ETFReplicatorApp(HtmlApp):
 
         portfolio = PortfolioInterface(portfolio_config_template=portfolio_config.model_dump())
 
-        results = portfolio.run(add_portfolio_to_markets_backend=True)
+        portfolio.run(add_portfolio_to_markets_backend=True)
 
+        # Fetch the computed data in batches to avoid query timeouts.
+        loop_start_date = portfolio.portfolio_strategy_time_serie.OFFSET_START
+        final_end_date = datetime.datetime.now(datetime.timezone.utc)
+        all_results = []
+        current_start = loop_start_date
+        while current_start < final_end_date:
+            current_end = current_start + pd.DateOffset(months=6)
+            logger.info(f"Fetching data from {current_start.date()} to {min(current_end, final_end_date).date()}")
+            results_chunk = portfolio.portfolio_strategy_time_serie.get_df_between_dates(start_date=current_start, end_date=current_end)
+            all_results.append(results_chunk)
+            current_start = current_end
+
+        results = pd.concat(all_results).drop_duplicates()
         if results.empty:
             return "<html><body><h1>No data available to generate ETF replication report.</h1></body></html>"
 
