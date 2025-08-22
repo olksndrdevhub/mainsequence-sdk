@@ -9,6 +9,7 @@ import pytz
 from sklearn.linear_model import ElasticNet, Lasso, LinearRegression
 from tqdm import tqdm
 
+from mainsequence.client import AssetCategory, Asset
 from mainsequence.virtualfundbuilder import TIMEDELTA
 from mainsequence.virtualfundbuilder.contrib.prices.data_nodes import get_interpolated_prices_timeseries
 from mainsequence.virtualfundbuilder.resource_factory.signal_factory import WeightsBase, register_signal_class
@@ -145,7 +146,7 @@ def rolling_elastic_net(y, X, window, alpha=1.0, l1_ratio=0.5):
 class ETFReplicator(WeightsBase, DataNode):
     def __init__(
         self,
-        symbol_to_replicate: str,
+        asset_identifer_to_replicate: str,
         tracking_strategy_configuration: TrackingStrategyConfiguration,
         in_window: int = 60,
         tracking_strategy: TrackingStrategy = TrackingStrategy.LASSO,
@@ -156,7 +157,7 @@ class ETFReplicator(WeightsBase, DataNode):
         Initialize the ETFReplicator.
 
         Args:
-            symbol_to_replicate (str): Symbol of the asset to replicate. Must be included in the signals asset universe.
+            asset_identifer_to_replicate (str): Symbol of the asset to replicate. Must be included in the signals asset universe.
             tracking_strategy_configuration (TrackingStrategyConfiguration): Configuration parameters for the tracking strategy.
             in_window (int, optional): The size of the rolling window for regression. Defaults to 60.
             tracking_strategy (TrackingStrategy, optional): The regression strategy to use for tracking. Defaults to TrackingStrategy.LASSO.
@@ -166,15 +167,22 @@ class ETFReplicator(WeightsBase, DataNode):
         super().__init__(*args, **kwargs)
 
         self.in_window = in_window
-        self.bars_ts, self.asset_symbols = get_interpolated_prices_timeseries(copy.deepcopy(self.assets_configuration))
-        assert len(list(self.asset_symbols.keys())) == 1
-        self.symbol_to_replicate = symbol_to_replicate
+        self.bars_ts = get_interpolated_prices_timeseries(copy.deepcopy(self.assets_configuration))
+        self.asset_identifer_to_replicate = asset_identifer_to_replicate
         self.tracking_strategy = tracking_strategy
         self.tracking_strategy_configuration = tracking_strategy_configuration
 
+    def get_asset_list(self) -> Union[None, list]:
+        asset_category = AssetCategory.get(unique_identifier=self.assets_configuration.assets_category_unique_id)
+        asset_list = Asset.filter(id__in=asset_category.assets)
+        return asset_list
+
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
+        return {"bars_ts": self.bars_ts}
+
     def get_explanation(self):
         info = f"""
-        <p>{self.__class__.__name__}: Signal aims to replicate {self.symbol_to_replicate} using a data-driven approach.
+        <p>{self.__class__.__name__}: Signal aims to replicate {self.asset_identifer_to_replicate} using a data-driven approach.
         This strategy will use {self.tracking_strategy} as approximation function with parameters </p>
         <code>{self.tracking_strategy_configuration}</code>
         """
@@ -185,18 +193,18 @@ class ETFReplicator(WeightsBase, DataNode):
         return pd.Timedelta(freq) - TIMEDELTA
 
     def get_tracking_weights(self, prices: pd.DataFrame) -> pd.DataFrame:
-        prices = prices[~prices[self.symbol_to_replicate].isnull()]
+        prices = prices[~prices[self.asset_identifer_to_replicate].isnull()]
         prices = prices.pct_change().iloc[1:]
         prices = prices.replace([np.inf, -np.inf], np.nan)
 
-        y = prices[self.symbol_to_replicate]
-        X = prices.drop(columns=[self.symbol_to_replicate])
+        y = prices[self.asset_identifer_to_replicate]
+        X = prices.drop(columns=[self.asset_identifer_to_replicate])
 
-        if self.tracking_strategy == TrackingStrategy.ELASTIC_NET.value:
+        if self.tracking_strategy == TrackingStrategy.ELASTIC_NET:
             betas = rolling_elastic_net(
                 y, X, window=self.in_window, **self.tracking_strategy_configuration.configuration
             )
-        elif self.tracking_strategy == TrackingStrategy.LASSO.value:
+        elif self.tracking_strategy == TrackingStrategy.LASSO:
             betas = rolling_lasso_regression(
                 y, X, window=self.in_window, **self.tracking_strategy_configuration.configuration
             )
@@ -210,26 +218,26 @@ class ETFReplicator(WeightsBase, DataNode):
         betas.index.name = "time_index"
         return betas
 
-    def update(
-        self, latest_value: Union[datetime, None], *args, **kwargs
-    ) -> pd.DataFrame:
-        if latest_value is None:
-            latest_value = datetime(year=2018, month=1, day=1).replace(tzinfo=pytz.utc)
+    def update(self) -> pd.DataFrame:
 
-        asset_symbols = [a for assets in self.asset_symbols.values() for a in assets]
+        asset_list = self.update_statistics.asset_list
 
-        prices_start_date = latest_value - pd.Timedelta(days=self.in_window)
-        prices = self.bars_ts.pandas_df_concat_on_rows_by_key_between_dates(
+        if self.update_statistics.max_time_index_value:
+            prices_start_date = self.update_statistics.max_time_index_value - pd.Timedelta(days=self.in_window)
+        else:
+            prices_start_date = self.OFFSET_START - pd.Timedelta(days=self.in_window)
+
+        prices = self.bars_ts.get_df_between_dates(
             start_date=prices_start_date,
             end_date=None,
             great_or_equal=True,
             less_or_equal=True,
-            asset_symbols=asset_symbols,
+            unique_identifier_list=[a.unique_identifier for a in asset_list],
         )
 
         prices = prices.reset_index().pivot_table(
             index="time_index",
-            columns="asset_symbol",
+            columns="unique_identifier",
             values=self.assets_configuration.price_type.value,
         )
 
@@ -240,6 +248,4 @@ class ETFReplicator(WeightsBase, DataNode):
         weights = self.get_tracking_weights(prices=prices)
         weights = weights.unstack().to_frame(name="signal_weight")
         weights = weights.swaplevel()
-        weights["execution_venue_symbol"] = list(self.asset_symbols.keys())[0]
-        weights = weights.set_index("execution_venue_symbol", append=True)
         return weights
