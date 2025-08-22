@@ -146,7 +146,7 @@ def rolling_elastic_net(y, X, window, alpha=1.0, l1_ratio=0.5):
 class ETFReplicator(WeightsBase, DataNode):
     def __init__(
         self,
-        asset_identifer_to_replicate: str,
+        etf_to_replicate: str,
         tracking_strategy_configuration: TrackingStrategyConfiguration,
         in_window: int = 60,
         tracking_strategy: TrackingStrategy = TrackingStrategy.LASSO,
@@ -157,7 +157,7 @@ class ETFReplicator(WeightsBase, DataNode):
         Initialize the ETFReplicator.
 
         Args:
-            asset_identifer_to_replicate (str): Symbol of the asset to replicate. Must be included in the signals asset universe.
+            etf_to_replicate (str): Unique Identifier of the etf to replicate.
             tracking_strategy_configuration (TrackingStrategyConfiguration): Configuration parameters for the tracking strategy.
             in_window (int, optional): The size of the rolling window for regression. Defaults to 60.
             tracking_strategy (TrackingStrategy, optional): The regression strategy to use for tracking. Defaults to TrackingStrategy.LASSO.
@@ -168,21 +168,29 @@ class ETFReplicator(WeightsBase, DataNode):
 
         self.in_window = in_window
         self.bars_ts = get_interpolated_prices_timeseries(copy.deepcopy(self.assets_configuration))
-        self.asset_identifer_to_replicate = asset_identifer_to_replicate
+        etf_assets_configuration = copy.deepcopy(self.assets_configuration)
+        etf_assets_configuration.assets_category_unique_id = "etfs"
+        self.etf_bars_ts = get_interpolated_prices_timeseries(etf_assets_configuration)
+        self.etf_to_replicate = etf_to_replicate
+
         self.tracking_strategy = tracking_strategy
         self.tracking_strategy_configuration = tracking_strategy_configuration
 
     def get_asset_list(self) -> Union[None, list]:
         asset_category = AssetCategory.get(unique_identifier=self.assets_configuration.assets_category_unique_id)
-        asset_list = Asset.filter(id__in=asset_category.assets)
-        return asset_list
+        self.price_assets = Asset.filter(id__in=asset_category.assets)
+        self.asset_to_replicate = Asset.get(unique_identifier=self.etf_to_replicate)
+        return self.price_assets + [self.asset_to_replicate]
 
     def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
-        return {"bars_ts": self.bars_ts}
+        return {
+            "bars_ts": self.bars_ts,
+            "etf_bars_ts": self.etf_bars_ts,
+        }
 
     def get_explanation(self):
         info = f"""
-        <p>{self.__class__.__name__}: Signal aims to replicate {self.asset_identifer_to_replicate} using a data-driven approach.
+        <p>{self.__class__.__name__}: Signal aims to replicate {self.etf_to_replicate} using a data-driven approach.
         This strategy will use {self.tracking_strategy} as approximation function with parameters </p>
         <code>{self.tracking_strategy_configuration}</code>
         """
@@ -193,12 +201,12 @@ class ETFReplicator(WeightsBase, DataNode):
         return pd.Timedelta(freq) - TIMEDELTA
 
     def get_tracking_weights(self, prices: pd.DataFrame) -> pd.DataFrame:
-        prices = prices[~prices[self.asset_identifer_to_replicate].isnull()]
+        prices = prices[~prices[self.etf_to_replicate].isnull()]
         prices = prices.pct_change().iloc[1:]
         prices = prices.replace([np.inf, -np.inf], np.nan)
 
-        y = prices[self.asset_identifer_to_replicate]
-        X = prices.drop(columns=[self.asset_identifer_to_replicate])
+        y = prices[self.etf_to_replicate]
+        X = prices.drop(columns=[self.etf_to_replicate])
 
         if self.tracking_strategy == TrackingStrategy.ELASTIC_NET:
             betas = rolling_elastic_net(
@@ -232,8 +240,18 @@ class ETFReplicator(WeightsBase, DataNode):
             end_date=None,
             great_or_equal=True,
             less_or_equal=True,
-            unique_identifier_list=[a.unique_identifier for a in asset_list],
+            unique_identifier_list=[a.unique_identifier for a in self.price_assets],
         )
+
+        etf_prices = self.etf_bars_ts.get_df_between_dates(
+            start_date=prices_start_date,
+            end_date=None,
+            great_or_equal=True,
+            less_or_equal=True,
+            unique_identifier_list=[self.asset_to_replicate.unique_identifier],
+        )
+
+        prices = pd.concat([prices, etf_prices])
 
         prices = prices.reset_index().pivot_table(
             index="time_index",
