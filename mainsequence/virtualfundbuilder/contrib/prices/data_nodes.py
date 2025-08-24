@@ -38,7 +38,6 @@ def get_interpolated_prices_timeseries(assets_configuration: Optional[AssetsConf
     prices_configuration_kwargs.pop("is_live", None)
     prices_configuration_kwargs.pop("markets_time_series", None)
 
-
     return InterpolatedPrices(
         asset_category_unique_id=assets_configuration.assets_category_unique_id,
         **prices_configuration_kwargs
