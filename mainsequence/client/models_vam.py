@@ -148,11 +148,11 @@ class AssetSnapshot(BaseObjectOrm, BasePydanticModel):
     asset: Union["AssetMixin", int]
 
     # Validity window
-    effective_from: datetime.date = Field(
-        default_factory=datetime.date.today,
+    effective_from: datetime.datetime = Field(
+       
         description="Date at which this snapshot became effective"
     )
-    effective_to: Optional[datetime.date] = Field(
+    effective_to: Optional[datetime.datetime] = Field(
         None,
         description="Date at which this snapshot was superseded (null if current)"
     )
@@ -290,7 +290,10 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         """
         transformed_kwargs = cls._translate_query_params(kwargs)
         return super().get(*args, **transformed_kwargs)
+    
 
+        
+    
     def get_calendar(self):
         if self.current_snapshot.exchange_code  in COMPOSITE_TO_ISO.keys():
             return Calendar(name=COMPOSITE_TO_ISO[self.current_snapshot.exchange_code])
@@ -639,7 +642,23 @@ class Asset(AssetMixin, BaseObjectOrm):
             raise Exception(f"{r.text}")
 
         return PortfolioIndexAsset(**r.json())
+    @classmethod
+    def get_or_register_custom_asset(cls,timeout=None,**kwargs,):
+        base_url = cls.get_object_url() + "/get_or_register_custom_asset/"
+        payload = {"json": kwargs}
+        s = cls.build_session()
 
+        r = make_request(
+            s=s,
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=base_url,
+            payload=payload,
+            time_out=timeout
+        )
+        if r.status_code not in (200, 201):
+            raise Exception(f"Error registering asset: {r.text}")
+        return cls(**r.json())
 
 class PortfolioIndexAsset(Asset):
     reference_portfolio : Union["Portfolio",int]
