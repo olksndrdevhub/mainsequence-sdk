@@ -109,14 +109,26 @@ class PortfolioStrategy(DataNode):
         self.rebalancer = RebalanceClass(**self.backtesting_weights_config.rebalance_strategy_configuration)
 
         self.rebalancer_explanation = ""  # TODO: Add rebalancer explanation
+
+        asset_list = None
+        if not self.assets_configuration.assets_category_unique_id:
+            asset_list = self.signal_weights.get_asset_list()
+
+        self.bars_ts = get_interpolated_prices_timeseries(copy.deepcopy(self.assets_configuration), asset_list=asset_list)
+
         super().__init__(*args, **kwargs)
 
     def get_asset_list(self):
         """
         Creates mappings from symbols to IDs
         """
-        asset_category = AssetCategory.get(unique_identifier=self.assets_configuration.assets_category_unique_id)
-        asset_list = Asset.filter(id__in=asset_category.assets) # no need for specifics as only symbols are relevant
+        if self.assets_configuration.assets_category_unique_id:
+            asset_category = AssetCategory.get(unique_identifier=self.assets_configuration.assets_category_unique_id)
+            asset_list = Asset.filter(id__in=asset_category.assets) # no need for specifics as only symbols are relevant
+        else:
+            # get all assets of signal
+            asset_list = self.signal_weights.get_asset_list()
+
         return asset_list
 
     def _calculate_start_end_dates(self):
