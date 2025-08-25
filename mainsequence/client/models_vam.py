@@ -643,7 +643,7 @@ class Asset(AssetMixin, BaseObjectOrm):
 
         return PortfolioIndexAsset(**r.json())
     @classmethod
-    def get_or_register_custom_asset(cls,timeout=None,**kwargs,):
+    def get_or_register_custom_asset(cls, timeout=None, **kwargs,):
         base_url = cls.get_object_url() + "/get_or_register_custom_asset/"
         payload = {"json": kwargs}
         s = cls.build_session()
