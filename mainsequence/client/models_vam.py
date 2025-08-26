@@ -148,11 +148,11 @@ class AssetSnapshot(BaseObjectOrm, BasePydanticModel):
     asset: Union["AssetMixin", int]
 
     # Validity window
-    effective_from: datetime.date = Field(
-        default_factory=datetime.date.today,
+    effective_from: datetime.datetime = Field(
+       
         description="Date at which this snapshot became effective"
     )
-    effective_to: Optional[datetime.date] = Field(
+    effective_to: Optional[datetime.datetime] = Field(
         None,
         description="Date at which this snapshot was superseded (null if current)"
     )
@@ -290,7 +290,10 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         """
         transformed_kwargs = cls._translate_query_params(kwargs)
         return super().get(*args, **transformed_kwargs)
+    
 
+        
+    
     def get_calendar(self):
         if self.current_snapshot.exchange_code  in COMPOSITE_TO_ISO.keys():
             return Calendar(name=COMPOSITE_TO_ISO[self.current_snapshot.exchange_code])
@@ -640,6 +643,43 @@ class Asset(AssetMixin, BaseObjectOrm):
 
         return PortfolioIndexAsset(**r.json())
 
+    @classmethod
+    def get_or_register_from_isin(cls,isin: str,exchange_code:str,timeout=None,) -> "Asset":
+
+        base_url = cls.get_object_url() + "/get_or_register_from_isin/"
+        payload = {"json": {"isin":isin,"exchange_code":exchange_code}}
+        s = cls.build_session()
+
+        r = make_request(
+            s=s,
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=base_url,
+            payload=payload,
+            time_out=timeout
+        )
+        if r.status_code not in (200, 201):
+            raise Exception(f"Error registering asset: {r.text}")
+        return cls(**r.json())
+
+
+    @classmethod
+    def get_or_register_custom_asset(cls, timeout=None, **kwargs,):
+        base_url = cls.get_object_url() + "/get_or_register_custom_asset/"
+        payload = {"json": kwargs}
+        s = cls.build_session()
+
+        r = make_request(
+            s=s,
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=base_url,
+            payload=payload,
+            time_out=timeout
+        )
+        if r.status_code not in (200, 201):
+            raise Exception(f"Error registering asset: {r.text}")
+        return cls(**r.json())
 
 class PortfolioIndexAsset(Asset):
     reference_portfolio : Union["Portfolio",int]
@@ -732,7 +772,7 @@ class AccountMixin(BasePydanticModel):
     account_is_active: bool
     account_name: Optional[str] = None
     is_paper: bool
-    account_target_portfolio: AccountPortfolio
+    account_target_portfolio: Optional[AccountPortfolio]=None # can be none on creation without holdings
     latest_holdings: Union["AccountLatestHoldings",None]=None
 
 
@@ -841,7 +881,7 @@ class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
                          payload=payload,
                          time_out=timeout)
         if r.status_code not in [200, 201]:
-            raise Exception(f"Error Getting NAV in account {r.text}")
+            raise Exception(f"Error geting or creating account {r.text}")
         return cls(**r.json())
 
     def set_account_target_portfolio_from_asset_holdings(self,timeout=None):
