@@ -27,7 +27,7 @@ from mainsequence.tdag.config import (
 from dataclasses import dataclass
 from mainsequence.logconf import logger
 from abc import ABC, abstractmethod
-
+import datetime
 build_model = lambda model_data: get_model_class(model_data["orm_class"])(**model_data)
 
 
@@ -70,7 +70,7 @@ def _(value: BaseModel, pickle_ts: bool = False) -> Dict[str, Any]:
     """Serialization logic for any Pydantic BaseModel."""
     import_path = {"module": value.__class__.__module__, "qualname": value.__class__.__qualname__}
     # Recursively call serialize_argument on each value in the model's dictionary.
-    serialized_model = {k: serialize_argument(v, pickle_ts) for k, v in value.model_dump().items()}
+    serialized_model = {k: serialize_argument(v, pickle_ts) for k, v in json.loads(value.model_dump_json()).items()}
 
     ignore_from_storage_hash = [k for k,v in value.model_fields.items() if v.json_schema_extra and v.json_schema_extra.get("ignore_from_storage_hash",False)==True]
 
@@ -78,9 +78,6 @@ def _(value: BaseModel, pickle_ts: bool = False) -> Dict[str, Any]:
             "ignore_from_storage_hash":ignore_from_storage_hash
             }
 
-@serialize_argument.register(BaseObjectOrm)
-def _(value, pickle_ts: bool):
-    return value.to_serialized_dict()
 
 
 @serialize_argument.register(list)

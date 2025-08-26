@@ -6,13 +6,14 @@ import numpy as np
 np.NaN = np.nan # Fix for a pandas-ta compatibility issue
 from mainsequence.tdag import DataNode, APIDataNode, WrapperDataNode
 from mainsequence.client.models_tdag import UpdateStatistics, ColumnMetaData
-import mainsequence.client as ms_client
+import mainsequence.client as msc
 from typing import Union, Optional, List, Dict, Any
 import datetime
 import pytz
 import pandas as pd
 from sklearn.linear_model import ElasticNet
 import copy
+from pydantic import BaseModel,Field
 from abc import ABC, abstractmethod
 
 MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES = "simulated_prices_from_category"
@@ -125,6 +126,12 @@ class SimulatedPricesManager:
                             ]
         return columns_metadata
 
+
+
+
+
+
+
 class SingleIndexTS(DataNode):
     """
        A simple time series with a single index, generating random numbers daily.
@@ -173,14 +180,14 @@ class SingleIndexTS(DataNode):
         return columns_metadata
 
 
-    def get_table_metadata(self)->ms_client.TableMetaData:
+    def get_table_metadata(self)->msc.TableMetaData:
         """
 
 
         """
         MARKET_TIME_SERIES_UNIQUE_IDENTIFIER = "simple_time_serie_example"
-        mts=ms_client.TableMetaData(unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
-                                               data_frequency_id=ms_client.DataFrequency.one_d,
+        mts=msc.TableMetaData(unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER,
+                                               data_frequency_id=msc.DataFrequency.one_d,
                                                description="This is a simulated prices time serie from asset category",
                                                )
 
@@ -189,13 +196,18 @@ class SingleIndexTS(DataNode):
 
 
 
+class PriceSimulConfig(BaseModel):
+
+    asset_list:List[msc.AssetMixin]=Field(...,title="Asset List",description="List of assets to simulate",
+                                          ignore_from_storage_hash=True
+                                          )
+
 class SimulatedPrices(DataNode):
     """
     Simulates price updates for a specific list of assets provided at initialization.
     """
     OFFSET_START = datetime.datetime(2024, 1, 1, tzinfo=pytz.utc)
-    _ARGS_IGNORE_IN_STORAGE_HASH = ["asset_list"]
-    def __init__(self, asset_list: List,
+    def __init__(self, simulation_config: PriceSimulConfig,
                  *args, **kwargs):
         """
         Args:
@@ -203,8 +215,8 @@ class SimulatedPrices(DataNode):
             *args: Additional positional arguments.
             **kwargs: Additional keyword arguments.
         """
-        self.asset_list = asset_list
-        self.asset_symbols_filter = [a.unique_identifier for a in asset_list]
+        self.asset_list = simulation_config.asset_list
+        self.asset_symbols_filter = [a.unique_identifier for a in self.asset_list]
         super().__init__(*args, **kwargs)
 
     def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
@@ -235,15 +247,15 @@ class SimulatedPrices(DataNode):
                             ]
         return columns_metadata
 
-    def get_table_metadata(self)->ms_client.TableMetaData:
+    def get_table_metadata(self)->msc.TableMetaData:
         """
         REturns the market time serie unique identifier, assets to append , or asset to overwrite
         Returns:
 
         """
 
-        mts=ms_client.TableMetaData(identifier="simulated_prices",
-                                               data_frequency_id=ms_client.DataFrequency.one_d,
+        mts=msc.TableMetaData(identifier="simulated_prices",
+                                               data_frequency_id=msc.DataFrequency.one_d,
                                                description="This is a simulated prices time serie from asset category",
                                                )
 
@@ -314,8 +326,8 @@ class CategorySimulatedPrices(DataNode):
     def get_asset_list(self):
         """[Hook] Dynamically fetches the list of assets from a category."""
 
-        asset_category=ms_client.AssetCategory.get(unique_identifier=self.asset_category_id)
-        asset_list=ms_client.Asset.filter(id__in=asset_category.assets)
+        asset_category=msc.AssetCategory.get(unique_identifier=self.asset_category_id)
+        asset_list=msc.Asset.filter(id__in=asset_category.assets)
         return asset_list
     def update(self):
         """
@@ -349,12 +361,12 @@ class CategorySimulatedPrices(DataNode):
                             ]
         return columns_metadata
 
-    def get_table_metadata(self)->ms_client.TableMetaData:
+    def get_table_metadata(self)->msc.TableMetaData:
         """
 
         """
-        meta=ms_client.TableMetaData(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES,
-                                               data_frequency_id=ms_client.DataFrequency.one_d,
+        meta=msc.TableMetaData(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES,
+                                               data_frequency_id=msc.DataFrequency.one_d,
                                                description="This is a simulated prices time serie from asset category",
                                                )
 
@@ -372,22 +384,22 @@ class CategorySimulatedPrices(DataNode):
         Returns:
 
         """
-        translation_table = ms_client.AssetTranslationTable.get_or_none(unique_identifier=TEST_TRANSLATION_TABLE_UID)
+        translation_table = msc.AssetTranslationTable.get_or_none(unique_identifier=TEST_TRANSLATION_TABLE_UID)
 
         rules = [
-            ms_client.AssetTranslationRule(
-                asset_filter=ms_client.AssetFilter(
-                    execution_venue_symbol=ms_client.MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
-                    security_type=ms_client.MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
+            msc.AssetTranslationRule(
+                asset_filter=msc.AssetFilter(
+                    execution_venue_symbol=msc.MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+                    security_type=msc.MARKETS_CONSTANTS.FIGI_SECURITY_TYPE_COMMON_STOCK,
                 ),
                 markets_time_serie_unique_identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES,
-                target_execution_venue_symbol=ms_client.MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
+                target_execution_venue_symbol=msc.MARKETS_CONSTANTS.MAIN_SEQUENCE_EV,
             )
         ]
         rules_serialized = [r.model_dump() for r in rules]
 
         if translation_table is None:
-            translation_table = ms_client.AssetTranslationTable.create(
+            translation_table = msc.AssetTranslationTable.create(
                 unique_identifier=TEST_TRANSLATION_TABLE_UID,
                 rules=rules_serialized,
             )
@@ -402,7 +414,7 @@ class FeatureStoreTA(DataNode):
        A derived time series that calculates a technical analysis feature from another price series.
        """
     _ARGS_IGNORE_IN_STORAGE_HASH = ["asset_list", "ta_feature_config"]
-    def __init__(self, asset_list: List[ms_client.Asset], ta_feature_config:List[dict],
+    def __init__(self, asset_list: List[msc.Asset], ta_feature_config:List[dict],
                  *args, **kwargs):
         """
         Initialize the TA feature time series.
@@ -643,7 +655,7 @@ class ModelTrainTimeSerie(DataNode):
     """
     def __init__(
         self,
-        asset_list: List[ms_client.Asset],
+        asset_list: List[msc.Asset],
         ta_feature_config: List[Dict[str, Any]],
         model_config: Any,                  # ModelConfiguration
         window_size: int,
@@ -734,7 +746,7 @@ class ModelTrainTimeSerie(DataNode):
         # with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as tmp:
         #     pickle.dump(model, tmp)
         #     tmp.flush()
-        #     artifact = ms_client.Artifact.upload_file(
+        #     artifact = msc.Artifact.upload_file(
         #         filepath=tmp.name,
         #         name=f"{self.__class__.__name__}_{uid}_{now.isoformat()}",
         #         created_by_resource_name=self.__class__.__name__,
@@ -743,8 +755,8 @@ class ModelTrainTimeSerie(DataNode):
         return 1
 
 
-    def get_table_metadata(self, ) -> ms_client.TableMetaData:
-        return ms_client.TableMetaData(
+    def get_table_metadata(self, ) -> msc.TableMetaData:
+        return msc.TableMetaData(
             identifier="model_retrain",
             data_frequency_id=None,
             description="Model coefficients retrained at specified frequency"
@@ -759,7 +771,7 @@ class RollingModelPrediction(DataNode):
       - SimulatedPrices: base price series for return calculation.
 
     Args:
-        asset_list: List of ms_client.Asset to include.
+        asset_list: List of msc.Asset to include.
         ta_feature_config: List of dicts, each with keys "kind" and parameters
                            for the TA indicator (e.g. {"kind":"SMA","length":14}).
         elastic_net_config: Dict of parameters to pass into sklearn.linear_model.ElasticNet.
@@ -768,7 +780,7 @@ g    """
 
     def __init__(
         self,
-        asset_list: List[ms_client.Asset],
+        asset_list: List[msc.Asset],
         ta_feature_config: List[Dict[str, Any]],
         model_config: ModelConfiguration,
         window_size: int,
@@ -798,7 +810,7 @@ g    """
         #even more prices from a DataNode not in the project using APIDataNode
 
         self.external_prices = APIDataNode.build_from_identifier(identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES)
-        translation_table=ms_client.AssetTranslationTable.get(unique_identifier=TEST_TRANSLATION_TABLE_UID)
+        translation_table=msc.AssetTranslationTable.get(unique_identifier=TEST_TRANSLATION_TABLE_UID)
         self.translated_prices_ts=WrapperDataNode(translation_table=translation_table)
         # retrainer DataNode
         self.model_train_ts = ModelTrainTimeSerie(
@@ -886,17 +898,17 @@ g    """
             )
         ]
 
-    def get_table_metadata(self, ) -> ms_client.TableMetaData:
-        return ms_client.TableMetaData(
+    def get_table_metadata(self, ) -> msc.TableMetaData:
+        return msc.TableMetaData(
             identifier="next_day_elastic_net",
-            data_frequency_id=ms_client.DataFrequency.one_d,
+            data_frequency_id=msc.DataFrequency.one_d,
             description="Next-day return via rolling ElasticNet on TA indicators"
         )
 
 class LivePrediction(DataNode):
     def __init__(
             self,
-            asset_list: List[ms_client.Asset],
+            asset_list: List[msc.Asset],
             ta_feature_config: List[Dict[str, Any]],
             model_config: ModelConfiguration,
             window_size: int,
@@ -927,7 +939,7 @@ class LivePrediction(DataNode):
 
         self.external_prices = APIDataNode.build_from_identifier(
             identifier=MARKET_TIME_SERIES_UNIQUE_IDENTIFIER_CATEGORY_PRICES)
-        translation_table = ms_client.AssetTranslationTable.get(unique_identifier=TEST_TRANSLATION_TABLE_UID)
+        translation_table = msc.AssetTranslationTable.get(unique_identifier=TEST_TRANSLATION_TABLE_UID)
         self.translated_prices_ts = WrapperDataNode(translation_table=translation_table)
         # retrainer DataNode
         self.model_train_ts = ModelTrainTimeSerie(
@@ -964,7 +976,7 @@ class LivePrediction(DataNode):
 class WorkflowManager(DataNode):
     def __init__(
             self,
-            asset_list: List[ms_client.Asset],
+            asset_list: List[msc.Asset],
             ta_feature_config: List[Dict[str, Any]],
             model_config: ModelConfiguration,
             window_size: int,
@@ -1002,7 +1014,7 @@ class WorkflowManager(DataNode):
 def test_features_from_prices_local_storage():
     from mainsequence.client import Asset
     from mainsequence.client import MARKETS_CONSTANTS
-    ms_client.SessionDataSource.set_local_db()
+    msc.SessionDataSource.set_local_db()
     assets = Asset.filter(ticker__in=["NVDA", "JPM"] )
     ts = FeatureStoreTA(asset_list=assets, ta_feature_config=[dict(kind="SMA", length=28),
                                                          dict(kind="SMA", length=21),
@@ -1021,11 +1033,16 @@ def test_simulated_prices():
     from mainsequence.client import MARKETS_CONSTANTS
 
     assets = Asset.filter(ticker__in=["NVDA", "APPL"], )
-    ts = SimulatedPrices(asset_list=assets)
+    config=PriceSimulConfig(asset_list=assets,)
+
+    batch_2_assets = Asset.filter(ticker__in=["JPM", "GS"], )
+    config_2 = PriceSimulConfig(asset_list=batch_2_assets, )
+
+    ts = SimulatedPrices(simulation_config=config)
     ts.run(debug_mode=True,force_update=True)
 
-    batch_2_assets= Asset.filter(ticker__in=["JPM", "GS"], )
-    ts_2 = SimulatedPrices(asset_list=batch_2_assets)
+
+    ts_2 = SimulatedPrices(simulation_config=config_2)
     ts_2.run(debug_mode=True,force_update=True)
 
 
@@ -1033,7 +1050,7 @@ def test_simulated_prices():
     #
     # ts_0=SingleIndexTS()
     # # ts_0.run(debug_mode=True,force_update=True)
-    # # ms_client.SessionDataSource.set_local_db() #run on duck
+    # # msc.SessionDataSource.set_local_db() #run on duck
     # # ts.run(debug_mode=True,force_update=True)
     # ts_2.run(debug_mode=True,force_update=True)
     #

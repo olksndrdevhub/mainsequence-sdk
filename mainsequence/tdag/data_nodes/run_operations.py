@@ -292,7 +292,7 @@ class UpdateRunner:
         """
         # 1. Ensure the dependency graph is built in the backend
         declared_dependencies = self.ts.dependencies() or {}
-        deps_ids=[d.local_time_serie.id  if d.local_time_serie is not None else None  for d in declared_dependencies.values()]
+        deps_ids=[d.local_time_serie.id  if (d.is_api ==False and d.local_time_serie is not None) else None  for d in declared_dependencies.values()]
 
         # 2. Get the list of dependencies to update
         dependencies_df = self.ts.dependencies_df
@@ -440,6 +440,11 @@ class UpdateRunner:
                     raise e  # Re-raise to halt the entire process on failure
 
         # refresh update statistics of direct dependencies
+        #for edge case of multicolumn self update
+        self.ts.local_persist_manager.synchronize_metadata(None)
+        us=self.ts.local_persist_manager.get_update_statistics_for_table()
+        self.ts.update_statistics = us
+
         refresh_update_statistics_of_deps(self.ts)
 
     # This code is a method within the UpdateRunner class.

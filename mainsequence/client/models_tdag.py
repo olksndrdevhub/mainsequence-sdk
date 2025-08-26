@@ -123,7 +123,8 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
 
         du = UpdateStatistics(
             max_time_index_value=self.last_time_index_value,
-            asset_time_statistics=max_per_asset
+            asset_time_statistics=max_per_asset,
+            multi_index_column_stats=self.multi_index_column_stats
         )
 
         du._max_time_in_update_statistics = self.last_time_index_value
@@ -1308,9 +1309,11 @@ class UpdateStatistics(BaseModel):
     def asset_identifier(self):
         return list(self.asset_time_statistics.keys())
 
+    def get_max_time_in_update_statistics(self):
+        return self._max_time_in_asset_time_statistics
 
     def get_update_range_map_great_or_equal_columnar(self,extra_time_delta:Optional[datetime.timedelta] = None,
-                                                     column_filter=[]
+                                                     column_filter:Optional[List[str]] = None,
                                                      ):
         fallback={c:{a.unique_identifier:{"min":self._initial_fallback_date,
                                                                                            "max":self._initial_fallback_date,
@@ -1325,6 +1328,9 @@ class UpdateStatistics(BaseModel):
                 dt = dt + extra_time_delta
             return dt
 
+
+        target_cols= fallback.keys() if column_filter is None else column_filter
+
         range_map = {
             col: {
                 asset_id: DateInfo({
@@ -1333,8 +1339,11 @@ class UpdateStatistics(BaseModel):
                 })
                 for asset_id, bounds in col_stats.items()
             }
-            for col, col_stats in fallback.items()
+            for col, col_stats in fallback.items() if col in column_filter
         }
+
+
+
         return range_map
 
     def get_update_range_map_great_or_equal(self,
@@ -1786,7 +1795,10 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             df[stc.time_index_name] = pd.to_datetime(df[stc.time_index_name], format='ISO8601')
         except Exception as e:
             raise e
+        columns_to_loop=columns or stc.column_dtypes_map.keys()
         for c, c_type in stc.column_dtypes_map.items():
+            if c not in columns_to_loop:
+                continue
             if c != stc.time_index_name:
                 if c_type == "object":
                     c_type = "str"

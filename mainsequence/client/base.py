@@ -74,11 +74,7 @@ class BasePydanticModel(BaseModel):
         # Set orm_class to the class itself
         cls.orm_class = cls.__name__
 
-    def to_serialized_dict(self):
-        new_dict = json.loads(self.model_dump_json())
-        if hasattr(self, 'unique_identifier'):
-            new_dict['unique_identifier'] = self.unique_identifier
-        return new_dict
+
 
 class BaseObjectOrm:
     END_POINTS = {
