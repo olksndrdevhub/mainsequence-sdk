@@ -28,7 +28,7 @@ from typing import Optional
 FULL_CALENDAR = "24/7"
 
 
-def get_interpolated_prices_timeseries(assets_configuration: Optional[AssetsConfiguration]=None,
+def get_interpolated_prices_timeseries(assets_configuration: Optional[AssetsConfiguration]=None, asset_list=None
                                      ):
     """
     Creates a Wrapper Timeseries for an asset configuration.
@@ -37,11 +37,16 @@ def get_interpolated_prices_timeseries(assets_configuration: Optional[AssetsConf
     prices_configuration_kwargs = prices_configuration.model_dump()
     prices_configuration_kwargs.pop("is_live", None)
     prices_configuration_kwargs.pop("markets_time_series", None)
-
-    return InterpolatedPrices(
-        asset_category_unique_id=assets_configuration.assets_category_unique_id,
-        **prices_configuration_kwargs
-    )
+    if asset_list is None:
+        return InterpolatedPrices(
+            asset_category_unique_id=assets_configuration.assets_category_unique_id,
+            **prices_configuration_kwargs
+        )
+    else:
+        return InterpolatedPrices(
+            asset_list=asset_list,
+            **prices_configuration_kwargs
+        )
 
 class UpsampleAndInterpolation:
     """

@@ -664,7 +664,7 @@ class Asset(AssetMixin, BaseObjectOrm):
 
 
     @classmethod
-    def get_or_register_custom_asset(cls,timeout=None,**kwargs,):
+    def get_or_register_custom_asset(cls, timeout=None, **kwargs,):
         base_url = cls.get_object_url() + "/get_or_register_custom_asset/"
         payload = {"json": kwargs}
         s = cls.build_session()
