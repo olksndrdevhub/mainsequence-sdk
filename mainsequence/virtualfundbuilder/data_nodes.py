@@ -91,7 +91,6 @@ class PortfolioStrategy(DataNode):
         self.portfolio_prices_frequency = portfolio_build_configuration.portfolio_prices_frequency
 
         self.assets_configuration = portfolio_build_configuration.assets_configuration
-        self.bars_ts = get_interpolated_prices_timeseries(copy.deepcopy(self.assets_configuration))
 
         self.portfolio_frequency = self.assets_configuration.prices_configuration.upsample_frequency_id
 
@@ -151,7 +150,7 @@ class PortfolioStrategy(DataNode):
             raise Exception("Prices are empty")
 
         # Determine the last value where all assets have data
-        end_date = earliest_last_value
+        end_date = earliest_last_value + self.bars_ts.maximum_forward_fill
 
         # Handle case when latest_value is None
         start_date = self.update_statistics.max_time_index_value or self.OFFSET_START
@@ -461,7 +460,7 @@ rebalance details:"""
             return pd.DataFrame()
 
         # limit index to last valid signal_weights value, as new signal_weights might be created afterwards (especially important for backtesting)
-        new_index = new_index[new_index <= signal_weights.index.max()]
+        new_index = new_index[new_index <= signal_weights.index.max() + self.signal_weights.maximum_forward_fill()]
 
         # Verify the format of signal_weights columns
         expected_columns = ["unique_identifier"]
