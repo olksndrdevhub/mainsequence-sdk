@@ -642,6 +642,27 @@ class Asset(AssetMixin, BaseObjectOrm):
             raise Exception(f"{r.text}")
 
         return PortfolioIndexAsset(**r.json())
+
+    @classmethod
+    def get_or_register_from_isin(cls,isin: str,exchange_code:str,timeout=None,) -> "Asset":
+
+        base_url = cls.get_object_url() + "/get_or_register_from_isin/"
+        payload = {"json": {"isin":isin,"exchange_code":exchange_code}}
+        s = cls.build_session()
+
+        r = make_request(
+            s=s,
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=base_url,
+            payload=payload,
+            time_out=timeout
+        )
+        if r.status_code not in (200, 201):
+            raise Exception(f"Error registering asset: {r.text}")
+        return cls(**r.json())
+
+
     @classmethod
     def get_or_register_custom_asset(cls,timeout=None,**kwargs,):
         base_url = cls.get_object_url() + "/get_or_register_custom_asset/"
@@ -751,7 +772,7 @@ class AccountMixin(BasePydanticModel):
     account_is_active: bool
     account_name: Optional[str] = None
     is_paper: bool
-    account_target_portfolio: AccountPortfolio
+    account_target_portfolio: Optional[AccountPortfolio]=None # can be none on creation without holdings
     latest_holdings: Union["AccountLatestHoldings",None]=None
 
 
@@ -860,7 +881,7 @@ class Account(AccountMixin, BaseObjectOrm, BasePydanticModel):
                          payload=payload,
                          time_out=timeout)
         if r.status_code not in [200, 201]:
-            raise Exception(f"Error Getting NAV in account {r.text}")
+            raise Exception(f"Error geting or creating account {r.text}")
         return cls(**r.json())
 
     def set_account_target_portfolio_from_asset_holdings(self,timeout=None):
