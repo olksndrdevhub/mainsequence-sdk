@@ -78,7 +78,12 @@ def _(value: BaseModel, pickle_ts: bool = False) -> Dict[str, Any]:
             "ignore_from_storage_hash":ignore_from_storage_hash
             }
 
-
+@serialize_argument.register(BaseObjectOrm)
+def _(value, pickle_ts: bool):
+    new_dict = json.loads(value.model_dump_json())
+    if hasattr(value, 'unique_identifier'):
+        new_dict['unique_identifier'] = value.unique_identifier
+    return new_dict
 
 @serialize_argument.register(list)
 def _(value: list, pickle_ts: bool):
