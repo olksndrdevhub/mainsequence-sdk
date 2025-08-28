@@ -13,7 +13,6 @@ from .utils import MARKETS_CONSTANTS, request_to_datetime, DATE_FORMAT, AuthLoad
 
 TDAG_ENDPOINT = os.environ.get('TDAG_ENDPOINT')
 API_ENDPOINT = f"{TDAG_ENDPOINT}/orm/api"
-REST_TOKEN_URL = f"{TDAG_ENDPOINT}/auth/rest-token-auth/" # TDOO REMOVE
 
 loaders = AuthLoaders()
 

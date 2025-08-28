@@ -1889,6 +1889,7 @@ class Project(BasePydanticModel, BaseObjectOrm):
     id: int
     project_name: str
     data_source: DynamicTableDataSource
+    git_repo_url:str
 
     @classmethod
     def get_user_default_project(cls):
