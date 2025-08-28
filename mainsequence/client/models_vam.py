@@ -681,6 +681,37 @@ class Asset(AssetMixin, BaseObjectOrm):
             raise Exception(f"Error registering asset: {r.text}")
         return cls(**r.json())
 
+    @classmethod
+    def batch_get_or_register_custom_assets(cls, assets_data: List[Dict], timeout=None) -> List["Asset"]:
+        """
+        Calls the batch endpoint to get or register multiple custom assets.
+
+        Args:
+            assets_data: A list of dictionaries, where each dictionary
+                         represents the data for one asset.
+            timeout: Optional request timeout in seconds.
+
+        Returns:
+            A list of Asset objects.
+        """
+        base_url = cls.get_object_url() + "/batch_get_or_register_custom_assets/"
+        payload = {"json": assets_data}
+        s = cls.build_session()
+
+        r = make_request(
+            s=s,
+            loaders=cls.LOADERS,
+            r_type="POST",
+            url=base_url,
+            payload=payload,
+            time_out=timeout
+        )
+
+        if r.status_code != 200:
+            raise Exception(f"Error in batch asset registration: {r.text}")
+
+        return [cls(**data) for data in r.json()]
+
 class PortfolioIndexAsset(Asset):
     reference_portfolio : Union["Portfolio",int]
 

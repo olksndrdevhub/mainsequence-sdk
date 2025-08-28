@@ -73,8 +73,6 @@ class BasePydanticModel(BaseModel):
         # Set orm_class to the class itself
         cls.orm_class = cls.__name__
 
-
-
 class BaseObjectOrm:
     END_POINTS = {
         "User": "user",
