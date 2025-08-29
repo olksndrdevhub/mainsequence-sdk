@@ -169,5 +169,6 @@ class SignalWeightsFactory(BaseFactory):
         Scans the given directory for Python files, imports the classes,
         and returns all classes that are subclasses of WeightsBase.
         """
+        import mainsequence.virtualfundbuilder.contrib.data_nodes # get default strategies
         SignalWeightsFactory.import_module("data_nodes")
         return SIGNAL_CLASS_REGISTRY
