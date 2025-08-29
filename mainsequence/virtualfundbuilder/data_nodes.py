@@ -492,6 +492,9 @@ rebalance details:"""
                 ]
             signal_weights = signal_weights[signal_weights.index > self.update_statistics.max_time_index_value]
 
+        if interpolated_prices.empty:
+            raise ValueError("Interpolated Prices are empty. Check if asset prices exist for time window")
+
         # Calculate rebalanced weights
         weights = self.rebalancer.apply_rebalance_logic(
             signal_weights=signal_weights,
