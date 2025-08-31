@@ -1215,12 +1215,13 @@ class UpdateStatistics(BaseModel):
 
     max_time_index_value: Optional[datetime.datetime] = None  # does not include fitler
     asset_list: Optional[List] = None
-
+    limit_update_time: Optional[datetime.datetime] = None # flag to limit the update of data node
     _max_time_in_update_statistics: Optional[datetime.datetime] = None  # include filter
     _initial_fallback_date: Optional[datetime.datetime] = None
 
     #when working with DuckDb and column based storage we want to have also stats by  column
     multi_index_column_stats: Optional[Dict[str, Dict[str,Dict[str,datetime.datetime]]]] = None
+    is_backfill: bool = False
 
     class Config:
         arbitrary_types_allowed = True
@@ -1310,7 +1311,9 @@ class UpdateStatistics(BaseModel):
         return list(self.asset_time_statistics.keys())
 
     def get_max_time_in_update_statistics(self):
-        return self._max_time_in_asset_time_statistics
+        if hasattr(self, "_max_time_in_update_statistics")==False:
+            self._max_time_in_update_statistics = self.max_time_index_value or self._initial_fallback_date
+        return self._max_time_in_update_statistics
 
     def get_update_range_map_great_or_equal_columnar(self,extra_time_delta:Optional[datetime.timedelta] = None,
                                                      column_filter:Optional[List[str]] = None,
@@ -1508,13 +1511,17 @@ class UpdateStatistics(BaseModel):
         else:
             _max_time_in_asset_time_statistics = self.max_time_index_value or init_fallback_date
 
+        new_multi_index_column_stats=self.multi_index_column_stats
+        if self.max_time_index_value is not None and self.multi_index_column_stats is not None:
+            new_multi_index_column_stats={k:v for k,v in self.multi_index_column_stats.items() if k in new_update_statistics.keys() }
+
         du = UpdateStatistics(
             asset_time_statistics=new_update_statistics,
             max_time_index_value=self.max_time_index_value,
             asset_list=asset_list,
-            multi_index_column_stats=self.multi_index_column_stats #todo filter by assets
+            multi_index_column_stats=new_multi_index_column_stats
         )
-        du._max_time_in_asset_time_statistics = _max_time_in_asset_time_statistics
+        du._max_time_in_update_statistics = _max_time_in_asset_time_statistics
         du._initial_fallback_date=init_fallback_date
         return du
 

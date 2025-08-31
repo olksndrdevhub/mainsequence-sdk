@@ -956,7 +956,8 @@ class DataNode(DataAccessMixin,ABC):
             update_tree: bool = True,
             force_update: bool = False,
             update_only_tree: bool = False,
-            remote_scheduler: Union[object, None] = None
+            remote_scheduler: Union[object, None] = None,
+            override_update_stats:Optional[UpdateStatistics] = None
     ):
 
         update_runner = run_operations.UpdateRunner(time_serie=self,
@@ -965,10 +966,11 @@ class DataNode(DataAccessMixin,ABC):
                      update_tree=update_tree,
                      update_only_tree=update_only_tree,
                      remote_scheduler=remote_scheduler,
+                                                    override_update_stats=override_update_stats
                      )
-        update_runner.run()
+        error_on_last_update, updated_df=        update_runner.run()
 
-
+        return  error_on_last_update,updated_df
 
 
     # --- Optional Hooks for Customization ---
@@ -1178,6 +1180,8 @@ class WrapperDataNode(DataNode):
         # evaluate the rules for each asset
         from mainsequence.client import Asset
         assets = Asset.filter(unique_identifier__in=list(wanted_src_uids))
+        #assets that i want to get pricces
+
         asset_translation_dict = {}
         for asset in assets:
             asset_translation_dict[asset.unique_identifier] = self.translation_table.evaluate_asset(asset)
@@ -1202,7 +1206,7 @@ class WrapperDataNode(DataNode):
             source_assets = [
                 a for a in assets
                 if a.unique_identifier in grouped_unique_ids
-            ]
+            ] # source the ones we want to have
 
             # get correct target assets based on the share classes
             asset_ticker_group_ides = [a.asset_ticker_group_id for a in assets]
@@ -1212,26 +1216,27 @@ class WrapperDataNode(DataNode):
             if not pd.isna(target_exchange_code):
                 asset_query["exchange_code"] = target_exchange_code
 
-            target_assets = Asset.filter(**asset_query)
+            target_assets = Asset.filter(**asset_query) #the assets that have the same group
 
             target_asset_unique_ids = [a.asset_ticker_group_id for a in target_assets]
             if len(asset_ticker_group_ides) > len(target_asset_unique_ids):
-                self.logger.warning(f"Not all assets were found in backend for translation table: {set(asset_ticker_group_ides) - set(target_asset_unique_ids)}")
+                raise Exception(f"Not all assets were found in backend for translation table: {set(asset_ticker_group_ides) - set(target_asset_unique_ids)}")
 
             if len(asset_ticker_group_ides) < len(target_asset_unique_ids):
-                self.logger.warning(f"Too many assets were found in backend for translation table: {set(target_asset_unique_ids) - set(asset_ticker_group_ides)}")
+                #this will blow the proper selection of assets
+                raise Exception(f"Too many assets were found in backend for translation table: {set(target_asset_unique_ids) - set(asset_ticker_group_ides)}")
 
             # create the source-target mapping
-            source_asset_share_class_map = {}
+            ticker_group_to_uid_map = {}
             for a in source_assets:
-                if a.asset_ticker_group_id in source_asset_share_class_map:
+                if a.asset_ticker_group_id in ticker_group_to_uid_map:
                     raise ValueError(f"Share class {a.asset_ticker_group_id} cannot be duplicated")
-                source_asset_share_class_map[a.asset_ticker_group_id] = a.unique_identifier
+                ticker_group_to_uid_map[a.asset_ticker_group_id] = a.unique_identifier
 
             source_target_map = {}
             for a in target_assets:
                 asset_ticker_group_id = a.asset_ticker_group_id
-                source_unique_identifier = source_asset_share_class_map[asset_ticker_group_id]
+                source_unique_identifier = ticker_group_to_uid_map[asset_ticker_group_id]
                 source_target_map[source_unique_identifier] = a.unique_identifier
 
             target_source_map = {v: k for k, v in source_target_map.items()}
@@ -1259,7 +1264,7 @@ class WrapperDataNode(DataNode):
                 tmp_data = api_ts.get_df_between_dates(
                     start_date=start_date,
                     end_date=end_date,
-                    unique_identifier_list=list(source_target_map.values()),
+                    unique_identifier_list=list(target_source_map.keys()),
                     great_or_equal=great_or_equal,
                     less_or_equal=less_or_equal,
                 )

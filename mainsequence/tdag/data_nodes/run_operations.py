@@ -16,6 +16,7 @@ import structlog.contextvars as cvars
 # Client and ORM Models
 import mainsequence.client as ms_client
 import pytz
+from mainsequence.client import UpdateStatistics
 
 # Instrumentation and Logging
 from mainsequence.instrumentation import (
@@ -45,7 +46,9 @@ class UpdateRunner:
 
     def __init__(self, time_serie: "DataNode", debug_mode: bool = False, force_update: bool = False,
                  update_tree: bool = True, update_only_tree: bool = False,
-                 remote_scheduler: Optional[ms_client.Scheduler] = None):
+                 remote_scheduler: Optional[ms_client.Scheduler] = None,
+                 override_update_stats:Optional[UpdateStatistics]=None
+                 ):
         self.ts = time_serie
         self.logger = self.ts.logger
         self.debug_mode = debug_mode
@@ -57,6 +60,7 @@ class UpdateRunner:
 
         self.remote_scheduler = remote_scheduler
         self.scheduler: Optional[ms_client.Scheduler] = None
+        self.override_update_stats=override_update_stats
 
     def _setup_scheduler(self) -> None:
         """Initializes or retrieves the scheduler and starts its heartbeat."""
@@ -139,25 +143,32 @@ class UpdateRunner:
         local_metadatas, state_data = self._pre_update_routines()
         return local_metadatas
 
-    def _start_update(self, use_state_for_update: bool):
+    def _start_update(self, use_state_for_update: bool,override_update_stats:Optional[UpdateStatistics]=None) -> [bool,pd.DataFrame]:
         """Orchestrates a single DataNode update, including pre/post routines."""
         historical_update = self.ts.local_persist_manager.local_metadata.set_start_of_execution(
             active_update_scheduler_id=self.scheduler.id
         )
-        update_statistics = historical_update.update_statistics
+
         must_update = historical_update.must_update or self.force_update
 
         # Ensure metadata is fully loaded with relationship details before proceeding.
         self.ts.local_persist_manager.set_local_metadata_lazy(include_relations_detail=True)
 
-        # The DataNode defines how to scope its statistics
-        self.ts._set_update_statistics(update_statistics)
 
+        if override_update_stats is not None:
+
+            self.ts.update_statistics = override_update_stats
+        else:
+            update_statistics = historical_update.update_statistics
+            # The DataNode defines how to scope its statistics
+            self.ts._set_update_statistics(update_statistics)
+
+        updated_df=pd.DataFrame()
         error_on_last_update = False
         try:
             if must_update:
                 self.logger.debug(f"Update required for {self.ts}.")
-                self._update_local(
+                updated_df=self._update_local(
                     overwrite_latest_value=historical_update.last_time_index_value,
                     use_state_for_update=use_state_for_update
                 )
@@ -183,7 +194,7 @@ class UpdateRunner:
                 self.ts.local_persist_manager.set_table_metadata(table_metadata=table_metadata)
 
 
-        return error_on_last_update
+        return error_on_last_update,updated_df
 
     def _validate_update_dataframe(self, df: pd.DataFrame) -> None:
         """
@@ -216,17 +227,18 @@ class UpdateRunner:
             self,
             overwrite_latest_value: Optional[datetime.datetime],
             use_state_for_update: bool,
-    ) -> Optional[bool]:
+    ) -> pd.DataFrame:
         """
         Calculates, validates, and persists the data update for the time series.
         """
+        tmp_df = pd.DataFrame()
         # 1. Handle dependency tree update first
         if self.update_tree:
             self._verify_tree_is_updated(use_state_for_update)
             if self.update_only_tree:
                 self.logger.info(f'Dependency tree for {self.ts} updated. Halting run as requested.')
-                return None
-
+                return tmp_df
+       
         # 2. Execute the core data calculation
         with tracer.start_as_current_span("Update Calculation") as update_span:
 
@@ -246,7 +258,7 @@ class UpdateRunner:
                 # If the update method returns no data, we're done.
                 if temp_df.empty:
                     self.logger.warning(f"No new data returned from update for {self.ts}.")
-                    return False
+                    return temp_df
 
                 # In a normal run, filter out data we already have.
                 if overwrite_latest_value is None and ms_client.SessionDataSource.is_local_duck_db ==False:
@@ -255,7 +267,7 @@ class UpdateRunner:
                 # If filtering left nothing, we're done.
                 if temp_df.empty:
                     self.logger.info(f"No new data to persist for {self.ts} after filtering.")
-                    return False
+                    return temp_df
 
                 # Validate the structure and content of the DataFrame
                 self._validate_update_dataframe(temp_df)
@@ -268,12 +280,13 @@ class UpdateRunner:
                 )
                 update_span.set_status(Status(StatusCode.OK))
                 self.logger.info(f'Successfully updated {self.ts}.')
-                return persisted
+                return temp_df
 
             except Exception as e:
                 self.logger.exception("Failed during update calculation or persistence.")
                 update_span.set_status(Status(StatusCode.ERROR, description=str(e)))
                 raise e
+        return tmp_df
 
     @tracer.start_as_current_span("UpdateRunner._verify_tree_is_updated")
     def _verify_tree_is_updated(
@@ -497,9 +510,12 @@ class UpdateRunner:
                     self.ts.local_time_serie.wait_for_update_time()
 
                 # 5. Trigger the core update process
-                self._start_update(
-                    use_state_for_update=True
+                error_on_last_update,updated_df=self._start_update(
+                    use_state_for_update=True,
+                override_update_stats=self.override_update_stats
                 )
+                
+                return error_on_last_update,updated_df
 
         except DependencyUpdateError as de:
             self.logger.error("A dependency failed to update, halting the run.", error=de)

@@ -107,6 +107,165 @@ class DuckDBInterface:
     # ──────────────────────────────────────────────────────────────────────────────
     # Public API
     # ──────────────────────────────────────────────────────────────────────────────
+    def remove_columns(self, table: str, columns: List[str]) -> Dict[str, Any]:
+        """
+        Forcefully drop the given columns from the dataset backing `table`.
+
+        Behavior:
+          • Rebuilds *every* partition directory (year=/month=/[day=]) into one new Parquet file.
+          • Drops the requested columns that exist in that partition (others are ignored).
+          • Always deletes the old Parquet fragments after the new file is written.
+          • Always refreshes the view to reflect the new schema.
+
+        Notes:
+          • Protected keys to keep storage model consistent:
+            {'time_index','unique_identifier','year','month','day'} are not dropped.
+          • If a requested column doesn’t exist in some partitions, those partitions are still rebuilt.
+          • Destructive and idempotent.
+        """
+        import uuid
+        import duckdb
+
+        def qident(name: str) -> str:
+            return '"' + str(name).replace('"', '""') + '"'
+
+        requested = list(dict.fromkeys(columns or []))
+        protected = {"time_index", "unique_identifier", "year", "month", "day"}
+
+        # Discover unified schema to know which requested columns actually exist
+        file_glob = f"{self.db_path}/{table}/**/*.parquet"
+        try:
+            desc_rows = self.con.execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{file_glob}', "
+                f"union_by_name=TRUE, hive_partitioning=TRUE)"
+            ).fetchall()
+            present_cols = {r[0] for r in desc_rows}
+        except duckdb.Error as e:
+            logger.error(f"remove_columns: cannot scan files for '{table}': {e}")
+            try:
+                self._ensure_view(table)
+            except Exception as ev:
+                logger.warning(f"remove_columns: _ensure_view failed after scan error: {ev}")
+            return {"dropped": [], "skipped": requested, "partitions_rebuilt": 0, "files_deleted": 0}
+
+        to_drop_global = [c for c in requested if c in present_cols and c not in protected]
+        skipped_global = [c for c in requested if c not in present_cols or c in protected]
+
+        # Enumerate all partition directories that currently contain Parquet files
+        selector = fs.FileSelector(f"{self.db_path}/{table}", recursive=True)
+        infos = self._fs.get_file_info(selector)
+        part_dirs = sorted({
+            info.path.rpartition("/")[0]
+            for info in infos
+            if info.type == fs.FileType.File and info.path.endswith(".parquet")
+        })
+
+        if not part_dirs:
+            logger.info(f"remove_columns: table '{table}' has no Parquet files.")
+            try:
+                self._ensure_view(table)
+            except Exception as ev:
+                logger.warning(f"remove_columns: _ensure_view failed on empty table: {ev}")
+            return {"dropped": to_drop_global, "skipped": skipped_global,
+                    "partitions_rebuilt": 0, "files_deleted": 0}
+
+        partitions_rebuilt = 0
+        files_deleted = 0
+
+        try:
+            for part_path in part_dirs:
+                # 1) Partition-local schema WITHOUT filename helper (stable "real" columns)
+                try:
+                    part_desc = self.con.execute(
+                        f"DESCRIBE SELECT * FROM parquet_scan('{part_path}/*.parquet', "
+                        f"                                      hive_partitioning=TRUE, union_by_name=TRUE)"
+                    ).fetchall()
+                    # Preserve order returned by DESCRIBE for deterministic output
+                    part_cols_ordered = [r[0] for r in part_desc]
+                    part_cols_set = set(part_cols_ordered)
+                except duckdb.Error as e:
+                    logger.warning(f"remove_columns: skipping partition due to scan error at {part_path}: {e}")
+                    continue
+
+                to_drop_here = [c for c in to_drop_global if c in part_cols_set]
+
+                # 2) Columns to keep (explicit projection → safest)
+                keep_cols = [c for c in part_cols_ordered if c not in to_drop_here]
+                if not keep_cols:
+                    # Should not happen due to 'protected', but guard anyway
+                    logger.warning(f"remove_columns: nothing to write after drops in {part_path}; skipping")
+                    continue
+                keep_csv = ", ".join(qident(c) for c in keep_cols)
+
+                # 3) Detect the actual helper file-path column name added by filename=TRUE
+                #    by comparing with/without filename=TRUE.
+                try:
+                    fname_desc = self.con.execute(
+                        f"DESCRIBE SELECT * FROM parquet_scan('{part_path}/*.parquet', "
+                        f"                                      hive_partitioning=TRUE, union_by_name=TRUE, filename=TRUE)"
+                    ).fetchall()
+                    cols_with_fname = {r[0] for r in fname_desc}
+                    added_by_filename = cols_with_fname - part_cols_set  # usually {'filename'} or {'file_name', ...}
+                    file_col = next(iter(added_by_filename), None)
+                except duckdb.Error:
+                    file_col = None
+
+                # 4) Decide ordering key for recency; fall back to time_index if helper missing
+                order_key = qident(file_col) if file_col else "time_index"
+
+                # 5) Rebuild partition with explicit projection + window de-dup
+                tmp_file = f"{part_path}/rebuild-{uuid.uuid4().hex}.parquet"
+                copy_sql = f"""
+                COPY (
+                  SELECT {keep_csv}
+                  FROM (
+                    SELECT {keep_csv},
+                           ROW_NUMBER() OVER (
+                             PARTITION BY time_index, unique_identifier
+                             ORDER BY {order_key} DESC
+                           ) AS rn
+                    FROM parquet_scan('{part_path}/*.parquet',
+                                      hive_partitioning=TRUE,
+                                      union_by_name=TRUE,
+                                      filename=TRUE)
+                  )
+                  WHERE rn = 1
+                )
+                TO '{tmp_file}'
+                (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 512000)
+                """
+                try:
+                    self.con.execute(copy_sql)
+                except duckdb.Error as e:
+                    logger.error(f"remove_columns: COPY failed for partition {part_path}: {e}")
+                    raise
+
+                # 6) Delete all old fragments, keep only the new file
+                try:
+                    current_infos = self._fs.get_file_info(fs.FileSelector(part_path))
+                    for fi in current_infos:
+                        if fi.type == fs.FileType.File and fi.path.endswith(".parquet") and fi.path != tmp_file:
+                            self._fs.delete_file(fi.path)
+                            files_deleted += 1
+                except Exception as cleanup_e:
+                    logger.warning(f"remove_columns: cleanup failed in {part_path}: {cleanup_e}")
+
+                partitions_rebuilt += 1
+
+        finally:
+            # Ensure logical schema matches physical files
+            try:
+                self._ensure_view(table)
+            except Exception as ev:
+                logger.warning(f"remove_columns: _ensure_view failed after rebuild: {ev}")
+
+        return {
+            "dropped": to_drop_global,
+            "skipped": skipped_global,
+            "partitions_rebuilt": partitions_rebuilt,
+            "files_deleted": files_deleted,
+        }
+
     def upsert(self, df: pd.DataFrame, table: str,
                data_frequency:DataFrequency=DataFrequency.one_m
                ) -> None:

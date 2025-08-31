@@ -140,7 +140,9 @@ class APIPersistManager:
         # fix types
         stc = self.metadata.sourcetableconfiguration
         filtered_data[stc.time_index_name] = pd.to_datetime(filtered_data[stc.time_index_name], utc=True)
-        for c, c_type in stc.column_dtypes_map.items():
+        column_filter = kwargs.get("columns") or  stc.column_dtypes_map.keys()
+        for c in column_filter:
+            c_type=stc.column_dtypes_map[c]
             if c != stc.time_index_name:
                 if c_type == "object":
                     c_type = "str"
