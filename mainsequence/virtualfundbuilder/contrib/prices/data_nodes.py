@@ -647,13 +647,14 @@ class InterpolatedPrices(DataNode):
         else:
             asset_category = AssetCategory.get(unique_identifier=self.asset_category_unique_id)
             asset_list = Asset.filter(id__in=asset_category.assets)
-        self.asset_calendar_map = {a.unique_identifier: a.get_calendar() for a in asset_list}
+
         return asset_list
 
     def update(self) -> pd.DataFrame:
         """
         Updates the series from the source based on the latest value.
         """
+        self.asset_calendar_map = {a.unique_identifier: a.get_calendar() for a in self.update_statistics.asset_list}
         prices = self.get_upsampled_data()
         if prices.shape[0] == 0:
             return pd.DataFrame()
