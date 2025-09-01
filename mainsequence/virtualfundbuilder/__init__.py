@@ -27,18 +27,17 @@ from mainsequence.virtualfundbuilder.utils import (
     runs_in_main_process
 )
 
-# no more default strategies, everything should be for user
 def register_default_strategies():
     # Keep this in a function to not clutter the libs namespace
     import mainsequence.virtualfundbuilder.contrib.apps
-    import mainsequence.virtualfundbuilder.contrib.data_nodes
-    import mainsequence.virtualfundbuilder.contrib.rebalance_strategies
 
 if os.getenv("PROJECT_LIBRARY_NAME") is None:
     # TODO workaround for now to make local execution work
     os.environ["PROJECT_LIBRARY_NAME"] = Path(os.environ.get("VFB_PROJECT_PATH")).name
 
-register_default_strategies()
+RUNS_IN_JOB = os.getenv("JOB_ID", None)
+if RUNS_IN_JOB:
+    register_default_strategies()
 
 if runs_in_main_process():
     get_pod_configuration()

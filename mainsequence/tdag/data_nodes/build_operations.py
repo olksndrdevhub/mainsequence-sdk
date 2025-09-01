@@ -50,16 +50,14 @@ def serialize_argument(value: Any, pickle_ts: bool) -> Any:
 def _serialize_timeserie(value: "DataNode", pickle_ts: bool = False) -> Dict[str, Any]:
     """Serialization logic for DataNode objects."""
     print(f"Serializing DataNode: {value.update_hash}")
-    # This logic can be expanded, for example, to handle pickling.
     if pickle_ts:
-        # Placeholder for actual pickling logic
-        return {"is_time_serie_pickled": True, "update_hash": value.update_hash, "data": "pickled_data_placeholder"}
+        return {"is_time_serie_pickled": True, "update_hash": value.update_hash, "data_source_id": value.data_source_id}
     return {"is_time_serie_instance": True, "update_hash": value.update_hash}
 
 def _serialize_api_timeserie(value, pickle_ts: bool):
     if pickle_ts:
         new_value = {"is_api_time_serie_pickled": True}
-        value.persist_to_pickle() # Assumes this method exists
+        value.persist_to_pickle()
         new_value["update_hash"] = value.update_hash
         new_value['data_source_id'] = value.data_source_id
         return new_value
@@ -604,7 +602,10 @@ def load_from_pickle(pickle_path: str) -> "DataNode":
         return time_serie
 
     data_source = load_data_source_from_pickle(pickle_path=pickle_path)
+
+    # set objects that are not pickleable
     time_serie.set_data_source(data_source=data_source)
+    time_serie._local_persist_manager = None
     # verify pickle
     verify_backend_git_hash_with_pickle(local_persist_manager=time_serie.local_persist_manager,
                                         time_serie_class=time_serie.__class__,

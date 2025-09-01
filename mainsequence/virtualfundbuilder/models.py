@@ -61,6 +61,7 @@ class PricesConfiguration(VFBConfigBaseModel):
     intraday_bar_interpolation_rule: str = "ffill"
     is_live: bool = False
     translation_table_unique_id: str = "prices_translation_table_1d"
+    forward_fill_to_now: bool = False
 
 @lru_cache(maxsize=1028)  # Cache up to 1028 different combinations
 def cached_asset_filter(*args,**kwargs):

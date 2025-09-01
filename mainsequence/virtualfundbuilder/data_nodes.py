@@ -150,7 +150,10 @@ class PortfolioStrategy(DataNode):
             raise Exception("Prices are empty")
 
         # Determine the last value where all assets have data
-        end_date = earliest_last_value + self.bars_ts.maximum_forward_fill
+        if self.assets_configuration.prices_configuration.forward_fill_to_now:
+            end_date = datetime.now(pytz.utc)
+        else:
+            end_date = earliest_last_value + self.bars_ts.maximum_forward_fill
 
         # Handle case when latest_value is None
         start_date = self.update_statistics.max_time_index_value or self.OFFSET_START
@@ -389,41 +392,45 @@ rebalance details:"""
                                 ):
         """
         Get interpolated prices for a time index.
-        Reason for interpolation: Prices might have a lower frequency that the index, so we need to ffill (e.g. daily signals and prices, but at different times, price at 8pm, MC signal at 0am)
-        NOTE: prices should be upsampled the same way as new_index, no need to upsample
+        Optionally forward-fills prices to the present if configured.
         """
+        prices_config = self.assets_configuration.prices_configuration
+
+        # Determine the end_date for data fetching
+        fetch_end_date = new_index.max()
+
+        # If forward-filling is enabled, we still fetch up to the latest signal date,
+        # but we will extend the index later.
         raw_prices = bars_ts.get_df_between_dates(
             start_date=new_index.min() - pd.Timedelta(index_freq),
-            end_date=new_index.max(),
+            end_date=fetch_end_date,
             great_or_equal=True,
             less_or_equal=True,
             unique_identifier_list=unique_identifier_list
         )
-
-        # fallback if we need more data before to interpolate first value of new_index
-        if len(raw_prices) == 0 or (raw_prices.index.get_level_values("time_index").min() > new_index.min()):
-            raw_prices = bars_ts.get_df_between_dates(
-                start_date=None,
-                unique_identifier_list=unique_identifier_list
-            )
 
         if len(raw_prices) == 0:
             self.logger.info(f"No prices data in index interpolation for node {bars_ts.storage_hash}")
             return pd.DataFrame(), pd.DataFrame()
 
         raw_prices.sort_values("time_index", inplace=True)
-        if any(new_index.isin(raw_prices.index.get_level_values("time_index")) == False):
-            bars_ts.logger.warning("Interpolating prices for new index")
-            interpolated_prices = raw_prices.unstack(["unique_identifier"])
 
-            # check the maximum forward period of the prices
-            max_forward_prices = interpolated_prices.index.get_level_values(level="time_index").max() + bars_ts.maximum_forward_fill
-            prices_new_index = new_index[new_index < max_forward_prices]
-            interpolated_prices = interpolated_prices.reindex(prices_new_index, method="ffill")
-            interpolated_prices.index.names = ["time_index"]
-            interpolated_prices = interpolated_prices.stack(["unique_identifier"])
-        else:
-            interpolated_prices = raw_prices.loc[new_index]
+        final_index_for_interpolation = new_index
+        if prices_config.forward_fill_to_now:
+            fill_end_date = datetime.now(pytz.utc)
+            last_ts_in_df = raw_prices.index.get_level_values("time_index").max()
+
+            self.logger.info(f"Forward-filling prices from {last_ts_in_df} to {fill_end_date}")
+            # Extend the `new_index` to the current time for the fill operation
+            pandas_freq = translate_to_pandas_freq(self.portfolio_prices_frequency)
+            final_index_for_interpolation = pd.date_range(start=new_index.min(), end=fill_end_date, freq=pandas_freq)
+
+        interpolated_prices = raw_prices.unstack(["unique_identifier"])
+
+        # Use the potentially extended index for reindexing
+        interpolated_prices = interpolated_prices.reindex(final_index_for_interpolation, method="ffill")
+        interpolated_prices.index.names = ["time_index"]
+        interpolated_prices = interpolated_prices.stack(["unique_identifier"])
 
         return raw_prices, interpolated_prices
 
@@ -484,6 +491,9 @@ rebalance details:"""
                     "time_index") > self.update_statistics.max_time_index_value
                 ]
             signal_weights = signal_weights[signal_weights.index > self.update_statistics.max_time_index_value]
+
+        if interpolated_prices.empty:
+            raise ValueError("Interpolated Prices are empty. Check if asset prices exist for time window")
 
         # Calculate rebalanced weights
         weights = self.rebalancer.apply_rebalance_logic(

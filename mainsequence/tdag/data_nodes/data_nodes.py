@@ -732,9 +732,9 @@ class DataNode(DataAccessMixin,ABC):
     def local_persist_manager(self) -> PersistManager:
         if self._local_persist_manager is None:
             self.logger.debug(f"Setting local persist manager for {self.storage_hash}")
-            self._set_local_persist_manager(update_hash=self.update_hash,
-                                            )
+            self._set_local_persist_manager(update_hash=self.update_hash)
         return self._local_persist_manager
+
     @property
     def data_source(self) -> Any:
         if self._data_source is not None:

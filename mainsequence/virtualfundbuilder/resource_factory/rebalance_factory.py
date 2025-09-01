@@ -88,6 +88,7 @@ class RebalanceFactory(BaseFactory):
 
     @staticmethod
     def get_rebalance_strategies():
+        import mainsequence.virtualfundbuilder.contrib.rebalance_strategies # get default strategies
         RebalanceFactory.import_module("rebalance_strategies")
         return REBALANCE_CLASS_REGISTRY
 
