@@ -1,7 +1,7 @@
 import copy
 
 import pytz
-from typing import Union, Dict, List, Literal, Optional
+from typing import Union, Dict, List, Literal, Optional,Tuple, Any
 import pandas as pd
 import numpy as np
 import datetime
@@ -60,11 +60,78 @@ def _get_schedule_cached(calendar_name: str, start_date: str, end_date: str) -> 
     return sched.set_index("session")
 
 
-def get_interpolated_prices_timeseries(assets_configuration: Optional[AssetsConfiguration]=None, asset_list=None
+
+def compute_limit_date(
+    unique_identifier_range_map: Dict[str, Dict[str, Any]],
+    bar_frequency_id: str,
+    max_rows: int = 10_000_000,
+    now: Optional[datetime.datetime] = None,
+) -> Tuple[Optional[datetime.datetime], Dict[str, int], int]:
+    """
+    unique_identifier_range_map: {
+        uid: {"start_date": datetime (tz-aware, UTC), "start_date_operand": ">=" or ">" (optional)},
+        ...
+    }
+    Returns: (limit_dt_or_None, rows_per_id, total_rows_at_limit_or_now)
+      - limit_dt_or_None == None  -> no limit needed (all rows up to `now` fit under cap)
+    """
+    if now is None:
+        now = datetime.datetime.now(pytz.utc)
+
+    bar_secs = string_frequency_to_minutes(bar_frequency_id) * 60
+    if bar_secs <= 0:
+        raise ValueError("bar frequency must be positive")
+
+    # effective start timestamps (operand '>' skips the first bar)
+    starts_ts = [
+        v["start_date"].timestamp() + (bar_secs if v.get("start_date_operand") == ">" else 0)
+        for v in unique_identifier_range_map.values()
+    ]
+    max_start=np.max(starts_ts)
+    starts_ts=[max_start for i in starts_ts]
+    if not starts_ts:
+        raise ValueError("No start_date values found.")
+
+    lo_ts = min(starts_ts)            # earliest effective start
+    hi_ts = now.timestamp()           # latest possible limit
+
+    def total_until(limit_ts: float) -> int:
+        return sum(max(0, int((limit_ts - s) // bar_secs)) for s in starts_ts)
+
+    # If even 'now' doesn't exceed the cap → no limit needed
+    total_now = total_until(hi_ts)
+    if total_now <= max_rows:
+        rows_per_id_now = {
+            uid: max(0, int((hi_ts - (v["start_date"].timestamp() + (bar_secs if v.get("start_date_operand") == ">" else 0))) // bar_secs))
+            for uid, v in unique_identifier_range_map.items()
+        }
+        return None, rows_per_id_now, total_now
+
+    # Binary search latest limit with total <= max_rows (monotone ↑ in limit)
+    for _ in range(64):
+        mid_ts = (lo_ts + hi_ts) / 2.0
+        if total_until(mid_ts) > max_rows:
+            hi_ts = mid_ts
+        else:
+            lo_ts = mid_ts
+    limit_ts = lo_ts
+    limit_dt = datetime.datetime.fromtimestamp(limit_ts, tz=pytz.utc)
+
+    rows_per_id = {
+        uid: max(0, int((limit_ts - (v["start_date"].timestamp() + (bar_secs if v.get("start_date_operand") == ">" else 0))) // bar_secs))
+        for uid, v in unique_identifier_range_map.items()
+    }
+    total_at_limit = sum(rows_per_id.values())
+    return limit_dt, rows_per_id, total_at_limit
+
+def get_interpolated_prices_timeseries(assets_configuration: Optional[AssetsConfiguration]=None, asset_list=None,
+
                                      ):
     """
     Creates a Wrapper Timeseries for an asset configuration.
     """
+
+
     if assets_configuration is None:
         assert asset_list is not None, "asset_list and assets_configuration both cant be None"
     if assets_configuration is not None:
@@ -391,14 +458,10 @@ def interpolate_intraday_bars(
 
     def sanitize_today_update(x: pd.DataFrame, date_range, day):
         # normalize to UTC for consistent “today” comparison
-        today_utc = pd.Timestamp.utcnow().tz_localize("UTC")
-        day_utc = pd.Timestamp(day)
-        if day_utc.tz is None:
-            day_utc = day_utc.tz_localize("UTC")
-        else:
-            day_utc = day_utc.tz_convert("UTC")
+        today_utc =datetime.datetime.utcnow()
+        day_utc = day
 
-        if day_utc.date() == today_utc.date():
+        if day.date() == today_utc.date():
             x.index.name = None
             if len(x.index) > 0:
                 last = x.index.max()
@@ -538,6 +601,7 @@ class InterpolatedPrices(DataNode):
             upsample_frequency_id: Optional[str] = None,
             asset_list: List = None,
             translation_table_unique_id: Optional[str] = None,
+            source_bars_data_node:Optional[DataNode] = None,
             *args,
             **kwargs
     ):
@@ -545,12 +609,11 @@ class InterpolatedPrices(DataNode):
         Initializes the InterpolatedPrices object.
         """
         assert "d" in bar_frequency_id or "m" in bar_frequency_id, f"bar_frequency_id={bar_frequency_id} should be 'd for days' or 'm for min'"
+        if source_bars_data_node is  None:
+            if asset_category_unique_id is None:
+                assert asset_list is not None, f"asset_category_unique_id={asset_category_unique_id} should not be None or asset_list should be defined"
 
-        if asset_category_unique_id is None:
-            assert asset_list is not None, f"asset_category_unique_id={asset_category_unique_id} should not be None or asset_list should be defined"
 
-        if translation_table_unique_id is None:
-            raise Exception(f"Translation table needs to be set")
 
         self.asset_category_unique_id = asset_category_unique_id
         self.interpolator = UpsampleAndInterpolation(
@@ -565,11 +628,17 @@ class InterpolatedPrices(DataNode):
         self.intraday_bar_interpolation_rule = intraday_bar_interpolation_rule
         self.bar_frequency_id = bar_frequency_id
         self.upsample_frequency_id = upsample_frequency_id
-
+        self.source_bars_data_node=source_bars_data_node
         # get the translation rules
-        translation_table = AssetTranslationTable.get(unique_identifier=translation_table_unique_id)
+        if source_bars_data_node is None:
+            if translation_table_unique_id is None:
+                raise Exception(f"Translation table needs to be set")
+            translation_table = AssetTranslationTable.get(unique_identifier=translation_table_unique_id)
 
-        self.bars_ts = WrapperDataNode(translation_table=translation_table)
+            self.bars_ts = WrapperDataNode(translation_table=translation_table)
+        else:
+            self.bars_ts = source_bars_data_node
+
         super().__init__(*args, **kwargs)
 
 
@@ -694,6 +763,14 @@ class InterpolatedPrices(DataNode):
         """
         unique_identifier_range_map = self.update_statistics.get_update_range_map_great_or_equal()
 
+        limit_dt, rows_per_id, total_at_limit=compute_limit_date(unique_identifier_range_map,
+                                                                 bar_frequency_id=self.bar_frequency_id)
+        if limit_dt is not None:
+            limit_dt=datetime.datetime(limit_dt.year, limit_dt.month, limit_dt.day,tzinfo=pytz.utc)
+            new_range_map={}
+            for k, v in unique_identifier_range_map.items():
+                v["end_date"]=limit_dt
+                v["end_date_operand"]="<="
         raw_data_df = self.bars_ts.get_ranged_data_per_asset(range_descriptor=unique_identifier_range_map)
         if raw_data_df.empty:
             self.logger.info("No new data to interpolate")
@@ -706,6 +783,9 @@ class InterpolatedPrices(DataNode):
         """
         Creates mappings from symbols to IDs
         """
+        if self.source_bars_data_node is not None:
+            return self.bars_ts.get_asset_list()
+
         if self.constructor_asset_list is not None:
             asset_list= self.constructor_asset_list
         else:
