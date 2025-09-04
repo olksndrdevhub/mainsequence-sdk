@@ -107,6 +107,130 @@ class DuckDBInterface:
     # ──────────────────────────────────────────────────────────────────────────────
     # Public API
     # ──────────────────────────────────────────────────────────────────────────────
+
+    def time_index_minima(
+            self,
+            table: str,
+            ids: Optional[List[str]] = None,
+    ) -> Tuple[Optional[pd.Timestamp], Dict[Any, Optional[pd.Timestamp]]]:
+        """
+        Compute the minimum time_index over the entire dataset AND the minimum per unique_identifier.
+
+        Returns:
+            (global_min, per_id_dict)
+
+            global_min:  pd.Timestamp (UTC) or None if table is empty / all-NULL
+            per_id_dict: {uid: pd.Timestamp (UTC) or None} for each distinct uid (after optional filtering)
+
+        Fast path:
+            Uses a single scan with GROUPING SETS ((), (unique_identifier)), reading only
+            (unique_identifier, time_index). DuckDB will push projection to Parquet and parallelize.
+
+        Fallback:
+            Runs two simple queries (global MIN + per-id MIN) if GROUPING SETS isn't supported
+            in your DuckDB build.
+
+        Args:
+            table: logical name (your view name); if the view is missing, we scan the Parquet
+                   directly under {self.db_path}/{table}/**/*.parquet with hive_partitioning.
+            ids:   optional list; if provided, restricts to those unique_identifiers only.
+        """
+        import duckdb
+        import pandas as pd
+        from typing import Any, Dict, Optional, Tuple, List
+
+        def qident(name: str) -> str:
+            return '"' + str(name).replace('"', '""') + '"'
+
+        qtbl = qident(table)
+        qid = qident("unique_identifier")
+        qts = qident("time_index")
+
+        # --- Choose fastest reliable source relation ---
+        # Prefer scanning the view if it exists (it normalizes schema); otherwise scan Parquet directly.
+        try:
+            use_view = bool(self.table_exists(table))
+        except Exception:
+            use_view = False
+
+        file_glob = f"{self.db_path}/{table}/**/*.parquet"
+        src_rel = (
+            qtbl
+            if use_view
+            else f"parquet_scan('{file_glob}', hive_partitioning=TRUE, union_by_name=TRUE)"
+        )
+
+        # Optional filter to reduce the output cardinality if the caller only cares about some ids
+        params: List[Any] = []
+        where_clause = ""
+        if ids:
+            placeholders = ", ".join("?" for _ in ids)
+            where_clause = f"WHERE {qid} IN ({placeholders})"
+            params.extend(list(ids))
+
+        # --- Single-pass: GROUPING SETS (grand total + per-id) ---
+        sql_one_pass = f"""
+            WITH src AS (
+                SELECT {qid} AS uid, {qts} AS ts
+                FROM {src_rel}
+                {where_clause}
+            )
+            SELECT
+                uid,
+                MIN(ts) AS min_val,
+                GROUPING(uid) AS is_total_row
+            FROM src
+            GROUP BY GROUPING SETS ((), (uid));
+        """
+
+        try:
+            rows = self.con.execute(sql_one_pass, params).fetchall()
+
+            global_min_raw: Optional[Any] = None
+            per_id_raw: Dict[Any, Optional[Any]] = {}
+
+            for uid, min_val, is_total in rows:
+                if is_total:
+                    global_min_raw = min_val  # grand total row
+                else:
+                    per_id_raw[uid] = min_val
+
+            # Normalize to tz-aware pandas Timestamps (UTC) for consistency with your interface
+            to_ts = lambda v: pd.to_datetime(v, utc=True) if v is not None else None
+            global_min = to_ts(global_min_raw)
+            per_id = {uid: to_ts(v) for uid, v in per_id_raw.items()}
+            return global_min, per_id
+
+        except duckdb.Error as e:
+            # --- Fallback: two straightforward queries (still reads only needed columns) ---
+            logger.info(f"time_index_minima: GROUPING SETS path failed; falling back. Reason: {e}")
+
+            sql_global = f"""
+                SELECT MIN(ts)
+                FROM (
+                    SELECT {qts} AS ts
+                    FROM {src_rel}
+                    {where_clause}
+                )
+            """
+            sql_per_id = f"""
+                SELECT uid, MIN(ts) AS min_val
+                FROM (
+                    SELECT {qid} AS uid, {qts} AS ts
+                    FROM {src_rel}
+                    {where_clause}
+                )
+                GROUP BY uid
+            """
+
+            global_min_raw = self.con.execute(sql_global, params).fetchone()[0]
+            pairs = self.con.execute(sql_per_id, params).fetchall()
+
+            to_ts = lambda v: pd.to_datetime(v, utc=True) if v is not None else None
+            global_min = to_ts(global_min_raw)
+            per_id = {uid: to_ts(min_val) for uid, min_val in pairs}
+            return global_min, per_id
+
     def remove_columns(self, table: str, columns: List[str]) -> Dict[str, Any]:
         """
         Forcefully drop the given columns from the dataset backing `table`.

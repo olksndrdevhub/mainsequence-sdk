@@ -25,7 +25,39 @@ from joblib import Parallel, delayed
 from mainsequence.virtualfundbuilder.models import AssetsConfiguration
 from mainsequence.virtualfundbuilder.utils import logger, TIMEDELTA
 from typing import Optional
+from functools import lru_cache
+
+
 FULL_CALENDAR = "24/7"
+
+@lru_cache(maxsize=256)
+def _get_calendar_by_name(calendar_name: str):
+    if calendar_name == FULL_CALENDAR:
+        return None
+    return mcal.get_calendar(calendar_name)
+
+@lru_cache(maxsize=1024)
+def _get_schedule_cached(calendar_name: str, start_date: str, end_date: str) -> pd.DataFrame:
+    """
+    Returns a schedule DataFrame indexed by normalized UTC session date.
+    start_date / end_date should be 'YYYY-MM-DD' strings for cacheability.
+    """
+    cal = _get_calendar_by_name(calendar_name)
+    if cal is None:
+        # 24/7 synthetic schedule (open at 00:00, close 23:59 UTC)
+        sessions = pd.date_range(start=start_date, end=end_date, freq="D", tz="UTC")
+        df = pd.DataFrame({
+            "market_open": sessions,
+            "market_close": sessions + pd.Timedelta(days=1) - pd.Timedelta(minutes=1),
+        }, index=sessions)
+        df.index.name = "session"
+        return df
+
+    sched = cal.schedule(start_date=start_date, end_date=end_date).reset_index().rename(columns={"index": "session"})
+    sched["session"]      = pd.to_datetime(sched["session"], utc=True).dt.normalize()
+    sched["market_open"]  = pd.to_datetime(sched["market_open"], utc=True)
+    sched["market_close"] = pd.to_datetime(sched["market_close"], utc=True)
+    return sched.set_index("session")
 
 
 def get_interpolated_prices_timeseries(assets_configuration: Optional[AssetsConfiguration]=None, asset_list=None
@@ -33,16 +65,21 @@ def get_interpolated_prices_timeseries(assets_configuration: Optional[AssetsConf
     """
     Creates a Wrapper Timeseries for an asset configuration.
     """
-    prices_configuration = copy.deepcopy(assets_configuration).prices_configuration
-    prices_configuration_kwargs = prices_configuration.model_dump()
-    prices_configuration_kwargs.pop("is_live", None)
-    prices_configuration_kwargs.pop("markets_time_series", None)
+    if assets_configuration is None:
+        assert asset_list is not None, "asset_list and assets_configuration both cant be None"
+    if assets_configuration is not None:
+        prices_configuration = copy.deepcopy(assets_configuration).prices_configuration
+        prices_configuration_kwargs = prices_configuration.model_dump()
+        prices_configuration_kwargs.pop("is_live", None)
+        prices_configuration_kwargs.pop("markets_time_series", None)
+
     if asset_list is None:
         return InterpolatedPrices(
             asset_category_unique_id=assets_configuration.assets_category_unique_id,
             **prices_configuration_kwargs
         )
     else:
+        raise Exception("Not implemented prices_configuration Kwargs")
         return InterpolatedPrices(
             asset_list=asset_list,
             **prices_configuration_kwargs
@@ -68,7 +105,7 @@ class UpsampleAndInterpolation:
             self.bar_frequency_id)
         assert rows.is_integer()
 
-        if "days" in self.bar_frequency_id:
+        if "d" in self.bar_frequency_id:
             assert bar_frequency_id == self.upsample_frequency_id  # Upsampling for daily bars not implemented
 
         self.upsample_frequency_td = string_freq_to_time_delta(self.upsample_frequency_id)
@@ -104,6 +141,10 @@ class UpsampleAndInterpolation:
         assert obs > 1.0
 
         trading_halts = calendar != FULL_CALENDAR
+
+
+
+
         calendar = mcal.get_calendar(calendar)
 
         full_schedule = calendar.schedule(bars_df["trade_day"].min(), bars_df["trade_day"].max()).reset_index()
@@ -223,7 +264,7 @@ class UpsampleAndInterpolation:
             else:
                 upsampled_df = tmp_df
             all_columns = self.TIMESTAMP_COLS + ["trade_day"]
-
+        # Keep everything as timezone-aware datetimes.
         for col in all_columns:
             if col in upsampled_df.columns:
                 upsampled_df[col] = pd.to_datetime(upsampled_df[col]).astype(np.int64).values
@@ -235,10 +276,10 @@ def interpolate_daily_bars(
         bars_df: pd.DataFrame,
         interpolation_rule: str,
         calendar: str,
-        last_observation: Union[None, pd.Series] = None,
+        last_observation: Union[None, pd.Series] = None, #fix annotation
 ):
     try:
-        calendar_instance = mcal.get_calendar(calendar.name)
+        calendar_name = getattr(calendar, "name", calendar)
     except Exception as e:
         raise e
 
@@ -288,8 +329,11 @@ def interpolate_daily_bars(
     restricted_schedule = None
     full_index = bars_df.index
 
-    restricted_schedule = calendar_instance.schedule(bars_df.index.min(),
-                                                     bars_df.index.max())  # This needs to be faster
+    restricted_schedule =_get_schedule_cached(
+        calendar_name,
+        bars_df.index.min().date().isoformat(),
+        bars_df.index.max().date().isoformat(),
+    )
     restricted_schedule = restricted_schedule.reset_index()
     market_type = "market_close"
 
@@ -317,6 +361,14 @@ def interpolate_daily_bars(
 
     null_index = bars_df[bars_df["open_time"].isnull()].index
     if len(null_index) > 0:
+        """
+        You set restricted_schedule = restricted_schedule.set_index("market_close"), then:
+
+        bars_df.loc[null_index, "open_time"] = restricted_schedule.loc[null_index].index
+        This fills open_time with market_close timestamps. That’s wrong and will silently misalign daily bars.
+        Fix: use market_open for open_time (or use the session date + open time column).
+        """
+        raise Exception("check implementation")
         bars_df.loc[null_index, "open_time"] = restricted_schedule.loc[null_index].index
 
     return bars_df
@@ -337,16 +389,25 @@ def interpolate_intraday_bars(
     def build_daily_range_from_schedule(start, end):
         return pd.date_range(start=start, end=end, freq=f"{bars_frequency_min}min")
 
-    def sanitize_today_update(x: pd.DataFrame, date_range):
-        today = datetime.datetime.utcnow()
-        if day.date() == today.date():
+    def sanitize_today_update(x: pd.DataFrame, date_range, day):
+        # normalize to UTC for consistent “today” comparison
+        today_utc = pd.Timestamp.utcnow().tz_localize("UTC")
+        day_utc = pd.Timestamp(day)
+        if day_utc.tz is None:
+            day_utc = day_utc.tz_localize("UTC")
+        else:
+            day_utc = day_utc.tz_convert("UTC")
+
+        if day_utc.date() == today_utc.date():
             x.index.name = None
-            date_range = [i for i in date_range if i <= x.index.max()]
+            if len(x.index) > 0:
+                last = x.index.max()
+                date_range = [i for i in date_range if i <= last]
         return date_range
 
     def rebase_withoutnan_fill(x, trade_starts, trade_ends):
         date_range = build_daily_range_from_schedule(trade_starts, trade_ends)
-        date_range = sanitize_today_update(x=x, date_range=date_range)
+        date_range = sanitize_today_update(x=x, date_range=date_range,day=trade_starts)
         x = x.reindex(date_range)
         return x
 
@@ -357,7 +418,7 @@ def interpolate_intraday_bars(
         x["interpolated"] = False
         if not is_start_of_day:
             date_range = build_daily_range_from_schedule(trade_starts, trade_ends)
-            date_range = sanitize_today_update(x=x, date_range=date_range)
+            date_range = sanitize_today_update(x=x, date_range=date_range,day=trade_starts)
             try:
                 x = x.reindex(date_range)
 
@@ -401,19 +462,17 @@ def interpolate_intraday_bars(
     full_index = bars_df.index.union(restricted_schedule.set_index("market_open").index).union(
         restricted_schedule.set_index("market_close").index)
 
-    restricted_schedule = restricted_schedule.set_index('market_open')
 
     bars_df = bars_df.reindex(full_index)
 
     bars_df["trade_day"] = bars_df.index
-    bars_df["trade_day"] = bars_df["trade_day"].apply(lambda x: x.replace(hour=0, minute=0, second=0))
+    bars_df["trade_day"] = pd.to_datetime(bars_df.index, utc=True).normalize()
+
 
     groups = bars_df.groupby("trade_day")
     interpolated_data = []
-    restricted_schedule.index = restricted_schedule.index.map(lambda x: x.timestamp())
-    restricted_schedule = restricted_schedule.to_dict()
-    for day, group_df in tqdm(groups,
-                              desc=f"Interpolating bars from {bars_df.index.min()} to {bars_df.index.max()} for assets {bars_df['unique_identifier'].dropna().unique()}"):
+
+    for day, group_df in groups:
         schedule = calendar_instance.schedule(start_date=day, end_date=day)
         if schedule.shape[0] == 0:
             continue
@@ -609,8 +668,13 @@ class InterpolatedPrices(DataNode):
             return pd.DataFrame()
 
         max_value_per_asset = {d.index.max(): d.unique_identifier.iloc[0] for d in upsampled_df}
-        min_max = min(max_value_per_asset.keys())
-        self.logger.info(f"min_max {max_value_per_asset[min_max]} {min_max} max_max {max(max_value_per_asset.keys())}")
+
+        min_end_time = min(max_value_per_asset.keys())
+        max_end_time = max(max_value_per_asset.keys())
+        self.logger.info(
+            "Upsampled window aligned: min_end=%s (asset=%s), max_end=%s",
+            min_end_time.isoformat(), max_value_per_asset[min_end_time], max_end_time.isoformat()
+        )
         upsampled_df = pd.concat(upsampled_df, axis=0)
         # upsampled_df = upsampled_df[upsampled_df.index <= min_max]
         upsampled_df.volume = upsampled_df.volume.fillna(0)
@@ -670,10 +734,10 @@ class InterpolatedPrices(DataNode):
             raise Exception()
 
         # adapt to InterpolatedPrices data schema
-        if "vwap" not in prices:
+        if "vwap" not in prices.columns:
             self.logger.warning("vwap not calculated in prices, set to NaN")
             prices["vwap"] = np.nan
-        if "trade_count" not in prices:
+        if "trade_count" not in prices.columns:
             self.logger.warning("trade_count not calculated in prices, set to NaN")
             prices["trade_count"] = np.nan
 

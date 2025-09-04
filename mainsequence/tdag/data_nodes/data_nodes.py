@@ -450,7 +450,10 @@ class APIDataNode(DataAccessMixin):
             A tuple containing the last update timestamp for the table and a dictionary of
             last update timestamps per asset.
         """
-        metadata = self.local_metadata.remote_table
+        if self.is_api:
+            metadata = self.local_persist_manager.metadata
+        else:
+            metadata = self.local_metadata.remote_table
 
         last_update_in_table, last_update_per_asset = None, None
 
@@ -483,7 +486,7 @@ class APIDataNode(DataAccessMixin):
             asset_symbols=asset_symbols, time_serie=self)
         return UpdateStatistics(
             max_time_index_value=last_update_in_table,
-            max_time_per_identifier=last_update_per_asset or {}
+            asset_time_statistics=last_update_per_asset or {}
         )
 
     def get_earliest_updated_asset_filter(self, unique_identifier_list: list,

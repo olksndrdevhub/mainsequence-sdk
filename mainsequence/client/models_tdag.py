@@ -19,7 +19,7 @@ import os
 from mainsequence.logconf import logger
 
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List, Dict, Any, TypedDict
+from typing import Optional, List, Dict, Any, TypedDict,Tuple
 from .data_sources_interfaces import timescale as TimeScaleInterface
 from functools import wraps
 import math
@@ -1812,6 +1812,19 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
                 df[c] = df[c].astype(c_type)
         df = df.set_index(stc.index_names)
         return df
+
+
+    def get_earliest_value(self,
+                           local_metadata: LocalTimeSerie,
+                           )->Tuple[Optional[pd.Timestamp], Dict[Any, Optional[pd.Timestamp]]]:
+        if self.class_type == DUCK_DB:
+            db_interface = DuckDBInterface()
+            table_name = local_metadata.remote_table.table_name
+            return db_interface.time_index_minima(table=table_name)
+
+
+        else:
+            raise NotImplementedError
 
 
 class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
