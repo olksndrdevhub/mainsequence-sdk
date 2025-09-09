@@ -1769,6 +1769,19 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             db_interface = DuckDBInterface()
             table_name = local_metadata.remote_table.table_name
 
+            adjusted_start, adjusted_end, adjusted_uirm,_ = db_interface.constrain_read(
+                table=table_name,
+                start=start_date,
+                end=end_date,
+                ids=unique_identifier_list,
+                unique_identifier_range_map=unique_identifier_range_map,
+            )
+            if unique_identifier_range_map is not None and adjusted_end is not None:
+                adjusted_end=datetime.datetime(adjusted_end.year,adjusted_end.month,adjusted_end.day,tzinfo=datetime.timezone.utc)
+                for v in unique_identifier_range_map.values():
+                    v["end_date"]=adjusted_end
+                    v["end_date_operand"]="<="
+
             df = db_interface.read(
                 table=table_name,
                 start=start_date,
@@ -1779,6 +1792,8 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
                 columns=columns,
                 unique_identifier_range_map=unique_identifier_range_map, # Pass range map
             )
+
+
         else:
             if column_range_descriptor is not None:
                 raise Exception("On this data source do not use column_range_descriptor")

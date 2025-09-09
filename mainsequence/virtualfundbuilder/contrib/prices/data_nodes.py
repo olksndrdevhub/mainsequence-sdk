@@ -61,68 +61,7 @@ def _get_schedule_cached(calendar_name: str, start_date: str, end_date: str) -> 
 
 
 
-def compute_limit_date(
-    unique_identifier_range_map: Dict[str, Dict[str, Any]],
-    bar_frequency_id: str,
-    max_rows: int = 10_000_000,
-    now: Optional[datetime.datetime] = None,
-) -> Tuple[Optional[datetime.datetime], Dict[str, int], int]:
-    """
-    unique_identifier_range_map: {
-        uid: {"start_date": datetime (tz-aware, UTC), "start_date_operand": ">=" or ">" (optional)},
-        ...
-    }
-    Returns: (limit_dt_or_None, rows_per_id, total_rows_at_limit_or_now)
-      - limit_dt_or_None == None  -> no limit needed (all rows up to `now` fit under cap)
-    """
-    if now is None:
-        now = datetime.datetime.now(pytz.utc)
 
-    bar_secs = string_frequency_to_minutes(bar_frequency_id) * 60
-    if bar_secs <= 0:
-        raise ValueError("bar frequency must be positive")
-
-    # effective start timestamps (operand '>' skips the first bar)
-    starts_ts = [
-        v["start_date"].timestamp() + (bar_secs if v.get("start_date_operand") == ">" else 0)
-        for v in unique_identifier_range_map.values()
-    ]
-    max_start=np.max(starts_ts)
-    starts_ts=[max_start for i in starts_ts]
-    if not starts_ts:
-        raise ValueError("No start_date values found.")
-
-    lo_ts = min(starts_ts)            # earliest effective start
-    hi_ts = now.timestamp()           # latest possible limit
-
-    def total_until(limit_ts: float) -> int:
-        return sum(max(0, int((limit_ts - s) // bar_secs)) for s in starts_ts)
-
-    # If even 'now' doesn't exceed the cap → no limit needed
-    total_now = total_until(hi_ts)
-    if total_now <= max_rows:
-        rows_per_id_now = {
-            uid: max(0, int((hi_ts - (v["start_date"].timestamp() + (bar_secs if v.get("start_date_operand") == ">" else 0))) // bar_secs))
-            for uid, v in unique_identifier_range_map.items()
-        }
-        return None, rows_per_id_now, total_now
-
-    # Binary search latest limit with total <= max_rows (monotone ↑ in limit)
-    for _ in range(64):
-        mid_ts = (lo_ts + hi_ts) / 2.0
-        if total_until(mid_ts) > max_rows:
-            hi_ts = mid_ts
-        else:
-            lo_ts = mid_ts
-    limit_ts = lo_ts
-    limit_dt = datetime.datetime.fromtimestamp(limit_ts, tz=pytz.utc)
-
-    rows_per_id = {
-        uid: max(0, int((limit_ts - (v["start_date"].timestamp() + (bar_secs if v.get("start_date_operand") == ">" else 0))) // bar_secs))
-        for uid, v in unique_identifier_range_map.items()
-    }
-    total_at_limit = sum(rows_per_id.values())
-    return limit_dt, rows_per_id, total_at_limit
 
 def get_interpolated_prices_timeseries(assets_configuration: Optional[AssetsConfiguration]=None, asset_list=None,
 
@@ -516,9 +455,13 @@ def interpolate_intraday_bars(
 
     full_index = bars_df.index
 
-    # because index are closes the greates value should be the open time of the last close to do not extra interpolate
-    restricted_schedule = calendar_instance.schedule(bars_df.index.min(),
-                                                     bars_df.iloc[-1]["open_time"])  # This needs to be faster
+    try:
+        # because index are closes the greates value should be the open time of the last close to do not extra interpolate
+
+        restricted_schedule = calendar_instance.schedule(bars_df.index.min(),
+                                                         bars_df.iloc[-1]["open_time"])  # This needs to be faster
+    except Exception as e:
+        raise e
 
     bars_df = bars_df[~bars_df.index.duplicated(keep='first')]  # todo: remove uncessary with indices.
 
@@ -708,7 +651,7 @@ class InterpolatedPrices(DataNode):
         if required_cores == 1:
             # Single-core processing
             for unique_identifier, df in raw_data_df.groupby("unique_identifier"):
-                if df.shape[0] > 0:
+                if df.shape[0] > 1:
                     df = self.interpolator.get_interpolated_upsampled_bars(
                         calendar=self.asset_calendar_map[unique_identifier],
                         tmp_df=df,
@@ -763,14 +706,7 @@ class InterpolatedPrices(DataNode):
         """
         unique_identifier_range_map = self.update_statistics.get_update_range_map_great_or_equal()
 
-        limit_dt, rows_per_id, total_at_limit=compute_limit_date(unique_identifier_range_map,
-                                                                 bar_frequency_id=self.bar_frequency_id)
-        if limit_dt is not None:
-            limit_dt=datetime.datetime(limit_dt.year, limit_dt.month, limit_dt.day,tzinfo=pytz.utc)
-            new_range_map={}
-            for k, v in unique_identifier_range_map.items():
-                v["end_date"]=limit_dt
-                v["end_date_operand"]="<="
+
         raw_data_df = self.bars_ts.get_ranged_data_per_asset(range_descriptor=unique_identifier_range_map)
         if raw_data_df.empty:
             self.logger.info("No new data to interpolate")

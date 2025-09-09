@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Optional, Literal, List, Dict,TypedDict
+from typing import Optional, Literal, List, Dict,TypedDict, Tuple, Any
 import os, pyarrow.fs as pafs
 
 import duckdb, pandas as pd
@@ -10,7 +10,7 @@ import datetime
 from mainsequence.logconf import logger
 import pyarrow as pa
 import pyarrow.parquet as pq
-from ..utils import DataFrequency
+from ..utils import DataFrequency,UniqueIdentifierRangeMap
 import uuid
 from pyarrow import fs
 
@@ -27,6 +27,10 @@ def _list_parquet_files(fs, dir_path: str) -> list[str]:
     infos = fs.get_file_info(pafs.FileSelector(dir_path, recursive=False))
     return [i.path for i in infos
             if i.type == pafs.FileType.File and i.path.endswith(".parquet")]
+
+
+
+
 
 class DuckDBInterface:
     """
@@ -391,16 +395,16 @@ class DuckDBInterface:
         }
 
     def upsert(self, df: pd.DataFrame, table: str,
-               data_frequency:DataFrequency=DataFrequency.one_m
-               ) -> None:
+               data_frequency: DataFrequency = DataFrequency.one_m) -> None:
         """
-        Idempotently writes a DataFrame into *table* using (time_index, uid) PK.
+        Idempotently writes a DataFrame into *table* using (time_index, unique_identifier) PK.
         Extra columns are added to the table automatically.
-
-        Args:
-            df (pd.DataFrame): DataFrame to upsert.
-            table (str): Target table name.
         """
+        import os
+        import uuid
+        import datetime
+        from pyarrow import fs  # used for cleanup listing
+
         if df.empty:
             logger.warning(f"Attempted to upsert an empty DataFrame to table '{table}'. Skipping.")
             return
@@ -412,7 +416,7 @@ class DuckDBInterface:
             df["unique_identifier"] = ""  # degenerate PK for daily data
 
         # —— derive partition columns ——---------------------------------------
-        partitions = self._partition_keys(df["time_index"],data_frequency=data_frequency)
+        partitions = self._partition_keys(df["time_index"], data_frequency=data_frequency)
         for col, values in partitions.items():
             df[col] = values
         part_cols = list(partitions)
@@ -420,162 +424,189 @@ class DuckDBInterface:
         logger.debug(f"Starting upsert of {len(df)} rows into table '{table}' in {self.db_path}")
 
         # —— de‑duplication inside *this* DataFrame ——--------------------------
-        df = (
-            df.sort_values(["unique_identifier", "time_index"])
-            .drop_duplicates(subset=["time_index", "unique_identifier"],
-                             keep="last")
-        )
+        df = df.drop_duplicates(subset=["time_index", "unique_identifier"], keep="last")
 
         # ──  Write each partition safely ─────────────────────────────────
         for keys, sub in df.groupby(part_cols, sort=False):
             part_path = self._partition_path(dict(zip(part_cols, keys)), table=table)
             self._fs.create_dir(part_path, recursive=True)
 
-            # 4a) Cross-file de-dup: drop any rows already on disk
+            # Register incoming batch as a DuckDB relation
+            self.con.register("incoming_sub", sub)
+
+            # Detect presence of existing files and time-range overlap (cheap)
+            has_existing = False
+            time_overlap = False
             try:
-                existing_keys = (
-                    self.con
-                    .execute(
-                        f"SELECT time_index, unique_identifier "
-                        f"FROM parquet_scan('{part_path}/*.parquet', hive_partitioning=TRUE)"
-                    )
-                    .fetch_df()
-                )
-                existing_cols = set(
-                    self.con.execute(
-                        f"SELECT * FROM parquet_scan('{part_path}/*.parquet', hive_partitioning=TRUE) LIMIT 0"
-                    ).fetch_df().columns
-                )
+                row = self.con.execute(
+                    f"""
+                    SELECT min(time_index) AS mn, max(time_index) AS mx
+                    FROM parquet_scan('{part_path}/*.parquet', hive_partitioning=TRUE)
+                    """
+                ).fetchone()
+                if row and row[0] is not None:
+                    has_existing = True
+                    mn = pd.to_datetime(row[0], utc=True)
+                    mx = pd.to_datetime(row[1], utc=True)
+                    smin = sub["time_index"].min()
+                    smax = sub["time_index"].max()
+                    time_overlap = not (smax < mn or smin > mx)
             except Exception:
-                existing_keys = pd.DataFrame(columns=["time_index", "unique_identifier"])
-                existing_cols = set()
+                has_existing = False
 
+            # Exact PK overlap check (only if time windows overlap)
             overlap_exists = False
-            if not existing_keys.empty:
-                overlap =   sub[["time_index", "unique_identifier"]].merge(
-                    existing_keys,
-                    on=["time_index", "unique_identifier"],
-                    how="inner",
-                )
-                overlap_exists = not overlap.empty
+            if has_existing and time_overlap:
+                overlap_exists = bool(self.con.execute(
+                    f"""
+                    SELECT EXISTS (
+                      SELECT 1
+                      FROM incoming_sub i
+                      JOIN parquet_scan('{part_path}/*.parquet', hive_partitioning=TRUE) e
+                        ON e.time_index = i.time_index
+                       AND e.unique_identifier = i.unique_identifier
+                      LIMIT 1
+                    );
+                    """
+                ).fetchone()[0])
 
-            incoming_cols = set(sub.columns)
-            required_cols_set = {"time_index", "unique_identifier", *part_cols}
-            # columns other than required
-            new_cols_present = len(incoming_cols - existing_cols - required_cols_set) > 0
-
-            if not overlap_exists and not new_cols_present:
-                # ---------- Append-only fast path ----------
-                # Drop rows already present (pure anti-join on PK) and append the rest
+            # -------------------- Append path (no PK collision) --------------------
+            if not has_existing or not time_overlap or not overlap_exists:
                 try:
-                    if not existing_keys.empty:
-                        merged = sub.merge(
-                            existing_keys,
-                            on=["time_index", "unique_identifier"],
-                            how="left",
-                            indicator=True
-                        )
-                        sub_to_write = merged[merged["_merge"] == "left_only"].drop(columns=["_merge"])
-                    else:
-                        sub_to_write = sub
-
-                    if sub_to_write.empty:
-                        continue
-
-                    # Write append file atomically
                     ts = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
                     final_name = f"part-{ts}-{uuid.uuid4().hex}.parquet"
                     tmp_name = final_name + ".tmp"
                     tmp_path = f"{part_path}/{tmp_name}"
                     final_path = f"{part_path}/{final_name}"
 
-                    sub_to_write = sub_to_write.sort_values(["unique_identifier", "time_index"])
-                    table_arrow = pa.Table.from_pandas(sub_to_write, preserve_index=False)
+                    if has_existing:
+                        # Keep dedup exact: write only rows not already present
+                        anti_join_select = f"""
+                            SELECT i.*
+                            FROM incoming_sub i
+                            WHERE NOT EXISTS (
+                              SELECT 1
+                              FROM parquet_scan('{part_path}/*.parquet', hive_partitioning=TRUE) e
+                              WHERE e.time_index = i.time_index
+                                AND e.unique_identifier = i.unique_identifier
+                            )
+                            ORDER BY i.unique_identifier, i.time_index
+                        """
+                        n_new = self.con.execute(
+                            f"SELECT COUNT(*) FROM ({anti_join_select})"
+                        ).fetchone()[0]
+                        if n_new == 0:
+                            continue
+                        self.con.execute(
+                            f"""
+                            COPY ({anti_join_select})
+                            TO '{tmp_path}'
+                            (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 512000);
+                            """
+                        )
+                    else:
+                        # No existing files → safe to copy all incoming rows
+                        self.con.execute(
+                            f"""
+                            COPY (
+                              SELECT i.*
+                              FROM incoming_sub i
+                              ORDER BY i.unique_identifier, i.time_index
+                            )
+                            TO '{tmp_path}'
+                            (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 512000);
+                            """
+                        )
 
-                    pq.write_table(
-                        table_arrow,
-                        where=tmp_path,
-                        row_group_size=512_000,
-                        compression="zstd",
-                        filesystem=self._fs,
-                        version="2.6",
-                        coerce_timestamps=None,
-                        allow_truncated_timestamps=False,
-                    )
+                    # Atomic move into place
                     self._fs.move(tmp_path, final_path)
-
                 except Exception as e:
                     logger.exception(f"Append path failed for partition {keys}: {e}")
                     raise
                 continue
 
-            # ---------- Rewrite path (true upsert + schema evolution) ----------
+            # -------------------- Rewrite path (true upsert) -----------------------
             try:
-                try:
-                    existing_full = self.con.execute(
-                        f"SELECT * FROM parquet_scan('{part_path}/*.parquet', hive_partitioning=TRUE)"
-                    ).fetch_df()
-                except Exception:
-                    existing_full = pd.DataFrame()
+                # Discover existing/incoming schemas and build COALESCE projection
+                desc_rows = self.con.execute(
+                    f"""
+                    DESCRIBE SELECT * FROM parquet_scan(
+                        '{part_path}/*.parquet',
+                        hive_partitioning=TRUE,
+                        union_by_name=TRUE
+                    )
+                    """
+                ).fetchall()
+                existing_cols = [r[0] for r in desc_rows]
+                incoming_cols = list(sub.columns)
+                all_cols = list(dict.fromkeys(incoming_cols + existing_cols))  # deterministic order
 
-                # Normalize for join
-                if not existing_full.empty:
-                    existing_full["time_index"] = pd.to_datetime(existing_full["time_index"], utc=True)
-                    existing_full["year"] =  existing_full["year"].astype(str)
-                    existing_full["month"] = existing_full["month"].astype(str)
+                def qident(name: str) -> str:
+                    return '"' + str(name).replace('"', '""') + '"'
 
-                # Ensure required cols exist in both frames
-                for rc in required_cols_set:
-                    if rc not in existing_full.columns:
-                        existing_full[rc] = pd.NA
-                    if rc not in sub.columns:
-                        sub[rc] = pd.NA
+                inc_set, ex_set = set(incoming_cols), set(existing_cols)
+                select_exprs = []
+                for c in all_cols:
+                    qc = qident(c)
+                    if c in inc_set and c in ex_set:
+                        select_exprs.append(f"COALESCE(i.{qc}, e.{qc}) AS {qc}")
+                    elif c in inc_set:
+                        select_exprs.append(f"i.{qc} AS {qc}")
+                    else:
+                        select_exprs.append(f"e.{qc} AS {qc}")
+                select_list = ", ".join(select_exprs)
 
-                # Set PK index for clean replacement
-                idx_cols = ["time_index", "unique_identifier"]
-                existing_full = existing_full.set_index(idx_cols, drop=False)
-                sub_idx = sub.set_index(idx_cols, drop=False)
-
-                # Union of columns (schema evolution)
-                all_cols = list(sorted(set(existing_full.columns) | set(sub_idx.columns)))
-                existing_full = existing_full.reindex(columns=all_cols)
-                sub_idx = sub_idx.reindex(columns=all_cols)
-
-                # Replace rows in existing with incoming sub rows (true upsert)
-                common_index=existing_full.index.union(sub_idx.index)
-                sub_idx=sub_idx.reindex(common_index)
-                existing_full=existing_full.reindex(common_index)
-                final_part = sub_idx.combine_first(existing_full)
-
-                # Sort for zone-maps and deterministic layout
-                final_part = final_part.sort_index()
-
-                # Write one new compacted file atomically
                 ts = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
                 final_name = f"part-{ts}-{uuid.uuid4().hex}.parquet"
                 tmp_name = final_name + ".tmp"
                 tmp_path = f"{part_path}/{tmp_name}"
                 final_path = f"{part_path}/{final_name}"
 
-                table_arrow = pa.Table.from_pandas(final_part, preserve_index=False)
-                pq.write_table(
-                    table_arrow,
-                    where=tmp_path,
-                    row_group_size=512_000,
-                    compression="zstd",
-                    filesystem=self._fs,
-                    version="2.6",
-                    coerce_timestamps=None,
-                    allow_truncated_timestamps=False,
+                merge_sql = f"""
+                COPY (
+                  WITH existing AS (
+                    SELECT * FROM parquet_scan(
+                        '{part_path}/*.parquet',
+                        hive_partitioning=TRUE,
+                        union_by_name=TRUE
+                    )
+                  ),
+                  merged_incoming AS (
+                    SELECT {select_list}
+                    FROM incoming_sub i
+                    LEFT JOIN existing e
+                      ON e.time_index = i.time_index
+                     AND e.unique_identifier = i.unique_identifier
+                  )
+                  SELECT *
+                  FROM (
+                    -- rows with incoming (coalesced over existing)
+                    SELECT * FROM merged_incoming
+                    UNION BY NAME ALL
+                    -- keep existing rows that do not collide on PK
+                    SELECT e.*
+                    FROM existing e
+                    ANTI JOIN incoming_sub i
+                      ON e.time_index = i.time_index
+                     AND e.unique_identifier = i.unique_identifier
+                  )
+                  ORDER BY unique_identifier, time_index
                 )
+                TO '{tmp_path}'
+                (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 512000);
+                """
+                self.con.execute(merge_sql)
                 self._fs.move(tmp_path, final_path)
 
-                # Best-effort cleanup of old files (keep the new one)
+                # Cleanup old parquet fragments, keep only the new file
                 try:
-                    for path in _list_parquet_files(self._fs, part_path):
-                        if os.path.basename(path) == final_name:
-                            continue
-                        self._fs.delete_file(path)  # not .delete(...)
+                    for fi in self._fs.get_file_info(fs.FileSelector(part_path)):
+                        if (
+                                fi.type == fs.FileType.File
+                                and fi.path.endswith(".parquet")
+                                and os.path.basename(fi.path) != final_name
+                        ):
+                            self._fs.delete_file(fi.path)
                 except Exception as cleanup_e:
                     logger.warning(f"Cleanup old parquet files failed in {part_path}: {cleanup_e}")
 
@@ -585,7 +616,6 @@ class DuckDBInterface:
 
         # ──  Refresh view ────────────────────────────────────────────────
         self._ensure_view(table=table)
-
 
     def table_exists(self,table):
         table_exists_result = self.con.execute("""
@@ -602,6 +632,424 @@ class DuckDBInterface:
             logger.warning(f"Table '{table}' does not exist in {self.db_path}. Returning empty DataFrame.")
             return pd.DataFrame()
         return table_exists_result
+
+    def constrain_read(
+            self,
+            table: str,
+            *,
+            start: Optional[datetime.datetime] = None,
+            end: Optional[datetime.datetime] = None,
+            ids: Optional[List[str]] = None,
+            unique_identifier_range_map: Optional[Dict[str, Dict[str, Any]]] = None,
+            max_rows: Optional[int] = None,
+            now: Optional[datetime.datetime] = None,
+    ) -> Tuple[
+        Optional[datetime.datetime],  # adjusted_start
+        Optional[datetime.datetime],  # adjusted_end
+        Optional[Dict[str, Dict[str, Any]]],  # adjusted_unique_identifier_range_map
+        Dict[str, Any]  # diagnostics
+    ]:
+        """
+        Constrain a prospective read so that the estimated number of rows does not exceed *max_rows*.
+        Estimation uses Parquet row-group metadata (min/max on time_index + num_rows), i.e. it does not
+        scan full data and does not depend on bar frequency.
+
+        Inputs are the same "shape" as DuckDBInterface.read(...). The function returns adjusted
+        (start, end, unique_identifier_range_map) that you can pass to read(...), plus diagnostics.
+
+        Row cap source:
+          • max_rows argument if provided
+          • else env MAX_READ_ROWS or TDAG_MAX_READ_ROWS
+          • else default 10_000_000
+
+        Behavior:
+          • Computes an overall effective [start, end] across inputs (range_map, start/end).
+          • Reads Parquet footers under {self.db_path}/{table}/**/*.parquet to gather row-group
+            (min_time, max_time, num_rows).
+          • If the estimated rows for [start, end] <= max_rows, returns inputs unchanged.
+          • Otherwise finds the latest limit_dt so that estimated rows in [start, limit_dt] ~= max_rows,
+            and tightens:
+                - global 'end'  → min(end, limit_dt) if plain start/end was used
+                - per-uid 'end_date' in unique_identifier_range_map → min(existing, limit_dt)
+
+        Returns:
+          adjusted_start, adjusted_end, adjusted_unique_identifier_range_map, diagnostics
+        """
+        import os
+        import re
+        import math
+        import numpy as np
+        import pandas as pd
+        import pyarrow.parquet as pq
+        from pyarrow import fs as pa_fs
+        from calendar import monthrange
+
+        # --- helpers -------------------------------------------------------------
+
+        def _to_utc_ts(dt: Optional[datetime.datetime]) -> Optional[pd.Timestamp]:
+            if dt is None:
+                return None
+            ts = pd.to_datetime(dt, utc=True)
+            # normalize to UTC tz-aware pandas Timestamp
+            if not isinstance(ts, pd.Timestamp):
+                ts = pd.Timestamp(ts, tz="UTC")
+            elif ts.tz is None:
+                ts = ts.tz_localize("UTC")
+            else:
+                ts = ts.tz_convert("UTC")
+            return ts
+
+        def _effective_start_from_range_map(rmap: Dict[str, Dict[str, Any]]) -> Optional[pd.Timestamp]:
+            starts = []
+            for v in rmap.values():
+                s = v.get("start_date")
+                if s is None:
+                    continue
+                ts = _to_utc_ts(s)
+                if ts is None:
+                    continue
+                # operand '>' means open interval → start just after s (epsilon)
+                if v.get("start_date_operand") == ">":
+                    ts = ts + pd.Timedelta(nanoseconds=1)
+                starts.append(ts)
+            return min(starts) if starts else None
+
+        def _effective_end_from_range_map(rmap: Dict[str, Dict[str, Any]]) -> Optional[pd.Timestamp]:
+            ends = []
+            for v in rmap.values():
+                e = v.get("end_date")
+                if e is not None:
+                    ends.append(_to_utc_ts(e))
+            return max(ends) if ends else None
+
+        def _parse_part_bounds_from_path(path: str) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]:
+            """
+            Infer inclusive [partition_start, partition_end] purely from path components
+            like .../year=2024/month=07[/day=03]/file.parquet.
+            Returns (p_start, p_end) as UTC tz-aware Timestamps, or (None, None) if not parsable.
+            """
+            m_year = re.search(r"/year=(\d{4})(/|$)", path)
+            m_month = re.search(r"/month=(\d{2})(/|$)", path)
+            m_day = re.search(r"/day=(\d{2})(/|$)", path)
+            if not (m_year and m_month):
+                return None, None
+            y = int(m_year.group(1))
+            m = int(m_month.group(1))
+            if m_day:
+                d = int(m_day.group(1))
+                start = pd.Timestamp(datetime.datetime(y, m, d, 0, 0, 0, tzinfo=datetime.timezone.utc))
+                end = start + pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1)
+                return start, end
+            # month granularity
+            last_day = monthrange(y, m)[1]
+            start = pd.Timestamp(datetime.datetime(y, m, 1, 0, 0, 0, tzinfo=datetime.timezone.utc))
+            end = pd.Timestamp(datetime.datetime(y, m, last_day, 23, 59, 59, tzinfo=datetime.timezone.utc)) \
+                  + pd.Timedelta(seconds=0.999999999)  # inclusive
+            return start, end
+
+        def _collect_row_groups_meta(file_path: str) -> Tuple[
+            List[Tuple[pd.Timestamp, pd.Timestamp, int]], Optional[str]]:
+            """
+            Return list of (rg_min, rg_max, rg_rows) for 'time_index' from Parquet footer.
+            If stats are missing, returns empty list and a reason.
+            """
+            try:
+                pf = pq.ParquetFile(file_path, filesystem=self._fs)
+            except Exception as e:
+                return [], f"open_error:{e}"
+
+            # Find Arrow time unit (ns/us/ms/s)
+            try:
+                arr_schema = pf.schema_arrow
+                tfield = arr_schema.field("time_index")
+                ttype = tfield.type  # pyarrow.TimestampType
+                unit = getattr(ttype, "unit", "ns")
+            except Exception:
+                # If schema isn't Arrow-resolvable, fall back to 'ns'
+                unit = "ns"
+
+            rg_list: List[Tuple[pd.Timestamp, pd.Timestamp, int]] = []
+            try:
+                meta = pf.metadata
+                nrg = meta.num_row_groups
+                # Find column index by name (robust against nested/flat)
+                col_idx = None
+                # Try direct mapping via schema_arrow index first
+                try:
+                    idx = arr_schema.get_field_index("time_index")
+                    if idx != -1:
+                        col_idx = idx
+                except Exception:
+                    col_idx = None
+                for i in range(nrg):
+                    rg = meta.row_group(i)
+                    # choose the column chunk for time_index
+                    col = None
+                    if col_idx is not None and col_idx < rg.num_columns:
+                        col = rg.column(col_idx)
+                        # Verify we picked the right column name; if not, search by path
+                        try:
+                            name = str(col.path_in_schema)
+                            if name.split(".")[-1] != "time_index":
+                                col = None
+                            # else ok
+                        except Exception:
+                            # fall back to search
+                            col = None
+                    if col is None:
+                        for j in range(rg.num_columns):
+                            cj = rg.column(j)
+                            try:
+                                name = str(cj.path_in_schema)
+                            except Exception:
+                                name = ""
+                            if name.split(".")[-1] == "time_index":
+                                col = cj
+                                break
+                    if col is None:
+                        # can't find time_index column → skip this row group
+                        continue
+                    stats = getattr(col, "statistics", None)
+                    if not stats or not getattr(stats, "has_min_max", False):
+                        continue
+                    vmin, vmax = stats.min, stats.max
+
+                    # Convert min/max to UTC Timestamps
+                    def conv(v):
+                        if v is None:
+                            return None
+                        # numeric epoch in unit
+                        if isinstance(v, (int, np.integer)):
+                            return pd.to_datetime(int(v), unit=unit, utc=True)
+                        if isinstance(v, float):
+                            return pd.to_datetime(int(v), unit=unit, utc=True)
+                        # already datetime-like
+                        try:
+                            return pd.to_datetime(v, utc=True)
+                        except Exception:
+                            return None
+
+                    tmin = conv(vmin)
+                    tmax = conv(vmax)
+                    if tmin is None or tmax is None:
+                        continue
+                    # ensure ordering
+                    if tmax < tmin:
+                        tmin, tmax = tmax, tmin
+                    rg_list.append((tmin, tmax, rg.num_rows))
+            except Exception as e:
+                return [], f"meta_error:{e}"
+            return rg_list, None
+
+        def _rows_estimate_until(T: pd.Timestamp, rgs: List[Tuple[pd.Timestamp, pd.Timestamp, int]],
+                                 start_ts: pd.Timestamp) -> int:
+            """
+            Estimate rows in [start_ts, T] by assuming uniform distribution within each row-group
+            between its (min_time, max_time). Uses only metadata.
+            """
+            if T < start_ts:
+                return 0
+            total = 0.0
+            Ts = T.value
+            Ss = start_ts.value
+            for (mn, mx, rows) in rgs:
+                a = max(Ss, mn.value)
+                b = min(Ts, mx.value)
+                if b <= a:
+                    continue
+                denom = (mx.value - mn.value)
+                if denom <= 0:
+                    # degenerate: all timestamps equal; include whole group if it intersects
+                    total += float(rows)
+                else:
+                    frac = (b - a) / denom
+                    total += frac * float(rows)
+            return int(total)
+
+        # --- resolve cap + effective time window -------------------------------
+
+        if max_rows is None:
+            env_val = os.getenv("MAX_READ_ROWS") or os.getenv("TDAG_MAX_READ_ROWS")
+            try:
+                max_rows = int(str(env_val).replace(",", "_")) if env_val is not None else 10_000_000
+            except Exception:
+                max_rows = 10_000_000
+        if now is None:
+            now = datetime.datetime.now(datetime.timezone.utc)
+
+        # Normalize inputs
+        start_ts = _to_utc_ts(start)
+        end_ts = _to_utc_ts(end)
+        uirm = None if unique_identifier_range_map is None else {k: dict(v) for k, v in
+                                                                 unique_identifier_range_map.items()}
+
+        # If ids are given without a range map, create a simple one from start/end
+        if ids and (uirm is None):
+            uirm = {
+                uid: {
+                    "start_date": start_ts.to_pydatetime() if start_ts is not None else None,
+                    "start_date_operand": ">=",
+                    "end_date": (end_ts or _to_utc_ts(now)).to_pydatetime() if (end_ts or now) is not None else None,
+                    "end_date_operand": "<=",
+                } for uid in ids
+            }
+
+        # Compute global window from inputs
+        if uirm:
+            eff_start = _effective_start_from_range_map(uirm)
+            eff_end_in_map = _effective_end_from_range_map(uirm)
+        else:
+            eff_start = start_ts
+            eff_end_in_map = None
+
+        eff_end = end_ts or eff_end_in_map or _to_utc_ts(now)
+
+        # If start still unknown, derive from metadata minima later
+        # If end still unknown, use now
+        if eff_end is None:
+            eff_end = _to_utc_ts(now)
+
+        # --- collect candidate files via partition pruning ---------------------
+
+        base = f"{self.db_path}/{table}"
+        selector = pa_fs.FileSelector(base, recursive=True)
+        files = [
+            info.path
+            for info in self._fs.get_file_info(selector)
+            if info.type == pa_fs.FileType.File and info.path.endswith(".parquet")
+        ]
+
+        # Gather row-group metadata for relevant files
+        row_groups: List[Tuple[pd.Timestamp, pd.Timestamp, int]] = []
+        files_considered = 0
+        files_skipped_part = 0
+        files_meta_errors = 0
+
+        # Use partition bounds to prune before opening footers
+        for path in files:
+            p_start, p_end = _parse_part_bounds_from_path(path)
+            # If we don't know start yet, we must not prune too aggressively; include all and tighten later
+            if eff_start is not None and p_start is not None and p_end is not None:
+                if p_end < eff_start or p_start > eff_end:
+                    files_skipped_part += 1
+                    continue
+            rgs, err = _collect_row_groups_meta(path)
+            if err is not None:
+                files_meta_errors += 1
+                # Fall back: if partition range overlaps, take whole file as one group
+                if p_start is not None and p_end is not None:
+                    # To avoid undercounting, include the file-level partition range as a single group
+                    # with the file's row count from footer if available; otherwise skip.
+                    try:
+                        pf = pq.ParquetFile(path, filesystem=self._fs)
+                        nrows_file = pf.metadata.num_rows
+                        row_groups.append((p_start or eff_start or _to_utc_ts(now), p_end or eff_end, nrows_file))
+                        files_considered += 1
+                    except Exception:
+                        pass
+                continue
+            if rgs:
+                row_groups.extend(rgs)
+                files_considered += 1
+
+        if not row_groups:
+            # No metadata found; nothing to constrain
+            diagnostics = {
+                "reason": "no_row_groups_found",
+                "max_rows": max_rows,
+                "files_considered": files_considered,
+                "files_skipped_partition": files_skipped_part,
+                "files_meta_errors": files_meta_errors,
+            }
+            return start_ts, end_ts or _to_utc_ts(now), uirm, diagnostics
+
+        # If start still None, derive earliest available tmin from metadata
+        if eff_start is None:
+            eff_start = min(mn for (mn, mx, _) in row_groups)
+        # Clamp if caller passed a later explicit start
+        if start_ts is not None:
+            eff_start = max(eff_start, start_ts)
+
+        # Filter row-groups that can intersect [eff_start, eff_end]
+        row_groups = [rg for rg in row_groups if not (rg[1] < eff_start or rg[0] > eff_end)]
+        if not row_groups:
+            diagnostics = {
+                "reason": "no_groups_in_window",
+                "window": [str(eff_start), str(eff_end)],
+                "max_rows": max_rows
+            }
+            return eff_start, eff_end, uirm, diagnostics
+
+        # --- estimate rows & binary search limit_dt ----------------------------
+
+        # Quick check: rows at eff_end
+        est_rows_at_end = _rows_estimate_until(eff_end, row_groups, eff_start)
+        if est_rows_at_end <= max_rows:
+            diagnostics = {
+                "limited": False,
+                "estimated_rows": est_rows_at_end,
+                "max_rows": max_rows,
+                "limit_dt": None,
+                "files_considered": files_considered,
+                "files_skipped_partition": files_skipped_part,
+                "files_meta_errors": files_meta_errors,
+                "row_groups_considered": len(row_groups),
+                "mode": "row_group_metadata",
+            }
+            # Nothing to change
+            return start_ts or eff_start, end_ts or eff_end, uirm, diagnostics
+
+        # Binary search for latest T in [eff_start, eff_end] with est_rows <= max_rows
+        lo = eff_start.value
+        hi = eff_end.value
+        for _ in range(64):
+            mid = (lo + hi) // 2
+            mid_ts = pd.Timestamp(mid, tz="UTC")
+            est = _rows_estimate_until(mid_ts, row_groups, eff_start)
+            if est > max_rows:
+                hi = mid
+            else:
+                lo = mid
+        limit_dt = pd.Timestamp(lo, tz="UTC")
+        est_at_limit = _rows_estimate_until(limit_dt, row_groups, eff_start)
+
+        # --- produce adjusted outputs ------------------------------------------
+
+        adjusted_start = start_ts or eff_start
+        adjusted_end = min(end_ts or eff_end, limit_dt)
+
+        adjusted_uirm = None
+        if uirm is not None:
+            adjusted_uirm = {}
+            for uid, info in uirm.items():
+                new_info = dict(info)
+                # tighten end_date by limit_dt
+                cur_end = info.get("end_date")
+                cur_end_ts = _to_utc_ts(cur_end) if cur_end is not None else eff_end
+                tight_end = min(cur_end_ts, limit_dt)
+                new_info["end_date"] = tight_end.to_pydatetime()
+                # preserve or default operand
+                if "end_date_operand" not in new_info:
+                    new_info["end_date_operand"] = "<="
+                adjusted_uirm[uid] = new_info
+
+        diagnostics = {
+            "limited": True,
+            "limit_dt": str(limit_dt),
+            "estimated_rows_at_limit": est_at_limit,
+            "estimated_rows_full": est_rows_at_end,
+            "max_rows": max_rows,
+            "files_considered": files_considered,
+            "files_skipped_partition": files_skipped_part,
+            "files_meta_errors": files_meta_errors,
+            "row_groups_considered": len(row_groups),
+            "mode": "row_group_metadata",
+            "effective_window_before": [str(eff_start), str(eff_end)],
+            "effective_window_after": [str(adjusted_start), str(adjusted_end)],
+        }
+
+        return adjusted_start, adjusted_end, adjusted_uirm or uirm, diagnostics
+
     def read(
             self,
             table: str,data_frequency:DataFrequency=DataFrequency.one_m,
