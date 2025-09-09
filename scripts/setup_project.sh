@@ -81,6 +81,7 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   mkdir -p "$VFB_PROJECT_PATH/data_nodes"
   mkdir -p "$VFB_PROJECT_PATH/rebalance_strategies"
   mkdir -p "$VFB_PROJECT_PATH/apps"
+  mkdir -p "$VFB_PROJECT_PATH/dashboards"
 
   touch "$VFB_PROJECT_PATH/__init__.py"
   touch "$VFB_PROJECT_PATH/data_nodes/__init__.py"
@@ -88,6 +89,7 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   touch "$VFB_PROJECT_PATH/scripts/__init__.py"
   touch "$VFB_PROJECT_PATH/notebooks/__init__.py"
   touch "$VFB_PROJECT_PATH/apps/__init__.py"
+  touch "$VFB_PROJECT_PATH/dashboards/__init__.py"
 
   echo "Copying Files from mainsequence-sdk"
   cp -a "/opt/code/mainsequence-sdk/examples/getting_started/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"

@@ -711,10 +711,3 @@ class Presentation(BaseModel):
             layout=slide_layout,
 
         )
-
-base_template_str = (
-    Path(__file__).parent
-    / "base_templates"
-    / "base_template.html"
-).read_text(encoding="utf-8")
-BASE_TEMPLATE = Environment().from_string(base_template_str)
