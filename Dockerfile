@@ -57,6 +57,10 @@ RUN pip install --no-cache-dir ipykernel && \
       --name my-venv \
       --display-name "Python 3 (my-venv)"
 
+RUN pip install --no-cache-dir \
+    streamlit \
+    jupyter-server-proxy
+
 RUN pip install --no-cache-dir jupyterhub
 RUN pip install --no-cache-dir jupyterlab
 RUN pip install --no-cache-dir ipywidgets
