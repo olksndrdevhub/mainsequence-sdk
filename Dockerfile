@@ -1,4 +1,4 @@
-FROM jupyter/base-notebook:python-3.11
+FROM quay.io/jupyter/base-notebook:python-3.11
 
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
@@ -56,6 +56,10 @@ RUN pip install --no-cache-dir ipykernel && \
       --prefix=/opt/kernel \
       --name my-venv \
       --display-name "Python 3 (my-venv)"
+
+RUN pip install --no-cache-dir \
+    streamlit \
+    jupyter-server-proxy
 
 RUN pip install --no-cache-dir jupyterhub
 RUN pip install --no-cache-dir jupyterlab
