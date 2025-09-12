@@ -8,3 +8,5 @@ build-backend = "setuptools.build_meta:__legacy__"
 #dependencies = [
 #    "mkdocstrings-python",
 #]
+[tool.setuptools.package-data]
+"mainsequence.dashboards.streamlit" = ["assets/*.png", "assets/config.toml"]

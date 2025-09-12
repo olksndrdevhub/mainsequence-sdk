@@ -7,6 +7,27 @@ import streamlit as st
 
 from mainsequence.dashboards.streamlit.core.registry import get_page, list_pages
 from mainsequence.dashboards.streamlit.core.theme import inject_css_for_dark_accents
+from importlib.resources import files as _pkg_files
+def _bootstrap_theme_from_package(
+    package: str = "mainsequence.dashboards.streamlit",
+    resource: str = "assets/config.toml",
+) -> None:
+    """If $CWD/.streamlit/config.toml is missing, copy it from the package once."""
+    try:
+        src = _pkg_files(package) / resource
+        default_toml = src.read_text(encoding="utf-8")
+    except Exception:
+        return  # no packaged theme; nothing to do
+
+    cfg_dir = Path.cwd() / ".streamlit"
+    cfg_file = cfg_dir / "config.toml"
+    if not cfg_file.exists():
+        cfg_dir.mkdir(parents=True, exist_ok=True)
+        cfg_file.write_text(default_toml, encoding="utf-8")
+        # Avoid infinite loop: only rerun once
+        if not st.session_state.get("_ms_theme_bootstrapped"):
+            st.session_state["_ms_theme_bootstrapped"] = True
+            st.rerun()
 
 # --- App configuration contract (provided by the example app) -----------------
 
@@ -90,7 +111,7 @@ def _resolve_assets(explicit_logo: Optional[Union[str, Path]],
 
 def run_app(cfg: AppConfig) -> None:
     """Run a Streamlit app using the base scaffold."""
-
+    _bootstrap_theme_from_package
     # Resolve assets (defaults shipped with the scaffold)
     _logo, _page_icon, _icon_for_logo = _resolve_assets(cfg.logo_path, cfg.page_icon_path)
 
