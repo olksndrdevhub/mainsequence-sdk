@@ -8,5 +8,7 @@ build-backend = "setuptools.build_meta:__legacy__"
 #dependencies = [
 #    "mkdocstrings-python",
 #]
-[tool.setuptools.package-data]
-"mainsequence.dashboards.streamlit" = ["assets/*.png", "assets/config.toml"]
+
+# TODO this explodes bc toml is not configured correctly
+#[tool.setuptools.package-data]
+#"mainsequence.dashboards.streamlit" = ["assets/*.png", "assets/config.toml"]
