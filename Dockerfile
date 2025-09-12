@@ -50,6 +50,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 USER ${NB_USER}
 WORKDIR ${HOME_DIR}
 
+RUN echo 'export PATH="/opt/venv/bin:$PATH"' >> ~/.bashrc
+
 # Setup jupyterlab
 RUN pip install --no-cache-dir ipykernel && \
     python -m ipykernel install \
