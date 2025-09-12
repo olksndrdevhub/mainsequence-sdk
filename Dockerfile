@@ -3,6 +3,9 @@ FROM quay.io/jupyter/base-notebook:python-3.11
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Stop conda from automatically activating the base environment in new shells
+RUN conda config --set auto_activate_base false
+
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     python3-venv \
