@@ -3,6 +3,8 @@ FROM quay.io/jupyter/base-notebook:python-3.11
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
+RUN rm /usr/local/bin/before-notebook.d/10activate-conda-env.sh
+
 # Stop conda from automatically activating the base environment in new shells
 RUN conda config --set auto_activate_base false
 
