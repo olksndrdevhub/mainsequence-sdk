@@ -414,6 +414,7 @@ class DuckDBInterface:
         df["time_index"] = pd.to_datetime(df["time_index"], utc=True)
         if "unique_identifier" not in df.columns:
             df["unique_identifier"] = ""  # degenerate PK for daily data
+        df["unique_identifier"] = df["unique_identifier"].astype(str)  # ADDED: harden as text
 
         # —— derive partition columns ——---------------------------------------
         partitions = self._partition_keys(df["time_index"], data_frequency=data_frequency)
@@ -538,23 +539,57 @@ class DuckDBInterface:
                     """
                 ).fetchall()
                 existing_cols = [r[0] for r in desc_rows]
-                incoming_cols = list(sub.columns)
+
+                # ADDED: also look at incoming schema so we can build a typed e-select
+                incoming_desc = self.con.execute("DESCRIBE SELECT * FROM incoming_sub").fetchall()  # ADDED
+                incoming_cols = [r[0] for r in incoming_desc]
+
                 all_cols = list(dict.fromkeys(incoming_cols + existing_cols))  # deterministic order
 
                 def qident(name: str) -> str:
                     return '"' + str(name).replace('"', '""') + '"'
 
                 inc_set, ex_set = set(incoming_cols), set(existing_cols)
+
+                # CHANGED: Build merged projection with explicit BIGINT casts for partition cols
                 select_exprs = []
                 for c in all_cols:
                     qc = qident(c)
                     if c in inc_set and c in ex_set:
-                        select_exprs.append(f"COALESCE(i.{qc}, e.{qc}) AS {qc}")
+                        if c in part_cols:
+                            select_exprs.append(
+                                f"COALESCE(CAST(i.{qc} AS BIGINT), CAST(e.{qc} AS BIGINT)) AS {qc}")  # CHANGED
+                        else:
+                            select_exprs.append(f"COALESCE(i.{qc}, e.{qc}) AS {qc}")
                     elif c in inc_set:
-                        select_exprs.append(f"i.{qc} AS {qc}")
-                    else:
-                        select_exprs.append(f"e.{qc} AS {qc}")
+                        if c in part_cols:
+                            select_exprs.append(f"CAST(i.{qc} AS BIGINT) AS {qc}")  # CHANGED
+                        else:
+                            select_exprs.append(f"i.{qc} AS {qc}")
+                    else:  # only in existing
+                        if c in part_cols:
+                            select_exprs.append(f"CAST(e.{qc} AS BIGINT) AS {qc}")  # CHANGED
+                        else:
+                            select_exprs.append(f"e.{qc} AS {qc}")
                 select_list = ", ".join(select_exprs)
+
+                # ADDED: Build a type-aligned projection of existing rows for the anti-join side
+                #        (so UNION ALL BY NAME sees identical types, esp. for partitions)
+                e_select_exprs = []
+                for c in all_cols:
+                    qc = qident(c)
+                    if c in ex_set:
+                        if c in part_cols:
+                            e_select_exprs.append(f"CAST(e.{qc} AS BIGINT) AS {qc}")  # ADDED
+                        else:
+                            e_select_exprs.append(f"e.{qc} AS {qc}")
+                    else:
+                        # Column exists only in incoming; let it be NULL here
+                        if c in part_cols:
+                            e_select_exprs.append(f"CAST(NULL AS BIGINT) AS {qc}")  # ADDED
+                        else:
+                            e_select_exprs.append(f"NULL AS {qc}")  # ADDED
+                e_select_list = ", ".join(e_select_exprs)
 
                 ts = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
                 final_name = f"part-{ts}-{uuid.uuid4().hex}.parquet"
@@ -582,9 +617,9 @@ class DuckDBInterface:
                   FROM (
                     -- rows with incoming (coalesced over existing)
                     SELECT * FROM merged_incoming
-                    UNION BY NAME ALL
+                    UNION ALL BY NAME  -- CHANGED: correct syntax order
                     -- keep existing rows that do not collide on PK
-                    SELECT e.*
+                    SELECT {e_select_list}  -- REPLACED: used to be 'SELECT e.*'
                     FROM existing e
                     ANTI JOIN incoming_sub i
                       ON e.time_index = i.time_index
@@ -595,7 +630,10 @@ class DuckDBInterface:
                 TO '{tmp_path}'
                 (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 512000);
                 """
-                self.con.execute(merge_sql)
+                try:
+                    self.con.execute(merge_sql)
+                except Exception as e:
+                    raise e
                 self._fs.move(tmp_path, final_path)
 
                 # Cleanup old parquet fragments, keep only the new file

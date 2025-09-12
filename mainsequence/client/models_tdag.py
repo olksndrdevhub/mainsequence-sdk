@@ -105,8 +105,10 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     index_names: List
     last_time_index_value: Optional[datetime.datetime] = Field(None, description="Last time index value")
     earliest_index_value: Optional[datetime.datetime] = Field(None, description="Earliest index value")
-    multi_index_stats: Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field")
-    multi_index_column_stats:Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field column based")
+
+    # multi_index_stats: Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field")
+    # multi_index_column_stats:Optional[Dict[str, Any]] = Field(None, description="Multi-index statistics JSON field column based")
+
     table_partition: Dict[str, Any] = Field(..., description="Table partition settings")
     open_for_everyone: bool = Field(default=False, description="Whether the table configuration is open for everyone")
     columns_metadata:Optional[List[ColumnMetaData]]=None
@@ -117,14 +119,23 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
 
     def get_data_updates(self):
         max_per_asset = None
-        if self.multi_index_stats is not None:
-            max_per_asset = self.multi_index_stats["max_per_asset_symbol"]
+
+        url = self.get_object_url() + f"/{self.related_table}/get_stats/"
+        s = self.build_session()
+        r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, accept_gzip=True)
+        if r.status_code != 200:
+            raise Exception(r.text)
+        data=r.json()
+        multi_index_stats=data["multi_index_stats"]
+        multi_index_column_stats=data["multi_index_column_stats"]
+        if multi_index_stats is not None:
+            max_per_asset = multi_index_stats["max_per_asset_symbol"]
             max_per_asset = {k: request_to_datetime(v) for k, v in max_per_asset.items()}
 
         du = UpdateStatistics(
             max_time_index_value=self.last_time_index_value,
             asset_time_statistics=max_per_asset,
-            multi_index_column_stats=self.multi_index_column_stats
+            multi_index_column_stats=multi_index_column_stats
         )
 
         du._max_time_in_update_statistics = self.last_time_index_value
@@ -238,7 +249,8 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         base_url = self.get_object_url()
         payload = {"json": kwargs}
         url = f"{base_url}/{self.id}/set_start_of_execution/"
-        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
+        r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload,
+                         accept_gzip=True)
         if r.status_code != 201:
             raise Exception(f"Error in request {r.text}")
 
@@ -337,13 +349,20 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     ) -> "LocalTimeSerie":
         s = self.build_session()
         url = self.get_object_url() + f"/{self.id}/set_last_update_index_time_from_update_stats/"
-        payload = {
-            "json": {
+
+
+        data_to_comp={
                 "last_time_index_value": last_time_index_value,
                 "max_per_asset_symbol": max_per_asset_symbol,
                 "multi_index_column_stats":multi_index_column_stats,
             }
-        }
+        chunk_json_str=json.dumps(data_to_comp)
+        compressed = gzip.compress(chunk_json_str.encode('utf-8'))
+        compressed_b64 = base64.b64encode(compressed).decode('utf-8')
+        payload = dict(json={
+            "data": compressed_b64,  # compres
+        })
+
         r = make_request(s=s, loaders=self.LOADERS, payload=payload, r_type="POST", url=url, time_out=timeout)
 
         if r.status_code == 404:
@@ -641,6 +660,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                                data: pd.DataFrame,
                                data_source: "DynamicTableDataSource",
                                ):
+
         overwrite = True  # ALWAYS OVERWRITE
         metadata = self.remote_table
 
@@ -1313,6 +1333,13 @@ class UpdateStatistics(BaseModel):
     def get_max_time_in_update_statistics(self):
         if hasattr(self, "_max_time_in_update_statistics")==False:
             self._max_time_in_update_statistics = self.max_time_index_value or self._initial_fallback_date
+        if self._max_time_in_update_statistics is None and self.asset_time_statistics is not None:
+            new_update_statistics, _max_time_in_asset_time_statistics = self._get_update_statistics(
+
+                asset_list=None,unique_identifier_list=None
+                )
+            self._max_time_in_update_statistics=_max_time_in_asset_time_statistics
+
         return self._max_time_in_update_statistics
 
     def get_update_range_map_great_or_equal_columnar(self,extra_time_delta:Optional[datetime.timedelta] = None,
@@ -1469,6 +1496,47 @@ class UpdateStatistics(BaseModel):
 
 
 
+    def _get_update_statistics(self,
+                               asset_list:Optional[List],
+                               unique_identifier_list: Union[list, None]):
+        new_update_statistics = {}
+        if asset_list is None and unique_identifier_list is None:
+            assert self.asset_time_statistics is not None
+            unique_identifier_list=list(self.asset_time_statistics.keys())
+
+        else:
+            unique_identifier_list = [a.unique_identifier for a in
+                                      asset_list] if unique_identifier_list is None else unique_identifier_list
+
+        for unique_identifier in unique_identifier_list:
+
+            if self.asset_time_statistics and unique_identifier in self.asset_time_statistics:
+                new_update_statistics[unique_identifier] = self.asset_time_statistics[unique_identifier]
+            else:
+
+                new_update_statistics[unique_identifier] = None
+
+        def _max_in_nested(d):
+            """
+            Recursively find the max leaf value in a nested dict-of-dicts,
+            where the leaves are comparable (e.g. datetime objects).
+            Returns None if there are no leaves.
+            """
+            max_val = None
+            for v in d.values():
+                if isinstance(v, dict):
+                    candidate = _max_in_nested(v)
+                else:
+                    candidate = v
+                if candidate is not None and (max_val is None or candidate > max_val):
+                    max_val = candidate
+            return max_val
+
+        _max_time_in_asset_time_statistics = _max_in_nested(new_update_statistics) if len(
+            new_update_statistics) > 0 else None
+
+        return new_update_statistics, _max_time_in_asset_time_statistics
+
     def update_assets(
             self,
             asset_list: Optional[List],
@@ -1479,34 +1547,9 @@ class UpdateStatistics(BaseModel):
         self.asset_list = asset_list
         new_update_statistics = self.asset_time_statistics
         if asset_list is not None or unique_identifier_list is not None:
-            new_update_statistics = {}
-            unique_identifier_list = [a.unique_identifier for a in asset_list] if unique_identifier_list is None else unique_identifier_list
-
-            for unique_identifier in unique_identifier_list:
-
-                if self.asset_time_statistics and unique_identifier in self.asset_time_statistics:
-                    new_update_statistics[unique_identifier] = self.asset_time_statistics[unique_identifier]
-                else:
-
-                    new_update_statistics[unique_identifier] =None
-
-            def _max_in_nested(d):
-                """
-                Recursively find the max leaf value in a nested dict-of-dicts,
-                where the leaves are comparable (e.g. datetime objects).
-                Returns None if there are no leaves.
-                """
-                max_val = None
-                for v in d.values():
-                    if isinstance(v, dict):
-                        candidate = _max_in_nested(v)
-                    else:
-                        candidate = v
-                    if candidate is not None and (max_val is None or candidate > max_val):
-                        max_val = candidate
-                return max_val
-
-            _max_time_in_asset_time_statistics = _max_in_nested(new_update_statistics) if len(new_update_statistics) > 0 else None
+            new_update_statistics,_max_time_in_asset_time_statistics=self._get_update_statistics(unique_identifier_list=unique_identifier_list,
+                                                                                                 asset_list=asset_list,
+                                                                                                 )
 
         else:
             _max_time_in_asset_time_statistics = self.max_time_index_value or init_fallback_date
@@ -1764,7 +1807,9 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
             column_range_descriptor: Optional[Dict[str,UniqueIdentifierRangeMap]] = None,
     ) -> pd.DataFrame:
-
+        
+        
+        logger.warning("EXTEND THE CONSTRAIN READ HERE!!")
         if self.class_type == DUCK_DB:
             db_interface = DuckDBInterface()
             table_name = local_metadata.remote_table.table_name
