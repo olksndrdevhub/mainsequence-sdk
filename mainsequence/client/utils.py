@@ -21,8 +21,9 @@ class DataFrequency(str, Enum):
     one_d = "1d"
     one_w = "1w"
     one_year = "1y"
-    one_month ="1mo"
-    one_quarter ="1q"
+    one_month = "1mo"
+    one_quarter = "1q"
+
 
 class DateInfo(TypedDict, total=False):
     start_date: Optional[datetime.datetime]
@@ -30,7 +31,9 @@ class DateInfo(TypedDict, total=False):
     end_date: Optional[datetime.datetime]
     end_date_operand: Optional[str]
 
+
 UniqueIdentifierRangeMap = Dict[str, DateInfo]
+
 
 def request_to_datetime(string_date: str):
     if "+" in string_date:
@@ -44,8 +47,10 @@ def request_to_datetime(string_date: str):
             tzinfo=pytz.utc)
     return date
 
+
 class DoesNotExist(Exception):
     pass
+
 
 class AuthLoaders:
     @property
@@ -58,17 +63,20 @@ class AuthLoaders:
         logger.debug("Getting Auth Headers ASSETS_ORM")
         self._auth_headers = get_authorization_headers()
 
+
 def get_authorization_headers():
     headers = get_rest_token_header()
     return headers
 
+
 def make_request(
-    s,
-    r_type: str,
-    url: str,
-    loaders: Union[AuthLoaders, None],
-    payload: Union[dict, None] = None,
-    time_out=None,
+        s,
+        r_type: str,
+        url: str,
+        loaders: Union[AuthLoaders, None],
+        payload: Union[dict, None] = None,
+        time_out=None,
+        accept_gzip: bool = True
 ):
     from requests.models import Response
 
@@ -94,7 +102,7 @@ def make_request(
     if r_type in ("POST", "PATCH") and "files" in payload:
         # We have file uploads → use multipart form data
         request_kwargs["data"] = payload.get("json", {})  # form fields
-        request_kwargs["files"] = payload["files"]        # actual files
+        request_kwargs["files"] = payload["files"]  # actual files
         s.headers.pop("Content-Type", None)
     else:
         # Fallback: no files, no json → just form fields
@@ -104,6 +112,11 @@ def make_request(
     keep_request = True
     counter = 0
     headers_refreshed = False
+
+    if accept_gzip:
+        # Don't clobber other headers; just ensure the key exists.
+        # Keep it simple: gzip covers Django's GZipMiddleware.
+        s.headers.setdefault("Accept-Encoding", "gzip")
 
     # Now loop with retry logic
     while keep_request:
@@ -145,12 +158,14 @@ def make_request(
         time.sleep(TIMEOFF)
     return r
 
+
 def build_session():
     from requests.adapters import HTTPAdapter, Retry
     s = requests.Session()
     retries = Retry(total=2, backoff_factor=2, )
     s.mount('http://', HTTPAdapter(max_retries=retries))
     return s
+
 
 def get_constants_tdag():
     url = f"{os.getenv('TDAG_ENDPOINT')}/orm/api/ts_manager/api/constants"
@@ -160,6 +175,7 @@ def get_constants_tdag():
     r = make_request(s=s, loaders=loaders, r_type="GET", url=url)
     return r.json()
 
+
 def get_constants_vam():
     url = f"{os.getenv('TDAG_ENDPOINT')}/orm/api/assets/api/constants"
     loaders = AuthLoaders()
@@ -168,18 +184,21 @@ def get_constants_vam():
     r = make_request(s=s, loaders=loaders, r_type="GET", url=url)
     return r.json()
 
+
 def get_binance_constants():
     url = f"{os.getenv('TDAG_ENDPOINT')}/orm/api/binance/constants"
     loaders = AuthLoaders()
     s = build_session()
     s.headers.update(loaders.auth_headers)
-    r = make_request(s=s,loaders=loaders, r_type="GET", url=url)
+    r = make_request(s=s, loaders=loaders, r_type="GET", url=url)
     return r.json()
+
 
 class LazyConstants(dict):
     """
     Class Method to load constants only once they are called. this minimizes the calls to the API
     """
+
     def __init__(self, constant_type: str):
         if constant_type == "tdag":
             self.CONSTANTS_METHOD = get_constants_tdag
@@ -226,6 +245,7 @@ class LazyConstants(dict):
             out[k] = self.to_attr_dict(v)  # recursively transform
         return out
 
+
 if 'TDAG_CONSTANTS' not in locals():
     TDAG_CONSTANTS = LazyConstants("tdag")
 
@@ -234,6 +254,7 @@ if 'MARKETS_CONSTANTS' not in locals():
 
 if "BINANCE_CONSTANTS" not in locals():
     BINANCE_CONSTANTS = LazyConstants("binance")
+
 
 def get_rest_token_header():
     headers = CaseInsensitiveDict()
@@ -245,6 +266,7 @@ def get_rest_token_header():
     else:
         raise Exception("MAINSEQUENCE_TOKEN is not set in env")
 
+
 def get_network_ip():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         # Connect to a well-known external host (Google DNS) on port 80
@@ -252,6 +274,7 @@ def get_network_ip():
         # Get the local IP address used to make the connection
         network_ip = s.getsockname()[0]
     return network_ip
+
 
 def is_process_running(pid: int) -> bool:
     """
@@ -271,6 +294,7 @@ def is_process_running(pid: int) -> bool:
         # Process with the given PID does not exist
         return False
 
+
 def set_types_in_table(df, column_types):
     index_cols = [name for name in df.index.names if name is not None]
     if index_cols:
@@ -287,6 +311,7 @@ def set_types_in_table(df, column_types):
         df = df.set_index(index_cols)
     return df
 
+
 def serialize_to_json(kwargs):
     new_data = {}
     for key, value in kwargs.items():
@@ -298,13 +323,12 @@ def serialize_to_json(kwargs):
     return new_data
 
 
-
-
 import os
 import pathlib
 import shutil
 import subprocess
 import uuid
+
 
 def _linux_machine_id() -> Optional[str]:
     """Return the OS machine‑id if readable (many distros make this 0644)."""
@@ -316,6 +340,7 @@ def _linux_machine_id() -> Optional[str]:
             except PermissionError:
                 continue
     return None
+
 
 def bios_uuid() -> str:
     """Best‑effort hardware/OS identifier that never returns None.
