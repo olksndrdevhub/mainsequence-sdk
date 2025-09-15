@@ -4,9 +4,10 @@ import yaml
 
 from .base import BasePydanticModel, BaseObjectOrm, TDAG_ENDPOINT
 from .data_sources_interfaces.duckdb import DuckDBInterface
-from .utils import (is_process_running, get_network_ip,DateInfo,
-                    TDAG_CONSTANTS,DataFrequency,UniqueIdentifierRangeMap,
-                    DATE_FORMAT, AuthLoaders, make_request, set_types_in_table, request_to_datetime, serialize_to_json, bios_uuid)
+from .utils import (is_process_running, get_network_ip, DateInfo,
+                    TDAG_CONSTANTS, DataFrequency, UniqueIdentifierRangeMap,
+                    DATE_FORMAT, AuthLoaders, make_request, set_types_in_table, request_to_datetime, serialize_to_json,
+                    bios_uuid)
 import copy
 import datetime
 import pytz
@@ -19,7 +20,7 @@ import os
 from mainsequence.logconf import logger
 
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List, Dict, Any, TypedDict,Tuple
+from typing import Optional, List, Dict, Any, TypedDict, Tuple
 from .data_sources_interfaces import timescale as TimeScaleInterface
 from functools import wraps
 import math
@@ -28,22 +29,19 @@ import base64
 import numpy as np
 import concurrent.futures
 
-
 _default_data_source = None  # Module-level cache
-
 
 JSON_COMPRESSED_PREFIX = ["json_compressed", "jcomp_"]
 
 loaders = AuthLoaders()
 
-
 # Global executor (or you could define one on your class)
 _executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
-DUCK_DB="duck_db"
+DUCK_DB = "duck_db"
+
 
 class AlreadyExist(Exception):
     pass
-
 
 
 def build_session(loaders):
@@ -54,24 +52,27 @@ def build_session(loaders):
     s.mount('http://', HTTPAdapter(max_retries=retries))
     return s
 
+
 session = build_session(loaders=loaders)
+
 
 class SchedulerDoesNotExist(Exception):
     pass
 
+
 class LocalTimeSeriesDoesNotExist(Exception):
     pass
 
+
 class DynamicTableDoesNotExist(Exception):
     pass
+
 
 class SourceTableConfigurationDoesNotExist(Exception):
     pass
 
 
-
-
-class ColumnMetaData(BasePydanticModel,BaseObjectOrm):
+class ColumnMetaData(BasePydanticModel, BaseObjectOrm):
     source_config_id: int = Field(
         ...,
         alias="source_config",
@@ -97,6 +98,7 @@ class ColumnMetaData(BasePydanticModel,BaseObjectOrm):
         description="Longer description of the column"
     )
 
+
 class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
     id: Optional[int] = Field(None, description="Primary key, auto-incremented ID")
     related_table: Union[int, "DynamicTableMetaData"]
@@ -111,11 +113,10 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
 
     table_partition: Dict[str, Any] = Field(..., description="Table partition settings")
     open_for_everyone: bool = Field(default=False, description="Whether the table configuration is open for everyone")
-    columns_metadata:Optional[List[ColumnMetaData]]=None
+    columns_metadata: Optional[List[ColumnMetaData]] = None
 
-    #todo remove
-    column_index_names: Optional[list]=[None]
-
+    # todo remove
+    column_index_names: Optional[list] = [None]
 
     def get_data_updates(self):
         max_per_asset = None
@@ -125,20 +126,22 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
         r = make_request(s=s, loaders=self.LOADERS, r_type="GET", url=url, accept_gzip=True)
         if r.status_code != 200:
             raise Exception(r.text)
-        data=r.json()
-        multi_index_stats=data["multi_index_stats"]
-        multi_index_column_stats=data["multi_index_column_stats"]
+        data = r.json()
+        multi_index_stats = data["multi_index_stats"]
+        multi_index_column_stats = data["multi_index_column_stats"]
+        max_time_index_value = self.last_time_index_value
         if multi_index_stats is not None:
             max_per_asset = multi_index_stats["max_per_asset_symbol"]
             max_per_asset = {k: request_to_datetime(v) for k, v in max_per_asset.items()}
+            max_time_index_value = np.max(list(max_per_asset.values()))
 
         du = UpdateStatistics(
-            max_time_index_value=self.last_time_index_value,
+            max_time_index_value=max_time_index_value,
             asset_time_statistics=max_per_asset,
             multi_index_column_stats=multi_index_column_stats
         )
 
-        du._max_time_in_update_statistics = self.last_time_index_value
+        du._max_time_in_update_statistics = max_time_index_value
         return du
 
     def get_time_scale_extra_table_indices(self) -> dict:
@@ -149,7 +152,7 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
             raise Exception(r.text)
         return r.json()
 
-    def set_or_update_columns_metadata(self,columns_metadata:List[ColumnMetaData],
+    def set_or_update_columns_metadata(self, columns_metadata: List[ColumnMetaData],
                                        timeout=None) -> None:
         """
         """
@@ -162,8 +165,8 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
         s = self.build_session()
         r = make_request(s=s, loaders=self.LOADERS, r_type="POST",
                          time_out=timeout,
-                         url=url,payload={"json": {"columns_metadata":columns_metadata}} )
-        if r.status_code not in [ 200,201]:
+                         url=url, payload={"json": {"columns_metadata": columns_metadata}})
+        if r.status_code not in [200, 201]:
             raise Exception(r.text)
         return r.json()
 
@@ -175,11 +178,12 @@ class SourceTableConfiguration(BasePydanticModel, BaseObjectOrm):
             id = self.related_table.id
         return self.__class__.patch_by_id(id, *args, **kwargs)
 
+
 class ColumnMetaData(BasePydanticModel):
     source_config_id: Optional[int] = Field(None, description="FK to SourceTableConfiguration")
-    column_name:str=  Field(...,max_length=63, description="Name of the column")
-    dtype:   str=Field(..., max_length=100,description="Data type of the column")
-    label:  str=Field(..., max_length=255,description="Human-readable label")
+    column_name: str = Field(..., max_length=63, description="Name of the column")
+    dtype: str = Field(..., max_length=100, description="Data type of the column")
+    label: str = Field(..., max_length=255, description="Human-readable label")
     description: str = Field(..., description="Detailed description")
 
 
@@ -192,8 +196,8 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     ogm_dependencies_linked: bool = Field(default=False, description="OGM dependencies linked flag")
     tags: Optional[list[str]] = Field(default=[], description="List of tags")
     description: Optional[str] = Field(None, description="Optional HTML description")
-    localtimeserieupdatedetails: Optional[Union["LocalTimeSerieUpdateDetails",int]] = None
-    run_configuration: Optional["RunConfiguration"]=None
+    localtimeserieupdatedetails: Optional[Union["LocalTimeSerieUpdateDetails", int]] = None
+    run_configuration: Optional["RunConfiguration"] = None
     open_for_everyone: bool = Field(default=False, description="Whether the ts is open for everyone")
 
     @property
@@ -229,8 +233,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         if r.status_code != 200:
             raise Exception(f"Error in request {r.json()}")
         return r.json()
-
-
 
     @classmethod
     def filter_by_hash_id(cls, local_hash_id_list: list, timeout=None):
@@ -269,8 +271,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                 result['asset_time_statistics']
             )
 
-
-
         hu = LocalTimeSeriesHistoricalUpdate(
             **result["historical_update"],
             update_statistics=UpdateStatistics(
@@ -286,7 +286,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     def set_end_of_execution(
             self,
             historical_update_id: int,
-            timeout=None,threaded_request=True,
+            timeout=None, threaded_request=True,
             **kwargs
     ):
         s = self.build_session()
@@ -350,13 +350,12 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         s = self.build_session()
         url = self.get_object_url() + f"/{self.id}/set_last_update_index_time_from_update_stats/"
 
-
-        data_to_comp={
-                "last_time_index_value": last_time_index_value,
-                "max_per_asset_symbol": max_per_asset_symbol,
-                "multi_index_column_stats":multi_index_column_stats,
-            }
-        chunk_json_str=json.dumps(data_to_comp)
+        data_to_comp = {
+            "last_time_index_value": last_time_index_value,
+            "max_per_asset_symbol": max_per_asset_symbol,
+            "multi_index_column_stats": multi_index_column_stats,
+        }
+        chunk_json_str = json.dumps(data_to_comp)
         compressed = gzip.compress(chunk_json_str.encode('utf-8'))
         compressed_b64 = base64.b64encode(compressed).decode('utf-8')
         payload = dict(json={
@@ -385,7 +384,8 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
     @classmethod
     def get_mermaid_dependency_diagram(cls, update_hash, data_source_id, desc=True, timeout=None) -> dict:
         s = cls.build_session()
-        url = cls.get_object_url("DataNode") + f"/{update_hash}/dependencies_graph_mermaid?desc={desc}&data_source_id={data_source_id}"
+        url = cls.get_object_url(
+            "DataNode") + f"/{update_hash}/dependencies_graph_mermaid?desc={desc}&data_source_id={data_source_id}"
         r = make_request(s=s, loaders=cls.LOADERS, r_type="GET", url=url,
                          time_out=timeout)
         if r.status_code != 200:
@@ -425,7 +425,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         instance = cls(**r.json())
         return instance
 
-
     def verify_if_direct_dependencies_are_updated(self) -> dict:
         """
         Response({
@@ -442,20 +441,18 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
     def get_data_between_dates_from_api(
             self,
-           *args,**kwargs
+            *args, **kwargs
     ):
 
-        return self.remote_table.get_data_between_dates_from_api(  *args,**kwargs)
-
-
+        return self.remote_table.get_data_between_dates_from_api(*args, **kwargs)
 
     @classmethod
-    def insert_data_into_table(cls,local_metadata_id,records:List[dict],
-                               overwrite=True,add_insertion_time=False):
+    def insert_data_into_table(cls, local_metadata_id, records: List[dict],
+                               overwrite=True, add_insertion_time=False):
         s = cls.build_session()
         url = cls.get_object_url() + f"/{local_metadata_id}/insert_data_into_table/"
 
-        chunk_json_str=json.dumps(records)
+        chunk_json_str = json.dumps(records)
         compressed = gzip.compress(chunk_json_str.encode('utf-8'))
         compressed_b64 = base64.b64encode(compressed).decode('utf-8')
 
@@ -497,7 +494,8 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         s = cls.build_session()
         url = cls.get_object_url() + f"/{local_metadata.id}/insert_data_into_table/"
 
-        def _send_chunk_recursively(df_chunk: pd.DataFrame, chunk_idx: int, total_chunks: int, is_sub_chunk: bool = False):
+        def _send_chunk_recursively(df_chunk: pd.DataFrame, chunk_idx: int, total_chunks: int,
+                                    is_sub_chunk: bool = False):
             """
             Internal helper to send a chunk. If it receives a 413 error, it splits
             the chunk and calls itself on the two halves.
@@ -537,7 +535,8 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                         f"Splitting in half and retrying as new uploads."
                     )
                     if len(df_chunk) <= 1:
-                        logger.error(f"A single row is too large to upload (from chunk {part_label}). Cannot split further.")
+                        logger.error(
+                            f"A single row is too large to upload (from chunk {part_label}). Cannot split further.")
                         raise Exception(f"A single row from chunk {part_label} is too large to upload.")
 
                     mid_point = len(df_chunk) // 2
@@ -598,28 +597,27 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
         if r.status_code != 200:
             raise Exception(f"Error in request {r.text}")
         r = r.json()
-        r["source_table_config_map"] = {int(k): SourceTableConfiguration(**v) if v is not None else v for k, v in r["source_table_config_map"].items()}
+        r["source_table_config_map"] = {int(k): SourceTableConfiguration(**v) if v is not None else v for k, v in
+                                        r["source_table_config_map"].items()}
         r["state_data"] = {int(k): LocalTimeSerieUpdateDetails(**v) for k, v in r["state_data"].items()}
         r["all_index_stats"] = {int(k): v for k, v in r["all_index_stats"].items()}
         r["local_metadatas"] = [LocalTimeSerie(**v) for v in r["local_metadatas"]]
         return r
 
-
-
     def depends_on_connect(self, target_time_serie_id
-                         ):
+                           ):
 
         url = self.get_object_url() + f"/{self.id}/depends_on_connect/"
         s = self.build_session()
         payload = dict(json={
-                             "target_time_serie_id": target_time_serie_id,
-                             })
+            "target_time_serie_id": target_time_serie_id,
+        })
         r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload)
         if r.status_code != 204:
             raise Exception(f"Error in request {r.text}")
 
     def depends_on_connect_to_api_table(self, target_table_id,
-                           timeout=None):
+                                        timeout=None):
 
         url = self.get_object_url() + f"/{self.id}/depends_on_connect_to_api_table/"
         s = self.build_session()
@@ -631,8 +629,6 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
                          payload=payload)
         if r.status_code != 204:
             raise Exception(f"Error in request {r.text}")
-
-
 
     @classmethod
     def _break_pandas_dataframe(cls, data_frame: pd.DataFrame, time_index_name: Union[str, None] = None):
@@ -653,18 +649,18 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
 
         data_frame = data_frame.replace({np.nan: None})
 
-        return data_frame,  index_names, column_dtypes_map, time_index_name
+        return data_frame, index_names, column_dtypes_map, time_index_name
 
     def upsert_data_into_table(
-                               self,
-                               data: pd.DataFrame,
-                               data_source: "DynamicTableDataSource",
-                               ):
+            self,
+            data: pd.DataFrame,
+            data_source: "DynamicTableDataSource",
+    ):
 
         overwrite = True  # ALWAYS OVERWRITE
         metadata = self.remote_table
 
-        data,  index_names, column_dtypes_map, time_index_name = self._break_pandas_dataframe(
+        data, index_names, column_dtypes_map, time_index_name = self._break_pandas_dataframe(
             data)
 
         # overwrite data origina data frame to release memory
@@ -688,11 +684,10 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             index_names=index_names,
             time_index_name=time_index_name
         )
-        multi_index_column_stats={}
-        column_names= [c for c in data.columns if c not in index_names]
+        multi_index_column_stats = {}
+        column_names = [c for c in data.columns if c not in index_names]
         for c in column_names:
-            multi_index_column_stats[c]=global_stats["_PER_ASSET_"]
-
+            multi_index_column_stats[c] = global_stats["_PER_ASSET_"]
 
         data_source.insert_data_into_table(
             serialized_data_frame=data,
@@ -734,7 +729,7 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             time_to_wait = max(0, time_to_wait)
         return time_to_wait, next_update
 
-    def wait_for_update_time(self,):
+    def wait_for_update_time(self, ):
         time_to_wait, next_update = self.get_node_time_to_wait()
         if time_to_wait > 0:
 
@@ -746,12 +741,11 @@ class LocalTimeSerie(BasePydanticModel, BaseObjectOrm):
             time.sleep(time_to_wait)
 
 
-
-
 class TableMetaData(BaseModel):
     identifier: str = None
     description: Optional[str] = None
     data_frequency_id: Optional[DataFrequency] = None
+
 
 class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     id: int = Field(None, description="Primary key, auto-incremented ID")
@@ -772,18 +766,16 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
     data_source: Union[int, "DynamicTableDataSource"]
     source_class_name: str
     sourcetableconfiguration: Optional[SourceTableConfiguration] = None
-    table_index_names:Optional[Dict] = None
+    table_index_names: Optional[Dict] = None
 
-    #TS specifi
+    # TS specifi
     compression_policy_config: Optional[Dict] = None
     retention_policy_config: Optional[Dict] = None
 
-    #MetaData
+    # MetaData
     identifier: Optional[str] = None
-    description: Optional[str] =None
+    description: Optional[str] = None
     data_frequency_id: Optional[DataFrequency] = None
-
-
 
     _drop_indices: bool = False  # for direct incertion we can pass this values
     _rebuild_indices: bool = False  # for direct incertion we can pass this values
@@ -823,7 +815,6 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
         if r.status_code != 202:
             raise Exception(f"Error in request {r.text}")
 
-
     @classmethod
     def patch_build_configuration(
             cls,
@@ -831,7 +822,7 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
             build_meta_data: dict,
             data_source_id: int,
             local_table_patch: dict,
-    ) :
+    ):
 
         logger.warning("TODO Fix Patch Build Configuration")
         # url = cls.get_object_url() + "/patch_build_configuration"
@@ -859,12 +850,12 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
 
     def handle_source_table_configuration_creation(self,
 
-                                           column_dtypes_map:dict,
-                                           index_names:List[str],
-                                           time_index_name,
-                                           data,
-                                           overwrite=False
-                                           ):
+                                                   column_dtypes_map: dict,
+                                                   index_names: List[str],
+                                                   time_index_name,
+                                                   data,
+                                                   overwrite=False
+                                                   ):
         """
         Handles the creation or retrieval of the source table configuration.
 
@@ -908,16 +899,17 @@ class DynamicTableMetaData(BasePydanticModel, BaseObjectOrm):
 
     def get_data_between_dates_from_api(
             self,
-            start_date: datetime.datetime=None,
-            end_date: datetime.datetime=None,
-            great_or_equal: bool=None,
-            less_or_equal: bool=None,
-            unique_identifier_list: list=None,
-            columns: list=None,
-            unique_identifier_range_map: Union[None, UniqueIdentifierRangeMap]=None,
-            column_range_descriptor: Union[None, UniqueIdentifierRangeMap]=None
-        ):
+            start_date: datetime.datetime = None,
+            end_date: datetime.datetime = None,
+            great_or_equal: bool = None,
+            less_or_equal: bool = None,
+            unique_identifier_list: list = None,
+            columns: list = None,
+            unique_identifier_range_map: Union[None, UniqueIdentifierRangeMap] = None,
+            column_range_descriptor: Union[None, UniqueIdentifierRangeMap] = None
+    ):
         """ Helper function to make a single batch request (or multiple paged requests if next_offset). """
+
         def fetch_one_batch(chunk_range_map):
             all_results_chunk = []
             offset = 0
@@ -1083,7 +1075,7 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
         r = make_request(s=s, r_type="POST", url=url, payload=payload,
                          time_out=timeout,
                          loaders=cls.LOADERS)
-        if r.status_code not in [200,201]:
+        if r.status_code not in [200, 201]:
             r.raise_for_status()
         return cls(**r.json())
 
@@ -1187,7 +1179,6 @@ class Scheduler(BasePydanticModel, BaseObjectOrm):
         logger.info("Heartbeat thread stopped.")
 
 
-
 class RunConfiguration(BasePydanticModel, BaseObjectOrm):
     local_time_serie_update_details: Optional[int] = None
     retry_on_error: int = 0
@@ -1202,6 +1193,7 @@ class RunConfiguration(BasePydanticModel, BaseObjectOrm):
     def ROOT_URL(cls):
         return None
 
+
 class LocalTimeSerieUpdateDetails(BasePydanticModel, BaseObjectOrm):
     related_table: Union[int, LocalTimeSerie]
     active_update: bool = Field(default=False, description="Flag to indicate if update is active")
@@ -1212,12 +1204,12 @@ class LocalTimeSerieUpdateDetails(BasePydanticModel, BaseObjectOrm):
     next_update: Optional[datetime.datetime] = Field(None, description="Timestamp of the next update")
     update_statistics: Optional[Dict[str, Any]] = Field(None, description="JSON field for update statistics")
     active_update_status: str = Field(default="Q", max_length=20, description="Current update status")
-    active_update_scheduler: Optional[Union[int,Scheduler]] = Field(None,
-                                                       description="Scheduler  for active update")
+    active_update_scheduler: Optional[Union[int, Scheduler]] = Field(None,
+                                                                     description="Scheduler  for active update")
     update_priority: int = Field(default=0, description="Priority level of the update")
     last_updated_by_user: Optional[int] = Field(None, description="Foreign key reference to User")
 
-    run_configuration: Optional["RunConfiguration"]=None
+    run_configuration: Optional["RunConfiguration"] = None
 
     @staticmethod
     def _parse_parameters_filter(parameters):
@@ -1227,20 +1219,21 @@ class LocalTimeSerieUpdateDetails(BasePydanticModel, BaseObjectOrm):
                 parameters[key] = ",".join(value)
         return parameters
 
+
 class UpdateStatistics(BaseModel):
     """
     This class contains the  update details of the table in the main sequence engine
     """
-    asset_time_statistics: Optional[Dict[str, Union[datetime.datetime, None,Dict]]] = None
+    asset_time_statistics: Optional[Dict[str, Union[datetime.datetime, None, Dict]]] = None
 
     max_time_index_value: Optional[datetime.datetime] = None  # does not include fitler
     asset_list: Optional[List] = None
-    limit_update_time: Optional[datetime.datetime] = None # flag to limit the update of data node
+    limit_update_time: Optional[datetime.datetime] = None  # flag to limit the update of data node
     _max_time_in_update_statistics: Optional[datetime.datetime] = None  # include filter
     _initial_fallback_date: Optional[datetime.datetime] = None
 
-    #when working with DuckDb and column based storage we want to have also stats by  column
-    multi_index_column_stats: Optional[Dict[str, Dict[str,Dict[str,datetime.datetime]]]] = None
+    # when working with DuckDb and column based storage we want to have also stats by  column
+    multi_index_column_stats: Optional[Dict[str, Dict[str, Dict[str, datetime.datetime]]]] = None
     is_backfill: bool = False
 
     class Config:
@@ -1260,16 +1253,17 @@ class UpdateStatistics(BaseModel):
                 return value
 
         if isinstance(value, datetime.datetime):
-            return value.astimezone(datetime.timezone.utc) if value.tzinfo else value.replace(tzinfo=datetime.timezone.utc)
+            return value.astimezone(datetime.timezone.utc) if value.tzinfo else value.replace(
+                tzinfo=datetime.timezone.utc)
 
         if isinstance(value, (int, float)):
             v = float(value)
             # seconds / ms / µs / ns heuristics by magnitude
-            if v > 1e17:   # ns
+            if v > 1e17:  # ns
                 v /= 1e9
-            elif v > 1e14: # µs
+            elif v > 1e14:  # µs
                 v /= 1e6
-            elif v > 1e11: # ms
+            elif v > 1e11:  # ms
                 v /= 1e3
             return datetime.datetime.fromtimestamp(v, tz=datetime.timezone.utc)
 
@@ -1326,30 +1320,29 @@ class UpdateStatistics(BaseModel):
     def is_empty(self):
         return self.asset_time_statistics is None and self.max_time_index_value is None
 
-
     def asset_identifier(self):
         return list(self.asset_time_statistics.keys())
 
     def get_max_time_in_update_statistics(self):
-        if hasattr(self, "_max_time_in_update_statistics")==False:
+        if hasattr(self, "_max_time_in_update_statistics") == False:
             self._max_time_in_update_statistics = self.max_time_index_value or self._initial_fallback_date
         if self._max_time_in_update_statistics is None and self.asset_time_statistics is not None:
             new_update_statistics, _max_time_in_asset_time_statistics = self._get_update_statistics(
 
-                asset_list=None,unique_identifier_list=None
-                )
-            self._max_time_in_update_statistics=_max_time_in_asset_time_statistics
+                asset_list=None, unique_identifier_list=None
+            )
+            self._max_time_in_update_statistics = _max_time_in_asset_time_statistics
 
         return self._max_time_in_update_statistics
 
-    def get_update_range_map_great_or_equal_columnar(self,extra_time_delta:Optional[datetime.timedelta] = None,
-                                                     column_filter:Optional[List[str]] = None,
+    def get_update_range_map_great_or_equal_columnar(self, extra_time_delta: Optional[datetime.timedelta] = None,
+                                                     column_filter: Optional[List[str]] = None,
                                                      ):
-        fallback={c:{a.unique_identifier:{"min":self._initial_fallback_date,
-                                                                                           "max":self._initial_fallback_date,
-                                                                                           }  for a in self.asset_list} for c in column_filter}
+        fallback = {c: {a.unique_identifier: {"min": self._initial_fallback_date,
+                                              "max": self._initial_fallback_date,
+                                              } for a in self.asset_list} for c in column_filter}
 
-        multi_index_column_stats=self.multi_index_column_stats or {}
+        multi_index_column_stats = self.multi_index_column_stats or {}
         fallback.update(multi_index_column_stats)
 
         def _start_dt(bounds):
@@ -1358,8 +1351,7 @@ class UpdateStatistics(BaseModel):
                 dt = dt + extra_time_delta
             return dt
 
-
-        target_cols= fallback.keys() if column_filter is None else column_filter
+        target_cols = fallback.keys() if column_filter is None else column_filter
 
         range_map = {
             col: {
@@ -1372,27 +1364,25 @@ class UpdateStatistics(BaseModel):
             for col, col_stats in fallback.items() if col in column_filter
         }
 
-
-
         return range_map
 
     def get_update_range_map_great_or_equal(self,
-                                            extra_time_delta:Optional[datetime.timedelta] = None,
+                                            extra_time_delta: Optional[datetime.timedelta] = None,
                                             ):
 
-
-
         if extra_time_delta is None:
-            range_map={k:DateInfo({"start_date_operand":">=","start_date":v or self._initial_fallback_date}) for k,v in self.asset_time_statistics.items()}
+            range_map = {k: DateInfo({"start_date_operand": ">=", "start_date": v or self._initial_fallback_date}) for
+                         k, v in self.asset_time_statistics.items()}
         else:
-            range_map = {k: DateInfo({"start_date_operand": ">=", "start_date": (v or self._initial_fallback_date)+extra_time_delta}) for
+            range_map = {k: DateInfo(
+                {"start_date_operand": ">=", "start_date": (v or self._initial_fallback_date) + extra_time_delta}) for
                          k, v in self.asset_time_statistics.items()}
         return range_map
 
-    def get_last_update_index_2d(self,uid):
+    def get_last_update_index_2d(self, uid):
         return self.asset_time_statistics[uid] or self._initial_fallback_date
 
-    def get_asset_earliest_multiindex_update(self,asset):
+    def get_asset_earliest_multiindex_update(self, asset):
         stats = self.asset_time_statistics.get(asset.unique_identifier)
         if not stats:
             return self._initial_fallback_date
@@ -1411,11 +1401,10 @@ class UpdateStatistics(BaseModel):
 
         return _min_in_nested(stats)
 
-
     def filter_assets_by_level(self,
-                               level:int,
-                               filters:List,
-                              ):
+                               level: int,
+                               filters: List,
+                               ):
         """
           Prune `self.asset_time_statistics` so that at the specified index level
           only the given keys remain.  Works for any depth of nesting.
@@ -1436,11 +1425,9 @@ class UpdateStatistics(BaseModel):
           """
         # Grab the full list of index names, in order
 
-
-
         # Determine the numeric depth of the target level
         #   0 == unique_identifier, 1 == first nested level, etc.
-        target_depth = level-1
+        target_depth = level - 1
 
         # Special‐case: filtering on unique_identifier itself
         if target_depth == 0:
@@ -1486,7 +1473,7 @@ class UpdateStatistics(BaseModel):
         # stats dict sits at depth=1 under each asset
         for asset, stats in self.asset_time_statistics.items():
             if stats is None:
-                new_stats[asset] = {f:self._initial_fallback_date for f in allowed}
+                new_stats[asset] = {f: self._initial_fallback_date for f in allowed}
             else:
                 pr = _prune(stats, current_depth=1)
                 new_stats[asset] = pr or None
@@ -1494,15 +1481,13 @@ class UpdateStatistics(BaseModel):
         self.asset_time_statistics = new_stats
         return self
 
-
-
     def _get_update_statistics(self,
-                               asset_list:Optional[List],
+                               asset_list: Optional[List],
                                unique_identifier_list: Union[list, None]):
         new_update_statistics = {}
         if asset_list is None and unique_identifier_list is None:
             assert self.asset_time_statistics is not None
-            unique_identifier_list=list(self.asset_time_statistics.keys())
+            unique_identifier_list = list(self.asset_time_statistics.keys())
 
         else:
             unique_identifier_list = [a.unique_identifier for a in
@@ -1547,16 +1532,18 @@ class UpdateStatistics(BaseModel):
         self.asset_list = asset_list
         new_update_statistics = self.asset_time_statistics
         if asset_list is not None or unique_identifier_list is not None:
-            new_update_statistics,_max_time_in_asset_time_statistics=self._get_update_statistics(unique_identifier_list=unique_identifier_list,
-                                                                                                 asset_list=asset_list,
-                                                                                                 )
+            new_update_statistics, _max_time_in_asset_time_statistics = self._get_update_statistics(
+                unique_identifier_list=unique_identifier_list,
+                asset_list=asset_list,
+                )
 
         else:
             _max_time_in_asset_time_statistics = self.max_time_index_value or init_fallback_date
 
-        new_multi_index_column_stats=self.multi_index_column_stats
+        new_multi_index_column_stats = self.multi_index_column_stats
         if self.max_time_index_value is not None and self.multi_index_column_stats is not None:
-            new_multi_index_column_stats={k:v for k,v in self.multi_index_column_stats.items() if k in new_update_statistics.keys() }
+            new_multi_index_column_stats = {k: v for k, v in self.multi_index_column_stats.items() if
+                                            k in new_update_statistics.keys()}
 
         du = UpdateStatistics(
             asset_time_statistics=new_update_statistics,
@@ -1565,7 +1552,7 @@ class UpdateStatistics(BaseModel):
             multi_index_column_stats=new_multi_index_column_stats
         )
         du._max_time_in_update_statistics = _max_time_in_asset_time_statistics
-        du._initial_fallback_date=init_fallback_date
+        du._initial_fallback_date = init_fallback_date
         return du
 
     def is_empty(self):
@@ -1678,7 +1665,7 @@ def get_chunk_stats(chunk_df, time_index_name, index_names):
             "min": chunk_df[time_index_name].min().timestamp()
         }
     }
-    chunk_stats["_PER_ASSET_"]={}
+    chunk_stats["_PER_ASSET_"] = {}
     grouped_dates = None
     if len(index_names) > 1:
         grouped_dates = chunk_df.groupby(index_names[1:])[
@@ -1716,6 +1703,7 @@ def get_chunk_stats(chunk_df, time_index_name, index_names):
         chunk_stats["_PER_ASSET_"] = per_asset
     return chunk_stats, grouped_dates
 
+
 class LocalTimeSeriesHistoricalUpdate(BasePydanticModel, BaseObjectOrm):
     id: Optional[int] = None
     related_table: int  # Assuming you're using the ID of the related table
@@ -1731,6 +1719,7 @@ class LocalTimeSeriesHistoricalUpdate(BasePydanticModel, BaseObjectOrm):
     update_statistics: Optional[UpdateStatistics]
     must_update: Optional[bool]
     direct_dependencies_ids: Optional[List[int]]
+
 
 class DataSource(BasePydanticModel, BaseObjectOrm):
     id: Optional[int] = Field(None, description="The unique identifier of the Local Disk Source Lake")
@@ -1805,16 +1794,15 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             columns: Optional[List[str]] = None,
             unique_identifier_list: Optional[List[str]] = None,
             unique_identifier_range_map: Optional[UniqueIdentifierRangeMap] = None,
-            column_range_descriptor: Optional[Dict[str,UniqueIdentifierRangeMap]] = None,
+            column_range_descriptor: Optional[Dict[str, UniqueIdentifierRangeMap]] = None,
     ) -> pd.DataFrame:
-        
-        
+
         logger.warning("EXTEND THE CONSTRAIN READ HERE!!")
         if self.class_type == DUCK_DB:
             db_interface = DuckDBInterface()
             table_name = local_metadata.remote_table.table_name
 
-            adjusted_start, adjusted_end, adjusted_uirm,_ = db_interface.constrain_read(
+            adjusted_start, adjusted_end, adjusted_uirm, _ = db_interface.constrain_read(
                 table=table_name,
                 start=start_date,
                 end=end_date,
@@ -1822,10 +1810,11 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
                 unique_identifier_range_map=unique_identifier_range_map,
             )
             if unique_identifier_range_map is not None and adjusted_end is not None:
-                adjusted_end=datetime.datetime(adjusted_end.year,adjusted_end.month,adjusted_end.day,tzinfo=datetime.timezone.utc)
+                adjusted_end = datetime.datetime(adjusted_end.year, adjusted_end.month, adjusted_end.day,
+                                                 tzinfo=datetime.timezone.utc)
                 for v in unique_identifier_range_map.values():
-                    v["end_date"]=adjusted_end
-                    v["end_date_operand"]="<="
+                    v["end_date"] = adjusted_end
+                    v["end_date_operand"] = "<="
 
             df = db_interface.read(
                 table=table_name,
@@ -1835,7 +1824,7 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
                 less_or_equal=less_or_equal,
                 ids=unique_identifier_list,
                 columns=columns,
-                unique_identifier_range_map=unique_identifier_range_map, # Pass range map
+                unique_identifier_range_map=unique_identifier_range_map,  # Pass range map
             )
 
 
@@ -1862,7 +1851,7 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             df[stc.time_index_name] = pd.to_datetime(df[stc.time_index_name], format='ISO8601')
         except Exception as e:
             raise e
-        columns_to_loop=columns or stc.column_dtypes_map.keys()
+        columns_to_loop = columns or stc.column_dtypes_map.keys()
         for c, c_type in stc.column_dtypes_map.items():
             if c not in columns_to_loop:
                 continue
@@ -1873,10 +1862,9 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
         df = df.set_index(stc.index_names)
         return df
 
-
     def get_earliest_value(self,
                            local_metadata: LocalTimeSerie,
-                           )->Tuple[Optional[pd.Timestamp], Dict[Any, Optional[pd.Timestamp]]]:
+                           ) -> Tuple[Optional[pd.Timestamp], Dict[Any, Optional[pd.Timestamp]]]:
         if self.class_type == DUCK_DB:
             db_interface = DuckDBInterface()
             table_name = local_metadata.remote_table.table_name
@@ -1965,11 +1953,12 @@ class DynamicTableDataSource(BasePydanticModel, BaseObjectOrm):
         else:
             self.related_resource.insert_data_into_table(*args, **kwargs)
 
+
 class Project(BasePydanticModel, BaseObjectOrm):
     id: int
     project_name: str
     data_source: DynamicTableDataSource
-    git_ssh_url:Optional[str]=None
+    git_ssh_url: Optional[str] = None
 
     @classmethod
     def get_user_default_project(cls):
@@ -1989,6 +1978,7 @@ class Project(BasePydanticModel, BaseObjectOrm):
             sort_keys=False,
             default_flow_style=False,
         )
+
 
 class TimeScaleDB(DataSource):
     database_user: str
@@ -2095,16 +2085,17 @@ class TimeScaleDB(DataSource):
 
 
 class DynamicResource(BasePydanticModel, BaseObjectOrm):
-    id:Optional[int]=None
+    id: Optional[int] = None
     name: str
     type: str
-    object_signature : dict
+    object_signature: dict
     attributes: Optional[dict]
 
-    created_at:datetime.datetime
-    updated_at:datetime.datetime
-    is_production:bool
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    is_production: bool
     pod: int
+
 
 def create_configuration_for_strategy(json_payload: dict, timeout=None):
     url = TDAG_ENDPOINT + "/orm/api/tdag-gpt/create_configuration_for_strategy/"
@@ -2132,7 +2123,8 @@ def query_agent(json_payload: dict, timeout=None):
     return r
 
 
-def add_created_object_to_jobrun(model_name: str, app_label: str, object_id: int, timeout: Optional[int] = None) -> dict:
+def add_created_object_to_jobrun(model_name: str, app_label: str, object_id: int,
+                                 timeout: Optional[int] = None) -> dict:
     """
     Logs a new object that was created by this JobRun instance.
 
@@ -2174,9 +2166,16 @@ class Artifact(BasePydanticModel, BaseObjectOrm):
     bucket_name: str
     content: Any
 
-    @staticmethod
-    def upload_file(filepath, name, created_by_resource_name, bucket_name=None):
+    @classmethod
+    def upload_file(cls, filepath, name, created_by_resource_name, bucket_name=None):
+        bucket_name if bucket_name else "default_bucket"
+        return cls.get_or_create(filepath=filepath, name=name, created_by_resource_name=created_by_resource_name,
+                                 bucket_name=bucket_name)
 
+    @classmethod
+    def get_or_create(cls, filepath, name, created_by_resource_name, bucket_name):
+        url = cls.get_object_url() + "/get_or_create/"
+        s = cls.build_session()
         with open(filepath, "rb") as f:
             data = {
                 "name": name,
@@ -2184,11 +2183,16 @@ class Artifact(BasePydanticModel, BaseObjectOrm):
                 "bucket_name": bucket_name if bucket_name else "default_bucket",
             }
             files = {"content": (str(filepath), f, "application/pdf")}
-            artifact = Artifact.create(files=files, **data)
-            return artifact
+            payload = {
+                "json": data,
+                "files": files
+            }
+            r = make_request(s=s, loaders=cls.LOADERS, r_type="POST", url=url, payload=payload)
 
+            if r.status_code not in [200, 201]:
+                raise Exception(f"Failed to get artifact: {r.status_code} - {r.text}")
 
-
+            return cls(**r.json())
 
 
 try:
@@ -2197,6 +2201,7 @@ except Exception as e:
     POD_PROJECT = None
     logger.exception(f"Could not retrive pod project {e}")
     raise e
+
 
 class PodDataSource:
     def set_remote_db(self):
@@ -2217,7 +2222,7 @@ class PodDataSource:
 
     @property
     def is_local_duck_db(self):
-        return SessionDataSource.data_source.related_resource.class_type==DUCK_DB
+        return SessionDataSource.data_source.related_resource.class_type == DUCK_DB
 
     def set_local_db(self):
         data_source = self._get_duck_db()
@@ -2231,7 +2236,7 @@ class PodDataSource:
         remote_table_names = [t.table_name for t in remote_tables]
         from mainsequence.client.data_sources_interfaces.duckdb import DuckDBInterface
         from mainsequence.client.utils import DataFrequency
-        db_interface=DuckDBInterface()
+        db_interface = DuckDBInterface()
         local_table_names = db_interface.list_tables()
 
         tables_to_delete_locally = set(local_table_names) - set(remote_table_names)
@@ -2265,6 +2270,7 @@ class PodDataSource:
 
     def __repr__(self):
         return f"{self.data_source.related_resource}"
+
 
 SessionDataSource = PodDataSource()
 SessionDataSource.set_remote_db()

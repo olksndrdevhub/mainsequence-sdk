@@ -104,14 +104,14 @@ class ETFReplicatorApp(HtmlApp):
         self.add_output(output=portfolio.target_portfolio)
 
         # Fetch Portfolio Results in batches to avoid timeouts
-        loop_start_date = portfolio.portfolio_strategy_time_serie.OFFSET_START
+        loop_start_date = portfolio.portfolio_strategy_data_node.OFFSET_START
         final_end_date = datetime.datetime.now(datetime.timezone.utc)
         all_results = []
         current_start = loop_start_date
         while current_start < final_end_date:
             current_end = current_start + pd.DateOffset(months=6)
             logger.info(f"Fetching data from {current_start.date()} to {min(current_end, final_end_date).date()}")
-            results_chunk = portfolio.portfolio_strategy_time_serie.get_df_between_dates(start_date=current_start, end_date=current_end)
+            results_chunk = portfolio.portfolio_strategy_data_node.get_df_between_dates(start_date=current_start, end_date=current_end)
             all_results.append(results_chunk)
             current_start = current_end
 
@@ -120,7 +120,7 @@ class ETFReplicatorApp(HtmlApp):
             return "<html><body><h1>No data available to generate ETF replication report.</h1></body></html>"
 
         # Fetch and Process Data for Plotting
-        etf_replicator_signal = portfolio.portfolio_strategy_time_serie.signal_weights
+        etf_replicator_signal = portfolio.portfolio_strategy_data_node.signal_weights
         etf_asset = etf_replicator_signal.etf_asset
         etf_data = etf_replicator_signal.etf_bars_ts.get_df_between_dates(
             start_date=results.index.min(),

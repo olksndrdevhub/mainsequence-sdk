@@ -6,28 +6,84 @@ from typing import Any, Callable, Mapping, MutableMapping, Optional, Tuple, Unio
 import streamlit as st
 
 from mainsequence.dashboards.streamlit.core.registry import get_page, list_pages
-from mainsequence.dashboards.streamlit.core.theme import inject_css_for_dark_accents
+from mainsequence.dashboards.streamlit.core.theme import inject_css_for_dark_accents, override_spinners
 from importlib.resources import files as _pkg_files
+
+import os
+
+def _detect_app_dir() -> Path:
+    """
+    Best-effort detection of the directory that contains the running Streamlit app.
+    Priority:
+      1) sys.modules['__main__'].__file__ (how Streamlit executes scripts)
+      2) Streamlit script run context (main_script_path) if available
+      3) env override MS_APP_DIR / STREAMLIT_APP_DIR
+      4) fallback: Path.cwd()
+    """
+    # 1) __main__.__file__
+    try:
+        main_mod = sys.modules.get("__main__")
+        if main_mod and getattr(main_mod, "__file__", None):
+            return Path(main_mod.__file__).resolve().parent
+    except Exception:
+        pass
+
+    # 2) Streamlit runtime (private API; guarded)
+    try:
+        from streamlit.runtime.scriptrunner.script_run_context import get_script_run_ctx
+        ctx = get_script_run_ctx()
+        if ctx and getattr(ctx, "main_script_path", None):
+            return Path(ctx.main_script_path).resolve().parent
+    except Exception:
+        pass
+
+    # 3) env override
+    for var in ("MS_APP_DIR", "STREAMLIT_APP_DIR"):
+        p = os.environ.get(var)
+        if p:
+            try:
+                return Path(p).resolve()
+            except Exception:
+                pass
+
+    # 4) fallback
+    return Path.cwd()
+
+
 def _bootstrap_theme_from_package(
     package: str = "mainsequence.dashboards.streamlit",
-    resource: str = "assets/config.toml",
-) -> None:
-    """If $CWD/.streamlit/config.toml is missing, copy it from the package once."""
+    resource: str = ".streamlit/config.toml",   # keep this in assets/ (dot-dirs often excluded from wheels)
+    target_root: Path | None = None,
+) -> Path | None:
+    """
+    Ensure there's a .streamlit/config.toml next to the app script.
+    If missing, copy the packaged default once and rerun so theme applies.
+    Returns the path to the config file (or None if not created).
+    """
+    # Read default theme from the package (if present)
     try:
         src = _pkg_files(package) / resource
         default_toml = src.read_text(encoding="utf-8")
     except Exception:
-        return  # no packaged theme; nothing to do
+        return None  # no packaged theme; nothing to do
 
-    cfg_dir = Path.cwd() / ".streamlit"
+    app_dir = target_root or _detect_app_dir()
+    cfg_dir = app_dir / ".streamlit"
     cfg_file = cfg_dir / "config.toml"
+
     if not cfg_file.exists():
-        cfg_dir.mkdir(parents=True, exist_ok=True)
-        cfg_file.write_text(default_toml, encoding="utf-8")
-        # Avoid infinite loop: only rerun once
-        if not st.session_state.get("_ms_theme_bootstrapped"):
-            st.session_state["_ms_theme_bootstrapped"] = True
-            st.rerun()
+        try:
+            cfg_dir.mkdir(parents=True, exist_ok=True)
+            cfg_file.write_text(default_toml, encoding="utf-8")
+            # Avoid infinite loop: only rerun once
+            if not st.session_state.get("_ms_theme_bootstrapped"):
+                st.session_state["_ms_theme_bootstrapped"] = True
+                st.rerun()
+        except Exception:
+            # If we cannot write, just skip silently to avoid breaking the app
+            return None
+
+    return cfg_file
 
 # --- App configuration contract (provided by the example app) -----------------
 
@@ -111,7 +167,8 @@ def _resolve_assets(explicit_logo: Optional[Union[str, Path]],
 
 def run_app(cfg: AppConfig) -> None:
     """Run a Streamlit app using the base scaffold."""
-    _bootstrap_theme_from_package
+    override_spinners()
+    _bootstrap_theme_from_package()
     # Resolve assets (defaults shipped with the scaffold)
     _logo, _page_icon, _icon_for_logo = _resolve_assets(cfg.logo_path, cfg.page_icon_path)
 
@@ -134,6 +191,8 @@ def run_app(cfg: AppConfig) -> None:
     # Allow example app to seed session defaults (e.g., cfg_path)
     if cfg.init_session:
         cfg.init_session(st.session_state)
+
+
 
     # Decide the target route
     qp = st.query_params

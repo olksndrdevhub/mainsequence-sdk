@@ -923,6 +923,12 @@ class DataNode(DataAccessMixin,ABC):
                 depth_df["local_time_serie_id"] != self.local_time_serie.id].copy()
         else:
             self.dependencies_df = pd.DataFrame()
+
+    def get_update_statistics(self):
+        """
+        This method always queries last state
+        """
+        return self.metadata.sourcetableconfiguration.get_data_updates()
     def _set_update_statistics(self,
                               update_statistics: UpdateStatistics) -> UpdateStatistics:
         """

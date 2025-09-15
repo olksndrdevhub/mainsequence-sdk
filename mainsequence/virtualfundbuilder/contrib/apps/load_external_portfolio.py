@@ -90,7 +90,7 @@ class LoadExternalPortfolio(BaseApp):
 
         # Switch out the prices source to get our external prices
         portfolio._initialize_nodes()
-        portfolio.portfolio_strategy_time_serie.bars_ts = external_prices_source
+        portfolio.portfolio_strategy_data_node.bars_ts = external_prices_source
 
         # Run the portfolio
         res = portfolio.run(add_portfolio_to_markets_backend=True)

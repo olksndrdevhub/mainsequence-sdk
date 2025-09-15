@@ -18,7 +18,7 @@ from mainsequence.virtualfundbuilder.resource_factory.signal_factory import Sign
 from tqdm import tqdm
 
 from .. import client as ms_client
-
+import mainsequence.client as msc
 
 def translate_to_pandas_freq(custom_freq):
     """
@@ -112,6 +112,13 @@ class PortfolioStrategy(DataNode):
         asset_list = None
         if not self.assets_configuration.assets_category_unique_id:
             asset_list = self.signal_weights.get_asset_list()
+            portfolio_asset_uid=self.signal_weights.get_asset_uid_to_override_portfolio_price()
+            if portfolio_asset_uid is not None:
+                asset=msc.Asset.get_or_none(unique_identifier=portfolio_asset_uid)
+                if asset is None:
+                    raise Exception(f"{portfolio_asset_uid} not found. be sure that is on the price transaltion table")
+                asset_list=asset_list+[asset]
+                asset_list= list({a.id:a for a in asset_list}.values())
 
         self.bars_ts = get_interpolated_prices_timeseries(copy.deepcopy(self.assets_configuration), asset_list=asset_list)
 
@@ -520,6 +527,26 @@ rebalance details:"""
 
         portfolio = self._add_serialized_weights(portfolio, weights)
         portfolio = self._resample_portfolio_with_calendar(portfolio)
+
+        #if price comes forn signal then override
+        asset_uid_to_override_portfolio_price = self.signal_weights.get_asset_uid_to_override_portfolio_price()
+        if asset_uid_to_override_portfolio_price is not None:
+            new_portfolio_price = self.bars_ts.get_ranged_data_per_asset(
+                range_descriptor={asset_uid_to_override_portfolio_price: {"start_date": portfolio.index.min(),
+                                                                          "start_date_operand": ">="
+                                                                          }})
+            if new_portfolio_price.empty:
+                self.logger.error("No Prices on portfolio target asset")
+                return pd.DataFrame()
+
+            new_portfolio_price=new_portfolio_price.reset_index("unique_identifier",drop=True)
+            union_index=new_portfolio_price.index.union(portfolio.index.unique()).unique()
+            new_portfolio_price=new_portfolio_price.reindex(union_index).ffill().bfill()
+            new_portfolio_price=new_portfolio_price.reindex(portfolio.index)
+            portfolio["calculated_close"]=portfolio["close"]
+            portfolio["close"] = new_portfolio_price["close"]
+            portfolio["return"]= portfolio["close"].pct_change().fillna(0.0) #todo get the correct return from previoyus price
+
         self.logger.info(f"{len(portfolio)} new portfolio values have been calculated.")
         return portfolio
 
