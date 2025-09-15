@@ -1,22 +1,14 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel", "toml"] # Ensure setuptools is recent enough
-build-backend = "setuptools.build_meta:__legacy__" # You might want to remove __legacy__ if you fully adopt PEP 621
+requires = ["setuptools", "wheel","toml"]
+build-backend = "setuptools.build_meta:__legacy__"
 
-[project]
-name = "mainsequence"
-version = "2.0.0" # This is the missing piece! Define your version here.
-authors = [
-    { name = "Main Sequence GmbH", email = "dev@main-sequence.io" },
-]
-description = "Main Sequence SDK"
-requires-python = ">=3.10.0"
-# You would define your dependencies here using PEP 621
-# This replaces `install_requires` in setup.py
-# dependencies = [
-#     "package1",
-#     "package2>1.0",
-#     "toml", # If toml is a runtime dependency, add it here
-# ]
+# PEP 621 dependencies declaration
+# adapt to your dependencies manager
+#[project]
+#dependencies = [
+#    "mkdocstrings-python",
+#]
 
-[tool.setuptools.package-data]
-"mainsequence.dashboards.streamlit" = ["assets/*.png", "assets/config.toml"]
+# TODO this explodes bc toml is not configured correctly
+#[tool.setuptools.package-data]
+#"mainsequence.dashboards.streamlit" = ["assets/*.png", "assets/config.toml"]

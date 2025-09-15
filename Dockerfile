@@ -3,6 +3,11 @@ FROM quay.io/jupyter/base-notebook:python-3.11
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
+RUN rm /usr/local/bin/before-notebook.d/10activate-conda-env.sh
+
+# Stop conda from automatically activating the base environment in new shells
+RUN conda config --set auto_activate_base false
+
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     python3-venv \
@@ -49,6 +54,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Switch to the notebook user so pip installs go into /opt/venv for jovyan
 USER ${NB_USER}
 WORKDIR ${HOME_DIR}
+
+RUN echo 'export PATH="/opt/venv/bin:$PATH"' >> ~/.bashrc
 
 # Setup jupyterlab
 RUN pip install --no-cache-dir ipykernel && \

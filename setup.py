@@ -64,6 +64,8 @@ setup(
         'mainsequence': [
             '**/*.html',  # Include all .html files recursively within 'mainsequence'
             '**/*.css',  # Include all .css files recursively within 'mainsequence'
+            '**/*.png',
+            '**/*.toml',
         ],
     },
     description='Main Sequence SDK'

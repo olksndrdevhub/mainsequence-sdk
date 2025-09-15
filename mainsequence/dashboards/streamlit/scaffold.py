@@ -52,11 +52,11 @@ def _detect_app_dir() -> Path:
 
 def _bootstrap_theme_from_package(
     package: str = "mainsequence.dashboards.streamlit",
-    resource: str = ".streamlit/config.toml",   # keep this in assets/ (dot-dirs often excluded from wheels)
+    resource: str = "assets/config.toml",   # keep this in assets/ (dot-dirs often excluded from wheels)
     target_root: Path | None = None,
 ) -> Path | None:
     """
-    Ensure there's a .streamlit/config.toml next to the app script.
+    Ensure there's a streamlit/config.toml next to the app script.
     If missing, copy the packaged default once and rerun so theme applies.
     Returns the path to the config file (or None if not created).
     """
