@@ -68,7 +68,7 @@ def _bootstrap_theme_from_package(
         return None  # no packaged theme; nothing to do
 
     app_dir = target_root or _detect_app_dir()
-    cfg_dir = app_dir / "streamlit"
+    cfg_dir = app_dir / ".streamlit"
     cfg_file = cfg_dir / "config.toml"
 
     if not cfg_file.exists():
