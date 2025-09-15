@@ -79,17 +79,19 @@ def get_interpolated_prices_timeseries(assets_configuration: Optional[AssetsConf
         prices_configuration_kwargs.pop("is_live", None)
         prices_configuration_kwargs.pop("markets_time_series", None)
 
-    if asset_list is None:
-        return InterpolatedPrices(
-            asset_category_unique_id=assets_configuration.assets_category_unique_id,
-            **prices_configuration_kwargs
-        )
-    else:
-        raise Exception("Not implemented prices_configuration Kwargs")
-        return InterpolatedPrices(
-            asset_list=asset_list,
-            **prices_configuration_kwargs
-        )
+        if asset_list is None:
+            return InterpolatedPrices(
+                asset_category_unique_id=assets_configuration.assets_category_unique_id,
+                **prices_configuration_kwargs
+            )
+        else:
+
+            return InterpolatedPrices(
+                asset_list=asset_list,
+                **prices_configuration_kwargs
+            )
+
+    raise Exception("Not implemented prices_configuration Kwargs")
 
 class UpsampleAndInterpolation:
     """
@@ -221,9 +223,17 @@ class UpsampleAndInterpolation:
             pd.DataFrame: Interpolated and upsampled bars dataframe.
         """
         for col in self.TIMESTAMP_COLS:
+
             try:
                 if col in tmp_df.columns:
-                    tmp_df[col] = pd.to_datetime(tmp_df[col], utc=True)
+                    s = pd.to_numeric(tmp_df[col], errors="coerce")
+                    digits = s.dropna().abs().astype("int64").astype(str).str.len()
+                    UNIT_BY_MIN_DIGITS = {18: "ns", 15: "us", 12: "ms", 10: "s", 0: "m"}
+                    d = int(digits.mode().iat[0])
+
+                    unit = UNIT_BY_MIN_DIGITS[max(k for k in UNIT_BY_MIN_DIGITS if d >= k)]
+                    tmp_df[col] = pd.to_datetime(s, unit=unit, utc=True)
+
             except Exception as e:
                 raise e
 
@@ -331,15 +341,12 @@ def interpolate_daily_bars(
 
         return bars_df
 
-    # Restrict to calendar types
-    restricted_schedule = None
-    full_index = bars_df.index
 
-    restricted_schedule =_get_schedule_cached(
-        calendar_name,
-        bars_df.index.min().date().isoformat(),
-        bars_df.index.max().date().isoformat(),
-    )
+    # Extend the schedule window so midnight stamps on non-trading days can fill to the next session close
+    start_date = bars_df.index.min().date().isoformat()
+    end_date = (pd.Timestamp(bars_df.index.max()).normalize()).date().isoformat()
+    restricted_schedule = _get_schedule_cached(calendar_name, start_date, end_date)
+
     restricted_schedule = restricted_schedule.reset_index()
     market_type = "market_close"
 
@@ -367,15 +374,9 @@ def interpolate_daily_bars(
 
     null_index = bars_df[bars_df["open_time"].isnull()].index
     if len(null_index) > 0:
-        """
-        You set restricted_schedule = restricted_schedule.set_index("market_close"), then:
 
-        bars_df.loc[null_index, "open_time"] = restricted_schedule.loc[null_index].index
-        This fills open_time with market_close timestamps. That’s wrong and will silently misalign daily bars.
-        Fix: use market_open for open_time (or use the session date + open time column).
-        """
-        raise Exception("check implementation")
-        bars_df.loc[null_index, "open_time"] = restricted_schedule.loc[null_index].index
+        # Use the market_open that corresponds to each market_close index
+        bars_df.loc[null_index, "open_time"] = restricted_schedule.loc[null_index, "market_open"]
 
     return bars_df
 
@@ -616,8 +617,8 @@ class InterpolatedPrices(DataNode):
         upsampled_df = []
 
         # TODO this should be a helper function
-        unique_identifier_range_map = {a: {"start_date": d} for a, d in self.update_statistics.asset_time_statistics.items() }
-        full_last_observation = self.get_df_between_dates(unique_identifier_range_map=unique_identifier_range_map)
+        unique_identifier_range_map =self.update_statistics.get_update_range_map_great_or_equal()
+        full_last_observation = self.get_ranged_data_per_asset  (range_descriptor=unique_identifier_range_map)
         last_observation_map = {}
 
         for unique_identifier in raw_data_df["unique_identifier"].unique():

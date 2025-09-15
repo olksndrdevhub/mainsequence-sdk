@@ -41,6 +41,10 @@ class WeightsBase(BaseResource):
     def maximum_forward_fill(self) -> timedelta:
         raise NotImplementedError
 
+    def get_asset_uid_to_override_portfolio_price(self):
+
+        return None
+
     def interpolate_index(self, new_index: pd.DatetimeIndex):
         """
         Get interpolated weights for a time index. Weights are only valid for a certain time, therefore forward fill is limited.
@@ -70,6 +74,8 @@ class WeightsBase(BaseResource):
             self.logger.warning(f"No weights data in index interpolation")
             return pd.DataFrame()
 
+
+
         weights_pivot = weights.reset_index().pivot(
             index="time_index",
             columns=[ "unique_identifier"],
@@ -98,6 +104,9 @@ class WeightsBase(BaseResource):
 
         weights_reindex = weights_reindex.loc[new_index]
         weights_reindex.index.name = "time_index"
+
+
+
         return weights_reindex
 
 def _get_class_source_code(cls):

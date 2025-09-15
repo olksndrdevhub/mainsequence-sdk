@@ -51,7 +51,7 @@ class PortfolioInterface():
         patch = os.environ.get("PATCH_BUILD_CONFIGURATION", "False")
         os.environ[
             "PATCH_BUILD_CONFIGURATION"] = "True"  if patch_build_configuration else "False" # It always needs to be true as we always want to overwrite the build
-        self.portfolio_strategy_time_serie = PortfolioStrategy(
+        self.portfolio_strategy_data_node = PortfolioStrategy(
             portfolio_build_configuration=copy.deepcopy(self.portfolio_build_configuration)
         )
 
@@ -67,7 +67,7 @@ class PortfolioInterface():
         if not self._is_initialized:
             self._initialize_nodes()
 
-        portfolio_ts = self.portfolio_strategy_time_serie
+        portfolio_ts = self.portfolio_strategy_data_node
 
         def build_markets_portfolio(ts, portfolio_tags):
             # when is live target portfolio
@@ -129,7 +129,7 @@ class PortfolioInterface():
         if not self._is_initialized or patch_build_configuration == True:
             self._initialize_nodes(patch_build_configuration=patch_build_configuration)
 
-        self.portfolio_strategy_time_serie.run(
+        self.portfolio_strategy_data_node.run(
             debug_mode=debug_mode,
             update_tree=update_tree,
             force_update=force_update,
@@ -138,7 +138,7 @@ class PortfolioInterface():
         if add_portfolio_to_markets_backend:
             self.build_target_portfolio_in_backend(portfolio_tags=portfolio_tags)
 
-        res = self.portfolio_strategy_time_serie.get_df_between_dates()
+        res = self.portfolio_strategy_data_node.get_df_between_dates()
         if len(res) > 0:
             res = res.sort_values("time_index")
         return res
