@@ -50,6 +50,7 @@ concurrent-log-handler = "*"
 duckdb = "*"
 plotly = "*"
 twine = "*"
+typer = "*"
 
 [dev-packages]
 mkdocs = "*"
