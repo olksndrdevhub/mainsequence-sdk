@@ -1,3 +1,4 @@
+# mainsequence/cli/api.py
 from __future__ import annotations
 import os, re, subprocess, json, platform, pathlib, shlex, sys
 import requests
@@ -13,6 +14,7 @@ S = requests.Session()
 S.headers.update({"Content-Type": "application/json"})
 
 class ApiError(RuntimeError): ...
+class NotLoggedIn(ApiError): ...
 
 def _full(path: str) -> str:
     p = "/" + path.lstrip("/")
@@ -25,11 +27,9 @@ def _normalize_api_path(p: str) -> str:
     return p
 
 def _access_token() -> str | None:
-    # 1) environment override
     t = os.environ.get("MAIN_SEQUENCE_USER_TOKEN")
     if t:
         return t
-    # 2) token file
     tok = get_tokens()
     return tok.get("access")
 
@@ -38,9 +38,8 @@ def _refresh_token() -> str | None:
     return tok.get("refresh")
 
 def login(email: str, password: str) -> dict:
-    """Obtain & store tokens; set MAIN_SEQUENCE_USER_TOKEN in the current process."""
     url = _full(AUTH_PATHS["obtain"])
-    payload = {"email": email, "password": password}  # Electron forces 'email' field
+    payload = {"email": email, "password": password}  # server expects 'email'
     r = S.post(url, data=json.dumps(payload))
     try:
         data = r.json()
@@ -48,7 +47,7 @@ def login(email: str, password: str) -> dict:
         data = {}
     if not r.ok:
         msg = data.get("detail") or data.get("message") or r.text
-        raise ApiError(f"Login failed: {msg}")
+        raise ApiError(f"{msg}")
     access = data.get("access") or data.get("token") or data.get("jwt") or data.get("access_token")
     refresh = data.get("refresh") or data.get("refresh_token")
     if not access or not refresh:
@@ -60,15 +59,14 @@ def login(email: str, password: str) -> dict:
 def refresh_access() -> str:
     refresh = _refresh_token()
     if not refresh:
-        raise ApiError("Missing refresh token; run `mainsequence login`.")
+        raise NotLoggedIn("Not logged in. Run `mainsequence login <email>`.")
     r = S.post(_full(AUTH_PATHS["refresh"]), data=json.dumps({"refresh": refresh}))
     data = r.json() if r.headers.get("content-type","").startswith("application/json") else {}
     if not r.ok:
-        raise ApiError(data.get("detail") or f"Refresh failed ({r.status_code})")
+        raise NotLoggedIn(data.get("detail") or "Token refresh failed.")
     access = data.get("access")
     if not access:
-        raise ApiError("Refresh succeeded but no access token returned.")
-    # persist alongside existing refresh
+        raise NotLoggedIn("Refresh succeeded but no access token returned.")
     tokens = get_tokens()
     save_tokens(tokens.get("username") or "", access, refresh)
     set_env_access(access)
@@ -78,20 +76,22 @@ def authed(method: str, api_path: str, body: dict | None = None) -> requests.Res
     api_path = _normalize_api_path(api_path)
     access = _access_token()
     if not access:
-        # try refresh implicitly
+        # try to refresh once
         access = refresh_access()
     headers = {"Authorization": f"Bearer {access}"}
     r = S.request(method.upper(), _full(api_path), headers=headers,
                   data=None if method.upper() in {"GET","HEAD"} else json.dumps(body or {}))
     if r.status_code == 401:
-        # one retry after refresh
+        # retry after refresh
         access = refresh_access()
         headers = {"Authorization": f"Bearer {access}"}
         r = S.request(method.upper(), _full(api_path), headers=headers,
                       data=None if method.upper() in {"GET","HEAD"} else json.dumps(body or {}))
+    if r.status_code == 401:
+        raise NotLoggedIn("Not logged in.")
     return r
 
-# ---------- Helpers matched to Electron code ----------
+# ---------- Helper APIs ----------
 
 def safe_slug(s: str) -> str:
     x = re.sub(r"[^a-z0-9-_]+", "-", (s or "project").lower()).strip("-")
@@ -134,7 +134,10 @@ def get_current_user_profile() -> dict:
 
 def get_projects() -> list[dict]:
     r = authed("GET", "/orm/api/pods/projects/")
-    data = r.json() if r.ok else {}
+    # If the API shape ever changes, still try to pull a list.
+    if not r.ok:
+        raise ApiError(f"Projects fetch failed ({r.status_code}).")
+    data = r.json() if r.headers.get("content-type","",).startswith("application/json") else {}
     if isinstance(data, list):
         return data
     return data.get("results") or []

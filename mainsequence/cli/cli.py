@@ -6,6 +6,7 @@ import os
 import pathlib
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -16,6 +17,7 @@ import typer
 from . import config as cfg
 from .api import (
     ApiError,
+    NotLoggedIn,
     add_deploy_key,
     deep_find_repo_url,
     fetch_project_env_text,
@@ -33,8 +35,10 @@ from .ssh_utils import (
 )
 
 app = typer.Typer(help="MainSequence CLI (login + project operations)")
+
 project = typer.Typer(help="Project commands")
 settings = typer.Typer(help="Settings (base folder, backend, etc.)")
+
 app.add_typer(project, name="project")
 app.add_typer(settings, name="settings")
 
@@ -43,6 +47,11 @@ app.add_typer(settings, name="settings")
 def _projects_root(base_dir: str, org_slug: str) -> pathlib.Path:
     p = pathlib.Path(base_dir).expanduser()
     return p / org_slug / "projects"
+
+def _org_slug_from_profile() -> str:
+    prof = get_current_user_profile()
+    name = prof.get("organization") or "default"
+    return re.sub(r"[^a-z0-9-_]+", "-", name.lower()).strip("-") or "default"
 
 def _determine_repo_url(p: dict) -> str:
     repo = (p.get("git_ssh_url") or "").strip()
@@ -69,8 +78,8 @@ def _copy_clipboard(txt: str) -> bool:
         pass
     return False
 
-def _render_projects_table(items: list[dict], links: dict) -> str:
-    """Return an aligned table with Local status + path."""
+def _render_projects_table(items: list[dict], links: dict, base_dir: str, org_slug: str) -> str:
+    """Return an aligned table with Local status + path (map or default folder guess)."""
     def ds(obj, path, default=""):
         try:
             for k in path.split("."):
@@ -87,17 +96,24 @@ def _render_projects_table(items: list[dict], links: dict) -> str:
         klass = ds(p, "data_source.related_resource.class_type",
                    ds(p, "data_source.related_resource_class_type", ""))
         status = ds(p, "data_source.related_resource.status", "")
-        local_path = links.get(pid, "")
-        local_ok = bool(local_path and pathlib.Path(local_path).exists())
-        local = "Local" if local_ok else "—"
-        path_col = local_path if local_ok else "—"
+
+        # 1) mapping file
+        mapped = links.get(pid)
+        local_path = mapped if mapped and pathlib.Path(mapped).exists() else None
+        # 2) guess default location if mapping is absent
+        if not local_path:
+            guess = _projects_root(base_dir, org_slug) / safe_slug(name)
+            if guess.exists():
+                local_path = str(guess)
+
+        local = "Local" if local_path else "—"
+        path_col = local_path or "—"
         rows.append((pid, name, dname, klass, status, local, path_col))
 
     header = ["ID","Project","Data Source","Class","Status","Local","Path"]
     if not rows:
         return "No projects."
 
-    # compute widths
     colw = [max(len(r[i]) for r in rows + [tuple(header)]) for i in range(len(header))]
     fmt = "  ".join("{:<" + str(colw[i]) + "}" for i in range(len(header)))
     out = [fmt.format(*header), fmt.format(*["-"*len(h) for h in header])]
@@ -105,7 +121,7 @@ def _render_projects_table(items: list[dict], links: dict) -> str:
         out.append(fmt.format(*r))
     return "\n".join(out)
 
-# ---------- commands ----------
+# ---------- top-level commands ----------
 
 @app.command()
 def login(
@@ -115,44 +131,45 @@ def login(
     no_status: bool = typer.Option(False, "--no-status", help="Do not print projects table after login")
 ):
     """
-    Obtain tokens (same as Electron), store them locally, and set MAIN_SEQUENCE_USER_TOKEN
-    in the current process. On success, shows the base folder and a Local/Path status
-    table like the Electron app.
+    Obtain tokens, store them locally, and set MAIN_SEQUENCE_USER_TOKEN for this process.
+    On success, print the base folder and the project table (like the Electron app).
     """
     try:
         res = api_login(email, password)
     except ApiError as e:
-        # <— no traceback, just the server message
         typer.secho(f"Login failed: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
-    except Exception:
-        typer.secho("Login failed.", fg=typer.colors.RED)
-        raise typer.Exit(1)
 
-    # success output
     cfg_obj = cfg.get_config()
     base = cfg_obj["mainsequence_path"]
     typer.secho(f"Signed in as {res['username']} (Backend: {res['backend']})", fg=typer.colors.GREEN)
     typer.echo(f"Projects base folder: {base}")
 
-    # optional export line
     tok = cfg.get_tokens().get("access", os.environ.get("MAIN_SEQUENCE_USER_TOKEN", ""))
     if export and tok:
         print(f'export MAIN_SEQUENCE_USER_TOKEN="{tok}"')
 
-    # summary table like the Electron view
     if not no_status:
         try:
             items = get_projects()
-        except Exception:
-            items = []
-        links = cfg.get_links()
-        typer.echo("\nProjects:")
-        typer.echo(_render_projects_table(items, links))
+            links = cfg.get_links()
+            org_slug = _org_slug_from_profile()
+            typer.echo("\nProjects:")
+            typer.echo(_render_projects_table(items, links, base, org_slug))
+        except NotLoggedIn:
+            typer.secho("Not logged in.", fg=typer.colors.RED)
+
+# ---------- settings group ----------
+
+@settings.callback(invoke_without_command=True)
+def settings_cb(ctx: typer.Context):
+    """`mainsequence settings` defaults to `show`."""
+    if ctx.invoked_subcommand is None:
+        settings_show()
+        raise typer.Exit()
 
 @settings.command("show")
 def settings_show():
-    """Show settings (backend + base folder)."""
     c = cfg.get_config()
     typer.echo(json.dumps({
         "backend_url": c.get("backend_url"),
@@ -161,22 +178,51 @@ def settings_show():
 
 @settings.command("set-base")
 def settings_set_base(path: str = typer.Argument(..., help="New projects base folder")):
-    """Change the projects base folder (like the Electron 'Change…' button)."""
     out = cfg.set_config({"mainsequence_path": path})
     typer.secho(f"Projects base folder set to: {out['mainsequence_path']}", fg=typer.colors.GREEN)
+
+# ---------- project group (require login) ----------
+
+@project.callback()
+def project_guard():
+    try:
+        prof = get_current_user_profile()
+        if not prof or not prof.get("username"):
+            raise NotLoggedIn("Not logged in.")
+    except NotLoggedIn:
+        typer.secho("Not logged in. Run: mainsequence login <email>", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except ApiError:
+        typer.secho("Not logged in. Run: mainsequence login <email>", fg=typer.colors.RED)
+        raise typer.Exit(1)
 
 @project.command("list")
 def project_list():
     """List projects with Local status and path."""
+    cfg_obj = cfg.get_config()
+    base = cfg_obj["mainsequence_path"]
+    org_slug = _org_slug_from_profile()
+
     items = get_projects()
     links = cfg.get_links()
-    typer.echo(_render_projects_table(items, links))
+    typer.echo(_render_projects_table(items, links, base, org_slug))
 
 @project.command("open")
 def project_open(project_id: int):
     """Open the local folder in the OS file manager."""
     links = cfg.get_links()
     path = links.get(str(project_id))
+    if not path or not pathlib.Path(path).exists():
+        # also try default guess
+        cfg_obj = cfg.get_config()
+        base = cfg_obj["mainsequence_path"]
+        org_slug = _org_slug_from_profile()
+        items = get_projects()
+        p = next((x for x in items if str(x.get("id")) == str(project_id)), None)
+        if p:
+            guess = _projects_root(base, org_slug) / safe_slug(p.get("project_name") or "")
+            if guess.exists():
+                path = str(guess)
     if not path or not pathlib.Path(path).exists():
         typer.secho("No local folder mapped for this project. Run `set-up-locally` first.", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -209,6 +255,19 @@ def project_open_signed_terminal(project_id: int):
     """Open a terminal window in the project directory with ssh-agent started and the repo's key added."""
     links = cfg.get_links()
     dir_ = links.get(str(project_id))
+
+    if not dir_ or not pathlib.Path(dir_).exists():
+        # also try default guess
+        cfg_obj = cfg.get_config()
+        base = cfg_obj["mainsequence_path"]
+        org_slug = _org_slug_from_profile()
+        items = get_projects()
+        p = next((x for x in items if str(x.get("id")) == str(project_id)), None)
+        if p:
+            guess = _projects_root(base, org_slug) / safe_slug(p.get("project_name") or "")
+            if guess.exists():
+                dir_ = str(guess)
+
     if not dir_ or not pathlib.Path(dir_).exists():
         typer.secho("No local folder mapped for this project. Run `set-up-locally` first.", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -224,21 +283,10 @@ def project_set_up_locally(
     project_id: int,
     base_dir: Optional[str] = typer.Option(None, "--base-dir", help="Override base dir (default from settings)")
 ):
-    """
-    Idempotently set up a project locally:
-      - derive repo URL
-      - create per-repo SSH key (~/.ssh/<repoName>)
-      - start/prime ssh-agent; upload deploy key (best-effort)
-      - clone into <base>/<org>/projects/<slug>
-      - fetch .env and write VFB_PROJECT_PATH
-      - remember mapping
-    """
     cfg_obj = cfg.get_config()
     base = base_dir or cfg_obj["mainsequence_path"]
 
-    prof = get_current_user_profile()
-    org_name = prof.get("organization") or "default"
-    org_slug = re.sub(r"[^a-z0-9-_]+", "-", org_name.lower()).strip("-") or "default"
+    org_slug = _org_slug_from_profile()
 
     items = get_projects()
     p = next((x for x in items if int(x.get("id", -1)) == project_id), None)
@@ -256,21 +304,17 @@ def project_set_up_locally(
     target_dir = projects_root / name
     projects_root.mkdir(parents=True, exist_ok=True)
 
-    # key & clipboard
     key_path, pub_path, pub = ensure_key_for_repo(repo)
     copied = _copy_clipboard(pub)
 
-    # deploy key (best-effort)
     try:
         host = platform.node()
         add_deploy_key(project_id, host, pub)
     except Exception:
         pass
 
-    # agent + add key
     agent_env = start_agent_and_add_key(key_path)
 
-    # clone
     if target_dir.exists():
         typer.secho(f"Target already exists: {target_dir}", fg=typer.colors.RED)
         raise typer.Exit(2)
@@ -288,29 +332,21 @@ def project_set_up_locally(
         typer.secho("git clone failed", fg=typer.colors.RED)
         raise typer.Exit(3)
 
-    # .env
     env_text = ""
     try:
         env_text = fetch_project_env_text(project_id)
     except Exception:
         env_text = ""
-
     env_text = (env_text or "").replace("\r", "")
     if any(line.startswith("VFB_PROJECT_PATH=") for line in env_text.splitlines()):
-        lines = []
-        for line in env_text.splitlines():
-            if line.startswith("VFB_PROJECT_PATH="):
-                lines.append(f"VFB_PROJECT_PATH={str(target_dir)}")
-            else:
-                lines.append(line)
+        lines = [f"VFB_PROJECT_PATH={str(target_dir)}" if line.startswith("VFB_PROJECT_PATH=") else line
+                 for line in env_text.splitlines()]
         env_text = "\n".join(lines)
     else:
-        if env_text and not env_text.endswith("\n"):
-            env_text += "\n"
+        if env_text and not env_text.endswith("\n"): env_text += "\n"
         env_text += f"VFB_PROJECT_PATH={str(target_dir)}\n"
     (target_dir / ".env").write_text(env_text, encoding="utf-8")
 
-    # remember mapping
     cfg.set_link(project_id, str(target_dir))
 
     typer.secho(f"Local folder: {target_dir}", fg=typer.colors.GREEN)
