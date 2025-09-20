@@ -23,6 +23,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field, validator,root_validator,constr
 
 from mainsequence.logconf import logger
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 
 
@@ -177,6 +178,16 @@ class AssetSnapshot(BaseObjectOrm, BasePydanticModel):
         None,
         description="Exchange-specific metadata"
     )
+def _set_query_param_on_url(url: str, key: str, value) -> str:
+    """
+    Add or replace a query parameter in a URL without disturbing others (e.g., offset/page).
+    Works with absolute or relative URLs.
+    """
+    parts = urlsplit(url)
+    q = dict(parse_qsl(parts.query, keep_blank_values=True))
+    q[key] = str(value)
+    new_query = urlencode(q, doseq=True)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, new_query, parts.fragment))
 
 class AssetMixin(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
@@ -225,6 +236,10 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         None,
         description="Latest active snapshot (effective_to is null)"
     )
+    instrument_pricing_detail:Optional[Dict]=Field(
+        None,
+        description="details for instrument pricing"
+    )
 
     def __repr__(self) -> str:
         return f"{self.class_name()}: {self.unique_identifier}"
@@ -272,6 +287,78 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
                 translated_params[key] = value
 
         return translated_params
+
+    @classmethod
+    def query(cls, timeout=None, per_page: int = None,  **kwargs):
+        """
+        POST-based filtering for large requests that don't fit in the URL.
+
+        - per_page: desired number of items per page (client-side).
+
+
+        Follows DRF pagination and accumulates ALL pages. Returns raw dict items.
+        """
+        base_url = cls.get_object_url()  # e.g. "https://api.example.com/assets"
+        body = cls._parse_parameters_filter(kwargs)  # same filters as GET
+        accumulated = []
+
+        # Start at the collection action
+        next_url = f"{base_url}/query/"
+
+        # Choose which page-size param(s) to set
+        # If not specified, we try the common ones in order.
+        page_size_params =  ["limit", "page_size"]
+
+        only_fields = "fields" in body  # your existing flag
+
+        while next_url:
+            # Inject per_page into the URL (NOT the JSON body), preserving offset/page/cursor.
+            if per_page:
+                for pname in page_size_params:
+                    if pname:  # skip None if passed
+                        next_url = _set_query_param_on_url(next_url, pname, per_page)
+
+            r = make_request(
+                s=cls.build_session(),
+                loaders=cls.LOADERS,
+                r_type="POST",
+                url=next_url,
+                payload={"json": body},  # filters stay in body
+                time_out=timeout,
+            )
+
+            if r.status_code != 200:
+                if r.status_code == 401:
+                    raise Exception("Unauthorized. Please add credentials to environment.")
+                elif r.status_code == 500:
+                    raise Exception("Server Error.")
+                elif r.status_code == 404:
+                    raise DoesNotExist("Not Found.")
+                elif r.status_code == 405:
+                    raise Exception("Method Not Allowed. Ensure the 'query' endpoint accepts POST.")
+                else:
+                    raise Exception(f"{r.status_code} - {r.text}")
+
+            data = r.json()
+            next_url = data.get("next")  # DRF-provided next URL (may be relative or absolute)
+
+            # Collect results
+            for item in data.get("results", []):
+                if only_fields:
+                    accumulated.append(item)
+                else:
+                    item["orm_class"] = cls.__name__
+                    try:
+                        accumulated.append(cls(**item) if issubclass(cls, BasePydanticModel) else item)
+                    except Exception as e:
+                        print(item)
+                        print(cls)
+                        print(cls(**item))
+                        import traceback
+                        traceback.print_exc()
+                        raise e
+
+        return accumulated
 
     @classmethod
     def filter(cls, *args, **kwargs):
@@ -417,6 +504,74 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
 
         # Convert the accumulated raw data into asset instances with correct classes
         return create_from_serializer_with_class(all_results)
+
+    def set_instrument_pricing_details_from_ms_instrument(self,instrument,timeout=None):
+
+
+        data=instrument.model_dump_json()
+        data=json.loads(data)
+        return self.set_instrument_pricing_details(instrument_pricing_details=data,timeout=timeout)
+
+
+    def set_instrument_pricing_details(
+            self,
+            instrument_pricing_details: Dict[str, Any],
+            timeout: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        POST /assets/{self.id}/set-asset-pricing-detail/
+
+        Sends the pricing details as a RAW JSON object (no wrapper keys).
+        The backend action treats the entire body as the pricing dump and
+        associates it to (asset, organization_owner).
+
+        Args:
+            instrument_pricing_details: JSON object to store.
+            timeout: optional request timeout (seconds).
+
+        Returns:
+            The server's JSON response (dict).
+        """
+        if not getattr(self, "id", None):
+            raise ValueError("This object has no 'id'; cannot POST to detail action.")
+        if not isinstance(instrument_pricing_details, dict):
+            raise ValueError("instrument_pricing_details must be a JSON object (dict).")
+
+        base_url = self.get_object_url()  # e.g., https://api.example.com/assets
+        url = f"{base_url}/{self.id}/set-asset-pricing-detail/"
+
+        r = make_request(
+            s=self.build_session(),
+            loaders=self.LOADERS,
+            r_type="POST",
+            url=url,
+            payload={"json": {"dump":instrument_pricing_details}},  # raw body (no 'dump', no 'organization_id')
+            time_out=timeout,
+        )
+
+        if r.status_code not in (200, 201):
+            if r.status_code == 401:
+                raise Exception("Unauthorized. Please add credentials to environment.")
+            elif r.status_code == 404:
+                raise DoesNotExist("Asset not found.")
+            elif r.status_code == 405:
+                raise Exception("Method Not Allowed. Ensure the custom action is enabled.")
+            elif r.status_code == 413:
+                raise Exception("Payload Too Large. Consider compressing or splitting.")
+            elif r.status_code >= 500:
+                raise Exception("Server Error.")
+            else:
+                raise Exception(f"{r.status_code} - {r.text}")
+
+        data = r.json()
+
+
+        self.instrument_pricing_detail = data.get("instrument_pricing_detail")
+
+
+
+
+
         
 class AssetCategory(BaseObjectOrm, BasePydanticModel):
     id: int

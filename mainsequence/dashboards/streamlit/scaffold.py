@@ -8,7 +8,7 @@ import streamlit as st
 from mainsequence.dashboards.streamlit.core.registry import get_page, list_pages
 from mainsequence.dashboards.streamlit.core.theme import inject_css_for_dark_accents, override_spinners
 from importlib.resources import files as _pkg_files
-
+import sys
 import os
 
 def _detect_app_dir() -> Path:
@@ -61,10 +61,15 @@ def _bootstrap_theme_from_package(
     Returns the path to the config file (or None if not created).
     """
     # Read default theme from the package (if present)
+
     try:
-        src = _pkg_files(package) / resource
+        src = _pkg_files(package).joinpath(resource)
+
+        if not src.is_file():
+            return None  # packaged file not present
         default_toml = src.read_text(encoding="utf-8")
     except Exception:
+
         return None  # no packaged theme; nothing to do
 
     app_dir = target_root or _detect_app_dir()

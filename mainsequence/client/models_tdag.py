@@ -1233,7 +1233,7 @@ class UpdateStatistics(BaseModel):
     _initial_fallback_date: Optional[datetime.datetime] = None
 
     # when working with DuckDb and column based storage we want to have also stats by  column
-    multi_index_column_stats: Optional[Dict[str, Dict[str, Dict[str, datetime.datetime]]]] = None
+    multi_index_column_stats: Optional[Dict[str, Any]] = None
     is_backfill: bool = False
 
     class Config:
@@ -1483,7 +1483,7 @@ class UpdateStatistics(BaseModel):
 
     def _get_update_statistics(self,
                                asset_list: Optional[List],
-                               unique_identifier_list: Union[list, None]):
+                               unique_identifier_list: Union[list, None],init_fallback_date=None):
         new_update_statistics = {}
         if asset_list is None and unique_identifier_list is None:
             assert self.asset_time_statistics is not None
@@ -1499,7 +1499,7 @@ class UpdateStatistics(BaseModel):
                 new_update_statistics[unique_identifier] = self.asset_time_statistics[unique_identifier]
             else:
 
-                new_update_statistics[unique_identifier] = None
+                new_update_statistics[unique_identifier] = init_fallback_date
 
         def _max_in_nested(d):
             """
@@ -1518,7 +1518,7 @@ class UpdateStatistics(BaseModel):
             return max_val
 
         _max_time_in_asset_time_statistics = _max_in_nested(new_update_statistics) if len(
-            new_update_statistics) > 0 else None
+            new_update_statistics) > 0 else init_fallback_date
 
         return new_update_statistics, _max_time_in_asset_time_statistics
 
@@ -1534,7 +1534,7 @@ class UpdateStatistics(BaseModel):
         if asset_list is not None or unique_identifier_list is not None:
             new_update_statistics, _max_time_in_asset_time_statistics = self._get_update_statistics(
                 unique_identifier_list=unique_identifier_list,
-                asset_list=asset_list,
+                asset_list=asset_list,init_fallback_date=init_fallback_date,
                 )
 
         else:

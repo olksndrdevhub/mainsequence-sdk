@@ -307,6 +307,24 @@ class DataAccessMixin:
         return  self.get_df_between_dates(unique_identifier_range_map=range_descriptor,
                                           columns=columns,
                                           )
+    def get_ranged_data_per_asset_great_or_equal(self, range_descriptor: Optional[UniqueIdentifierRangeMap],
+                                  columns=None,
+                                  ) -> pd.DataFrame:
+        """
+        Gets data based on a range descriptor.
+
+        Args:
+            range_descriptor: A UniqueIdentifierRangeMap object.
+
+        Returns:
+            A DataFrame with the ranged data.
+        """
+
+        for k,v in range_descriptor.items():
+            v["start_date_operand"]="=>"
+        return  self.get_df_between_dates(unique_identifier_range_map=range_descriptor,
+                                          columns=columns,
+                                          )
 
     def filter_by_assets_ranges(self, asset_ranges_map: dict) -> pd.DataFrame:
         """
