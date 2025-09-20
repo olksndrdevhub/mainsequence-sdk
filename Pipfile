@@ -51,6 +51,7 @@ duckdb = "*"
 plotly = "*"
 twine = "*"
 typer = "*"
+quantlib = "*"
 
 [dev-packages]
 mkdocs = "*"
