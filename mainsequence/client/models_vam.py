@@ -20,7 +20,7 @@ from mainsequence.client import LocalTimeSerie
 from .base import BasePydanticModel, BaseObjectOrm, MARKETS_CONSTANTS as CONSTANTS, TDAG_ENDPOINT, API_ENDPOINT, HtmlSaveException
 from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, DATE_FORMAT
 from typing import List, Optional, Dict, Any, Tuple
-from pydantic import BaseModel, Field, validator,root_validator,constr
+from pydantic import BaseModel, Field, validator,root_validator,constr,model_validator
 
 from mainsequence.logconf import logger
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
@@ -189,6 +189,11 @@ def _set_query_param_on_url(url: str, key: str, value) -> str:
     new_query = urlencode(q, doseq=True)
     return urlunsplit((parts.scheme, parts.netloc, parts.path, new_query, parts.fragment))
 
+class AssetPricingDetail(BasePydanticModel):
+    instrument_dump:dict
+    market_pricing_details:dict
+    pricing_details_date:datetime.datetime
+
 class AssetMixin(BaseObjectOrm, BasePydanticModel):
     id: Optional[int] = None
 
@@ -236,13 +241,36 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         None,
         description="Latest active snapshot (effective_to is null)"
     )
-    instrument_pricing_detail:Optional[Dict]=Field(
+    current_pricing_detail:Optional[AssetPricingDetail]=Field(
         None,
         description="details for instrument pricing"
     )
 
     def __repr__(self) -> str:
         return f"{self.class_name()}: {self.unique_identifier}"
+
+    @model_validator(mode="after")
+    def _inject_main_sequence_asset_id(self) -> "AssetMixin":
+        """
+        After model construction, if instrument_pricing_detail is present,
+        ensure it contains {'main_sequence_asset_id': self.id}.
+        """
+        ipd = self.instrument_pricing_detail
+        if ipd is not None:
+            # Be tolerant: coerce to a dict if necessary.
+            if not isinstance(ipd, dict):
+                try:
+                    # Try JSON string first
+                    import json
+                    if isinstance(ipd, str):
+                        ipd = json.loads(ipd)
+                    else:
+                        ipd = dict(ipd)
+                except Exception:
+                    ipd = {}
+            ipd["main_sequence_asset_id"] = self.id
+            self.instrument_pricing_detail = ipd
+        return self
 
     @property
     def ticker(self):
@@ -505,11 +533,18 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         # Convert the accumulated raw data into asset instances with correct classes
         return create_from_serializer_with_class(all_results)
 
-    def set_instrument_pricing_details_from_ms_instrument(self,instrument,timeout=None):
+    def set_instrument_pricing_details_from_ms_instrument(self,instrument,
+                                                          market_pricing_details:dict,
+                                                          pricing_details_date:datetime.datetime,
+                                                          timeout=None):
 
 
-        data=instrument.model_dump_json()
+        data=instrument.serialize_for_backend()
         data=json.loads(data)
+        data["instrument"]["main_sequence_asset_id"]=self.id
+        data["pricing_details_date"]=pricing_details_date.timestamp()
+        data["market_pricing_details"]=market_pricing_details
+
         return self.set_instrument_pricing_details(instrument_pricing_details=data,timeout=timeout)
 
 

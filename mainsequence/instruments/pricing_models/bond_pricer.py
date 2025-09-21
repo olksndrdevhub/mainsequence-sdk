@@ -231,40 +231,46 @@ def create_floating_rate_bond_with_curve(
             business_day_convention, business_day_convention,
             ql.DateGeneration.Forward, False
         )
-    # else:
-    #     has_periods = schedule.size() > 1
-    #
-    #     if not has_periods:
-    #         # Redemption-only: use ZeroCouponBond
-    #         zcb = ql.ZeroCouponBond(
-    #             settlement_days,
-    #             calendar,
-    #             face,  # redemption notional per 100 original
-    #             schedule.date(0) if schedule.size() == 1 else issue_date,  # maturity date
-    #             payment_convention,
-    #             100.0,  # redemption (% of face)
-    #             issue_date
-    #         )
-    #         zcb.setPricingEngine(ql.DiscountingBondEngine(curve))
-    #         return zcb
-    #
+    else:
+        asof = ql.Settings.instance().evaluationDate
+        n = len(schedule.dates())
+        # True floater periods exist only if schedule has >=2 dates AND at least one period end > as-of date.
+        has_periods_left = (n >= 2) and any(schedule.dates()[i + 1] > asof for i in range(n - 1))
+        if not has_periods_left:
+            # Redemption-only: price as a zero-coupon bond (par redemption by default).
+            maturity = schedule.dates()[n-1] if n > 0 else eff_end
+            zcb = ql.ZeroCouponBond(
+                settlement_days,
+                cal,  # use the same calendar as above
+                face,  # notional
+                maturity,  # maturity date
+                business_day_convention,  # payment convention (for settlement)
+                100.0,  # redemption (% of face)
+                issue_date  # issue date
+            )
+            zcb.setPricingEngine(ql.DiscountingBondEngine(curve))
+            return zcb
+
 
     # --------- Instrument ----------
-    bond = ql.FloatingRateBond(
-        settlement_days,
-        face,
-        schedule,
-        pricing_index,
-        dc,
-        business_day_convention,
-        pricing_index.fixingDays(),
-        [1.0],  # gearings
-        [spread],  # spreads
-        [], [],  # caps, floors
-        False,  # inArrears
-        100.0,  # redemption
-        issue_date
-    )
+    try:
+        bond = ql.FloatingRateBond(
+            settlement_days,
+            face,
+            schedule,
+            pricing_index,
+            dc,
+            business_day_convention,
+            pricing_index.fixingDays(),
+            [1.0],  # gearings
+            [spread],  # spreads
+            [], [],  # caps, floors
+            False,  # inArrears
+            100.0,  # redemption
+            issue_date
+        )
+    except Exception as e:
+        raise e
 
 
     # --------- Pricing engine ----------

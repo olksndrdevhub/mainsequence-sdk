@@ -27,7 +27,7 @@ class PositionLine:
     Units may be negative for short positions.
     """
     instrument: Instrument
-    units: float = 1.0
+    units: float
     extra_market_info:dict = None
 
     def unit_price(self) -> float:
@@ -72,7 +72,7 @@ class Position(BaseModel):
         for item in data.get("lines", []):
             t = item.get("instrument_type")
             payload = item.get("instrument", {})
-            units = float(item.get("units", 1.0))
+            units = item["units"]
             extra_market_info= item.get("extra_market_info")
             cls_ = reg.get(t)
             if cls_ is None or not hasattr(cls_, "from_json"):

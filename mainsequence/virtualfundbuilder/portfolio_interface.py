@@ -6,7 +6,7 @@ import yaml
 import re
 
 from .config_handling import configuration_sanitizer
-from .data_nodes import PortfolioStrategy
+from .data_nodes import PortfolioStrategy, PortfolioFromDF
 from mainsequence.client import Asset, AssetFutureUSDM, MARKETS_CONSTANTS as CONSTANTS, Portfolio, PortfolioIndexAsset
 
 from .models import PortfolioConfiguration
@@ -19,10 +19,12 @@ class PortfolioInterface():
     directly with a full tree update.
     """
     def __init__(self, portfolio_config_template: dict,
-                 configuration_name: str=None):
+                 configuration_name: str=None,is_portfolio_from_df=False):
         """
         Initializes the portfolio strategy with the necessary configurations.
         """
+        if is_portfolio_from_df == True:
+            return None
         if configuration_name:
             self.check_valid_configuration_name(configuration_name)
         self.portfolio_config_template = portfolio_config_template
@@ -41,6 +43,51 @@ class PortfolioInterface():
 
     def __repr__(self):
         return self.__str__()
+
+    @classmethod
+    def build_and_run_portfolio_from_df(cls,portfolio_node:PortfolioFromDF,
+                                        debug_mode=True,
+                                        force_update=True,
+                                        update_tree=True,
+                                        portfolio_tags: List[str] = None,
+                                        add_portfolio_to_markets_backend=False,
+                                        ):
+        assert isinstance(portfolio_node, PortfolioFromDF)
+
+        interface=cls(portfolio_config_template=None,is_portfolio_from_df=True)
+        interface._is_initialized=True
+        interface.portfolio_strategy_data_node=portfolio_node
+
+
+
+        interface.run( patch_build_configuration=False,
+            debug_mode=debug_mode,
+            force_update=force_update,
+            update_tree=update_tree,
+            portfolio_tags = portfolio_tags,
+            add_portfolio_to_markets_backend=False,)
+
+
+        ## manualely
+        target_portfolio = Portfolio.get_or_none(local_time_serie__id=portfolio_node.local_time_serie.id)
+        standard_kwargs = dict(portfolio_name=portfolio_node.portfolio_name,
+                               local_time_serie_id=portfolio_node.local_time_serie.id,
+                               signal_local_time_serie_id=None,
+                               is_active=True,
+                               calendar_name=portfolio_node.calendar_name,
+                               target_portfolio_about=dict(description=portfolio_node.target_portfolio_about,
+                                                           signal_name=None,
+                                                           signal_description=None,
+                                                           rebalance_strategy_name=None),
+                               backtest_table_price_column_name="close")
+        if target_portfolio is None:
+            target_portfolio, index_asset = Portfolio.create_from_time_series(**standard_kwargs)
+        else:
+            # patch timeserie of portfolio to guaranteed recreation
+            target_portfolio.patch(**standard_kwargs)
+
+            index_asset = PortfolioIndexAsset.get(reference_portfolio__id=target_portfolio.id)
+
 
     def _initialize_nodes(self,patch_build_configuration=True) -> None:
         """

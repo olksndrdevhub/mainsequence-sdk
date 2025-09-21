@@ -3,6 +3,7 @@ from typing import Protocol, runtime_checkable, Optional
 from pydantic import BaseModel, Field, PrivateAttr
 from .json_codec import JSONMixin
 import datetime
+import json
 class InstrumentModel(BaseModel, JSONMixin):
     """
     Common base for all Pydantic instrument models.
@@ -27,3 +28,12 @@ class InstrumentModel(BaseModel, JSONMixin):
     # explicit setter method (per your request)
     def set_valuation_date(self, value: Optional[datetime.datetime]) -> None:
         self._valuation_date = value
+
+    def serialize_for_backend(self):
+        serialized={}
+        data = self.model_dump_json()
+        data = json.loads(data)
+        serialized["instrument_type"] = type(self).__name__
+        serialized["instrument"] = data
+
+        return json.dumps(serialized)

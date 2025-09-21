@@ -54,20 +54,82 @@ def translate_to_pandas_freq(custom_freq):
     # Combine the number with the pandas frequency
     return f"{number}{pandas_freq}"
 
+WEIGHTS_TO_PORTFOLIO_COLUMNS = {
+    "rebalance_weights": "weights_current",
+    "rebalance_price": "price_current",
+    "volume": "volume_current",
+    "weights_at_last_rebalance": "weights_before",
+    "price_at_last_rebalance": "price_before",
+    "volume_at_last_rebalance": "volume_before"
+}
+
+All_PORTFOLIO_COLUMNS = []
+All_PORTFOLIO_COLUMNS.extend(list(WEIGHTS_TO_PORTFOLIO_COLUMNS.keys()))
+All_PORTFOLIO_COLUMNS.extend(["last_rebalance_date","close","return"])
+
+
+class PortfolioFromDF(DataNode):
+
+    def __init__(self, portfolio_name:str,calendar_name:str,
+                 target_portfolio_about:str,
+                 *args, **kwargs):
+        self.portfolio_name = portfolio_name
+        self.calendar_name=calendar_name
+        self.target_portfolio_about=target_portfolio_about
+        super().__init__(*args, **kwargs)
+
+    def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
+        return {}
+
+    def get_portfolio_df(self):
+        raise NotImplementedError()
+
+    def update(self):
+        df=self.get_portfolio_df()
+        if df.empty:
+            return pd.DataFrame()
+
+        assert all([c in All_PORTFOLIO_COLUMNS for  c in df.columns])
+        if self.update_statistics.max_time_index_value is not None:
+            df=df[df.index>=self.update_statistics.max_time_index_value]
+        if df.empty:
+            return pd.DataFrame()
+
+        for c in WEIGHTS_TO_PORTFOLIO_COLUMNS.keys():
+            def _to_json_dict(v):
+                # Normalize missing to empty dict
+                if v is None or (isinstance(v, float) and np.isnan(v)):
+                    v = {}
+
+                # If already a JSON string, parse; if a Python-literal string, literal_eval
+                if isinstance(v, str):
+                    try:
+                        v = json.loads(v)
+                    except Exception:
+                        try:
+                            v = ast.literal_eval(v)
+                        except Exception:
+                            raise ValueError(f"Value in '{col}' is not JSON/dict: {v!r}")
+
+                if not isinstance(v, dict):
+                    raise ValueError(f"Value in '{col}' is not a dict after normalization (got {type(v)}).")
+
+                # Dump to canonical JSON (and verify round-trip)
+                s = json.dumps(v, ensure_ascii=False, sort_keys=True)
+                json.loads(s)  # will raise if invalid
+                return s
+
+            df[c] = df[c].apply(_to_json_dict)
+
+        return df
+
 
 class PortfolioStrategy(DataNode):
     """
     Manages the rebalancing of asset weights within a portfolio over time, considering transaction fees
     and rebalancing strategies. Calculates portfolio values and returns while accounting for execution-specific fees.
     """
-    WEIGHTS_TO_PORTFOLIO_COLUMNS = {
-        "rebalance_weights": "weights_current",
-        "rebalance_price": "price_current",
-        "volume": "volume_current",
-        "weights_at_last_rebalance": "weights_before",
-        "price_at_last_rebalance": "price_before",
-        "volume_at_last_rebalance": "volume_before"
-    }
+
 
     def __init__(
             self,
@@ -355,7 +417,7 @@ rebalance details:"""
 
         # calculate close metrics
         rebalance_weights_serialized = pd.DataFrame(index=weights_pivot.index)
-        for portfolio_column, weights_column in self.WEIGHTS_TO_PORTFOLIO_COLUMNS.items():
+        for portfolio_column, weights_column in WEIGHTS_TO_PORTFOLIO_COLUMNS.items():
             rebalance_weights_serialized[portfolio_column] = [json.dumps(r) for r in
                                                               weights_pivot[weights_column].to_dict(orient="records")]
 
@@ -369,7 +431,7 @@ rebalance details:"""
         )
 
         # Forward-fill the serialized weights and last rebalance dates
-        rebalance_columns = list(self.WEIGHTS_TO_PORTFOLIO_COLUMNS.keys())
+        rebalance_columns = list(WEIGHTS_TO_PORTFOLIO_COLUMNS.keys())
         portfolio[rebalance_columns] = portfolio[rebalance_columns].ffill()
         portfolio['last_rebalance_date'] = portfolio['last_rebalance_date'].ffill()
 
@@ -384,7 +446,7 @@ rebalance details:"""
             return None
 
         last_weights = {}
-        for portfolio_column, weights_column in self.WEIGHTS_TO_PORTFOLIO_COLUMNS.items():
+        for portfolio_column, weights_column in WEIGHTS_TO_PORTFOLIO_COLUMNS.items():
             last_weights[weights_column] = json.loads(last_obs[portfolio_column].iloc[0])
 
         last_weights = pd.DataFrame(last_weights)
