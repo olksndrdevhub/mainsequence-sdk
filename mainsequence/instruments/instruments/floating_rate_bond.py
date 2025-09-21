@@ -137,16 +137,15 @@ class FloatingRateBond(InstrumentModel):
                 self._bond = None
                 self._build_bond(curve, with_yield=with_yield)
 
+
+    def get_index_curve(self):
+        self._ensure_index()
+        return self._index.forwardingTermStructure()
+
     def price(self, with_yield: Optional[float] = None) -> float:
         self._setup_pricer(with_yield=with_yield)
         return float(self._bond.NPV())
 
-
-
-
-    def price(self,with_yield:Optional[float]=None) -> float:
-        self._setup_pricer(with_yield=with_yield)
-        return float(self._bond.NPV())
 
     def analytics(self,with_yield:Optional[float]=None) -> dict:
         self._setup_pricer(with_yield=with_yield)

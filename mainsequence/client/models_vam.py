@@ -191,7 +191,6 @@ def _set_query_param_on_url(url: str, key: str, value) -> str:
 
 class AssetPricingDetail(BasePydanticModel):
     instrument_dump:dict
-    market_pricing_details:dict
     pricing_details_date:datetime.datetime
 
 class AssetMixin(BaseObjectOrm, BasePydanticModel):
@@ -255,21 +254,12 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         After model construction, if instrument_pricing_detail is present,
         ensure it contains {'main_sequence_asset_id': self.id}.
         """
-        ipd = self.instrument_pricing_detail
+        ipd = self.current_pricing_detail
         if ipd is not None:
             # Be tolerant: coerce to a dict if necessary.
-            if not isinstance(ipd, dict):
-                try:
-                    # Try JSON string first
-                    import json
-                    if isinstance(ipd, str):
-                        ipd = json.loads(ipd)
-                    else:
-                        ipd = dict(ipd)
-                except Exception:
-                    ipd = {}
-            ipd["main_sequence_asset_id"] = self.id
-            self.instrument_pricing_detail = ipd
+
+            ipd.instrument_dump["instrument"]['main_sequence_asset_id'] = self.id
+            self.current_pricing_detail = ipd
         return self
 
     @property
@@ -377,6 +367,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
                 else:
                     item["orm_class"] = cls.__name__
                     try:
+
                         accumulated.append(cls(**item) if issubclass(cls, BasePydanticModel) else item)
                     except Exception as e:
                         print(item)
@@ -533,8 +524,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         # Convert the accumulated raw data into asset instances with correct classes
         return create_from_serializer_with_class(all_results)
 
-    def set_instrument_pricing_details_from_ms_instrument(self,instrument,
-                                                          market_pricing_details:dict,
+    def add_instrument_pricing_details_from_ms_instrument(self,instrument,
                                                           pricing_details_date:datetime.datetime,
                                                           timeout=None):
 
@@ -543,12 +533,11 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         data=json.loads(data)
         data["instrument"]["main_sequence_asset_id"]=self.id
         data["pricing_details_date"]=pricing_details_date.timestamp()
-        data["market_pricing_details"]=market_pricing_details
 
-        return self.set_instrument_pricing_details(instrument_pricing_details=data,timeout=timeout)
+        return self.add_instrument_pricing_details(instrument_pricing_details=data,timeout=timeout)
 
 
-    def set_instrument_pricing_details(
+    def add_instrument_pricing_details(
             self,
             instrument_pricing_details: Dict[str, Any],
             timeout: Optional[float] = None,
@@ -580,7 +569,7 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
             loaders=self.LOADERS,
             r_type="POST",
             url=url,
-            payload={"json": {"dump":instrument_pricing_details}},  # raw body (no 'dump', no 'organization_id')
+            payload={"json": instrument_pricing_details},  # raw body (no 'dump', no 'organization_id')
             time_out=timeout,
         )
 
@@ -600,8 +589,11 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
 
         data = r.json()
 
-
-        self.instrument_pricing_detail = data.get("instrument_pricing_detail")
+        data.get("instrument_pricing_detail")
+        when=data["pricing_details_date"]
+        self.current_pricing_detail = AssetPricingDetail(instrument_dump=data["instrument_dump"],
+                                                            pricing_details_date=datetime.datetime.utcfromtimestamp(when).replace(tzinfo=pytz.utc)
+                                                            )
 
 
 

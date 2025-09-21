@@ -112,6 +112,13 @@ class DataAccessMixin:
         repr = self.__class__.__name__ + f" {os.environ['TDAG_ENDPOINT']}/local-time-series/details/?local_time_serie_id={local_id}"
         return repr
 
+    def get_last_observation(self,asset_list:List[ms_client.AssetMixin]):
+        update_statistics = self.get_update_statistics()
+        update_statistics = update_statistics.update_assets(asset_list=asset_list)
+        update_range_map = update_statistics.get_update_range_map_great_or_equal()
+        last_observation = self.get_ranged_data_per_asset(update_range_map)
+        return last_observation
+
     def get_pickle_path_from_time_serie(self) -> str:
         path = build_operations.get_pickle_path(update_hash=self.update_hash,
                                data_source_id=self.data_source_id,
@@ -460,36 +467,7 @@ class APIDataNode(DataAccessMixin):
         assert metadata is not None, f"Verify that the table {self.storage_hash} exists "
 
 
-    def _get_update_statistics(self, asset_symbols: List[str],
-                              storage_hash: str, time_serie: "DataNode" #necessary for uatomated methods
-                              ) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
-        """
-        Gets update statistics for the time series.
 
-        Returns:
-            A tuple containing the last update timestamp for the table and a dictionary of
-            last update timestamps per asset.
-        """
-        if self.is_api:
-            metadata = self.local_persist_manager.metadata
-        else:
-            metadata = self.local_metadata.remote_table
-
-        last_update_in_table, last_update_per_asset = None, None
-
-        if metadata.sourcetableconfiguration is not None:
-            last_update_in_table = metadata.sourcetableconfiguration.last_time_index_value
-            if last_update_in_table is None:
-                return last_update_in_table, last_update_per_asset
-            if metadata.sourcetableconfiguration.multi_index_stats is not None:
-                last_update_per_asset = metadata.sourcetableconfiguration.multi_index_stats['max_per_asset_symbol']
-                if last_update_per_asset is not None:
-                    last_update_per_asset = {unique_identifier: ms_client.request_to_datetime(v) for unique_identifier, v in last_update_per_asset.items()}
-
-        if asset_symbols is not None and last_update_per_asset is not None:
-            last_update_per_asset = {asset: value for asset, value in last_update_per_asset.items() if asset in asset_symbols}
-
-        return last_update_in_table, last_update_per_asset
 
     def get_update_statistics(self, asset_symbols: Optional[list] = None) -> Tuple[Optional[datetime.datetime], Optional[Dict[str, datetime.datetime]]]:
         """
@@ -501,13 +479,8 @@ class APIDataNode(DataAccessMixin):
         Returns:
             A tuple containing the last update time for the table and a dictionary of last update times per asset.
         """
-        last_update_in_table, last_update_per_asset = self._get_update_statistics(
-            storage_hash=self.storage_hash,
-            asset_symbols=asset_symbols, time_serie=self)
-        return UpdateStatistics(
-            max_time_index_value=last_update_in_table,
-            asset_time_statistics=last_update_per_asset or {}
-        )
+
+        return  self.local_persist_manager.metadata.sourcetableconfiguration.get_data_updates()
 
     def get_earliest_updated_asset_filter(self, unique_identifier_list: list,
                                           last_update_per_asset: dict) -> datetime.datetime:

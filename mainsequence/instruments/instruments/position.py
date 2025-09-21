@@ -53,6 +53,9 @@ class Position(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
+
+
+
     @classmethod
     def from_json_dict(
             cls,
