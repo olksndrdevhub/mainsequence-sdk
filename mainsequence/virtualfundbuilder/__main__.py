@@ -160,7 +160,7 @@ def import_project_configuration():
     logger = get_vfb_logger()
 
     # load project configuration if exists
-    config_file = Path(os.getenv("VFB_PROJECT_PATH")) / "project_configuration.yaml"
+    config_file = Path(os.getenv("VFB_PROJECT_PATH")).parent / "project_configuration.yaml"
     logger.info(f"Try to import project configuration from {config_file}")
 
     if not config_file.exists():
