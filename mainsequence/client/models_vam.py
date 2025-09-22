@@ -68,6 +68,7 @@ def get_model_class(model_class: str):
         "PortfolioIndexAsset": PortfolioIndexAsset,
         "Calendar": Calendar,
         "ExecutionVenue": ExecutionVenue,
+        "PortfolioGroup": PortfolioGroup,
     }
     return MODEL_CLASS_MAP[model_class]
 
@@ -1500,6 +1501,85 @@ class Portfolio(PortfolioMixin, BaseObjectOrm, BasePydanticModel):
     pass
 
 
+class PortfolioGroup(BaseObjectOrm, BasePydanticModel):
+    id: int
+    unique_identifier: str
+    display_name: str
+    source: str
+    portfolios: List[Union[int, "Portfolio"]]
+    organization_owner_uid: str
+    description: Optional[str] = None
+
+    def __repr__(self):
+        return f"{self.display_name} ({self.unique_identifier}), {len(self.portfolios)} portfolios"
+
+    def append_portfolios(self, portfolio_ids: List[int]) -> "PortfolioGroup":
+        """
+        Appends portfolios to the group by calling the custom API action.
+
+        Args:
+            portfolio_ids: A list of portfolio primary keys to add to the group.
+
+        Returns:
+            The updated PortfolioGroup instance.
+        """
+        if not self.id:
+            raise ValueError("Cannot append portfolios to an unsaved PortfolioGroup.")
+
+        url = f"{self.get_object_url()}/{self.id}/append-portfolios/"
+        payload = {"portfolios": portfolio_ids}
+
+        r = make_request(
+            s=self.build_session(),
+            loaders=self.LOADERS,
+            r_type="POST",
+            url=url,
+            payload={"json": payload}
+        )
+
+        if r.status_code != 200:
+            raise Exception(f"Error appending portfolios: {r.text}")
+
+        # Update the current instance in-place with the response from the server
+        updated_data = r.json()
+        for key, value in updated_data.items():
+            setattr(self, key, value)
+
+        return self
+
+    def remove_portfolios(self, portfolio_ids: List[int]) -> "PortfolioGroup":
+        """
+        Removes portfolios from the group by calling the custom API action.
+
+        Args:
+            portfolio_ids: A list of portfolio primary keys to remove from the group.
+
+        Returns:
+            The updated PortfolioGroup instance.
+        """
+        if not self.id:
+            raise ValueError("Cannot remove portfolios from an unsaved PortfolioGroup.")
+
+        url = f"{self.get_object_url()}/{self.id}/remove-portfolios/"
+        payload = {"portfolios": portfolio_ids}
+
+        r = make_request(
+            s=self.build_session(),
+            loaders=self.LOADERS,
+            r_type="POST",
+            url=url,
+            payload={"json": payload}
+        )
+
+        if r.status_code != 200:
+            raise Exception(f"Error removing portfolios: {r.text}")
+
+        # Update the current instance in-place with the response from the server
+        updated_data = r.json()
+        for key, value in updated_data.items():
+            setattr(self, key, value)
+
+        return self
 
 class ExecutionPrediction(BaseObjectOrm):
     @classmethod

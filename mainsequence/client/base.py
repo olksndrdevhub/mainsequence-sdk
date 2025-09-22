@@ -79,6 +79,7 @@ class BaseObjectOrm:
 
         # VAM
         "Portfolio": 'assets/target_portfolio',
+        "PortfolioGroup": "assets/portfolio_group",
         "Asset": "assets/asset",
         "IndexAsset": "assets/index_asset",
         "AssetFutureUSDM": "assets/asset_future_usdm",
