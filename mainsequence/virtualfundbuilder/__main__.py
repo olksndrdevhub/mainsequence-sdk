@@ -75,20 +75,20 @@ def run_app(app_name, configuration):
         raise
     logger.info(f"Finished App {app_name} run with results: {results}")
 
-def run_notebook(notebook_name):
+def run_notebook(execution_object):
     from mainsequence.virtualfundbuilder.notebook_handling import convert_notebook_to_python_file
     from mainsequence.virtualfundbuilder.utils import get_vfb_logger
     logger = get_vfb_logger()
-    logger.info(f"Run Notebook {notebook_name}")
-    notebook_file_path = os.path.join(os.getenv("VFB_PROJECT_PATH"), "notebooks", f"{notebook_name}.ipynb")
+    logger.info(f"Run Notebook {execution_object}")
+    notebook_file_path = Path(os.getenv("VFB_PROJECT_PATH")).parent / execution_object
     python_notebook_file = convert_notebook_to_python_file(notebook_file_path)
     runpy.run_path(python_notebook_file, run_name="__main__")
 
-def run_script(script_name):
+def run_script(execution_object):
     from mainsequence.virtualfundbuilder.utils import get_vfb_logger
     logger = get_vfb_logger()
-    logger.info(f"Run script {script_name}")
-    python_file_path = os.path.join(os.getenv("VFB_PROJECT_PATH"), "scripts", f"{script_name}.py")
+    logger.info(f"Run script {execution_object}")
+    python_file_path = Path(os.getenv("VFB_PROJECT_PATH")).parent / execution_object
     runpy.run_path(python_file_path, run_name="__main__")
 
 def get_py_modules(folder_path):
@@ -98,6 +98,7 @@ def get_py_modules(folder_path):
     return [f.split(".")[0] for f in files]
 
 def get_pod_configuration():
+    # TODO needs to introspect for apps in any folder?
     print("Get pod configuration")
 
     project_library = os.getenv("PROJECT_LIBRARY_NAME")
