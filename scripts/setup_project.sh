@@ -24,8 +24,8 @@ echo ">> PROJECT_NAME: $PROJECT_NAME"
 echo ">> VFB_PROJECT_PATH: $VFB_PROJECT_PATH"
 echo ">> AUTHENTICATION_METHOD: $AUTHENTICATION_METHOD"
 
-if [ ! -d "$VFB_PROJECT_PATH" ]; then
-  echo "Folder $VFB_PROJECT_PATH does not exist. Cloning repo..."
+if [ ! -f "${ROOT_PROJECT_PATH}/requirements.txt" ]; then
+  echo "File ${ROOT_PROJECT_PATH}/requirements.txt does not exist. Cloning repo..."
 
   # Basic SSH config if we’re using SSH-based Git
   mkdir -p "$HOME_DIR/.ssh" || true
@@ -74,27 +74,17 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   fi
 
   # create default folders if not exist
-  mkdir -p "$VFB_PROJECT_PATH"
-  mkdir -p "$VFB_PROJECT_PATH/notebooks"
-  mkdir -p "$VFB_PROJECT_PATH/configurations"
-  mkdir -p "$VFB_PROJECT_PATH/scripts"
-  mkdir -p "$VFB_PROJECT_PATH/data_nodes"
-  mkdir -p "$VFB_PROJECT_PATH/rebalance_strategies"
-  mkdir -p "$VFB_PROJECT_PATH/apps"
-  mkdir -p "$VFB_PROJECT_PATH/dashboards"
+  mkdir -p "$ROOT_PROJECT_PATH/dashboards"
+  mkdir -p "$ROOT_PROJECT_PATH/src"
 
-  touch "$VFB_PROJECT_PATH/__init__.py"
-  touch "$VFB_PROJECT_PATH/data_nodes/__init__.py"
-  touch "$VFB_PROJECT_PATH/rebalance_strategies/__init__.py"
-  touch "$VFB_PROJECT_PATH/scripts/__init__.py"
-  touch "$VFB_PROJECT_PATH/notebooks/__init__.py"
-  touch "$VFB_PROJECT_PATH/apps/__init__.py"
-  touch "$VFB_PROJECT_PATH/dashboards/__init__.py"
+
+  touch "$ROOT_PROJECT_PATH/dashboards/__init__.py"
+  touch "$ROOT_PROJECT_PATH/src/__init__.py"
 
   echo "Copying Files from mainsequence-sdk"
-  cp -a "/opt/code/mainsequence-sdk/examples/getting_started/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"
+#  cp -a "/opt/code/mainsequence-sdk/examples/getting_started/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"
   cp -a "/opt/code/mainsequence-sdk/requirements.txt" "${ROOT_PROJECT_PATH}/requirements.txt" || echo "WARNING: Copy requirements step failed!"
-  cp -a /opt/code/mainsequence-sdk/examples/configurations/market_cap.yaml "$VFB_PROJECT_PATH/configurations" || echo "WARNING: Copy configurations step failed!"
+#  cp -a /opt/code/mainsequence-sdk/examples/configurations/market_cap.yaml "$VFB_PROJECT_PATH/configurations" || echo "WARNING: Copy configurations step failed!"
 
   echo "Adding/Updating .gitignore..."
   echo ".ipynb_checkpoints" > "$ROOT_PROJECT_PATH/.gitignore"
@@ -108,7 +98,7 @@ if [ ! -d "$VFB_PROJECT_PATH" ]; then
   git commit -am "initial commit for $TDAG_ENDPOINT"
   git push
 else
-  echo "Folder $VFB_PROJECT_PATH already exists. Updating repo..."
+  echo "File ${ROOT_PROJECT_PATH}/requirements.txt already exists. Updating repo..."
 
   # Fix SSH key perms if re-using SSH
   chmod 600 "$HOME_DIR/.ssh/id_rsa" 2>/dev/null || true
