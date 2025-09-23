@@ -1486,7 +1486,8 @@ class PortfolioMixin:
                          )
         if r.status_code in [200] == False:
             raise Exception(f" {r.text()}")
-        return r.json()
+        results=r.json()
+        return results["weights"],datetime.datetime.utcfromtimestamp(results["weights_date"]).replace(tzinfo=pytz.utc)
 
     def get_historical_weights(self,
                                start_date_timestamp:float,end_date_timestamp:float,

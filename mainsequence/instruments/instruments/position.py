@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 from .base_instrument import InstrumentModel as Instrument  # runtime_checkable Protocol: requires .price() -> float
 
 from typing import Type, Mapping
+
 from .european_option import EuropeanOption
 from .vanilla_fx_option import VanillaFXOption
 from .knockout_fx_option import KnockOutFXOption
@@ -18,7 +19,16 @@ from .floating_rate_bond import FloatingRateBond
 from .interest_rate_swap import InterestRateSwap
 import pandas as pd
 import numpy as np
-
+Instrument._DEFAULT_REGISTRY.update({
+    "EuropeanOption":    globals().get("EuropeanOption"),
+    "VanillaFXOption":   globals().get("VanillaFXOption"),
+    "KnockOutFXOption":  globals().get("KnockOutFXOption"),
+    "FixedRateBond":     globals().get("FixedRateBond"),
+    "FloatingRateBond":  globals().get("FloatingRateBond"),
+    "InterestRateSwap":  globals().get("InterestRateSwap"),
+})
+# Optionally: prune any Nones if some classes aren't imported yet
+Instrument._DEFAULT_REGISTRY = {k: v for k, v in Instrument._DEFAULT_REGISTRY.items() if v is not None}
 
 @dataclass(frozen=True)
 class PositionLine:
@@ -50,7 +60,7 @@ class Position(BaseModel):
     """
 
     lines: List[PositionLine] = Field(default_factory=list)
-
+    position_date:Optional[datetime.datetime]=None
     model_config = {"arbitrary_types_allowed": True}
 
 
@@ -63,25 +73,13 @@ class Position(BaseModel):
             registry: Optional[Mapping[str, Type]] = None
     ) -> "Position":
         # default registry with your known instruments
-        reg = dict(registry or {
-            "EuropeanOption": EuropeanOption,
-            "VanillaFXOption": VanillaFXOption,
-            "KnockOutFXOption": KnockOutFXOption,
-            "FixedRateBond": FixedRateBond,
-            "FloatingRateBond": FloatingRateBond,
-            "InterestRateSwap": InterestRateSwap,
-        })
+
         lines: List[PositionLine] = []
         for item in data.get("lines", []):
-            t = item.get("instrument_type")
-            payload = item.get("instrument", {})
+            inst = Instrument.rebuild(item, registry=registry)
             units = item["units"]
-            extra_market_info= item.get("extra_market_info")
-            cls_ = reg.get(t)
-            if cls_ is None or not hasattr(cls_, "from_json"):
-                raise ValueError(f"Unknown or non-JSONable instrument type: {t}")
-            inst = cls_.from_json(payload)
-            lines.append(PositionLine(instrument=inst, units=units,extra_market_info=extra_market_info))
+            extra_market_info = item.get("extra_market_info")
+            lines.append(PositionLine(instrument=inst, units=units, extra_market_info=extra_market_info))
         return cls(lines=lines)
 
         # ---------------- JSON ENCODING ----------------
