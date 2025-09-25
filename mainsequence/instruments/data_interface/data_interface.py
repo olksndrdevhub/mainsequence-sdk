@@ -281,17 +281,22 @@ class MSInterface():
         from mainsequence.instruments.settings import DISCOUNT_CURVES_TABLE
         data_node = APIDataNode.build_from_identifier(identifier=DISCOUNT_CURVES_TABLE)
 
-        print("REMOVE FONLY FOR TEST PURPOSES")
-        import pytz  # patch
 
-        target_date = datetime.datetime(2025, 9, 15, tzinfo=pytz.utc)
-        if "M_BONO" in curve_name:
-            target_date = datetime.datetime(2025, 9, 9, tzinfo=pytz.utc)
+
+        # for test purposes only get lats observations
+        update_statistics = data_node.get_update_statistics()
+        target_date = update_statistics.asset_time_statistics[curve_name]
+        print("REMOVE ABOCVE ONLU FOR TESTING")
+
 
         try:
             limit = target_date + datetime.timedelta(days=1)
         except Exception as e:
             raise e
+
+
+
+
         curve = data_node.get_ranged_data_per_asset(
             range_descriptor={curve_name: {"start_date": target_date, "start_date_operand": ">=",
                                            "end_date": limit, "end_date_operand": "<", }}

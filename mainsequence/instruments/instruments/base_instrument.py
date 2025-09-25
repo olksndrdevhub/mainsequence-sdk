@@ -1,5 +1,5 @@
 # src/instruments/base_instrument.py
-from typing import Protocol, runtime_checkable, Optional
+from typing import Protocol, runtime_checkable, Optional, Union,Dict, Any, Mapping,Type,ClassVar
 from pydantic import BaseModel, Field, PrivateAttr
 from .json_codec import JSONMixin
 import datetime
@@ -19,7 +19,7 @@ class InstrumentModel(BaseModel, JSONMixin):
 
     _valuation_date: Optional[datetime.datetime] =PrivateAttr(default=None)
 
-
+    _DEFAULT_REGISTRY: ClassVar[Dict[str, Type["InstrumentModel"]]] = {}
     # public read access (still not serialized)
     @property
     def valuation_date(self) -> Optional[datetime.datetime]:
@@ -37,3 +37,49 @@ class InstrumentModel(BaseModel, JSONMixin):
         serialized["instrument"] = data
 
         return json.dumps(serialized)
+
+    @classmethod
+    def rebuild(
+            cls,
+            data: Union[str, Dict[str, Any]],
+            registry: Optional[Mapping[str, Type["InstrumentModel"]]] = None,
+    ) -> "InstrumentModel":
+        """
+        Rebuild a single instrument from its wire format.
+
+        Accepts either:
+          - a dict: {"instrument_type": "FixedRateBond", "instrument": {...}}
+          - a JSON string of the same shape
+
+        Optional `registry` maps instrument_type -> InstrumentModel subclass.
+        Falls back to InstrumentModel._DEFAULT_REGISTRY.
+        """
+        # Parse JSON if needed
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except Exception as e:
+                raise ValueError(f"Invalid JSON for instrument: {e}")
+
+        if not isinstance(data, dict):
+            raise ValueError("Instrument payload must be dict or JSON string.")
+
+        t = data.get("instrument_type")
+        payload = data.get("instrument", {})
+        if not t or not isinstance(payload, dict):
+            raise ValueError(
+                "Expected {'instrument_type': <str>, 'instrument': <dict>}."
+            )
+
+        # Merge registries (explicit registry overrides defaults)
+        effective_registry: Dict[str, Type[InstrumentModel]] = dict(cls._DEFAULT_REGISTRY)
+        if registry:
+            effective_registry.update(registry)
+
+        target_cls = effective_registry.get(t)
+        if target_cls is None:
+            raise ValueError(f"Unknown instrument type: {t}")
+        if not hasattr(target_cls, "from_json"):
+            raise TypeError(f"Instrument type {t} is not JSON-rebuildable (missing from_json).")
+
+        return target_cls.from_json(payload)

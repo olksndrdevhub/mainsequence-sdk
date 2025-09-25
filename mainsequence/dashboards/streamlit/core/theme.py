@@ -20,7 +20,7 @@ def explain_theming():
     )
 
 
-from .base64_imgs import *
+from mainsequence.base64_imgs import *
 
 
 # In streamlit/core/theme.py
@@ -68,10 +68,11 @@ def override_spinners(
 <style>
 /* ---- 4-frame animation ---- */
 @keyframes st-fourframe {{
-  0%,100% {{ background-image:url("{i1}"); }}
+  0%% {{ background-image:url("{i1}"); }}
   25%      {{ background-image:url("{i2}"); }}
   50%      {{ background-image:url("{i3}"); }}
   75%      {{ background-image:url("{i4}"); }}
+   100% {{ background-image:url("{i4}"); }}
 }}
 
 /* ---- CSS variables ---- */

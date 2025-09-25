@@ -5,7 +5,6 @@ from typing import Any, Callable, Mapping, MutableMapping, Optional, Tuple, Unio
 
 import streamlit as st
 
-from mainsequence.dashboards.streamlit.core.registry import get_page, list_pages
 from mainsequence.dashboards.streamlit.core.theme import inject_css_for_dark_accents, override_spinners
 from importlib.resources import files as _pkg_files
 import sys
@@ -99,22 +98,20 @@ InitSessionFn = Callable[[MutableMapping[str, Any]], None]
 NotFoundFn    = Callable[[], None]
 
 @dataclass
-class AppConfig:
+class PageConfig:
     title: str
-    build_context: ContextFn                              # required
-    route_selector: Optional[RouteFn] = None              # default: first visible page
+    build_context: Optional[ContextFn]   =None                           # required
+
     render_header: Optional[HeaderFn] = None              # if None, minimal header
     init_session: Optional[InitSessionFn] = None          # set defaults in session_state
-    on_not_found: Optional[NotFoundFn] = None             # optional 404 renderer
 
     # Optional overrides; if None, scaffold uses its bundled defaults.
     logo_path: Optional[Union[str, Path]] = None
     page_icon_path: Optional[Union[str, Path]] = None
 
     use_wide_layout: bool = True
-    hide_streamlit_multipage_nav: bool = True
+    hide_streamlit_multipage_nav: bool = False
     inject_theme_css: bool = True
-    default_page: Optional[str] = None                    # fallback slug
 
 # --- Internal helpers ---------------------------------------------------------
 
@@ -170,62 +167,54 @@ def _resolve_assets(explicit_logo: Optional[Union[str, Path]],
 
 # --- Public entrypoint --------------------------------------------------------
 
-def run_app(cfg: AppConfig) -> None:
-    """Run a Streamlit app using the base scaffold."""
-    override_spinners()
-    _bootstrap_theme_from_package()
-    # Resolve assets (defaults shipped with the scaffold)
+# scaffold.py
+def run_page(cfg: PageConfig):
+    """
+    Initialize page-wide look & feel, theme, context, and header.
+    Call this at the top of *every* Streamlit page (Home + pages/*).
+    Returns a context object (whatever build_context returns).
+    """
+    # 1) Page config should be the first Streamlit call
     _logo, _page_icon, _icon_for_logo = _resolve_assets(cfg.logo_path, cfg.page_icon_path)
-
     st.set_page_config(
         page_title=cfg.title,
-        page_icon=_page_icon,  # can be a path or an emoji fallback
-        layout="wide" if cfg.use_wide_layout else "centered"
+        page_icon=_page_icon,
+        layout="wide" if cfg.use_wide_layout else "centered",
     )
 
+    # 2) Optional: logo + CSS tweaks
     if _logo:
-        # Only pass icon_image if we have a real file for it
         st.logo(_logo, icon_image=_icon_for_logo)
-
     if cfg.inject_theme_css:
         inject_css_for_dark_accents()
 
+    # 3) Spinners (pure CSS)
+    override_spinners()
+
+    # 4) Do NOT hide the native nav unless explicitly asked
     if cfg.hide_streamlit_multipage_nav:
         st.markdown(_HIDE_NATIVE_NAV, unsafe_allow_html=True)
 
-    # Allow example app to seed session defaults (e.g., cfg_path)
+    # 5) Session + context
     if cfg.init_session:
         cfg.init_session(st.session_state)
 
+    ctx={}
+    if cfg.build_context:
+        ctx = cfg.build_context(st.session_state)
 
-
-    # Decide the target route
-    qp = st.query_params
-    visible_pages = list_pages(visible_only=True)
-    default_slug = cfg.default_page or (visible_pages[0].slug if visible_pages else None)
-    target_slug = cfg.route_selector(qp) if cfg.route_selector else default_slug
-
-    # Fallback if route not found or missing
-    page = get_page(target_slug) if target_slug else None
-    if page is None:
-        if cfg.on_not_found:
-            cfg.on_not_found()
-        else:
-            st.error("Page not found.")
-        return
-
-    # If this page doesn't own a sidebar, hide it (container + burger)
-    if not page.has_sidebar:
-        _hide_sidebar()
-
-    # Build a UI-free context (example app decides what "context" means)
-    ctx = cfg.build_context(st.session_state)
-
-    # Header (example can render a rich caption with context)
+    # 6) Header
     if cfg.render_header:
         cfg.render_header(ctx)
     else:
         _minimal_header(cfg.title)
 
-    # Route to the page
-    page.render(ctx)
+    # 7) Create .streamlit/config.toml on first run (reruns once if created)
+    from pathlib import Path
+    print(Path.cwd())
+    _bootstrap_theme_from_package()
+
+    return ctx
+
+
+
