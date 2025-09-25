@@ -1,5 +1,7 @@
 from __future__ import annotations
 import streamlit as st
+from pathlib import Path
+
 
 def inject_css_for_dark_accents():
     st.markdown(
@@ -20,14 +22,25 @@ def explain_theming():
     )
 
 
-from mainsequence.base64_imgs import *
 
 
-# In streamlit/core/theme.py
+# --- Load spinner frames ONCE from two levels above, files: image_1_base64.txt ... image_5_base64.txt ---
+def _load_spinner_frames_for_this_template() -> list[str]:
+    base_dir = Path(__file__).resolve().parent.parent.parent.parent # two levels above this module
+    frames: list[str] = []
+    for i in range(1, 6):
+        p = base_dir / f"image_{i}_base64.txt"
+        if not p.exists():
+            raise FileNotFoundError(f"Missing spinner frame file: {p}")
+        frames.append(p.read_text(encoding="utf-8").strip())
+    return frames
 
 
-import streamlit as st
+_SPINNER_FRAMES_RAW = _load_spinner_frames_for_this_template()
 
+
+# Expose constants for the function (keeps the code below simple)
+IMAGE_1_B64, IMAGE_2_B64, IMAGE_3_B64, IMAGE_4_B64, IMAGE_5_B64 = _SPINNER_FRAMES_RAW
 
 def override_spinners(
     hide_deploy_button: bool = False,
@@ -61,6 +74,7 @@ def override_spinners(
     i2 = as_data_uri(IMAGE_2_B64)
     i3 = as_data_uri(IMAGE_3_B64)
     i4 = as_data_uri(IMAGE_4_B64)
+    i5= as_data_uri(IMAGE_5_B64)
 
     veil_bg = f"rgba(0,0,0,{overlay_opacity})"
 
@@ -69,10 +83,11 @@ def override_spinners(
 /* ---- 4-frame animation ---- */
 @keyframes st-fourframe {{
   0%% {{ background-image:url("{i1}"); }}
-  25%      {{ background-image:url("{i2}"); }}
-  50%      {{ background-image:url("{i3}"); }}
-  75%      {{ background-image:url("{i4}"); }}
-   100% {{ background-image:url("{i4}"); }}
+  20%      {{ background-image:url("{i2}"); }}
+  40%      {{ background-image:url("{i3}"); }}
+  60%      {{ background-image:url("{i4}"); }}
+   80% {{ background-image:url("{i5}"); }}
+      100% {{ background-image:url("{i5}"); }}
 }}
 
 /* ---- CSS variables ---- */

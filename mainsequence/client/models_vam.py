@@ -1527,7 +1527,6 @@ class PortfolioGroup(BaseObjectOrm, BasePydanticModel):
     display_name: str
     source: str
     portfolios: List[Union[int, "Portfolio"]]
-    organization_owner_uid: str
     description: Optional[str] = None
 
     def __repr__(self):
