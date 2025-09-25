@@ -1,14 +1,42 @@
 [build-system]
-requires = ["setuptools", "wheel","toml"]
-build-backend = "setuptools.build_meta:__legacy__"
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
 
-# PEP 621 dependencies declaration
-# adapt to your dependencies manager
-#[project]
-#dependencies = [
-#    "mkdocstrings-python",
-#]
+[project]
+name = "mainsequence"
+version = "2.0.0"
+description = "Main Sequence SDK"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Main Sequence GmbH", email = "dev@main-sequence.io" }]
+# PEP 621 dependencies (published requirements)
+dependencies = [
+  "cloudpickle", "cryptography", "fire", "google-auth", "joblib", "matplotlib", "nbconvert", "numexpr",
+  "opentelemetry-api", "opentelemetry-exporter-otlp", "opentelemetry-sdk", "pandas", "pandas-market-calendars",
+  "psutil", "pyarrow", "pydantic", "pytest", "pytest-freezegun", "python-binance", "python-dotenv", "python-logstash",
+  "pyyaml", "s3fs", "scikit-learn", "scipy", "structlog", "tqdm", "colorama", "kaleido", "newspaper3k", "lxml-html-clean",
+  "docstring-parser", "concurrent-log-handler", "duckdb", "plotly", "twine", "typer", "quantlib",
+]
 
-# TODO this explodes bc toml is not configured correctly
-#[tool.setuptools.package-data]
-#"mainsequence.dashboards.streamlit" = ["assets/*.png", "assets/config.toml"]
+# PEP 735 dependency groups (local-only, not published)
+[dependency-groups]
+dev = [
+  "mkdocs",
+  "mkdocs-material",
+  "mkdocs-gen-files",
+  "mkdocs-literate-nav",
+  "mkdocs-autorefs",
+  "mkdocstrings[python]",
+  "mkdocs-mermaid2-plugin",
+  "pymdown-extensions",
+  "pipdeptree"
+]
+
+# Package discovery equivalent to find_packages(include=['mainsequence','mainsequence.*'])
+[tool.setuptools.packages.find]
+include = ["mainsequence", "mainsequence.*"]
+
+# Include your non-.py assets in wheels/sdists
+[tool.setuptools.package-data]
+"mainsequence" = ["**/*.html", "**/*.css", "**/*.png", "**/*.toml"]
+"mainsequence.dashboards.streamlit" = ["assets/*.png", "assets/config.toml"]
