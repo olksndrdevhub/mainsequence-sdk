@@ -258,8 +258,11 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
         ipd = self.current_pricing_detail
         if ipd is not None:
             # Be tolerant: coerce to a dict if necessary.
-
-            ipd.instrument_dump["instrument"]['main_sequence_asset_id'] = self.id
+            try:
+                ipd.instrument_dump["instrument"]['main_sequence_asset_id'] = self.id
+            except Exception as e:
+                self.clear_asset_pricing_details()
+                raise e
             self.current_pricing_detail = ipd
         return self
 
@@ -524,6 +527,22 @@ class AssetMixin(BaseObjectOrm, BasePydanticModel):
 
         # Convert the accumulated raw data into asset instances with correct classes
         return create_from_serializer_with_class(all_results)
+
+
+    def clear_asset_pricing_details(self,timeout=None):
+        base_url = self.get_object_url()  # e.g., https://api.example.com/assets
+        url = f"{base_url}/{self.id}/clear-asset-pricing-details/"
+        r = make_request(
+            s=self.build_session(),
+            loaders=self.LOADERS,
+            r_type="PATCH",
+            url=url,
+            time_out=timeout,
+        )
+
+        if r.status_code not in (200, 201):
+            raise Exception(r.text)
+
 
     def add_instrument_pricing_details_from_ms_instrument(self,instrument,
                                                           pricing_details_date:datetime.datetime,

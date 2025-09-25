@@ -14,8 +14,8 @@ from typing import Type, Mapping
 from .european_option import EuropeanOption
 from .vanilla_fx_option import VanillaFXOption
 from .knockout_fx_option import KnockOutFXOption
-from .fixed_rate_bond import FixedRateBond
-from .floating_rate_bond import FloatingRateBond
+from .bond import FixedRateBond
+from .bond import FloatingRateBond
 from .interest_rate_swap import InterestRateSwap
 import pandas as pd
 import numpy as np
