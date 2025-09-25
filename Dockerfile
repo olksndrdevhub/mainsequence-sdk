@@ -83,8 +83,8 @@ RUN pip uninstall -y mainsequence
 # and installing again
 
 # Make scripts executable, if you need them
-RUN chmod +x ${CODE_DIR}/mainsequence-sdk/platform_setup_scripts/get_git_and_run.sh
-RUN chmod +x ${CODE_DIR}/mainsequence-sdk/platform_setup_scripts/setup_project.sh
+RUN chmod +x ${CODE_DIR}/mainsequence-sdk/scripts/get_git_and_run.sh
+RUN chmod +x ${CODE_DIR}/mainsequence-sdk/scripts/setup_project.sh
 
 # Provide any environment variables you need
 ENV TDAG_CONFIG_PATH=${HOME_DIR}/tdag/default_config.yml \
