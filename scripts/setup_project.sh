@@ -93,10 +93,14 @@ if [ ! -f "${ROOT_PROJECT_PATH}/requirements.txt" ]; then
   # create default folders if not exist
   mkdir -p "$ROOT_PROJECT_PATH/dashboards"
   mkdir -p "$ROOT_PROJECT_PATH/src"
+  mkdir -p "$ROOT_PROJECT_PATH/scripts"
 
 
   touch "$ROOT_PROJECT_PATH/dashboards/__init__.py"
   touch "$ROOT_PROJECT_PATH/src/__init__.py"
+  touch "$ROOT_PROJECT_PATH/scripts/__init__.py"
+  printf 'import mainsequence\nprint("Main Sequence running")\n' > "$ROOT_PROJECT_PATH/scripts/test_script.py"
+
 
   # ensure src/<package>/__init__.py exists for packaging
   mkdir -p "$ROOT_PROJECT_PATH/src/$PKG_NAME"
