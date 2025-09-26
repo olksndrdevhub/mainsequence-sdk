@@ -16,6 +16,8 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
+[project.scripts]
+mainsequence = "mainsequence.cli.cli:app"
 
 # PEP 621 dependencies (published requirements)
 
