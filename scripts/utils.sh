@@ -129,3 +129,53 @@ update_backend_job_status() {
     echo "Error updating job (HTTP code ${http_code}): ${response_body}"
   fi
 }
+
+########################################
+# Render a template by expanding ${VARS} from the environment.
+# Uses envsubst if present, otherwise a tiny Python fallback.
+#   $1: template path
+#   $2: output path
+########################################
+render_template_file() {
+  local template_path="$1"
+  local output_path="$2"
+  if command -v envsubst >/dev/null 2>&1; then
+    envsubst < "$template_path" > "$output_path"
+  else
+    python - "$template_path" "$output_path" <<'PY'
+import os, sys
+inp, out = sys.argv[1], sys.argv[2]
+with open(inp, 'r', encoding='utf-8') as f:
+    s = f.read()
+# Only expands $VAR / ${VAR}; unknown vars become empty strings.
+s = os.path.expandvars(s)
+with open(out, 'w', encoding='utf-8') as f:
+    f.write(s)
+PY
+  fi
+}
+
+########################################
+# Ensure a file exists by rendering it from a template.
+# Won't overwrite unless $3 == "true".
+#   $1: template path
+#   $2: destination path
+#   $3: overwrite flag (true/false)
+########################################
+ensure_file_from_template() {
+  local template_path="$1"
+  local output_path="$2"
+  local overwrite="${3:-false}"
+  if [ -f "$output_path" ] && [ "$overwrite" != "true" ]; then
+    echo "Found $output_path — leaving it as-is."
+    return 0
+  fi
+  mkdir -p "$(dirname "$output_path")"
+  if [ -f "$template_path" ]; then
+    echo "Rendering $output_path from $template_path"
+    render_template_file "$template_path" "$output_path"
+  else
+    echo "Template $template_path not found; creating empty $output_path"
+    : > "$output_path"
+  fi
+}
