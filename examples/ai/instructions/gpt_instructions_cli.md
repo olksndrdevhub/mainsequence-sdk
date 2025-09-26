@@ -1,7 +1,7 @@
 # MainSequence CLI — Usage Guide
 
 > Run every command via the module entrypoint:  
-> `python -m mainsequence …`
+> `mainsequence …`
 
 This CLI helps you sign in, view and set up projects locally (with SSH keys generated & added automatically), open mapped folders, and optionally build/run containers from a project.
 
@@ -11,22 +11,22 @@ This CLI helps you sign in, view and set up projects locally (with SSH keys gene
 
 ```bash
 # 1) Sign in (prompts for password)
-python -m mainsequence login you@example.com
+mainsequence login you@example.com
 
 # 2) See your current settings
-python -m mainsequence settings
+mainsequence settings
 
 # 3) List projects you have access to
-python -m mainsequence project list
+mainsequence project list
 
 # 4) Clone & link a project locally (creates ~/.ssh/<repo-key>, starts ssh-agent, writes .env)
-python -m mainsequence project set-up-locally 123
+mainsequence project set-up-locally 123
 
 # 5) Open the mapped folder in your file manager
-python -m mainsequence project open 123
+mainsequence project open 123
 
 # 6) Open a terminal pre-wired with ssh-agent & the project’s key
-python -m mainsequence project open-signed-terminal 123
+mainsequence project open-signed-terminal 123
 ```
 
 ---
@@ -72,7 +72,7 @@ python -m mainsequence project open-signed-terminal 123
 Obtain and store tokens, set `MAIN_SEQUENCE_USER_TOKEN` for the current process, and (by default) print a projects table.
 
 ```bash
-python -m mainsequence login <email>
+mainsequence login <email>
 # options:
 #   --export      Print: export MAIN_SEQUENCE_USER_TOKEN="…"
 #   --no-status   Do not print the projects table after login
@@ -81,7 +81,7 @@ python -m mainsequence login <email>
 **Examples**
 ```bash
 # POSIX shells: set token env var for the current shell
-eval "$(python -m mainsequence login you@example.com --export)"
+eval "$(mainsequence login you@example.com --export)"
 ```
 
 > On Windows PowerShell, run login normally (it prints a POSIX `export …` line). Then set the token manually:  
@@ -94,12 +94,12 @@ Show or change local settings.
 
 ```bash
 # `settings` with no subcommand == `settings show`
-python -m mainsequence settings
-python -m mainsequence settings show
+mainsequence settings
+mainsequence settings show
 
 # Change the projects base folder (created if missing)
-python -m mainsequence settings set-base "D:\Work\mainsequence"         # Windows
-python -m mainsequence settings set-base ~/work/mainsequence             # macOS/Linux
+mainsequence settings set-base "D:\Work\mainsequence"         # Windows
+mainsequence settings set-base ~/work/mainsequence             # macOS/Linux
 ```
 
 Output of `show` is JSON, e.g.:
@@ -118,7 +118,7 @@ Output of `show` is JSON, e.g.:
 List projects with local mapping status and guessed path.
 
 ```bash
-python -m mainsequence project list
+mainsequence project list
 ```
 
 Output columns:
@@ -136,9 +136,9 @@ End-to-end local setup:
 6. Fetches environment text from the backend and writes `.env` (ensuring `VFB_PROJECT_PATH=<local-path>`).
 
 ```bash
-python -m mainsequence project set-up-locally 123
+mainsequence project set-up-locally 123
 # optional: override base dir for this one command
-python -m mainsequence project set-up-locally 123 --base-dir ~/my-projects
+mainsequence project set-up-locally 123 --base-dir ~/my-projects
 ```
 
 **Exit codes**
@@ -150,7 +150,7 @@ python -m mainsequence project set-up-locally 123 --base-dir ~/my-projects
 Opens the mapped/guessed folder in your OS file manager.
 
 ```bash
-python -m mainsequence project open 123
+mainsequence project open 123
 ```
 
 If no mapping exists yet, the CLI tries the default path:
@@ -161,10 +161,10 @@ Unlink the local mapping; optionally **delete** the folder.
 
 ```bash
 # just unlink the mapping (keeps folder)
-python -m mainsequence project delete-local 123
+mainsequence project delete-local 123
 
 # unlink and remove the folder (dangerous)
-python -m mainsequence project delete-local 123 --permanent
+mainsequence project delete-local 123 --permanent
 ```
 
 #### `project open-signed-terminal <project_id>`
@@ -174,7 +174,7 @@ Opens a new terminal window **in the project directory** with `ssh-agent` starte
 - **Linux:** opens the first available emulator (e.g. `gnome-terminal`, `konsole`, etc.).
 
 ```bash
-python -m mainsequence project open-signed-terminal 123
+mainsequence project open-signed-terminal 123
 ```
 
 ---
@@ -188,10 +188,10 @@ Project packaging helper:
 
 ```bash
 # Only lock & export requirements.txt (no Docker)
-python -m mainsequence build_and_run
+mainsequence build_and_run
 
 # Build & run with a specific Dockerfile
-python -m mainsequence build_and_run ./Dockerfile
+mainsequence build_and_run ./Dockerfile
 ```
 
 **Requirements & behavior**
@@ -205,19 +205,19 @@ python -m mainsequence build_and_run ./Dockerfile
 
 ```bash
 # sign in
-python -m mainsequence login you@example.com
+mainsequence login you@example.com
 
 # pick a project to set up
-python -m mainsequence project list
+mainsequence project list
 
 # set it up locally (creates SSH key, clones, writes .env, links the folder)
-python -m mainsequence project set-up-locally 456
+mainsequence project set-up-locally 456
 
 # open the folder to browse files
-python -m mainsequence project open 456
+mainsequence project open 456
 
 # open a ready-to-use terminal for git operations over SSH
-python -m mainsequence project open-signed-terminal 456
+mainsequence project open-signed-terminal 456
 ```
 
 ---
@@ -225,7 +225,7 @@ python -m mainsequence project open-signed-terminal 456
 ## Troubleshooting
 
 - **“Not logged in.”**  
-  Run `python -m mainsequence login <email>` again. Tokens live in `token.json`.
+  Run `mainsequence login <email>` again. Tokens live in `token.json`.
 
 - **Token refresh / 401**  
   The CLI will auto-refresh once. If it still fails, re-login.
@@ -254,9 +254,9 @@ python -m mainsequence project open-signed-terminal 456
 ## Help
 
 ```bash
-python -m mainsequence --help
-python -m mainsequence login --help
-python -m mainsequence settings --help
-python -m mainsequence project --help
-python -m mainsequence build_and_run --help
+mainsequence --help
+mainsequence login --help
+mainsequence settings --help
+mainsequence project --help
+mainsequence build_and_run --help
 ```

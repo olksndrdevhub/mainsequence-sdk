@@ -13,7 +13,18 @@ mkdir -p /tmp
 if [ -z "$HOME_DIR" ]; then
   HOME_DIR="/tmp/repo"
 fi
+
+
+
+# >>> Resolve PROJECT_NAME early and recompute paths (fixes empty PROJECT_NAME) <<<
+PNAME="${PROJECT_NAME:-}"
+if [ -z "$PNAME" ] && [ -n "${GIT_REPO_URL:-}" ]; then
+  PNAME="$(basename -s .git "$GIT_REPO_URL")"
+fi
+PNAME="${PNAME:-project}"
+PROJECT_NAME="$PNAME"
 ROOT_PROJECT_PATH="$HOME_DIR/$PROJECT_NAME"
+PKG_NAME="${PROJECT_NAME//-/_}"
 
 if [ -z "$VFB_PROJECT_PATH" ]; then
   VFB_PROJECT_PATH=$ROOT_PROJECT_PATH/$PROJECT_LIBRARY_NAME
@@ -23,6 +34,12 @@ echo ">> HOME_DIR: $HOME_DIR"
 echo ">> PROJECT_NAME: $PROJECT_NAME"
 echo ">> VFB_PROJECT_PATH: $VFB_PROJECT_PATH"
 echo ">> AUTHENTICATION_METHOD: $AUTHENTICATION_METHOD"
+
+# Template locations (keep as-is)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYPROJECT_TEMPLATE="${SCRIPT_DIR}/pyproject.template.toml"
+README_TEMPLATE="${SCRIPT_DIR}/README.template.md"
+
 
 if [ ! -f "${ROOT_PROJECT_PATH}/requirements.txt" ]; then
   echo "File ${ROOT_PROJECT_PATH}/requirements.txt does not exist. Cloning repo..."
@@ -81,6 +98,10 @@ if [ ! -f "${ROOT_PROJECT_PATH}/requirements.txt" ]; then
   touch "$ROOT_PROJECT_PATH/dashboards/__init__.py"
   touch "$ROOT_PROJECT_PATH/src/__init__.py"
 
+  # ensure src/<package>/__init__.py exists for packaging
+  mkdir -p "$ROOT_PROJECT_PATH/src/$PKG_NAME"
+  [ -f "$ROOT_PROJECT_PATH/src/$PKG_NAME/__init__.py" ] || echo '__all__ = []' > "$ROOT_PROJECT_PATH/src/$PKG_NAME/__init__.py"
+
   echo "Copying Files from mainsequence-sdk"
 #  cp -a "/opt/code/mainsequence-sdk/examples/getting_started/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"
   cp -a "/opt/code/mainsequence-sdk/requirements.txt" "${ROOT_PROJECT_PATH}/requirements.txt" || echo "WARNING: Copy requirements step failed!"
@@ -90,11 +111,16 @@ if [ ! -f "${ROOT_PROJECT_PATH}/requirements.txt" ]; then
   echo ".ipynb_checkpoints" > "$ROOT_PROJECT_PATH/.gitignore"
   echo ".env" >> "$ROOT_PROJECT_PATH/.gitignore"
 
+
+  # Render root files from templates (create-only by default)
+  PROJECT_NAME="$PROJECT_NAME" ensure_file_from_template "$PYPROJECT_TEMPLATE" "$ROOT_PROJECT_PATH/pyproject.toml" "${OVERWRITE_TEMPLATES:-false}"
+  PROJECT_NAME="$PROJECT_NAME" ensure_file_from_template "$README_TEMPLATE"    "$ROOT_PROJECT_PATH/README.md"      "${OVERWRITE_TEMPLATES:-false}"
+
   chown -R 1000:100 "$HOME_DIR" 2>/dev/null || true
 
   echo "Create initial commit"
   cd "$ROOT_PROJECT_PATH"
-  git add "$ROOT_PROJECT_PATH"
+  git add -A
   git commit -am "initial commit for $TDAG_ENDPOINT"
   git push
 else
@@ -105,6 +131,17 @@ else
   mkdir -p $ROOT_PROJECT_PATH
   cd "$ROOT_PROJECT_PATH" || true
   pull_changes
+
+  # Ensure templated files exist after pulling and commit if anything changed
+  mkdir -p "$ROOT_PROJECT_PATH/src/$PKG_NAME"
+  [ -f "$ROOT_PROJECT_PATH/src/$PKG_NAME/__init__.py" ] || echo '__all__ = []' > "$ROOT_PROJECT_PATH/src/$PKG_NAME/__init__.py"
+  PROJECT_NAME="$PROJECT_NAME" ensure_file_from_template "$PYPROJECT_TEMPLATE" "$ROOT_PROJECT_PATH/pyproject.toml" "${OVERWRITE_TEMPLATES:-false}"
+  PROJECT_NAME="$PROJECT_NAME" ensure_file_from_template "$README_TEMPLATE"    "$ROOT_PROJECT_PATH/README.md"      "${OVERWRITE_TEMPLATES:-false}"
+  git add -A
+  if ! git diff --cached --quiet; then
+    git commit -m "chore: ensure README.md and pyproject.toml from templates"
+    git push || true
+  fi
 fi
 
 # Install requirements if they exist

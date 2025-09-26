@@ -3,9 +3,12 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
+name = "${PROJECT_NAME}"
+version = "0.1.0"
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = ["mainsequence"]
 
-dependencies = [
-  "mainsequence"
-]
+[tool.setuptools.packages.find]
+where = ["src"]
+
