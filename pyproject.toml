@@ -16,8 +16,7 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
-[project.scripts]
-mainsequence = "mainsequence.cli.cli:app"
+
 
 # PEP 621 dependencies (published requirements)
 
@@ -33,6 +32,8 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/mainsequence-sdk/mainsequence-sdk"
 Issues = "https://github.com/mainsequence-sdk/mainsequence-sdk/issues"
+[project.scripts]
+mainsequence = "mainsequence.cli.cli:app"
 
 # PEP 621 dependencies (published requirements)
 [dependency-groups]
