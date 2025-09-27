@@ -99,8 +99,10 @@ if [ ! -f "${ROOT_PROJECT_PATH}/requirements.txt" ]; then
   touch "$ROOT_PROJECT_PATH/src/__init__.py"
 
   # ensure src/<package>/__init__.py exists for packaging
-  mkdir -p "$ROOT_PROJECT_PATH/src/$PKG_NAME"
-  [ -f "$ROOT_PROJECT_PATH/src/$PKG_NAME/__init__.py" ] || echo '__all__ = []' > "$ROOT_PROJECT_PATH/src/$PKG_NAME/__init__.py"
+  mkdir -p "$ROOT_PROJECT_PATH/src/data_notes"
+  [ -f "$ROOT_PROJECT_PATH/src/data_notes/__init__.py" ] || echo '__all__ = []' > "$ROOT_PROJECT_PATH/src/data_notes/__init__.py"
+
+  mkdir -p "$ROOT_PROJECT_PATH/src/scripts"
 
   echo "Copying Files from mainsequence-sdk"
 #  cp -a "/opt/code/mainsequence-sdk/examples/getting_started/Getting Started.ipynb" "$VFB_PROJECT_PATH/notebooks" || echo "WARNING: Copy Notebooks step failed!"
@@ -110,6 +112,7 @@ if [ ! -f "${ROOT_PROJECT_PATH}/requirements.txt" ]; then
   echo "Adding/Updating .gitignore..."
   echo ".ipynb_checkpoints" > "$ROOT_PROJECT_PATH/.gitignore"
   echo ".env" >> "$ROOT_PROJECT_PATH/.gitignore"
+  echo ".venv" >> "$ROOT_PROJECT_PATH/.gitignore"
 
   # Render root files from templates (create-only by default)
   PROJECT_NAME="$PROJECT_NAME" ensure_file_from_template "$PYPROJECT_TEMPLATE" "$ROOT_PROJECT_PATH/pyproject.toml" "${OVERWRITE_TEMPLATES:-false}"
@@ -132,8 +135,8 @@ else
   pull_changes
 
   # Ensure templated files exist after pulling and commit if anything changed
-  mkdir -p "$ROOT_PROJECT_PATH/src/$PKG_NAME"
-  [ -f "$ROOT_PROJECT_PATH/src/$PKG_NAME/__init__.py" ] || echo '__all__ = []' > "$ROOT_PROJECT_PATH/src/$PKG_NAME/__init__.py"
+  mkdir -p "$ROOT_PROJECT_PATH/src/data_notes"
+  [ -f "$ROOT_PROJECT_PATH/src/data_notes/__init__.py" ] || echo '__all__ = []' > "$ROOT_PROJECT_PATH/src/data_notes/__init__.py"
   PROJECT_NAME="$PROJECT_NAME" ensure_file_from_template "$PYPROJECT_TEMPLATE" "$ROOT_PROJECT_PATH/pyproject.toml" "${OVERWRITE_TEMPLATES:-false}"
   PROJECT_NAME="$PROJECT_NAME" ensure_file_from_template "$README_TEMPLATE"    "$ROOT_PROJECT_PATH/README.md"      "${OVERWRITE_TEMPLATES:-false}"
   git add -A

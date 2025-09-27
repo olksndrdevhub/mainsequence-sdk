@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict
 from tqdm import tqdm
 from .utils import MARKETS_CONSTANTS, request_to_datetime, DATE_FORMAT, AuthLoaders, make_request, DoesNotExist
 
-TDAG_ENDPOINT = os.environ.get('TDAG_ENDPOINT')
+TDAG_ENDPOINT = os.environ.get('TDAG_ENDPOINT',"https://main-sequence.app")
 API_ENDPOINT = f"{TDAG_ENDPOINT}/orm/api"
 
 loaders = AuthLoaders()

@@ -37,6 +37,9 @@ class RandomDataNodeConfig(BaseModel):
 
 
 class DailyRandomNumber(DataNode):
+    """
+    Example Data Node that generates one random number every day  every day
+    """
 
     def __init__(self,node_configuration:RandomDataNodeConfig, *args, **kwargs):
         """
@@ -68,6 +71,9 @@ class DailyRandomNumber(DataNode):
         )
 
     def dependencies(self) -> Dict[str, Union["DataNode", "APIDataNode"]]:
+        """
+        This nodes does not depend on any other data nodes.
+        """
         return {}
 
 
