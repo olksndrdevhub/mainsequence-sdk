@@ -16,7 +16,6 @@ jobs:
   deploy:
     # This job runs on the latest version of Ubuntu provided by GitHub.
     runs-on: ubuntu-latest
-
     # This section is CRITICAL for trusted publishing.
     # It grants the necessary permission for the workflow to request an
     # OIDC token from GitHub, which PyPI will then verify.
