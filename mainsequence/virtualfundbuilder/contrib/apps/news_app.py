@@ -12,7 +12,6 @@ from mainsequence.virtualfundbuilder.utils import get_vfb_logger
 # Assuming TDAGAgent is correctly set up and accessible in the execution environment
 from mainsequence.virtualfundbuilder.agent_interface import TDAGAgent
 from pydantic import BaseModel, Field
-from polygon import RESTClient
 from jinja2 import Environment, FileSystemLoader
 
 from mainsequence.client import AssetCategory
@@ -47,6 +46,7 @@ class SentimentReport(BaseApp):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from polygon import RESTClient
 
         if not POLYGON_API_KEY:
             raise ValueError("Warning: POLYGON_API_KEY environment variable not set. Data fetching will fail.")

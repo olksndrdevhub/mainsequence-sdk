@@ -227,7 +227,8 @@ class SimulatedPrices(DataNode):
         df=update_manager.update()
         return df
 
-
+    def get_asset_list(self):
+        return self.asset_list
     def get_column_metadata(self):
         """
         Add MetaData information to the DataNode Table

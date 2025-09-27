@@ -1,4 +1,4 @@
-TDAG is proprietary software that is part of the MainSequence SDK and is developed for use only under an explicit
+MainSequence SDK and is developed for use only under an explicit
 license agreement. The details of the license are as follows:
 
 MainSequence GmbH SDK License Agreement

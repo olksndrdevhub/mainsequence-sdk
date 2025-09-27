@@ -2,10 +2,8 @@ site_name: Main Sequence SDK
 nav:
   - Home: index.md
   - Examples: examples/index.md
-  - TDAG:
-      - Getting Started: tdag/getting_started.md
-      - Time Series Data Pipelines Fundamentals: tdag/time_series_fundamentals.md
-      - Orchestration & Monitoring: tdag/orchestration_and_monitoring.md
+  - Tutorial:
+      - Getting Started: tutorial/getting_started.md
   - About: about.md
   - Reference: reference/
 
