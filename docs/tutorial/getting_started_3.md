@@ -1,62 +1,85 @@
 # Getting Started 3: Orchestration
 
+Now that you’ve built and tested your `DataNode`s locally, it’s time to **orchestrate** them on the Main Sequence Platform. This guide improves clarity and grammar while keeping your original images and code blocks intact.
 
-Now that we have built and test our DataNodes locally. We can start to orchestrate them and  running the Main Sequence
-Platform. 
+## 1) Update Your Environment
 
+Before scheduling anything, make sure your environment is consistent and your latest changes are committed.
 
-Before anything lets fix our environmetn and commit our changes
+1. **Compile dependencies** from your declared deps into `requirements.txt` (most common flow):
 
-1) Compile from your declared deps (most common)
 ```shell
 uv pip compile pyproject.toml --universal -o requirements.txt
-
 ```
-2) commit all your changes and push. 
 
-2.1)
+2. **Commit and push** your changes.
+
 ```shell
 git add -A        # stages new, modified, and deleted files
 git commit -m "Tutorial files"
-
 ```
-2.2) Push to the repo
 
-Now this is a little more complicated, as we are working with a security private repository behind the main sequence platform
-we need a signed terminal with the correct cryptographic key
+3. **Push to the repository.**  
+   Because this is a private, security‑backed repo behind the Main Sequence Platform, you’ll need a **signed terminal** that loads the correct cryptographic key.
 
-use the cli to open a signed terminal
+   Open a signed terminal via the CLI:
 
 ```shell
 python -m mainsequence project open-signed-terminal 60
-
 ```
+
+   Then push:
+
 ```shell
 #commit your changes
 git push
 ```
 
+## 2) Scheduling Jobs
 
-We can do this  in two ways first we will do it manaully
+You can run jobs **manually** or **automatically** on a schedule.
 
+### 2.1 Manual Run
 
-Lets go to our Tutorial Project
+1. Open your Tutorial Project:  
+   https://main-sequence.app/projects/?search=tutorial
 
-https://main-sequence.app/projects/?search=tutorial
-
-the file browser should look something like this
+2. In the file browser, navigate to the project. It should look similar to:
 
 ![img.png](project_file_browser.png)
 
-Now click on the scripts folder and select  Create Job + on any of the launchers
+3. Click the **scripts** folder and select **Create Job +** on any of the launcher scripts. Name it, for example, **Random Number Launcher — Manual Job**.
 
-and lets call it  Random NMumbe Launcher Manual Job
 ![img.png](random_number_launcher_create_job.png)
 
-create the job and you should see it under the Jobs tab. As we didnt schedule it nothing has run so far we can run it 
-manualy with clicking on the Run  button
+4. After creation, the job will appear under the **Jobs** tab. Because it’s not scheduled, nothing has run yet. Click **Run** to execute it manually.
 
-you should see a confirmation box on the top right of the screen
+You’ll see a confirmation toast in the top‑right corner:
+
 ![img.png](job_run_confirmation.png)
 
-Now click the Job and you will see all the JobRuns wait a bit for the Job To run 
+5. Click the job to view its **Job Runs**. Wait for the run to complete to see the results.
+
+![img.png](manual_job.png)
+
+### 2.2 Automatic Schedule
+
+As projects and workflows grow, you’ll usually want **automation described as code**. You can define jobs and schedules within your project repo.
+
+Create a file named **`project_configuration.yaml`** at the **repository root** with the following structure:
+
+```yaml
+name: "Tutorial job Configuration"
+jobs:
+  - name: "Simulated Prices"
+    resource:
+      script:
+        path: "scripts/simulated_prices_launcher.py"
+    schedule:
+      type: "crontab"
+      expression: "0 0 * * *"
+```
+
+Commit and push this file; the platform will detect it and create the scheduled job automatically.
+
+![img.png](automatic_job_schedule.png)
