@@ -32,7 +32,7 @@ jobs:
             mkdocs-gen-files \
             mkdocs-literate-nav \
             mkdocs-autorefs \
-            mkdocs-mermaid2 \
+            mkdocs-mermaid2-plugin \
             mkdocstrings[python]
       # --- END OF THE FIX ---
 

@@ -137,3 +137,4 @@ copy_configs
 .idea/
 /.env*
 /uv.lock
+.vscode/
