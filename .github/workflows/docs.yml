@@ -2,8 +2,8 @@ name: Deploy MkDocs Documentation
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    tags:
+      - 'v*'   # only run on version tags (e.g. v1.2.3)
 
 permissions:
   contents: read
@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   deploy-docs:
+    # extra safety so it never runs on non-tag refs
+    if: startsWith(github.ref, 'refs/tags/v')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -41,8 +43,10 @@ jobs:
         run: mkdocs build
 
       - uses: actions/configure-pages@v4
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./site
+
       - id: deployment
         uses: actions/deploy-pages@v4
