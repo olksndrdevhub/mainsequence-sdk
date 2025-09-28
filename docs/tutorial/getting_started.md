@@ -2,6 +2,8 @@
 
 This tutorial walks you through creating a project, setting it up on your local machine, and building your first data nodes. The goal is to make each step clear and actionable while preserving all the examples and screenshots from your original guide.
 
+you can see the final repository here: https://github.com/mainsequence-sdk/tutorial-project/blob/main/README.md 
+
 ## 1. Create a Project
 
 Log in to Main Sequence. You’ll land on the **Projects** page. Projects help you organize work, data, and compute. Let’s create the first one: choose **Create New Project** and name it **Tutorial Project**.
