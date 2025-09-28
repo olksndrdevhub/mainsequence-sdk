@@ -9,4 +9,3 @@
   - [About](about.md)
   - [Changelog](changelog.md)
   - [Contributing](contributing.md)
-  - [License](license.md)
