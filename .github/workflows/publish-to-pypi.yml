@@ -1,3 +1,4 @@
+#publish-to-pypi.yml
 # This is a GitHub Actions workflow file that automates the process of
 # building and publishing your Python package to PyPI.
 # It is triggered automatically whenever you push a new git tag to your repository.
@@ -16,13 +17,13 @@ jobs:
   deploy:
     # This job runs on the latest version of Ubuntu provided by GitHub.
     runs-on: ubuntu-latest
-
+    environment: pypi
     # This section is CRITICAL for trusted publishing.
     # It grants the necessary permission for the workflow to request an
     # OIDC token from GitHub, which PyPI will then verify.
     permissions:
       id-token: write # This is required for trusted publishing
-
+      contents: read           # recommended
     # These are the individual steps the workflow will execute in order.
     steps:
       # Step 1: Check out the repository's code

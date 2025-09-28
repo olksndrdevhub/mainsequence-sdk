@@ -2,8 +2,7 @@ site_name: Main Sequence SDK
 nav:
   - Home: index.md
   - Examples: examples/index.md
-  - Tutorial:
-      - Getting Started: tutorial/getting_started.md
+  - Tutorial: tutorial/
   - About: about.md
   - Reference: reference/
 
