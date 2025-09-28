@@ -46,21 +46,21 @@ You can run jobs **manually** or **automatically** on a schedule.
 
 2. In the file browser, navigate to the project. It should look similar to:
 
-![img.png](project_file_browser.png)
+![img.png](../img/tutorial/project_file_browser.png)
 
 3. Click the **scripts** folder and select **Create Job +** on any of the launcher scripts. Name it, for example, **Random Number Launcher — Manual Job**.
 
-![img.png](random_number_launcher_create_job.png)
+![img.png](../img/tutorial/random_number_launcher_create_job.png)
 
 4. After creation, the job will appear under the **Jobs** tab. Because it’s not scheduled, nothing has run yet. Click **Run** to execute it manually.
 
 You’ll see a confirmation toast in the top‑right corner:
 
-![img.png](job_run_confirmation.png)
+![img.png](../img/tutorial/job_run_confirmation.png)
 
 5. Click the job to view its **Job Runs**. Wait for the run to complete to see the results.
 
-![img.png](manual_job.png)
+![img.png](../img/tutorial/manual_job.png)
 
 ### 2.2 Automatic Schedule
 
@@ -82,4 +82,4 @@ jobs:
 
 Commit and push this file; the platform will detect it and create the scheduled job automatically.
 
-![img.png](automatic_job_schedule.png)
+![img.png](../img/tutorial/automatic_job_schedule.png)

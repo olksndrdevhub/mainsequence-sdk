@@ -1,7 +1,6 @@
 # Navigation
 
 - [Home](index.md)
-
 - [Tutorial](tutorial/index.md)
 - [Examples](examples/index.md)
 - [Reference](reference/index.md)

@@ -6,20 +6,20 @@ This tutorial walks you through creating a project, setting it up on your local 
 
 Log in to Main Sequence. You’ll land on the **Projects** page. Projects help you organize work, data, and compute. Let’s create the first one: choose **Create New Project** and name it **Tutorial Project**.
 
-![img.png](projects_search.png)
+![img.png](../img/tutorial/projects_search.png)
 
-![img.png](create_new_project.png)
+![img.png](../img/tutorial/create_new_project.png)
 
 After a few seconds, your new project should appear with a checkmark indicating it’s initialized. Click the project to open it.
 
-![img.png](project_tutorial_search.png)
+![img.png](../img/tutorial/project_tutorial_search.png)
 
 On the **Project Details** page you’ll see:
 - A green status indicator confirming the project was set up correctly.
 - The repository and branch (e.g., `tutorial-project/main`) and the latest commit.
 - Two **Jobs** representing background processes—no action needed for now.
 
-![img.png](project_detail.png)
+![img.png](../img/tutorial/project_detail.png)
 
 ## 2. Work on the Project Locally
 
@@ -39,7 +39,7 @@ mainsequence --help
 python -m mainsequence --help
 ```
 
-![img.png](cli_help.png)
+![img.png](../img/tutorial/cli_help.png)
 
 Now log in via the CLI:
 
@@ -183,11 +183,11 @@ https://main-sequence.app/dynamic-table-metadatas/
 
 Search for `dailyrandom`. You should see your data node and its table.
 
-![img.png](table_search.png)
+![img.png](../img/tutorial/table_search.png)
 
 Click the **storage hash**, then in the table’s context menu (the **…** button), select **Explore Table Data** to confirm that your node persisted data.
 
-![img.png](random_number_table.png)
+![img.png](../img/tutorial/random_number_table.png)
 
 ### Add a Dependent Data Node
 
@@ -223,11 +223,11 @@ https://main-sequence.app/dynamic-table-metadatas/?search=dailyrandom&storage_ha
 
 Open the `dailyrandomaddition_XXXXX` table to explore it. For a visual of the dependency structure, click the **update process** arrow and then the **update hash**.
 
-![img.png](update_hash.png)
+![img.png](../img/tutorial/update_hash.png)
 
 You’ll see the dependency graph for this workflow:
 
-![img.png](update_hash_detail.png)
+![img.png](../img/tutorial/update_hash_detail.png)
 
 ## 4. `update_hash` vs. `storage_hash`
 
@@ -260,7 +260,7 @@ modify ytour daily random number launche file adding another configuration for t
 
 You’ll still see **two update processes**, but they’ll write to the **same underlying table** for the daily random number node.
 
-![img.png](update_vs_storage.png)
+![img.png](../img/tutorial/update_vs_storage.png)
 
 ---
 
