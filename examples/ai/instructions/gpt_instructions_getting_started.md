@@ -33,7 +33,7 @@ REPO_NAME/
 ├─ requirements.txt
 ├─ pyproject.toml
 ├─ Readme.md
-└─ Dockerfile
+
 ```
 
 ### Repository conventions
