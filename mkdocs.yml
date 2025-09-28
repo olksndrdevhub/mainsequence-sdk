@@ -1,10 +1,4 @@
 site_name: Main Sequence SDK
-nav:
-  - Home: index.md
-  - Examples: examples/index.md
-  - Tutorial: tutorial/
-  - About: about.md
-  - Reference: reference/
 
 
 dev_addr: 127.0.0.1:8003
