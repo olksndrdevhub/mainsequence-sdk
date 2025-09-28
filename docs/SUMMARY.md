@@ -1,7 +1,5 @@
-# Navigation
-
 - [Home](index.md)
-- [Tutorial](tutorial/index.md)
+- [Tutorial](tutorial/getting_started.md)
 - [Examples](examples/index.md)
 - [Reference](reference/index.md)
 - Project
