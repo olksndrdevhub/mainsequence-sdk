@@ -19,7 +19,7 @@ import time
 import os
 from mainsequence.logconf import logger
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator,computed_field
 from typing import Optional, List, Dict, Any, TypedDict, Tuple
 from .data_sources_interfaces import timescale as TimeScaleInterface
 from functools import wraps
@@ -28,6 +28,9 @@ import gzip
 import base64
 import numpy as np
 import concurrent.futures
+
+from cachetools import TTLCache, cachedmethod
+from operator import attrgetter
 
 _default_data_source = None  # Module-level cache
 
@@ -2271,6 +2274,58 @@ class PodDataSource:
     def __repr__(self):
         return f"{self.data_source.related_resource}"
 
+
+
+
+def _norm_kwargs(kwargs: Dict[str, Any]) -> Tuple[Tuple[str, Any], ...]:
+    """Stable, hashable key from kwargs (order-insensitive)."""
+    items = []
+    for k, v in kwargs.items():
+        # Special-case a big `name__in` so you don’t produce huge keys.
+        if k == "name__in" and isinstance(v, (list, tuple, set)):
+            items.append((k, tuple(sorted(str(x) for x in v))))
+        else:
+            items.append((k, _norm_value(v)))
+    return tuple(sorted(items))
+
+class Constant(BasePydanticModel, BaseObjectOrm):
+    """
+    Simple scoped constant.
+    - Global when project is None.
+    - Project-scoped when project is set.
+
+    Uniqueness (enforced in DB/service layer):
+      * Global:      (organization_owner, name)
+      * Per-project: (organization_owner, project, name)
+    """
+    name: str = Field(
+        ...,
+        max_length=255,
+        description="UPPER_SNAKE_CASE; optional category via double-underscore, e.g. 'CURVE__US_TREASURIES'."
+    )
+    value: Any = Field(
+        ...,
+        description="Small JSON value (string/number/bool/object/array). Keep it small (e.g., <=10KB).",
+    )
+    project: Optional[Union[Project,int]] = Field(
+        None,
+        description="Project ID; None ⇒ global."
+    )
+    _filter_cache = TTLCache(maxsize=512, ttl=600)
+
+    model_config = dict(from_attributes=True)  # allows .model_validate(from_orm_obj)
+
+    @computed_field
+    @property
+    def category(self) -> Optional[str]:
+        parts = self.name.split("__", 1)
+        return parts[0] if len(parts) == 2 else None
+
+
+    @classmethod
+    @cachedmethod(attrgetter("_filter_cache"), key=lambda cls, **kw: _norm_kwargs(kw))
+    def filter(cls, **kwargs):
+        return super().filter(**kwargs)
 
 SessionDataSource = PodDataSource()
 SessionDataSource.set_remote_db()

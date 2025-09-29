@@ -128,7 +128,6 @@ def _render_projects_table(items: list[dict], links: dict, base_dir: str, org_sl
 def login(
     email: str = typer.Argument(..., help="Email/username (server expects 'email' field)"),
     password: Optional[str] = typer.Option(None, prompt=True, hide_input=True, help="Password"),
-    export: bool = typer.Option(False, "--export", help='Print `export MAIN_SEQUENCE_USER_TOKEN=...` so you can eval it'),
     no_status: bool = typer.Option(False, "--no-status", help="Do not print projects table after login")
 ):
     """
@@ -146,9 +145,7 @@ def login(
     typer.secho(f"Signed in as {res['username']} (Backend: {res['backend']})", fg=typer.colors.GREEN)
     typer.echo(f"Projects base folder: {base}")
 
-    tok = cfg.get_tokens().get("access", os.environ.get("MAIN_SEQUENCE_USER_TOKEN", ""))
-    if export and tok:
-        print(f'export MAIN_SEQUENCE_USER_TOKEN="{tok}"')
+
 
     if not no_status:
         try:
