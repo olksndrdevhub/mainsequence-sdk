@@ -264,4 +264,3 @@ You’ll still see **two update processes**, but they’ll write to the **same u
 
 ---
 
-**Tip:** Throughout this guide we preserved your code exactly as written (including imports), and we kept every image reference unchanged. The edits you’re reading focus solely on grammar, clarity, and structure to improve readability without altering your Python code or screenshots.
