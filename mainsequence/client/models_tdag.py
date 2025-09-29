@@ -18,9 +18,10 @@ from typing import Union
 import time
 import os
 from mainsequence.logconf import logger
+from threading import RLock
 
 from pydantic import BaseModel, Field, field_validator,computed_field
-from typing import Optional, List, Dict, Any, TypedDict, Tuple
+from typing import Optional, List, Dict, Any, TypedDict, Tuple, ClassVar
 from .data_sources_interfaces import timescale as TimeScaleInterface
 from functools import wraps
 import math
@@ -2276,7 +2277,22 @@ class PodDataSource:
 
 
 
+def _norm_value(v: Any) -> Any:
+    """Normalize values into hashable, deterministic forms for the cache key."""
+    # Project objects → their integer IDs (project scoped vs global)
+    if Project and isinstance(v, Project):
+        return getattr(v, "id", v)
 
+    # Common iterables → sorted tuples to ignore order in queries like name__in
+    if isinstance(v, (set, list, tuple)):
+        # Convert nested items too, just in case
+        return tuple(sorted(_norm_value(x) for x in v))
+
+    # Dicts → sorted (k,v) tuples
+    if isinstance(v, dict):
+        return tuple(sorted((k, _norm_value(val)) for k, val in v.items()))
+
+    return v  # primitives pass through
 def _norm_kwargs(kwargs: Dict[str, Any]) -> Tuple[Tuple[str, Any], ...]:
     """Stable, hashable key from kwargs (order-insensitive)."""
     items = []
@@ -2298,6 +2314,8 @@ class Constant(BasePydanticModel, BaseObjectOrm):
       * Global:      (organization_owner, name)
       * Per-project: (organization_owner, project, name)
     """
+    id: Optional[int]
+
     name: str = Field(
         ...,
         max_length=255,
@@ -2311,21 +2329,45 @@ class Constant(BasePydanticModel, BaseObjectOrm):
         None,
         description="Project ID; None ⇒ global."
     )
-    _filter_cache = TTLCache(maxsize=512, ttl=600)
+    category: Optional[str] = None
+
+    # Class-level cache & lock (Pydantic ignores ClassVar)
+    _filter_cache: ClassVar[TTLCache] = TTLCache(maxsize=512, ttl=600)
+    _get_cache:    ClassVar[TTLCache] = TTLCache(maxsize=1024, ttl=600)
+
+
+    _cache_lock: ClassVar[RLock] = RLock()
 
     model_config = dict(from_attributes=True)  # allows .model_validate(from_orm_obj)
 
-    @computed_field
-    @property
-    def category(self) -> Optional[str]:
-        parts = self.name.split("__", 1)
-        return parts[0] if len(parts) == 2 else None
-
 
     @classmethod
-    @cachedmethod(attrgetter("_filter_cache"), key=lambda cls, **kw: _norm_kwargs(kw))
+    @cachedmethod(
+        lambda cls: cls._filter_cache,  # <- resolves to the real TTLCache
+        lock=lambda cls: cls._cache_lock,
+        key=lambda cls, **kw: _norm_kwargs(kw)
+    )
     def filter(cls, **kwargs):
+        # Delegate to your real filter (API/DB) only on cache miss
         return super().filter(**kwargs)
+
+    @classmethod
+    @cachedmethod(
+        lambda cls: cls._get_cache,
+        lock=lambda cls: cls._cache_lock,
+        key=lambda cls, **kw: _norm_kwargs(kw),
+    )
+    def get(cls, **kwargs):
+        # e.g. get(name="CURVE__M_BONOS", project=None)
+        return super().get(**kwargs)
+
+    @classmethod
+    def get_value(cls,*args, **kwargs):
+        return cls.get(*args, **kwargs).value
+
+    @classmethod
+    def invalidate_filter_cache(cls) -> None:
+        cls._filter_cache.clear()
 
 SessionDataSource = PodDataSource()
 SessionDataSource.set_remote_db()
