@@ -1,6 +1,13 @@
 name: Deploy MkDocs Documentation
 
 on:
+
+  workflow_dispatch: # run manually from the Actions tab
+    inputs:
+      ref:
+        description: "Branch or tag to build"
+        required: false
+        default: main
   push:
     tags:
       - 'v*'   # only run on version tags (e.g. v1.2.3)
