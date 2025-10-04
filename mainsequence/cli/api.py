@@ -38,6 +38,9 @@ def _refresh_token() -> str | None:
     return tok.get("refresh")
 
 def login(email: str, password: str) -> dict:
+    email = (email or "").strip()
+    password = (password or "").rstrip("\r\n")
+
     url = _full(AUTH_PATHS["obtain"])
     payload = {"email": email, "password": password}  # server expects 'email'
     r = S.post(url, data=json.dumps(payload))
