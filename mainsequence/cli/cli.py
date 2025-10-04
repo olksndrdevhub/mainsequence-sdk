@@ -366,12 +366,22 @@ def project_set_up_locally(
         if env_text and not env_text.endswith("\n"): env_text += "\n"
         env_text += f"MAINSEQUENCE_TOKEN={project_token}\n"
 
+    # ---  ensure TDAG_ENDPOINT points at the current backend URL ---
+    backend = cfg.backend_url()
+    lines = env_text.splitlines()
+    if any(line.startswith("TDAG_ENDPOINT=") for line in lines):
+        env_text = "\n".join(
+            (f"TDAG_ENDPOINT={backend}" if line.startswith("TDAG_ENDPOINT=") else line)
+            for line in lines
+        )
+    else:
+        if env_text and not env_text.endswith("\n"): env_text += "\n"
+        env_text += f"TDAG_ENDPOINT={backend}\n"
+
+
+
     # write final .env with both vars present
     (target_dir / ".env").write_text(env_text, encoding="utf-8")
-
-
-
-
     cfg.set_link(project_id, str(target_dir))
 
     typer.secho(f"Local folder: {target_dir}", fg=typer.colors.GREEN)

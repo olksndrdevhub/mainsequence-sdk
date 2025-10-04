@@ -26,10 +26,10 @@ def explain_theming():
 
 # --- Load spinner frames ONCE from two levels above, files: image_1_base64.txt ... image_5_base64.txt ---
 def _load_spinner_frames_for_this_template() -> list[str]:
-    base_dir = Path(__file__).resolve().parent.parent.parent.parent # two levels above this module
+    base_dir = Path(__file__).resolve().parent.parent
     frames: list[str] = []
     for i in range(1, 6):
-        p = base_dir / f"image_{i}_base64.txt"
+        p = base_dir / f"assets/image_{i}_base64.txt"
         if not p.exists():
             raise FileNotFoundError(f"Missing spinner frame file: {p}")
         frames.append(p.read_text(encoding="utf-8").strip())

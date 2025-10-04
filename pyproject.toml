@@ -50,7 +50,7 @@ include = ["mainsequence", "mainsequence.*"]
 # Include your non-.py assets in wheels/sdists
 [tool.setuptools.package-data]
 "mainsequence" = ["**/*.html", "**/*.css", "**/*.png", "**/*.toml"]
-"mainsequence.dashboards.streamlit" = ["assets/*.png", "assets/config.toml"]
+"mainsequence.dashboards.streamlit" = ["assets/*.png", "assets/*.txt"]
 
 [[tool.uv.index]]
 name = "testpypi"
