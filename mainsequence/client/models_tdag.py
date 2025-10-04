@@ -2362,12 +2362,43 @@ class Constant(BasePydanticModel, BaseObjectOrm):
         return super().get(**kwargs)
 
     @classmethod
-    def get_value(cls,*args, **kwargs):
-        return cls.get(*args, **kwargs).value
+    def get_value(cls,name:str,project_id:Optional[int]=None):
+        return cls.get(name=name,project_id=project_id).value
 
     @classmethod
     def invalidate_filter_cache(cls) -> None:
         cls._filter_cache.clear()
+
+    @classmethod
+    def create_constants_if_not_exist(cls,constants_to_create: dict):
+        # crete global constants if not exist in  backed
+
+        # constants_to_create=dict(
+        # TIIE_28_UID        = "TIIE_28",
+        # TIIE_91_UID        = "TIIE_91",
+        # TIIE_182_UID       = "TIIE_182",
+        # TIIE_OVERNIGHT_UID = "TIIE_OVERNIGHT",
+        #
+        # CETE_28_UID        = "CETE_28",
+        # CETE_91_UID        = "CETE_91",
+        # CETE_182_UID       = "CETE_182",
+        #
+        # # Curve identifiers
+        # TIIE_28_ZERO_CURVE = "F_TIIE_28_VALMER",
+        # M_BONOS_ZERO_CURVE = "M_BONOS_ZERO_OTR",
+        #
+        #
+        # DISCOUNT_CURVES_TABLE         = "discount_curves",
+        # REFERENCE_RATES_FIXING_TABLE  = "fixing_rates_1d",
+        # )
+        existing_constants = cls.filter(name__in=list(constants_to_create.keys()))
+        existing_constants_names = [c.name for c in existing_constants]
+        constants_to_register = {k: v for k, v in constants_to_create.items() if k not in existing_constants_names}
+        created_constants=[]
+        for k, v in constants_to_register.items():
+            new_constant = cls.create(name=k, value=v)
+            created_constants.append(new_constant)
+        return created_constants
 
 SessionDataSource = PodDataSource()
 SessionDataSource.set_remote_db()
