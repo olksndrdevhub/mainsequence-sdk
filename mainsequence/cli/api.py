@@ -181,9 +181,8 @@ def get_project_token(project_id: int | str) -> str:
     token = None
     if r.headers.get("content-type","").startswith("application/json"):
         data = r.json()
-        token=data["development"]
-    if not token:
+        token=data["development"][0]
         token = (r.text or "").strip()
     if not token:
         raise ApiError("Project token response did not include a token.")
-    return token[0]
+    return token
