@@ -215,7 +215,7 @@ class PersistManager:
         else:
             return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
 
-    def set_local_data_node_update(self, data_node_update: DataNodeUpdate) -> None:
+    def set_data_node_update(self, data_node_update: DataNodeUpdate) -> None:
         """
         Caches the local data_node_storage object for lazy queries
 
@@ -702,14 +702,14 @@ class PersistManager:
     def set_column_metadata(self,
                             columns_metadata: Optional[List[ms_client.ColumnMetaData]]
                             ) -> None:
-        if self.metadata:
-            if self.metadata.sourcetableconfiguration != None:
-                if self.metadata.sourcetableconfiguration.columns_metadata is not None:
+        if self.data_node_storage:
+            if self.data_node_storage.sourcetableconfiguration != None:
+                if self.data_node_storage.sourcetableconfiguration.columns_metadata is not None:
                     if columns_metadata is None:
                         self.logger.info(f"get_column_metadata method not implemented")
                         return
 
-                    self.metadata.sourcetableconfiguration.set_or_update_columns_metadata(
+                    self.data_node_storage.sourcetableconfiguration.set_or_update_columns_metadata(
                         columns_metadata=columns_metadata)
 
     def set_table_metadata(self,
@@ -722,7 +722,7 @@ class PersistManager:
         including its description, frequency, and associated assets, based on the
         configuration returned by `_get_time_series_meta_details`.
         """
-        if not (self.metadata):
+        if not (self.data_node_storage):
             self.logger.warning("metadata not set")
             return
 
@@ -731,15 +731,15 @@ class PersistManager:
             return
 
         # 2. Get or create the MarketsTimeSeriesDetails object in the backend.
-        source_table_id = self.metadata.patch(**table_metadata.model_dump())
+        source_table_id = self.data_node_storage.patch(**table_metadata.model_dump())
 
     def delete_table(self) -> None:
         if self.data_source.related_resource.class_type == "duck_db":
             from mainsequence.client.data_sources_interfaces.duckdb import DuckDBInterface
             db_interface = DuckDBInterface()
-            db_interface.drop_table(self.metadata.storage_hash)
+            db_interface.drop_table(self.data_node_storage.storage_hash)
 
-        self.metadata.delete()
+        self.data_node_storage.delete()
 
     @tracer.start_as_current_span("TS: Persist Data")
     def persist_updated_data(self,
@@ -780,13 +780,13 @@ class PersistManager:
         Returns:
             A UpdateStatistics object with the latest statistics.
         """
-        if isinstance(self.metadata, int):
+        if isinstance(self.data_node_storage, int):
             self.set_data_node_update_lazy(force_registry=True, include_relations_detail=True)
 
-        if self.metadata.sourcetableconfiguration is None:
+        if self.data_node_storage.sourcetableconfiguration is None:
             return ms_client.UpdateStatistics()
 
-        update_stats = self.metadata.sourcetableconfiguration.get_data_updates()
+        update_stats = self.data_node_storage.sourcetableconfiguration.get_data_updates()
         return update_stats
 
     def is_local_relation_tree_set(self) -> bool:
@@ -806,7 +806,7 @@ class TimeScaleLocalPersistManager(PersistManager):
     Main Controler to interacti with backend
     """
     def get_table_schema(self,table_name):
-        return self.metadata["sourcetableconfiguration"]["column_dtypes_map"]
+        return self.data_node_storage["sourcetableconfiguration"]["column_dtypes_map"]
 
 
 

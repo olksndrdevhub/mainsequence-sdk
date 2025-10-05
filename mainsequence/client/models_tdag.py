@@ -1,4 +1,5 @@
-from importlib.metadata import metadata
+from __future__ import annotations
+
 
 import yaml
 
@@ -605,7 +606,7 @@ class DataNodeUpdate(BasePydanticModel, BaseObjectOrm):
                                         r["source_table_config_map"].items()}
         r["state_data"] = {int(k): DataNodeUpdateDetails(**v) for k, v in r["state_data"].items()}
         r["all_index_stats"] = {int(k): v for k, v in r["all_index_stats"].items()}
-        r["data_node_updates"] = [DataNodeUpdate(**v) for v in r["data_node_updates"]]
+        r["data_node_updates"] = [DataNodeUpdate(**v) for v in r["local_metadatas"]]
         return r
 
     def depends_on_connect(self, target_time_serie_id
@@ -743,6 +744,33 @@ class DataNodeUpdate(BasePydanticModel, BaseObjectOrm):
             time_to_wait = max(0, 60 - datetime.datetime.now(pytz.utc).second)
             logger.info(f"Scheduler Waiting for ts update at start of minute")
             time.sleep(time_to_wait)
+
+
+
+class DataNodeUpdateDetails(BasePydanticModel, BaseObjectOrm):
+    related_table: Union[int, DataNodeUpdate]
+    active_update: bool = Field(default=False, description="Flag to indicate if update is active")
+    update_pid: int = Field(default=0, description="Process ID of the update")
+    error_on_last_update: bool = Field(default=False,
+                                       description="Flag to indicate if there was an error in the last update")
+    last_update: Optional[datetime.datetime] = Field(None, description="Timestamp of the last update")
+    next_update: Optional[datetime.datetime] = Field(None, description="Timestamp of the next update")
+    update_statistics: Optional[Dict[str, Any]] = Field(None, description="JSON field for update statistics")
+    active_update_status: str = Field(default="Q", max_length=20, description="Current update status")
+    active_update_scheduler: Optional[Union[int, Scheduler]] = Field(None,
+                                                                     description="Scheduler  for active update")
+    update_priority: int = Field(default=0, description="Priority level of the update")
+    last_updated_by_user: Optional[int] = Field(None, description="Foreign key reference to User")
+
+    run_configuration: Optional["RunConfiguration"] = None
+
+    @staticmethod
+    def _parse_parameters_filter(parameters):
+        for key, value in parameters.items():
+            if "__in" in key:
+                assert isinstance(value, list)
+                parameters[key] = ",".join(value)
+        return parameters
 
 
 class TableMetaData(BaseModel):
@@ -1197,31 +1225,6 @@ class RunConfiguration(BasePydanticModel, BaseObjectOrm):
     def ROOT_URL(cls):
         return None
 
-
-class DataNodeUpdateDetails(BasePydanticModel, BaseObjectOrm):
-    related_table: Union[int, DataNodeUpdate]
-    active_update: bool = Field(default=False, description="Flag to indicate if update is active")
-    update_pid: int = Field(default=0, description="Process ID of the update")
-    error_on_last_update: bool = Field(default=False,
-                                       description="Flag to indicate if there was an error in the last update")
-    last_update: Optional[datetime.datetime] = Field(None, description="Timestamp of the last update")
-    next_update: Optional[datetime.datetime] = Field(None, description="Timestamp of the next update")
-    update_statistics: Optional[Dict[str, Any]] = Field(None, description="JSON field for update statistics")
-    active_update_status: str = Field(default="Q", max_length=20, description="Current update status")
-    active_update_scheduler: Optional[Union[int, Scheduler]] = Field(None,
-                                                                     description="Scheduler  for active update")
-    update_priority: int = Field(default=0, description="Priority level of the update")
-    last_updated_by_user: Optional[int] = Field(None, description="Foreign key reference to User")
-
-    run_configuration: Optional["RunConfiguration"] = None
-
-    @staticmethod
-    def _parse_parameters_filter(parameters):
-        for key, value in parameters.items():
-            if "__in" in key:
-                assert isinstance(value, list)
-                parameters[key] = ",".join(value)
-        return parameters
 
 
 class UpdateStatistics(BaseModel):
@@ -1801,7 +1804,6 @@ class DataSource(BasePydanticModel, BaseObjectOrm):
             column_range_descriptor: Optional[Dict[str, UniqueIdentifierRangeMap]] = None,
     ) -> pd.DataFrame:
 
-        logger.warning("EXTEND THE CONSTRAIN READ HERE!!")
         if self.class_type == DUCK_DB:
             db_interface = DuckDBInterface()
             table_name = data_node_update.data_node_storage.table_name
@@ -2402,3 +2404,11 @@ class Constant(BasePydanticModel, BaseObjectOrm):
 
 SessionDataSource = PodDataSource()
 SessionDataSource.set_remote_db()
+
+DataNodeUpdateDetails.model_rebuild()
+DataNodeUpdate.model_rebuild()
+RunConfiguration.model_rebuild()
+SourceTableConfiguration.model_rebuild()
+DataNodeStorage.model_rebuild()
+DynamicTableDataSource.model_rebuild()
+DataSource.model_rebuild()

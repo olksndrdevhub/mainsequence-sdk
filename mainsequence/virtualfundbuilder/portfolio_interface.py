@@ -69,10 +69,10 @@ class PortfolioInterface():
 
 
         ## manualely
-        target_portfolio = Portfolio.get_or_none(local_time_serie__id=portfolio_node.data_node_update.id)
+        target_portfolio = Portfolio.get_or_none(data_node_update__id=portfolio_node.data_node_update.id)
         standard_kwargs = dict(portfolio_name=portfolio_node.portfolio_name,
-                               local_time_serie_id=portfolio_node.data_node_update.id,
-                               signal_local_time_serie_id=None,
+                               data_node_update_id=portfolio_node.data_node_update.id,
+                               signal_data_node_update_id=None,
                                is_active=True,
                                calendar_name=portfolio_node.calendar_name,
                                target_portfolio_about=dict(description=portfolio_node.target_portfolio_about,

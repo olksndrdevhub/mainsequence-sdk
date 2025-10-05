@@ -1468,8 +1468,8 @@ class PortfolioMixin:
         payload_data = {
             "portfolio_name": portfolio_name,
             "is_active": is_active,
-            "local_time_serie_id": data_node_update_id,
-            "signal_local_time_serie_id": signal_data_node_update_id,
+            "data_node_update_id": data_node_update_id,
+            "signal_data_node_update_id": signal_data_node_update_id,
             # Using the same ID for local_signal_time_serie_id as specified.
             "calendar_name": calendar_name,
             "target_portfolio_about": target_portfolio_about,

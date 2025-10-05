@@ -17,7 +17,6 @@ import json
 from typing import Dict, List, Union,Optional
 import datetime
 
-from mainsequence.client import DataNodeUpdate
 from mainsequence.logconf import logger
 from ..utils import DATE_FORMAT, make_request, set_types_in_table
 import os
