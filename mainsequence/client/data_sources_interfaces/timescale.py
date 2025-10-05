@@ -131,7 +131,7 @@ def direct_data_from_db(local_metadata: dict, connection_uri: str,
         Data from the table as a pandas DataFrame, optionally filtered by date range.
     """
     import_psycopg2()
-    metadata=local_metadata.remote_table
+    metadata=local_metadata.data_node_storage
     def fast_table_dump(connection_config, table_name, ):
         query = f"COPY {table_name} TO STDOUT WITH CSV HEADER"
 
@@ -184,7 +184,7 @@ def direct_data_from_db(local_metadata: dict, connection_uri: str,
     return data
 
 
-def direct_table_update(metadata:"DynamicTableMetaData", serialized_data_frame: pd.DataFrame, overwrite: bool,
+def direct_table_update(metadata:"DataNodeStorage", serialized_data_frame: pd.DataFrame, overwrite: bool,
                         grouped_dates,
                          table_is_empty: bool,
                         time_series_orm_db_connection: Union[str, None] = None,
@@ -388,7 +388,7 @@ def direct_table_update(metadata:"DynamicTableMetaData", serialized_data_frame: 
 
 def process_and_update_table(
         serialized_data_frame,
-        local_metadata: "LocalTimeSerie",
+        local_metadata: "DataNodeUpdate",
         grouped_dates: List,
         data_source: object,
         index_names: List[str],
@@ -403,7 +403,7 @@ def process_and_update_table(
 
     Args:
         serialized_data_frame (pd.DataFrame): The DataFrame to process and update.
-        metadata (DynamicTableMetaData): Metadata about the table, including table configuration.
+        metadata (DataNodeStorage): Metadata about the table, including table configuration.
         grouped_dates (list): List of grouped dates to assist with the update.
         data_source (object): A data source object with a `get_connection_uri` method.
         index_names (list): List of index column names.
@@ -416,7 +416,7 @@ def process_and_update_table(
     """
     import_psycopg2()
     JSON_COMPRESSED_PREFIX=JSON_COMPRESSED_PREFIX or []
-    metadata=local_metadata.remote_table
+    metadata=local_metadata.data_node_storage
     if "unique_identifier" in serialized_data_frame.columns:
         serialized_data_frame['unique_identifier'] = serialized_data_frame['unique_identifier'].astype(str)
 

@@ -5,9 +5,9 @@ import os
 from mainsequence.logconf import logger
 
 
-from mainsequence.client import (LocalTimeSerie, UniqueIdentifierRangeMap,
+from mainsequence.client import (DataNodeUpdate, UniqueIdentifierRangeMap,
                                  LocalTimeSeriesDoesNotExist,
-                                 DynamicTableDoesNotExist, DynamicTableDataSource, TDAG_CONSTANTS as CONSTANTS, DynamicTableMetaData,
+                                 DynamicTableDoesNotExist, DynamicTableDataSource, TDAG_CONSTANTS as CONSTANTS, DataNodeStorage,
                                  UpdateStatistics, DoesNotExist)
 
 from mainsequence.client.models_tdag import  LocalTimeSerieUpdateDetails
@@ -102,7 +102,7 @@ class APIPersistManager:
 
 
     @property
-    def metadata(self) -> DynamicTableMetaData:
+    def metadata(self) -> DataNodeStorage:
         """Lazily block and cache the result if needed."""
         if not hasattr(self, '_metadata_cached'):
             # This call blocks until the future is resolved.
@@ -115,7 +115,7 @@ class APIPersistManager:
         Sets the result or exception on the future object.
         """
         try:
-            result = DynamicTableMetaData.get_or_none(storage_hash=self.storage_hash,
+            result = DataNodeStorage.get_or_none(storage_hash=self.storage_hash,
                                                 data_source__id=self.data_source_id,
                                                 include_relations_detail=True
             )
@@ -159,7 +159,7 @@ class PersistManager:
                  description: Optional[str] = None,
                  class_name: Optional[str] = None,
                  metadata: Optional[Dict] = None,
-                 local_metadata: Optional[LocalTimeSerie] = None
+                 local_metadata: Optional[DataNodeUpdate] = None
                  ):
         """
         Initializes the PersistManager.
@@ -176,7 +176,7 @@ class PersistManager:
         self.update_hash: str = update_hash
         if local_metadata is not None and metadata is None:
             # query remote storage_hash
-            metadata = local_metadata.remote_table
+            metadata = local_metadata.data_node_storage
         self.description: Optional[str] = description
         self.logger = logger
 
@@ -185,14 +185,14 @@ class PersistManager:
 
         # Private members for managing lazy asynchronous retrieval.
         self._local_metadata_future: Optional[Future] = None
-        self._local_metadata_cached: Optional[LocalTimeSerie] = None
+        self._local_metadata_cached: Optional[DataNodeUpdate] = None
         self._local_metadata_lock = threading.Lock()
-        self._metadata_cached: Optional[DynamicTableMetaData] = None
+        self._metadata_cached: Optional[DataNodeStorage] = None
 
         if self.update_hash is not None:
             self.synchronize_metadata(local_metadata=local_metadata)
 
-    def synchronize_metadata(self, local_metadata: Optional[LocalTimeSerie]) -> None:
+    def synchronize_metadata(self, local_metadata: Optional[DataNodeUpdate]) -> None:
         if local_metadata is not None:
             self.set_local_metadata(local_metadata)
         else:
@@ -215,17 +215,17 @@ class PersistManager:
         else:
             return TimeScaleLocalPersistManager(data_source=data_source, *args, **kwargs)
 
-    def set_local_metadata(self, local_metadata: LocalTimeSerie) -> None:
+    def set_local_metadata(self, local_metadata: DataNodeUpdate) -> None:
         """
         Caches the local metadata object for lazy queries
 
         Args:
-            local_metadata: The LocalTimeSerie object to cache.
+            local_metadata: The DataNodeUpdate object to cache.
         """
         self._local_metadata_cached = local_metadata
 
     @property
-    def local_metadata(self) -> LocalTimeSerie:
+    def local_metadata(self) -> DataNodeUpdate:
         """Lazily block and retrieve the local metadata, caching the result."""
         with self._local_metadata_lock:
             if self._local_metadata_cached is None:
@@ -239,19 +239,19 @@ class PersistManager:
 
             # Define a callback that will launch set_local_metadata_lazy after the remote update is complete.
     @property
-    def metadata(self) -> Optional[DynamicTableMetaData]:
+    def metadata(self) -> Optional[DataNodeStorage]:
         """
         Lazily retrieves and returns the remote metadata.
         """
         if self.local_metadata is None:
             return None
-        if self.local_metadata.remote_table is not None:
-            if self.local_metadata.remote_table.sourcetableconfiguration is not None:
-                if self.local_metadata.remote_table.build_meta_data.get("initialize_with_default_partitions",True) == False:
-                    if self.local_metadata.remote_table.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
+        if self.local_metadata.data_node_storage is not None:
+            if self.local_metadata.data_node_storage.sourcetableconfiguration is not None:
+                if self.local_metadata.data_node_storage.build_meta_data.get("initialize_with_default_partitions",True) == False:
+                    if self.local_metadata.data_node_storage.data_source.related_resource_class_type in CONSTANTS.DATA_SOURCE_TYPE_TIMESCALEDB:
                         self.logger.warning("Default Partitions will not be initialized ")
 
-        return self.local_metadata.remote_table
+        return self.local_metadata.data_node_storage
 
     @property
     def local_build_configuration(self) -> Dict:
@@ -295,7 +295,7 @@ class PersistManager:
         def _get_or_none_local_metadata():
             """Perform the REST request asynchronously."""
             try:
-                result = LocalTimeSerie.get_or_none(
+                result = DataNodeUpdate.get_or_none(
                     update_hash=self.update_hash,
                     remote_table__data_source__id=self.data_source.id,
                     include_relations_detail=include_relations_detail
@@ -325,7 +325,7 @@ class PersistManager:
             is_api: True if the target is an APIDataNode
         """
         if not is_api:
-            self.local_metadata.depends_on_connect(target_time_serie_id=new_ts.local_time_serie.id)
+            self.local_metadata.depends_on_connect(target_time_serie_id=new_ts.data_node_update.id)
         else:
             try:
                 self.local_metadata.depends_on_connect_to_api_table(target_table_id=new_ts.local_persist_manager.metadata.id)
@@ -444,7 +444,7 @@ class PersistManager:
     @property
     def update_details(self) -> Optional[LocalTimeSerieUpdateDetails]:
         """Returns the update details associated with the local time series."""
-        return self.local_metadata.localtimeserieupdatedetails
+        return self.local_metadata.update_details
 
     @property
     def run_configuration(self) -> Optional[Dict]:
@@ -462,7 +462,7 @@ class PersistManager:
         """
         Updates the source code and git hash for the remote table.
         """
-        self.local_metadata.remote_table = self.metadata.patch(
+        self.local_metadata.data_node_storage = self.metadata.patch(
             time_serie_source_code_git_hash=git_hash_id,
             time_serie_source_code=source_code,
         )
@@ -518,8 +518,8 @@ class PersistManager:
         def _patch_build_configuration():
             """Helper function for patching build configuration asynchronously."""
             try:
-                # Execute the patch operation; this method is expected to return a LocalTimeSerie-like instance.
-                result = DynamicTableMetaData.patch_build_configuration(
+                # Execute the patch operation; this method is expected to return a DataNodeUpdate-like instance.
+                result = DataNodeStorage.patch_build_configuration(
                     remote_table_patch=kwargs,
                     data_source_id=self.data_source.id,
                     build_meta_data=remote_build_metadata,
@@ -579,7 +579,7 @@ class PersistManager:
                               )
 
 
-                dtd_metadata = DynamicTableMetaData.get_or_create(**kwargs)
+                dtd_metadata = DataNodeStorage.get_or_create(**kwargs)
                 storage_hash = dtd_metadata.storage_hash
             except Exception as e:
                 self.logger.exception(f"{storage_hash} Could not set meta data in DB for P")
@@ -602,7 +602,7 @@ class PersistManager:
         if local_build_configuration is None:
 
             logger.debug(f"local_metadata {self.update_hash} does not exist creating")
-            local_update = LocalTimeSerie.get_or_none(update_hash=self.update_hash,
+            local_update = DataNodeUpdate.get_or_none(update_hash=self.update_hash,
                                                        remote_table__data_source__id=self.data_source.id)
             if local_update is None:
                 local_build_metadata = local_configuration[
@@ -615,7 +615,7 @@ class PersistManager:
                     data_source_id=self.data_source.id
                 )
 
-                local_metadata = LocalTimeSerie.get_or_create(**metadata_kwargs,)
+                local_metadata = DataNodeUpdate.get_or_create(**metadata_kwargs,)
             else:
                 local_metadata = local_update
 
@@ -648,7 +648,7 @@ class PersistManager:
         def _update_task():
             try:
                 # Run the remote build/update details task.
-                self.local_metadata.remote_table.build_or_update_update_details(**update_kwargs)
+                self.local_metadata.data_node_storage.build_or_update_update_details(**update_kwargs)
                 future.set_result(True)  # Signal success
             except Exception as exc:
                 future.set_exception(exc)

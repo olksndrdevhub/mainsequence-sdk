@@ -15,7 +15,7 @@ import time
 
 from enum import IntEnum, Enum
 from decimal import Decimal
-from mainsequence.client import LocalTimeSerie
+from mainsequence.client import DataNodeUpdate
 
 from .base import BasePydanticModel, BaseObjectOrm, MARKETS_CONSTANTS as CONSTANTS, TDAG_ENDPOINT, API_ENDPOINT, HtmlSaveException
 from .utils import AuthLoaders, make_request, DoesNotExist, request_to_datetime, DATE_FORMAT
@@ -1427,8 +1427,8 @@ class PortfolioAbout(TypedDict):
 class PortfolioMixin:
     id: Optional[int] = None
     is_active: bool = False
-    local_time_serie: Optional['LocalTimeSerie']
-    signal_local_time_serie: Optional['LocalTimeSerie']
+    data_node_update: Optional['DataNodeUpdate']
+    signal_data_node_update: Optional['DataNodeUpdate']
     follow_account_rebalance: bool = False
     comparable_portfolios: Optional[List[int]] = None
     backtest_table_price_column_name: Optional[str] = Field(None, max_length=20)
@@ -1454,8 +1454,8 @@ class PortfolioMixin:
     def create_from_time_series(
             cls,
             portfolio_name: str,
-            local_time_serie_id: int,
-            signal_local_time_serie_id: int,
+            data_node_update_id: int,
+            signal_data_node_update_id: int,
             is_active: bool,
             calendar_name: str,
             target_portfolio_about: PortfolioAbout,
@@ -1468,8 +1468,8 @@ class PortfolioMixin:
         payload_data = {
             "portfolio_name": portfolio_name,
             "is_active": is_active,
-            "local_time_serie_id": local_time_serie_id,
-            "signal_local_time_serie_id": signal_local_time_serie_id,
+            "local_time_serie_id": data_node_update_id,
+            "signal_local_time_serie_id": signal_data_node_update_id,
             # Using the same ID for local_signal_time_serie_id as specified.
             "calendar_name": calendar_name,
             "target_portfolio_about": target_portfolio_about,
@@ -1512,9 +1512,9 @@ class PortfolioMixin:
     def get_historical_weights(self,
                                start_date_timestamp:float,end_date_timestamp:float,
                                timeout=None)->Dict[str, float]:
-        if self.local_time_serie is None:
+        if self.data_node_update is None:
             print("this portfolio does not have a weights table")
-        self.local_time_serie
+        self.data_node_update
 
 
 class Portfolio(PortfolioMixin, BaseObjectOrm, BasePydanticModel):

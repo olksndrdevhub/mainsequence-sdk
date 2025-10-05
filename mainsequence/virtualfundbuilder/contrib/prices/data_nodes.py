@@ -8,7 +8,7 @@ import datetime
 import pandas_market_calendars as mcal
 
 from mainsequence.tdag.data_nodes import DataNode, WrapperDataNode, APIDataNode
-from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, LocalTimeSerie, DynamicTableDataSource,
+from mainsequence.client import (CONSTANTS, LocalTimeSeriesDoesNotExist, DataNodeUpdate, DynamicTableDataSource,
                                   UpdateStatistics, AssetCategory, AssetTranslationTable, AssetTranslationRule, AssetFilter
                                  )
 from mainsequence.client import MARKETS_CONSTANTS, ExecutionVenue

@@ -34,7 +34,7 @@ from abc import ABC
 
 from typing import Union
 
-from mainsequence.client import LocalTimeSerie,  CONSTANTS, \
+from mainsequence.client import DataNodeUpdate,  CONSTANTS, \
     DynamicTableDataSource, AssetTranslationTable
 
 from functools import wraps
@@ -106,7 +106,7 @@ class DataAccessMixin:
 
     def __repr__(self) -> str:
         try:
-            local_id = self.local_time_serie.id
+            local_id = self.data_node_update.id
         except:
             local_id = 0
         repr = self.__class__.__name__ + f" {os.environ['TDAG_ENDPOINT']}/local-time-series/details/?local_time_serie_id={local_id}"
@@ -350,14 +350,14 @@ class APIDataNode(DataAccessMixin):
 
 
     @classmethod
-    def build_from_local_time_serie(cls, source_table: "LocalTimeSerie") -> "APIDataNode":
+    def build_from_local_time_serie(cls, source_table: "DataNodeUpdate") -> "APIDataNode":
         return cls(data_source_id=source_table.data_source.id,
                    storage_hash=source_table.storage_hash
                    )
 
     @classmethod
     def build_from_table_id(cls, table_id: str) -> "APIDataNode":
-        table = ms_client.DynamicTableMetaData.get(id=table_id)
+        table = ms_client.DataNodeStorage.get(id=table_id)
         ts = cls(
             data_source_id=table.data_source.id,
             storage_hash=table.storage_hash
@@ -367,7 +367,7 @@ class APIDataNode(DataAccessMixin):
     @classmethod
     def build_from_identifier(cls, identifier: str) -> "APIDataNode":
 
-        table = ms_client.DynamicTableMetaData.get(identifier=identifier)
+        table = ms_client.DataNodeStorage.get(identifier=identifier)
         ts = cls(
             data_source_id=table.data_source.id,
             storage_hash=table.storage_hash
@@ -548,7 +548,7 @@ class DataNode(DataAccessMixin,ABC):
         - init_meta
         - build_meta_data
 
-        Each DataNode instance will create a update_hash and a LocalTimeSerie instance in the Data Engine by uniquely hashing
+        Each DataNode instance will create a update_hash and a DataNodeUpdate instance in the Data Engine by uniquely hashing
         the same arguments as the table but excluding the arguments inside _LOCAL_KWARGS_TO_IGNORE
 
 
@@ -715,12 +715,12 @@ class DataNode(DataAccessMixin,ABC):
 
 
     @property
-    def local_time_serie(self) -> LocalTimeSerie:
+    def data_node_update(self) -> DataNodeUpdate:
         """The local time series metadata object."""
         return self.local_persist_manager.local_metadata
 
     @property
-    def metadata(self) -> "DynamicTableMetaData":
+    def metadata(self) -> "DataNodeStorage":
         return self.local_persist_manager.metadata
 
 
@@ -911,7 +911,7 @@ class DataNode(DataAccessMixin,ABC):
         self.depth_df = depth_df
         if not depth_df.empty:
             self.dependencies_df = depth_df[
-                depth_df["local_time_serie_id"] != self.local_time_serie.id].copy()
+                depth_df["data_node_update_id"] != self.data_node_update.id].copy()
         else:
             self.dependencies_df = pd.DataFrame()
 
@@ -1108,7 +1108,7 @@ class WrapperDataNode(DataNode):
             """
             from mainsequence.client import DoesNotExist
             try:
-                metadata = ms_client.DynamicTableMetaData.get(identifier=table_identifier)
+                metadata = ms_client.DataNodeStorage.get(identifier=table_identifier)
 
             except DoesNotExist as e:
                 raise e
