@@ -80,7 +80,7 @@ INDEX_CONFIGS: Dict[str, Dict] = {
     ),
     # Add more identifiers here as needed.
     _C.get_value(name="TIIE_OVERNIGHT_UID"): dict(
-        curve_uid=_C.get_value(name="TIIE_28_ZERO_CURVE"),
+        curve_uid=_C.get_value(name="ZERO_CURVE__VALMER_TIIE_28"),
         calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
         day_counter=ql.Actual360(),
         currency=ql.MXNCurrency(),
@@ -90,7 +90,7 @@ INDEX_CONFIGS: Dict[str, Dict] = {
         end_of_month=False,
     ),
     _C.get_value(name="CETE_28_UID"): dict(
-        curve_uid=_C.get_value(name="M_BONOS_ZERO_CURVE"),
+        curve_uid=_C.get_value(name="ZERO_CURVE__BANXICO_M_BONOS_OTR"),
         calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
         day_counter=ql.Actual360(),  # BONOS accrue on Act/360
         currency=ql.MXNCurrency(),
@@ -100,7 +100,7 @@ INDEX_CONFIGS: Dict[str, Dict] = {
         end_of_month=False,  # Irrelevant when scheduling by days
     ),
     _C.get_value(name="CETE_91_UID"): dict(
-        curve_uid=_C.get_value(name="M_BONOS_ZERO_CURVE"),
+        curve_uid=_C.get_value(name="ZERO_CURVE__BANXICO_M_BONOS_OTR"),
         calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
         day_counter=ql.Actual360(),  # BONOS accrue on Act/360
         currency=ql.MXNCurrency(),
@@ -111,7 +111,18 @@ INDEX_CONFIGS: Dict[str, Dict] = {
     ),
 
     _C.get_value(name="CETE_182_UID"): dict(
-        curve_uid=_C.get_value(name="M_BONOS_ZERO_CURVE"),
+        curve_uid=_C.get_value(name="ZERO_CURVE__BANXICO_M_BONOS_OTR"),
+        calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
+        day_counter=ql.Actual360(),  # BONOS accrue on Act/360
+        currency=ql.MXNCurrency(),
+        period=ql.Period(182, ql.Days),  # Coupons every 182 days
+        settlement_days=1,  # T+1 in Mexico since May 27–28, 2024
+        bdc=ql.Following,  # “next banking business day” => Following
+        end_of_month=False,  # Irrelevant when scheduling by days
+    ),
+
+    _C.get_value(name="UST"): dict(
+        curve_uid=_C.get_value(name="ZERO_CURVE__UST_CMT_ZERO_CURVE_UID"),
         calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
         day_counter=ql.Actual360(),  # BONOS accrue on Act/360
         currency=ql.MXNCurrency(),
