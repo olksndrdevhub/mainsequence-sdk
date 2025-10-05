@@ -604,7 +604,7 @@ class InterpolatedPrices(DataNode):
         return required
 
     def run_post_update_routines(self, error_on_last_update):
-        if not self.local_persist_manager.metadata.protect_from_deletion:
+        if not self.local_persist_manager.data_node_storage.protect_from_deletion:
             self.local_persist_manager.protect_from_deletion()
 
     def _transform_raw_data_to_upsampled_df(
