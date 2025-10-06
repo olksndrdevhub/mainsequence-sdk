@@ -44,7 +44,7 @@ We’ll source the data from **polygon.io**.
 
 A complete `DataNode` implementation lives in the public data connectors repo:  
 https://github.com/mainsequence-sdk/data-connectors  
-Look under `data_connectors/prices/polygon/data_node.py`.
+Look under `data_connectors/prices/polygon/data_nodes.py`.
 
 ```python
 class PolygonUSTCMTYields(PolygonEconomyNode):
@@ -180,6 +180,7 @@ _C.create_constants_if_not_exist(constants_to_create)
 ## One‑Shot Runner
 
 Here’s how everything looks if you want to run it all at once:
+Add this code to new file in `scripts/run_ust_cmt_and_zero_curve.py`:
 
 ```python
 from data_connectors.prices.polygon.data_nodes import PolygonUSTCMTYields
@@ -197,3 +198,43 @@ config = CurveConfig(
 node = DiscountCurves(curve_config=config)
 node.run(debug_mode=True, force_update=True)
 ```
+
+Now you can run the script directly:
+
+```bash
+python scripts/run_ust_cmt_and_zero_curve.py
+```
+
+Or add new entry to your `.vscode\launch.json` file in `configurations` list:
+
+(Windows):
+```json
+{
+    "name": "Debug ust_cmt_and_zero_curve",
+    "type": "debugpy",
+    "request": "launch",
+    "program": "${workspaceFolder}\\scripts\\run_ust_cmt_and_zero_curve.py",
+    "console": "integratedTerminal",
+    "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+    },
+    "python": "${workspaceFolder}\\.venv\\Scripts\\python.exe"
+}
+```
+
+(macOS/Linux):
+```json
+{
+    "name": "Debug ust_cmt_and_zero_curve",
+    "type": "debugpy",
+    "request": "launch",
+    "program": "${workspaceFolder}/scripts/run_ust_cmt_and_zero_curve.py",
+    "console": "integratedTerminal",
+    "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+    },
+    "python": "${workspaceFolder}/.venv/bin/python"
+}
+```
+
+Then run it from the Run and Debug tab in VS Code.
