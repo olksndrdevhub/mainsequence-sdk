@@ -52,8 +52,8 @@ _C.create_constants_if_not_exist(constants_to_create)
 # No tenor tokens; we store the QuantLib Period directly.
 
 INDEX_CONFIGS: Dict[str, Dict] = {
-    _C.get_value(name="TIIE_28_UID"): dict(
-        curve_uid=_C.get_value(name="TIIE_28_ZERO_CURVE"),
+    _C.get_value(name="REFERENCE_RATE__TIIE_28"): dict(
+        curve_uid=_C.get_value(name="ZERO_CURVE__VALMER_TIIE_28"),
         calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
         day_counter=ql.Actual360(),
         currency=(ql.MXNCurrency() if hasattr(ql, "MXNCurrency") else ql.USDCurrency()),
@@ -62,8 +62,8 @@ INDEX_CONFIGS: Dict[str, Dict] = {
         bdc=ql.ModifiedFollowing,
         end_of_month=False,
     ),
-    _C.get_value(name="TIIE_91_UID"): dict(
-        curve_uid=_C.get_value(name="TIIE_28_ZERO_CURVE"),
+    _C.get_value(name="REFERENCE_RATE__TIIE_91"): dict(
+        curve_uid=_C.get_value(name="ZERO_CURVE__VALMER_TIIE_28"),
         calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
         day_counter=ql.Actual360(),
         currency=ql.MXNCurrency(),
@@ -72,8 +72,8 @@ INDEX_CONFIGS: Dict[str, Dict] = {
         bdc=ql.ModifiedFollowing,
         end_of_month=False,
     ),
-    _C.get_value(name="TIIE_182_UID"): dict(
-        curve_uid=_C.get_value(name="TIIE_28_ZERO_CURVE"),
+    _C.get_value(name="REFERENCE_RATE__TIIE_182"): dict(
+        curve_uid=_C.get_value(name="ZERO_CURVE__VALMER_TIIE_28"),
         calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
         day_counter=ql.Actual360(),
         currency=ql.MXNCurrency(),
@@ -83,7 +83,7 @@ INDEX_CONFIGS: Dict[str, Dict] = {
         end_of_month=False,
     ),
     # Add more identifiers here as needed.
-    _C.get_value(name="TIIE_OVERNIGHT_UID"): dict(
+    _C.get_value(name="REFERENCE_RATE__TIIE_OVERNIGHT"): dict(
         curve_uid=_C.get_value(name="ZERO_CURVE__VALMER_TIIE_28"),
         calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
         day_counter=ql.Actual360(),
@@ -93,7 +93,7 @@ INDEX_CONFIGS: Dict[str, Dict] = {
         bdc=ql.ModifiedFollowing,
         end_of_month=False,
     ),
-    _C.get_value(name="CETE_28_UID"): dict(
+    _C.get_value(name="REFERENCE_RATE__CETE_28"): dict(
         curve_uid=_C.get_value(name="ZERO_CURVE__BANXICO_M_BONOS_OTR"),
         calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
         day_counter=ql.Actual360(),  # BONOS accrue on Act/360
@@ -103,7 +103,7 @@ INDEX_CONFIGS: Dict[str, Dict] = {
         bdc=ql.Following,  # “next banking business day” => Following
         end_of_month=False,  # Irrelevant when scheduling by days
     ),
-    _C.get_value(name="CETE_91_UID"): dict(
+    _C.get_value(name="REFERENCE_RATE__CETE_91"): dict(
         curve_uid=_C.get_value(name="ZERO_CURVE__BANXICO_M_BONOS_OTR"),
         calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
         day_counter=ql.Actual360(),  # BONOS accrue on Act/360
@@ -114,7 +114,7 @@ INDEX_CONFIGS: Dict[str, Dict] = {
         end_of_month=False,  # Irrelevant when scheduling by days
     ),
 
-    _C.get_value(name="CETE_182_UID"): dict(
+    _C.get_value(name="REFERENCE_RATE__CETE_182"): dict(
         curve_uid=_C.get_value(name="ZERO_CURVE__BANXICO_M_BONOS_OTR"),
         calendar=(ql.Mexico() if hasattr(ql, "Mexico") else ql.TARGET()),
         day_counter=ql.Actual360(),  # BONOS accrue on Act/360
@@ -125,13 +125,13 @@ INDEX_CONFIGS: Dict[str, Dict] = {
         end_of_month=False,  # Irrelevant when scheduling by days
     ),
 
-    _C.get_value(name="UST"): dict(
+    _C.get_value(name="REFERENCE_RATE__UST"): dict(
         curve_uid=_C.get_value(name="ZERO_CURVE__UST_CMT_ZERO_CURVE_UID"),
         calendar=ql.UnitedStates(ql.UnitedStates.GovernmentBond),
         day_counter=ql.ActualActual(ql.ActualActual.Bond),  # Treasuries accrue Act/Act (Bond/ICMA)
         currency=ql.USDCurrency(),
         period=ql.Period(6, ql.Months),  # Semiannual coupons
-        settlement_days=1,  # T+1 in Mexico since May 27–28, 2024
+        settlement_days=1,  # T+1
         bdc=ql.Following,  # “next banking business day” => Following
         end_of_month=False,  # Irrelevant when scheduling by days
     ),
