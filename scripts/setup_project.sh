@@ -103,8 +103,8 @@ if [ ! -f "${ROOT_PROJECT_PATH}/requirements.txt" ]; then
 
 
   # ensure src/<package>/__init__.py exists for packaging
-  mkdir -p "$ROOT_PROJECT_PATH/src/data_notes"
-  [ -f "$ROOT_PROJECT_PATH/src/data_notes/__init__.py" ] || echo '__all__ = []' > "$ROOT_PROJECT_PATH/src/data_notes/__init__.py"
+  mkdir -p "$ROOT_PROJECT_PATH/src/data_nodes"
+  [ -f "$ROOT_PROJECT_PATH/src/data_nodes/__init__.py" ] || echo '__all__ = []' > "$ROOT_PROJECT_PATH/src/data_nodes/__init__.py"
 
   mkdir -p "$ROOT_PROJECT_PATH/src/scripts"
 
@@ -139,8 +139,8 @@ else
   pull_changes
 
   # Ensure templated files exist after pulling and commit if anything changed
-  mkdir -p "$ROOT_PROJECT_PATH/src/data_notes"
-  [ -f "$ROOT_PROJECT_PATH/src/data_notes/__init__.py" ] || echo '__all__ = []' > "$ROOT_PROJECT_PATH/src/data_notes/__init__.py"
+  mkdir -p "$ROOT_PROJECT_PATH/src/data_nodes"
+  [ -f "$ROOT_PROJECT_PATH/src/data_nodes/__init__.py" ] || echo '__all__ = []' > "$ROOT_PROJECT_PATH/src/data_nodes/__init__.py"
   PROJECT_NAME="$PROJECT_NAME" ensure_file_from_template "$PYPROJECT_TEMPLATE" "$ROOT_PROJECT_PATH/pyproject.toml" "${OVERWRITE_TEMPLATES:-false}"
   PROJECT_NAME="$PROJECT_NAME" ensure_file_from_template "$README_TEMPLATE"    "$ROOT_PROJECT_PATH/README.md"      "${OVERWRITE_TEMPLATES:-false}"
   git add -A
