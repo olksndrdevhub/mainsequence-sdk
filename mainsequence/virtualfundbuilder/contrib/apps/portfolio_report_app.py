@@ -39,7 +39,7 @@ class PortfolioReport(HtmlApp):
         for portfolio_id in self.configuration.portfolio_ids:
             try:
                 portfolio = Portfolio.get(id=portfolio_id)
-                data = portfolio.local_time_serie.get_data_between_dates_from_api()
+                data = portfolio.data_node_update.get_data_between_dates_from_api()
                 data['time_index'] = pd.to_datetime(data['time_index'])
                 report_data = data[data['time_index'] >= start_date].copy().sort_values('time_index')
 

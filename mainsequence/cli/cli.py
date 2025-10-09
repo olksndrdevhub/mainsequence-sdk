@@ -231,7 +231,6 @@ def project_open(project_id: int):
 @project.command("delete-local")
 def project_delete_local(
     project_id: int,
-    permanent: bool = typer.Option(False, "--permanent", help="Also remove the folder (dangerous)")
 ):
     """Unlink the mapped folder, optionally delete it."""
     mapped = cfg.remove_link(project_id)
@@ -240,12 +239,10 @@ def project_delete_local(
         return
     p = pathlib.Path(mapped)
     if p.exists():
-        if permanent:
-            import shutil
-            shutil.rmtree(mapped, ignore_errors=True)
-            typer.secho(f"Deleted: {mapped}", fg=typer.colors.YELLOW)
-        else:
-            typer.secho(f"Unlinked mapping (kept folder): {mapped}", fg=typer.colors.GREEN)
+        import shutil
+        shutil.rmtree(mapped, ignore_errors=True)
+        typer.secho(f"Deleted: {mapped}", fg=typer.colors.YELLOW)
+
     else:
         typer.echo("Mapping removed; folder already absent.")
 

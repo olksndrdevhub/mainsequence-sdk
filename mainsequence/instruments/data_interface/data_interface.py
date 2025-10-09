@@ -9,8 +9,8 @@ import pandas as pd
 from pathlib import Path
 
 
-DISCOUNT_CURVES_TABLE=msc.Constant.get_or_none(name="DISCOUNT_CURVES_TABLE")
-REFERENCE_RATES_FIXING_TABLE = msc.Constant.get_or_none(name="REFERENCE_RATES_FIXING_TABLE")
+DISCOUNT_CURVES_TABLE=msc.Constant.get_value(name="DISCOUNT_CURVES_TABLE")
+REFERENCE_RATES_FIXING_TABLE = msc.Constant.get_value(name="REFERENCE_RATES_FIXING_TABLE")
 
 assert DISCOUNT_CURVES_TABLE is not None, "DISCOUNT_CURVES_TABLE not found in constants"
 assert REFERENCE_RATES_FIXING_TABLE is not None, "REFERENCE_RATES_FIXING_TABLE not found in constants"
@@ -294,7 +294,7 @@ class MSInterface():
         # for test purposes only get lats observations
         update_statistics = data_node.get_update_statistics()
         target_date = update_statistics.asset_time_statistics[curve_name]
-        print("REMOVE ABOCVE ONLU FOR TESTING")
+        print("REMOVE ABOCVE ONLY FOR TESTING")
 
 
         try:
@@ -336,7 +336,6 @@ class MSInterface():
         :return:
         """
         from mainsequence.tdag import APIDataNode
-        from mainsequence.instruments.settings import REFERENCE_RATES_FIXING_TABLE
 
         data_node = APIDataNode.build_from_identifier(identifier=REFERENCE_RATES_FIXING_TABLE)
 

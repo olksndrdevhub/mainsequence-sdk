@@ -177,6 +177,43 @@ constants_to_create = dict(
 
 _C.create_constants_if_not_exist(constants_to_create)
 ```
+
+## Interest rate fixing DataNode
+
+So far, we’ve used the `zero_curve` registry helper from `data_connectors` to model future cash flows. However, with most pricing libraries — including QuantLib — we also need past fixing dates to price cash flows whose fixings occurred in the past.
+
+Below, let’s look at `data_connectors/prices/fred/data_nodes.py`. Here we have a data node designed to integrate economic data from the Federal Reserve Bank of St. Louis (FRED).
+
+Take the code below and run it in your tutorial project.
+
+
+```python
+def run_fred_fixing():
+    from src.data_nodes.interest_rates.nodes import FixingRatesNode, FixingRateConfig, RateConfig
+    from mainsequence.client import Constant as _C
+
+    USD_SOFR = _C.get_value(name="REFERENCE_RATE__USD_SOFR")
+    USD_EFFR = _C.get_value(name="REFERENCE_RATE__USD_EFFR")
+    USD_OBFR = _C.get_value(name="REFERENCE_RATE__USD_OBFR")
+    fixing_config = FixingRateConfig(rates_config_list=[
+    RateConfig(unique_identifier=USD_SOFR,
+               name=f"Secured Overnight Financing Rate "),
+    RateConfig(unique_identifier=USD_EFFR,
+               name=f"Effective Federal Funds Rate "),
+    RateConfig(unique_identifier=USD_OBFR,
+               name=f"Overnight Bank Funding Rate"),
+        ])
+    ts = FixingRatesNode(rates_config=fixing_config)
+    ts.run(debug_mode=True, force_update=True)
+
+    ts = FixingRatesNode(rates_config=fixing_config)
+    ts.run(debug_mode=True, force_update=True)
+
+```
+
+Important: Don’t forget to copy the interest_rate folder from data_connectors.
+
+
 ## One‑Shot Runner
 
 Here’s how everything looks if you want to run it all at once:
