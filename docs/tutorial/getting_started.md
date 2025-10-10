@@ -171,7 +171,11 @@ export VFB_PROJECT_PATH="/home/user/mainsequence/my_organization/projects/tutori
 
 **Key concepts:** data DAGs, `DataNode`, dependencies, `update_hash`, and `storage_hash`.
 
-Main Sequence encourages you to express workflows as data DAGs—composing work into small steps called **data nodes**, where each node performs a transformation. Create a new file at `src\data_nodes\example_nodes.py` (Windows) or `src/data_nodes/example_nodes.py` (macOS/Linux) and define the first node, `DailyRandomNumber`, by extending `DataNode`.
+Main Sequence encourages you to model workflows as data DAGs (directed acyclic graphs), composing your work into small steps called **data nodes**, each performing a single transformation.
+
+Create a new file at `src\data_nodes\example_nodes.py` (Windows) or `src/data_nodes/example_nodes.py` (macOS/Linux), and define your first node, `DailyRandomNumber`, by subclassing `DataNode`.
+
+You can find the complete code for the subsequent data nodes in the [examples folder](https://github.com/mainsequence-sdk/mainsequence-sdk/tree/main/examples).
 
 ```python
 from typing import Dict, Union
