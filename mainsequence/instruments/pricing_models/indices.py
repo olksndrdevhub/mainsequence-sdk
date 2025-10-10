@@ -42,11 +42,7 @@ _INDEX_CACHE: Dict[_IndexCacheKey, ql.Index] = {}
 def clear_index_cache() -> None:
     _INDEX_CACHE.clear()
 
-constants_to_create = dict(
-    UST="UST",
-)
 
-_C.create_constants_if_not_exist(constants_to_create)
 # ----------------------------- Config ----------------------------- #
 # Put every supported identifier here with its curve + index construction config.
 # No tenor tokens; we store the QuantLib Period directly.
@@ -125,14 +121,15 @@ INDEX_CONFIGS: Dict[str, Dict] = {
         end_of_month=False,  # Irrelevant when scheduling by days
     ),
 
-    _C.get_value(name="REFERENCE_RATE__UST"): dict(
+
+    _C.get_value(name="REFERENCE_RATE__USD_SOFR"): dict(
         curve_uid=_C.get_value(name="ZERO_CURVE__UST_CMT_ZERO_CURVE_UID"),
-        calendar=ql.UnitedStates(ql.UnitedStates.GovernmentBond),
-        day_counter=ql.ActualActual(ql.ActualActual.Bond),  # Treasuries accrue Act/Act (Bond/ICMA)
+        calendar=ql.UnitedStates(ql.UnitedStates.FederalReserve),
+        day_counter=ql.Actual360(),
         currency=ql.USDCurrency(),
         period=ql.Period(6, ql.Months),  # Semiannual coupons
         settlement_days=1,  # T+1
-        bdc=ql.Following,  # “next banking business day” => Following
+        bdc=ql.ModifiedFollowing,
         end_of_month=False,  # Irrelevant when scheduling by days
     ),
 }
