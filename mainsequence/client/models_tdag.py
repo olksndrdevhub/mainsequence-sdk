@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from asyncio import exceptions
 
 import yaml
 
@@ -33,6 +34,9 @@ import concurrent.futures
 
 from cachetools import TTLCache, cachedmethod
 from operator import attrgetter
+from mainsequence.client  import exceptions
+
+
 
 _default_data_source = None  # Module-level cache
 
@@ -818,7 +822,10 @@ class DataNodeStorage(BasePydanticModel, BaseObjectOrm):
         s = self.build_session()
         r = make_request(s=s, loaders=self.LOADERS, r_type="PATCH", url=url, payload=payload, time_out=time_out)
         if r.status_code != 200:
-            raise Exception(f"Error in request {r.text}")
+            data = r.json()  # guaranteed JSON from your backend
+            if r.status_code == 409:
+                raise exceptions.ConflictError(data["error"])
+            raise exceptions.ApiError(data["error"])
         return self.__class__(**r.json())
 
     @classmethod
