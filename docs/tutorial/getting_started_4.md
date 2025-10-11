@@ -89,15 +89,63 @@ Or even better and simpler - if you not sure that will be able add all needed co
 To fork the repo into new project:
 1. Go to [https://main-sequence.app/projects/](https://main-sequence.app/projects/)
 2. Find project with "data_connectors" name and click on it
-3. in the top right corner you see three dots menu, open it and  click on "Fork Project" button, assing it name like "my_data_connectors" and click on "Fork".
-4. than you can set up new project locally as you done before in prevbious part of tutorial and work with this new project afterwards.
+3. In the top right corner you see three dots menu, open it and  click on "Fork Project" button, assing it name like "my_data_connectors" and click on "Fork".
+4. Than you can set up new project locally as you done before in prevbious part of tutorial and work with this new project afterwards.
+
+Now create a new runner file in `scripts` folder with a name `run_ust_cmt_yields.py` and add this code to it:
+
+```python
+from data_connectors.prices.polygon.data_nodes import PolygonUSTCMTYields
+from mainsequence.client import Constant as _C
+
+data_node = PolygonUSTCMTYields()
+data_node.run(debug_mode=True, force_update=True)
+```
 
 
-> TODO: Add step‑by‑step instructions to fork the public repo and keep a remote pointing to `main-sequence` public.
+Now you need is to get your API key from polygon.io and add it as environment variable `POLYGON_API_KEY` in the `.env` file in the root of your project.
 
-After running the node, you should see the table in the platform:
+Register and request your API key here [https://polygon.io/](https://polygon.io/)
 
-![img.png](img.png)
+```env
+POLYGON_API_KEY="your_polygon_api_key_here"
+```
+
+
+After that you can add a new entry to your `.vscode\launch.json` file in `configurations` list:
+
+(Windows):
+```json
+{
+    "name": "Debug ust_cmt_yields",
+    "type": "debugpy",
+    "request": "launch",
+    "program": "${workspaceFolder}\\scripts\\run_ust_cmt_yields.py",
+    "console": "integratedTerminal",
+    "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+    },
+    "python": "${workspaceFolder}\\.venv\\Scripts\\python.exe"
+}
+```
+(macOS/Linux):
+```json
+{
+    "name": "Debug ust_cmt_yields",
+    "type": "debugpy",
+    "request": "launch",
+    "program": "${workspaceFolder}/scripts/run_ust_cmt_yields.py",
+    "console": "integratedTerminal",
+    "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+    },
+    "python": "${workspaceFolder}/.venv/bin/python"
+}
+```
+
+Then run it from the Run and Debug tab in VS Code.
+
+After running the node, you should see the table in the platform: [https://main-sequence.app/dynamic-table-metadatas/?search=polygonustcmtyields_&storage_hash=&identifier=](https://main-sequence.app/dynamic-table-metadatas/?search=polygonustcmtyields_&storage_hash=&identifier=)
 
 
 ## From CMT Yields to a Zero Curve
@@ -288,12 +336,10 @@ node.run(debug_mode=True, force_update=True)
 
 Add this code to new file `run_ust_cmt_and_zero_curve.py` in the `scripts` folder in your project.
 
-At this point only thing you need is to get your API key from polygon.io and add it as environment variable `POLYGON_API_KEY` in the `.env` file in the root of your project.
-
+Dont forget about Polygon API key in the `.env` file if you not added it before:
 ```env
 POLYGON_API_KEY="your_polygon_api_key_here"
 ```
-
 
 Now you can add a new entry to your `.vscode\launch.json` file in `configurations` list:
 
